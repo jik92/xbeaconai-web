@@ -12,4 +12,9 @@ describe("task state machine", () => {
     const task = { id: "t1", moduleId: "video-remix", title: "测试", status: "failed", progress: 48, failedStage: "analysis", createdAt: 1, updatedAt: 1 } as const;
     expect(transitionTask(task, { type: "RETRY" })).toMatchObject({ status: "queued", progress: 48 });
   });
+
+  test("cancels an active task without discarding its progress", () => {
+    const task = { id: "t2", moduleId: "video-cut", title: "长视频切分", status: "processing", progress: 57, createdAt: 1, updatedAt: 1 } as const;
+    expect(transitionTask(task, { type: "CANCEL" })).toMatchObject({ status: "cancelled", progress: 57 });
+  });
 });
