@@ -58,6 +58,20 @@ test("navigation keeps all twelve modules reachable", async ({ page }) => {
   for (const module of modules) await expect(page.getByRole("link", { name: new RegExp(module.label) })).toBeVisible();
 });
 
+test("人像库 loads, filters and opens a portrait dossier", async ({ page }) => {
+  await page.goto("/assets/portraits");
+  await expect(page.getByRole("heading", { name: "人像库" })).toBeVisible();
+  await expect(page.getByText("1,125").first()).toBeVisible();
+  await page.getByPlaceholder("搜索职业、年龄或人物描述…").fill("养蜂人");
+  await expect(page.getByText(/\d+ 个匹配结果/)).toBeVisible();
+  await page.locator(".portrait-card").first().click();
+  await expect(page.getByText("PORTRAIT DOSSIER")).toBeVisible();
+  await expect(page.getByRole("button", { name: "用于创作" })).toBeVisible();
+  await page.getByRole("button", { name: "用于创作" }).click();
+  await expect(page).toHaveURL(/\/aigc\/video-remix$/);
+  await expect(page.getByText("已从人像库带入")).toBeVisible();
+});
+
 test("口播脚本 completes from validated brief to result preview", async ({ page }) => {
   await page.goto("/aigc/ad-script");
   await page.locator("#product").fill("便携榨汁杯");
