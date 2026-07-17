@@ -8,7 +8,7 @@ export interface ModuleConfig { id: ModuleId; path: string; label: string; group
 
 const module = (config: ModuleConfig) => config;
 export const modules: ModuleConfig[] = [
-  module({ id:"video-remix", path:"/aigc/video-remix", label:"爆款二创", group:"创作工作流", icon:Clapperboard, eyebrow:"热门内容再创作", description:"拆解爆款视频的结构、文案与节奏，保留有效表达并生成符合账号风格的新版本。", steps:["上传爆款","拆解改写","合成视频"], fields:[
+  module({ id:"video-remix", path:"/aigc/video-remix", label:"爆款二创", group:"创作工作流", icon:Clapperboard, eyebrow:"热门内容再创作", description:"拆解爆款视频的结构、文案与节奏，保留有效表达并生成符合账号风格的新版本。", steps:["上传配置","AI 解析","提示词校对","分镜校对","合并成片"], fields:[
     {id:"source",label:"爆款参考视频",kind:"video",required:true,hint:"MP4/MOV，≤ 500MB，建议 15–180 秒"},
     {id:"rewrite",label:"二创方式",kind:"segmented",required:true,options:["智能重构","保留结构","仅改文案"]},
     {id:"persona",label:"出镜数字人",kind:"select",required:true,options:["自然讲解员·宁宁","专业主播·景舟","不使用数字人"]},
