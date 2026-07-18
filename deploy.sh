@@ -16,6 +16,7 @@ readonly LOCK_FILE="/var/lock/xbeaconai-web-deploy.lock"
 readonly API_HEALTH_URL="http://127.0.0.1:8787/api/health"
 readonly APP_ORIGIN="${APP_ORIGIN:-https://app.xbeaconai.com}"
 readonly API_ORIGIN="${API_ORIGIN:-https://api.xbeaconai.com}"
+readonly DIRECT_ORIGIN="${DIRECT_ORIGIN:-http://118.196.101.57}"
 
 log() {
     printf '[%s] %s\n' "$(date '+%F %T')" "$*"
@@ -53,7 +54,7 @@ ensure_runtime_environment() {
     upsert_env "API_HOST" "127.0.0.1"
     upsert_env "API_PORT" "8787"
     upsert_env "YAOZUO_DATA_DIR" "$DATA_DIR"
-    upsert_env "ALLOWED_ORIGINS" "${APP_ORIGIN},${API_ORIGIN}"
+    upsert_env "ALLOWED_ORIGINS" "${APP_ORIGIN},${API_ORIGIN},${DIRECT_ORIGIN}"
     upsert_env "ALLOW_MOCK_FALLBACK" "true"
 }
 
@@ -142,6 +143,9 @@ systemctl reload nginx
 systemctl is-active --quiet nginx
 
 log "验证公网入口..."
+curl --fail --silent --show-error -H "Host: 118.196.101.57" http://127.0.0.1/ >/dev/null
+curl --fail --silent --show-error -H "Host: 118.196.101.57" -H "Origin: $DIRECT_ORIGIN" \
+    http://127.0.0.1/api/health >/dev/null
 curl --fail --silent --show-error --resolve app.xbeaconai.com:443:127.0.0.1 \
     https://app.xbeaconai.com/ >/dev/null
 curl --fail --silent --show-error --resolve api.xbeaconai.com:443:127.0.0.1 -H "Origin: $APP_ORIGIN" \
