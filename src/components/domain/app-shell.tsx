@@ -1,5 +1,5 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { Bell, CircleHelp, Coins, Command, Images, PanelLeftClose, Search, Settings2 } from "lucide-react";
+import { Bell, CircleHelp, Coins, Images, PanelLeftClose, Search, Settings2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { listNotifications } from "@/api/generated/sdk.gen";
 import { APP_CONFIG, isAssetOpen, isModuleOpen } from "@/app/config";
@@ -7,6 +7,7 @@ import { modules } from "@/app/routes";
 import { useAuth } from "@/features/account/auth-context";
 import { AuthScreen } from "@/features/account/auth-screen";
 import { type WorkspacePanel, WorkspacePanelDrawer } from "@/features/account/workspace-panels";
+import { BrandLogo } from "./brand-logo";
 
 export function AppShell() {
   const path = useRouterState({ select: (s) => s.location.pathname });
@@ -30,7 +31,7 @@ export function AppShell() {
     return (
       <main className="auth-page">
         <div className="app-loading">
-          <Command />
+          <BrandLogo className="loading-logo" />
           正在打开{APP_CONFIG.projectName}工作台…
         </div>
       </main>
@@ -40,9 +41,7 @@ export function AppShell() {
     <div className="app-frame">
       <header className="topbar">
         <div className="brand">
-          <div className="brand-mark">
-            <Command size={19} />
-          </div>
+          <BrandLogo className="brand-mark" />
           <div>
             <b>{APP_CONFIG.projectName}</b>
             <span>CREATIVE OPS</span>

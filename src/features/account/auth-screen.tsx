@@ -1,6 +1,7 @@
-import { Command, Eye, EyeOff, LoaderCircle } from "lucide-react";
+import { Eye, EyeOff, LoaderCircle } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { APP_CONFIG } from "@/app/config";
+import { BrandLogo } from "@/components/domain/brand-logo";
 import { apiErrorMessage, useAuth } from "./auth-context";
 
 export function AuthScreen() {
@@ -30,7 +31,7 @@ export function AuthScreen() {
       <section className="auth-card">
         <header>
           <span className="auth-brand">
-            <Command />
+            <BrandLogo />
             {APP_CONFIG.projectName}
           </span>
           <p>一个账号，连接你的全部创作任务与素材</p>

@@ -36,7 +36,7 @@ describe("unified project config", () => {
     ].sort();
     expect(configuredModuleIds).toEqual(modules.map((item) => item.id).sort());
     expect(Object.keys(APP_CONFIG.menuFeatures.assets)).toEqual(["portraits"]);
-    expect(APP_CONFIG.projectName).toBe("曜作");
+    expect(APP_CONFIG.projectName).toBe("烽火AI");
     expect(resolveHomeDestination(modules)).toEqual({ kind: "route", path: "/tools/ai-generate" });
     expect(isAssetOpen("portraits")).toBeTrue();
   });

@@ -20,7 +20,7 @@ export interface PublicAppConfig {
  * true = 开放；false = Coming Soon。
  */
 export const APP_CONFIG = {
-  projectName: "曜作",
+  projectName: "烽火AI",
   menuFeatures: {
     creationWorkflow: {
       "video-remix": false,

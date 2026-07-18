@@ -83,15 +83,27 @@ select:focus-visible {
   align-items: center;
   gap: 10px;
 }
+.brand-logo {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  overflow: hidden;
+  aspect-ratio: 491 / 319;
+  background: #fff;
+}
+.brand-logo img {
+  position: absolute;
+  top: -43%;
+  left: -132.6%;
+  width: 361.9%;
+  max-width: none;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+}
 .brand-mark {
-  width: 31px;
-  height: 31px;
-  border-radius: 9px;
-  display: grid;
-  place-items: center;
-  color: white;
-  background: linear-gradient(145deg, #152852, #286fff);
-  box-shadow: 0 6px 15px #246bfd33;
+  width: 38px;
+  border-radius: 5px;
 }
 .brand b {
   font-size: 17px;
