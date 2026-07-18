@@ -10,7 +10,6 @@ import {
   Maximize2,
   RefreshCw,
   Sparkles,
-  Upload,
   UserRound,
   Video,
   WandSparkles,
@@ -18,14 +17,9 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import {
-  downloadAuthenticated,
-  fetchCreationCapabilities,
-  fetchJobs,
-  submitJob,
-  uploadMediaFile,
-} from "@/api/api-client";
+import { downloadAuthenticated, fetchCreationCapabilities, fetchJobs, submitJob } from "@/api/api-client";
 import type { Job, SeedanceModelId } from "@/api/generated/types.gen";
+import { AttachmentPicker } from "@/components/domain/attachment-picker";
 import { randomUuid } from "@/lib/random-id";
 import "./ai-creation-composer.css";
 
@@ -206,7 +200,6 @@ export function AiCreationComposer() {
   const [kind, setKind] = useState<"image" | "video">("image");
   const [panel, setPanel] = useState<OpenPanel>("type");
   const [submitting, setSubmitting] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [showReview, setShowReview] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Job | null>(null);
@@ -238,7 +231,6 @@ export function AiCreationComposer() {
   const draft = kind === "image" ? imageDraft : videoDraft;
   const setDraft = kind === "image" ? setImageDraft : setVideoDraft;
   const model = models.find((item) => item.id === draft.modelId && item.kind === kind);
-  const fileInput = useRef<HTMLInputElement>(null);
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const requestKey = useRef(randomUuid());
   const { data: tasks = [] } = useQuery({
@@ -320,41 +312,6 @@ export function AiCreationComposer() {
       ],
     });
     setPanel(null);
-  };
-  const upload = async (file?: File) => {
-    if (!file) return;
-    setUploading(true);
-    setError("");
-    try {
-      if (
-        model &&
-        !model.acceptedReferenceKinds.includes(
-          assetKind(file.type) === "图片" ? "image" : assetKind(file.type) === "视频" ? "video" : "audio",
-        )
-      )
-        throw new Error("当前模型不支持这种参考素材");
-      const asset = await uploadMediaFile(file);
-      update({
-        references: [
-          ...draft.references,
-          {
-            id: asset.id,
-            name: asset.name,
-            mimeType: asset.mimeType,
-            label: nextAssetLabel(draft.references, asset.mimeType),
-            source: "upload",
-            size: asset.size,
-          },
-        ],
-      });
-      setPanel(null);
-      toast.success("素材已安全上传");
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "素材上传失败");
-    } finally {
-      setUploading(false);
-      if (fileInput.current) fileInput.current.value = "";
-    }
   };
   const doSubmit = async () => {
     const validation = validate();
@@ -474,28 +431,50 @@ export function AiCreationComposer() {
             {panel === "reference" && (
               <Panel title="添加参考">
                 <div className="reference-menu">
-                  <button type="button" onClick={() => addDemo("library")}>
-                    <Library />
-                    素材库<small>{kind === "video" ? "演示素材不可用于真实提交" : "选择灵感素材"}</small>
-                  </button>
+                  <AttachmentPicker
+                    multiple
+                    trigger={(openPicker) => (
+                      <button type="button" onClick={openPicker}>
+                        <Library />
+                        附件素材<small>从素材库选择或从本地上传</small>
+                      </button>
+                    )}
+                    onSelect={(assets) => {
+                      const references = [...draft.references];
+                      for (const asset of assets) {
+                        if (
+                          model &&
+                          !model.acceptedReferenceKinds.includes(
+                            assetKind(asset.mimeType) === "图片"
+                              ? "image"
+                              : assetKind(asset.mimeType) === "视频"
+                                ? "video"
+                                : "audio",
+                          )
+                        ) {
+                          setError("当前模型不支持所选参考素材中的文件格式");
+                          return;
+                        }
+                        references.push({
+                          id: asset.id,
+                          name: asset.name,
+                          mimeType: asset.mimeType,
+                          label: nextAssetLabel(references, asset.mimeType),
+                          source: asset.source,
+                          size: asset.size,
+                        });
+                      }
+                      update({ references });
+                      setPanel(null);
+                    }}
+                  />
                   <button type="button" onClick={() => addDemo("portrait")}>
                     <UserRound />
                     人像库<small>{kind === "video" ? "演示人像不可用于真实提交" : "选择人物参考"}</small>
                   </button>
-                  <button type="button" onClick={() => fileInput.current?.click()}>
-                    <Upload />
-                    本地上传<small>安全上传至当前账号</small>
-                  </button>
                 </div>
               </Panel>
             )}
-            <input
-              ref={fileInput}
-              hidden
-              type="file"
-              accept="image/*,video/*,audio/*"
-              onChange={(event) => void upload(event.target.files?.[0])}
-            />
           </div>
           <textarea
             ref={promptRef}
@@ -538,12 +517,6 @@ export function AiCreationComposer() {
                   </button>
                 </span>
               ))}
-            </div>
-          )}
-          {uploading && (
-            <div className="composer-uploading">
-              <LoaderCircle />
-              正在安全上传素材…
             </div>
           )}
         </div>

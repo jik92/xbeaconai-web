@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { Box, Check, ChevronDown, LoaderCircle, ScanSearch, X } from "lucide-react";
 import { useRef, useState } from "react";
-import { fetchJobs, submitJob, uploadMediaFile } from "@/api/api-client";
+import { fetchJobs, submitJob } from "@/api/api-client";
 import type { Job } from "@/api/generated/types.gen";
+import type { AttachmentSelection } from "@/components/domain/attachment-picker";
 import { type PromptReference, PromptWorkbench } from "@/components/domain/prompt-workbench";
 import type { ApiJobResult } from "@/entities/types";
 import { randomUuid } from "@/lib/random-id";
@@ -32,12 +33,10 @@ export function MediaUnderstandPage() {
   const [panel, setPanel] = useState<Panel>();
   const [model, setModel] = useState(models[0].id);
   const [reasoning, setReasoning] = useState<(typeof reasoningOptions)[number]["id"]>("off");
-  const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState("");
   const [selectedTask, setSelectedTask] = useState<Job | null>(null);
   const requestKey = useRef(randomUuid());
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { data: tasks = [], refetch } = useQuery({
     queryKey: ["api-tasks", "media-understand"],
@@ -45,38 +44,28 @@ export function MediaUnderstandPage() {
     refetchInterval: 4_000,
   });
 
-  const chooseFiles = async (files: File[]) => {
-    if (!files.length) return;
-    if (references.length + files.length > 20) {
+  const chooseAssets = (assets: AttachmentSelection[]) => {
+    if (!assets.length) return;
+    if (references.length + assets.length > 20) {
       setNotice("单次最多分析 20 个素材");
       return;
     }
-    setUploading(true);
     setNotice("");
-    try {
-      const assets = await Promise.all(files.map(uploadMediaFile));
-      setReferences((current) => [
-        ...current,
-        ...assets.map((asset) => ({
-          id: asset.id,
-          assetId: asset.id,
-          name: asset.name,
-          mimeType: asset.mimeType,
-          kind: referenceKind(asset.mimeType),
-        })),
-      ]);
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "素材上传失败");
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
+    setReferences((current) => [
+      ...current,
+      ...assets.map((asset) => ({
+        id: asset.id,
+        assetId: asset.id,
+        name: asset.name,
+        mimeType: asset.mimeType,
+        kind: referenceKind(asset.mimeType),
+      })),
+    ]);
   };
 
   const submit = async () => {
     if (!references.length) {
       setNotice("请先添加需要理解的图片、视频或音频素材");
-      fileInputRef.current?.click();
       return;
     }
     setSubmitting(true);
@@ -116,13 +105,12 @@ export function MediaUnderstandPage() {
           placeholder="请输入问题，帮你深入解答"
           inputLabel="素材理解问题"
           inputRef={inputRef}
-          fileInputRef={fileInputRef}
-          onChooseFiles={(files) => void chooseFiles(files)}
+          onChooseAssets={chooseAssets}
           onRemoveReference={(id) => setReferences((current) => current.filter((item) => item.id !== id))}
           onPromptChange={setPrompt}
           onExpandedChange={setExpanded}
           onSubmit={() => void submit()}
-          submitting={uploading || submitting}
+          submitting={submitting}
           controls={
             <>
               <button onClick={() => setPanel(panel === "model" ? undefined : "model")}>
@@ -175,10 +163,10 @@ export function MediaUnderstandPage() {
             </div>
           )}
         </PromptWorkbench>
-        {(uploading || submitting) && (
+        {submitting && (
           <div className="mu-loading">
             <LoaderCircle />
-            {uploading ? "正在上传素材…" : "正在提交理解任务…"}
+            正在提交理解任务…
           </div>
         )}
         {notice && (

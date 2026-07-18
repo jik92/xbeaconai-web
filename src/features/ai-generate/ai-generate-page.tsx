@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import type { AttachmentSelection } from "@/components/domain/attachment-picker";
 import { PromptWorkbench } from "@/components/domain/prompt-workbench";
 import {
   AiGenerateMockStore,
@@ -133,7 +134,6 @@ export function AiGeneratePage() {
     [query, setQuery] = useState(""),
     [kindFilter, setKindFilter] = useState<"all" | GenerateKind>("all"),
     [favoriteOnly, setFavoriteOnly] = useState(false),
-    fileRef = useRef<HTMLInputElement>(null),
     inputRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
     return () => store.dispose();
@@ -154,10 +154,9 @@ export function AiGeneratePage() {
         ),
       [active.results, kindFilter, favoriteOnly, query],
     );
-  const chooseFiles = (files: File[]) => {
-      const error = store.addFiles(files);
+  const chooseAssets = (assets: AttachmentSelection[]) => {
+      const error = store.addAssets(assets);
       if (error) setNotice(error);
-      if (fileRef.current) fileRef.current.value = "";
     },
     requestSubmit = () => {
       if (!snapshot.prompt.trim()) {
@@ -238,8 +237,7 @@ export function AiGeneratePage() {
           placeholder="使用 @快速调用参考内容，例如：@图片1模仿 @视频1的动作，音色参考 @音频1"
           inputLabel="创作指令"
           inputRef={inputRef}
-          fileInputRef={fileRef}
-          onChooseFiles={chooseFiles}
+          onChooseAssets={chooseAssets}
           onRemoveReference={(id) => store.removeReference(id)}
           onPromptChange={(value) => store.setPrompt(value)}
           onExpandedChange={(value) => store.setExpanded(value)}

@@ -31,13 +31,13 @@ import {
   requestCancel,
   requestRetry,
   submitJob,
-  uploadMediaFile,
   watchJob,
 } from "@/api/api-client";
 import type { Job, ModuleId, SeedanceModelId } from "@/api/generated/types.gen";
 import type { FieldSpec, ModuleConfig } from "@/app/routes";
 import type { ApiJobResult } from "@/entities/types";
 import { db } from "@/lib/db";
+import { AttachmentPicker } from "./attachment-picker";
 import { AuthenticatedMedia } from "./authenticated-media";
 
 const statusMap: Record<Job["status"], string> = {
@@ -61,49 +61,22 @@ function UploadField({
   onChange: (value: string) => void;
 }) {
   const Icon = field.kind === "audio" ? FileAudio2 : field.kind === "image" ? ImagePlus : FileVideo2;
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState("");
   const displayValue = value.startsWith("asset:") ? value.split(":").slice(2).join(":") : value;
   return (
-    <label className="upload-zone">
-      <input
-        id={field.id}
-        className="sr-only"
-        type="file"
-        accept={`${field.kind}/*`}
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (!file) {
-            onChange("");
-            return;
-          }
-          onChange(`uploading:${file.name}`);
-          setUploading(true);
-          setError("");
-          void uploadMediaFile(file)
-            .then((asset) => onChange(`asset:${asset.id}:${asset.name}`))
-            .catch((reason) => {
-              onChange("");
-              setError(reason instanceof Error ? reason.message : "上传失败");
-            })
-            .finally(() => setUploading(false));
-        }}
-      />
-      <span className="upload-icon">
-        {uploading ? (
-          <LoaderCircle className="animate-spin" size={22} />
-        ) : value ? (
-          <Icon size={22} />
-        ) : (
-          <UploadCloud size={22} />
-        )}
-      </span>
-      <span>
-        <b>{uploading ? "正在上传…" : displayValue || field.label}</b>
-        <small>{error || (value ? "已安全上传，点击可重新选择" : field.hint || "点击选择或将文件拖到这里")}</small>
-      </span>
-      {value && !uploading && <Check className="ml-auto text-emerald-600" size={20} />}
-    </label>
+    <AttachmentPicker
+      accept={`${field.kind}/*`}
+      trigger={(open) => (
+        <button id={field.id} type="button" className="upload-zone" onClick={open}>
+          <span className="upload-icon">{value ? <Icon size={22} /> : <UploadCloud size={22} />}</span>
+          <span>
+            <b>{displayValue || field.label}</b>
+            <small>{value ? "已选择，点击可重新选择" : field.hint || "从素材库选择或从本地上传"}</small>
+          </span>
+          {value && <Check className="ml-auto text-emerald-600" size={20} />}
+        </button>
+      )}
+      onSelect={([asset]) => asset && onChange(`asset:${asset.id}:${asset.name}`)}
+    />
   );
 }
 
@@ -116,8 +89,6 @@ function AssetGroupField({
   value: string;
   onChange: (value: string) => void;
 }) {
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState("");
   let names: string[] = [];
   try {
     if (value.startsWith("assets:"))
@@ -126,48 +97,28 @@ function AssetGroupField({
     names = [];
   }
   return (
-    <label className="asset-uploader">
-      <input
-        id={field.id}
-        className="sr-only"
-        type="file"
-        accept="image/*,video/*,audio/*"
-        multiple
-        onChange={(event) => {
-          const files = [...(event.target.files ?? [])];
-          if (!files.length) return;
-          setUploading(true);
-          setError("");
-          void Promise.all(files.map(uploadMediaFile))
-            .then((assets) =>
-              onChange(
-                `assets:${JSON.stringify(assets.map((asset) => ({ id: asset.id, name: asset.name, mimeType: asset.mimeType })))}`,
-              ),
-            )
-            .catch((reason) => {
-              onChange("");
-              setError(reason instanceof Error ? reason.message : "素材上传失败");
-            })
-            .finally(() => setUploading(false));
-        }}
-      />
-      <span className="asset-stack">
-        <i />
-        <i />
-        <i />
-      </span>
-      <span>
-        <b>
-          {uploading
-            ? `正在上传 ${names.length || ""} 个素材…`
-            : names.length
-              ? `已上传 ${names.length} 个素材`
-              : "从本地批量上传素材"}
-        </b>
-        <small>{error || field.hint || "支持图片、视频和音频"}</small>
-      </span>
-      <em>{names.length ? "重新选择" : "添加素材"}</em>
-    </label>
+    <AttachmentPicker
+      multiple
+      trigger={(open) => (
+        <button id={field.id} type="button" className="asset-uploader" onClick={open}>
+          <span className="asset-stack">
+            <i />
+            <i />
+            <i />
+          </span>
+          <span>
+            <b>{names.length ? `已选择 ${names.length} 个素材` : "选择任务素材"}</b>
+            <small>{field.hint || "支持从素材库选择或本地批量上传"}</small>
+          </span>
+          <em>{names.length ? "重新选择" : "添加素材"}</em>
+        </button>
+      )}
+      onSelect={(assets) =>
+        onChange(
+          `assets:${JSON.stringify(assets.map((asset) => ({ id: asset.id, name: asset.name, mimeType: asset.mimeType })))}`,
+        )
+      }
+    />
   );
 }
 
@@ -302,8 +253,6 @@ function ToolboxUploadTile({
   onChange: (value: string) => void;
   multiple?: boolean;
 }) {
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState("");
   const names = value.startsWith("assets:")
     ? (() => {
         try {
@@ -315,42 +264,26 @@ function ToolboxUploadTile({
     : value.startsWith("asset:")
       ? [value.split(":").slice(2).join(":")]
       : [];
+  const accept =
+    field.kind === "audio" ? "audio/*" : field.kind === "image" ? "image/*" : multiple ? "video/*,image/*" : "video/*";
   return (
-    <label className={`tool-upload-tile ${value ? "has-file" : ""}`}>
-      <input
-        className="sr-only"
-        type="file"
-        accept={
-          field.kind === "audio"
-            ? "audio/*"
-            : field.kind === "image"
-              ? "image/*"
-              : multiple
-                ? "video/*,image/*"
-                : "video/*"
-        }
-        multiple={multiple}
-        onChange={(event) => {
-          const files = [...(event.target.files ?? [])];
-          if (!files.length) return;
-          setUploading(true);
-          setError("");
-          void Promise.all(files.map(uploadMediaFile))
-            .then((assets) => {
-              if (multiple)
-                onChange(
-                  `assets:${JSON.stringify(assets.map((asset) => ({ id: asset.id, name: asset.name, mimeType: asset.mimeType })))}`,
-                );
-              else onChange(`asset:${assets[0].id}:${assets[0].name}`);
-            })
-            .catch((reason) => setError(reason instanceof Error ? reason.message : "上传失败"))
-            .finally(() => setUploading(false));
-        }}
-      />
-      {uploading ? <LoaderCircle className="animate-spin" /> : value ? <Check /> : <Plus />}
-      {names.length > 0 && <small>{names.length > 1 ? `已选择 ${names.length} 个素材` : names[0]}</small>}
-      {error && <small className="tool-upload-error">{error}</small>}
-    </label>
+    <AttachmentPicker
+      accept={accept}
+      multiple={multiple}
+      trigger={(open) => (
+        <button type="button" className={`tool-upload-tile ${value ? "has-file" : ""}`} onClick={open}>
+          {value ? <Check /> : <Plus />}
+          {names.length > 0 && <small>{names.length > 1 ? `已选择 ${names.length} 个素材` : names[0]}</small>}
+        </button>
+      )}
+      onSelect={(assets) => {
+        if (multiple)
+          onChange(
+            `assets:${JSON.stringify(assets.map((asset) => ({ id: asset.id, name: asset.name, mimeType: asset.mimeType })))}`,
+          );
+        else if (assets[0]) onChange(`asset:${assets[0].id}:${assets[0].name}`);
+      }}
+    />
   );
 }
 

@@ -5,6 +5,118 @@
   background: #f5f7fa;
   color: #263147;
 }
+.material-library-page {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 18px;
+  padding: 16px;
+  overflow: hidden;
+  background: #edf3ff;
+}
+.material-folder-sidebar,
+.material-library-content {
+  min-height: 0;
+  overflow: auto;
+  border-radius: 12px;
+  background: white;
+}
+.material-folder-sidebar {
+  padding: 20px 14px;
+  display: flex;
+  flex-direction: column;
+}
+.material-folder-sidebar > header {
+  padding: 0 8px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.material-folder-sidebar > header b {
+  font-size: 16px;
+}
+.material-folder-sidebar > header button,
+.folder-actions button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: #687386;
+}
+.material-folder-sidebar > header svg {
+  width: 18px;
+}
+.material-folder-sidebar nav > div {
+  min-height: 42px;
+  padding: 0 5px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+}
+.material-folder-sidebar nav > div.active {
+  background: #e8f2ff;
+  color: #246bfd;
+}
+.material-folder-sidebar nav > div > button:first-child {
+  min-width: 0;
+  height: 42px;
+  flex: 1;
+  padding: 0 7px;
+  border: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+.material-folder-sidebar nav > div > button:first-child svg {
+  width: 18px;
+  flex: none;
+}
+.material-folder-sidebar nav > div > button:first-child span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.folder-actions {
+  display: none;
+}
+.material-folder-sidebar nav > div:hover .folder-actions {
+  display: flex;
+}
+.folder-actions svg {
+  width: 14px;
+}
+.folder-actions button:last-child {
+  color: #dc4458;
+}
+.material-folder-sidebar > footer {
+  margin-top: auto;
+  padding: 16px 8px 0;
+  border-top: 1px solid #edf0f4;
+}
+.material-folder-sidebar > footer span,
+.material-folder-sidebar > footer b {
+  display: block;
+}
+.material-folder-sidebar > footer span {
+  color: #929baa;
+  font-size: 10px;
+}
+.material-folder-sidebar > footer b {
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+  color: #667186;
+  font-size: 9px;
+  font-weight: 500;
+}
+.material-library-content {
+  padding: 24px;
+}
 .asset-library-head {
   display: flex;
   align-items: flex-end;
@@ -134,6 +246,16 @@
   height: 100%;
   object-fit: cover;
   display: block;
+}
+.library-asset-preview.media video,
+.library-asset-preview.media audio {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.library-asset-preview.media audio {
+  padding: 20px;
+  object-fit: contain;
 }
 .library-asset-preview.voice {
   display: flex;
@@ -368,6 +490,11 @@
   height: 100%;
   object-fit: contain;
 }
+.asset-detail-media.media video,
+.asset-detail-media.media audio {
+  width: 100%;
+  max-height: 390px;
+}
 .asset-detail-media.voice {
   height: 120px;
   display: grid;
@@ -415,6 +542,17 @@
   background: #fff;
 }
 @media (max-width: 760px) {
+  .material-library-page {
+    display: block;
+    overflow: auto;
+  }
+  .material-folder-sidebar {
+    min-height: 180px;
+    margin-bottom: 12px;
+  }
+  .material-library-content {
+    overflow: visible;
+  }
   .asset-library-page {
     padding: 18px 12px;
   }

@@ -4,6 +4,7 @@ import {
   Bell,
   CircleHelp,
   Coins,
+  Files,
   Images,
   Package,
   PanelLeftClose,
@@ -135,6 +136,7 @@ export function AppShell() {
           <h3>资产</h3>
           {(
             [
+              { id: "materials", path: "/assets/materials", label: "素材库", icon: Files, badge: undefined },
               { id: "portraits", path: "/assets/portraits", label: "人像库", icon: Images, badge: "1125" },
               { id: "products", path: "/assets/products", label: "商品库", icon: Package, badge: undefined },
               { id: "voices", path: "/assets/voices", label: "音色库", icon: AudioLines, badge: undefined },

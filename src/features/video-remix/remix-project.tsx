@@ -12,7 +12,6 @@ import {
   Download,
   FileText,
   History,
-  Image as ImageIcon,
   LoaderCircle,
   Mic2,
   Pencil,
@@ -31,9 +30,9 @@ import {
   fetchLibraryAssets,
   fetchProducts,
   generateRemixProject,
-  uploadMediaFile,
 } from "@/api/api-client";
 import type { Job } from "@/api/generated/types.gen";
+import { AttachmentPicker, type AttachmentSelection } from "@/components/domain/attachment-picker";
 import { AuthenticatedMedia } from "@/components/domain/authenticated-media";
 import type { ApiJobResult, LibraryAsset, LibraryProduct } from "@/entities/types";
 import "./remix-project.css";
@@ -108,8 +107,7 @@ function ConfigSidebar({
   selectedProduct,
   selectedVoice,
   source,
-  uploading,
-  onUpload,
+  onSelectAttachment,
   onPick,
 }: {
   mode: "product" | "talking";
@@ -122,8 +120,7 @@ function ConfigSidebar({
   selectedProduct: LibraryProduct | null;
   selectedVoice: LibraryAsset | null;
   source: string;
-  uploading: boolean;
-  onUpload: (file?: File) => void;
+  onSelectAttachment: (asset: AttachmentSelection) => void;
   onPick: (kind: "product" | "portrait" | "voice") => void;
 }) {
   const fileName = source ? source.split(":").slice(2).join(":") : "";
@@ -200,33 +197,33 @@ function ConfigSidebar({
         </b>
         <small>（同一成片的连续片段）</small>
       </div>
-      {source ? (
-        <label className="uploaded-video-card">
-          <input type="file" accept="video/*" onChange={(event) => onUpload(event.target.files?.[0])} />
-          <span className="video-card-thumb">
-            <Video />
-          </span>
-          <span>
-            <b>{fileName}</b>
-            <small>时长：17.0s</small>
-            <small>解析模版：未设置</small>
-            <small>思考深度：深度</small>
-          </span>
-        </label>
-      ) : (
-        <div className="config-upload-box">
-          <label>
-            <ImageIcon />
-            <span>素材库选择</span>
-            <input type="file" accept="video/*" onChange={(event) => onUpload(event.target.files?.[0])} />
-          </label>
-          <label>
-            {uploading ? <LoaderCircle className="animate-spin" /> : <Upload />}
-            <span>{uploading ? "上传中" : "本地上传"}</span>
-            <input type="file" accept="video/*" onChange={(event) => onUpload(event.target.files?.[0])} />
-          </label>
-        </div>
-      )}
+      <AttachmentPicker
+        accept="video/*"
+        trigger={(open) =>
+          source ? (
+            <button type="button" className="uploaded-video-card" onClick={open}>
+              <span className="video-card-thumb">
+                <Video />
+              </span>
+              <span>
+                <b>{fileName}</b>
+                <small>点击可从素材库或本地重新选择</small>
+                <small>解析模版：未设置</small>
+                <small>思考深度：深度</small>
+              </span>
+            </button>
+          ) : (
+            <button type="button" className="config-attachment-picker" onClick={open}>
+              <Upload />
+              <span>
+                <b>选择分镜视频</b>
+                <small>从素材库选择或从本地上传</small>
+              </span>
+            </button>
+          )
+        }
+        onSelect={([asset]) => asset && onSelectAttachment(asset)}
+      />
     </aside>
   );
 }
@@ -246,7 +243,7 @@ function AssetPickerModal({
     error,
   } = useQuery({
     queryKey: ["asset-library", kind],
-    queryFn: () => fetchLibraryAssets(kind),
+    queryFn: () => (kind === "voice" ? fetchLibraryAssets("voice") : Promise.resolve([])),
   });
   const title = kind === "product" ? "选择商品" : "选择口播音色";
   return (
@@ -459,7 +456,6 @@ export function RemixProject() {
   const [editing, setEditing] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [source, setSource] = useState("");
-  const [uploading, setUploading] = useState(false);
   const [mode, setMode] = useState<"product" | "talking">("product");
   const [projectName, setProjectName] = useState("");
   const [description, setDescription] = useState("");
@@ -532,19 +528,6 @@ export function RemixProject() {
     return () => window.clearInterval(timer);
   }, [activeJobId, parsed]);
 
-  const upload = async (file?: File) => {
-    if (!file) return;
-    setUploading(true);
-    setNotice("");
-    try {
-      const asset = await uploadMediaFile(file);
-      setSource(`asset:${asset.id}:${asset.name}`);
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "上传失败");
-    } finally {
-      setUploading(false);
-    }
-  };
   const parse = async () => {
     if (parsing) return;
     if (!source || !selectedProduct) {
@@ -675,8 +658,7 @@ export function RemixProject() {
           selectedProduct={selectedProduct}
           selectedVoice={selectedVoice}
           source={source}
-          uploading={uploading}
-          onUpload={(file) => void upload(file)}
+          onSelectAttachment={(asset) => setSource(`asset:${asset.id}:${asset.name}`)}
           onPick={(kind) => {
             if (kind === "portrait") window.location.assign("/assets/portraits");
             else setPicker(kind);
@@ -924,11 +906,7 @@ export function RemixProject() {
         </section>
       </div>
       {stage === 0 && (
-        <button
-          className="parse-button"
-          disabled={!source || !selectedProduct || uploading || parsing}
-          onClick={() => void parse()}
-        >
+        <button className="parse-button" disabled={!source || !selectedProduct || parsing} onClick={() => void parse()}>
           <Sparkles />
           {parsing ? "解析中" : "视频解析"}
         </button>

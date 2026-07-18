@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
-import { extname, resolve } from "node:path";
+import { mkdirSync, readFileSync } from "node:fs";
+import { dirname, extname, resolve } from "node:path";
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
@@ -13,6 +13,7 @@ import { buildExecutionPlan, MemoryJobQueue } from "./jobs/memory-job-queue";
 import { InsufficientCreditsError, SqliteJobStore } from "./jobs/sqlite-job-store";
 import { seedanceModelIds, videoModels } from "./models/video-models";
 import { auditSdkRegistry } from "./sdk-registry";
+import { ossutils } from "./storage/ossutils";
 import type { JobRecord, StageProvenance } from "./types";
 
 const moduleIds = [
@@ -104,6 +105,7 @@ const LibraryAssetSchema = z.object({
   size: z.number().int(),
   kind: AssetKindSchema,
   description: z.string().optional(),
+  folderId: z.string().uuid().optional(),
   url: z.string(),
   createdAt: z.string(),
 });
@@ -319,6 +321,13 @@ app.openapi(registerRoute, async (c) => {
     );
   try {
     const registration = await accounts.register(c.req.valid("json"));
+    const materialFolder = accounts.ensureDefaultAssetFolder(registration.user.id);
+    mkdirSync(resolve(env.dataDir, "uploads", materialFolder.storagePrefix), { recursive: true, mode: 0o700 });
+    if (ossutils.configured)
+      await Promise.all([
+        ossutils.ensureDirectory(`${registration.user.id}/`),
+        ossutils.ensureDirectory(materialFolder.storagePrefix),
+      ]).catch((error) => console.error("Failed to initialize user TOS directories", error));
     if (registration.claimedLegacy) queue.recoverOwned(registration.user.id);
     return c.json(await issueToken(accounts, registration.user), 201);
   } catch (error) {
@@ -834,6 +843,7 @@ const uploadRoute = createRoute({
             kind: AssetKindSchema.optional(),
             displayName: z.string().max(80).optional(),
             description: z.string().max(300).optional(),
+            folderId: z.string().uuid().optional(),
           }),
         },
       },
@@ -853,6 +863,7 @@ const uploadRoute = createRoute({
               kind: AssetKindSchema,
               displayName: z.string(),
               description: z.string().optional(),
+              folderId: z.string().uuid().optional(),
               url: z.string(),
               createdAt: z.string(),
             }),
@@ -872,6 +883,7 @@ app.openapi(uploadRoute, async (c) => {
   const kind = AssetKindSchema.safeParse(rawKind || "media");
   const rawDisplayName = form.get("displayName");
   const rawDescription = form.get("description");
+  const rawFolderId = form.get("folderId");
   const requestId = crypto.randomUUID();
   if (!(file instanceof File) || file.size === 0)
     return c.json({ error: { code: "INVALID_MEDIA", message: "请选择有效文件", retryable: false, requestId } }, 400);
@@ -925,7 +937,18 @@ app.openapi(uploadRoute, async (c) => {
     extname(file.name)
       .replace(/[^.a-zA-Z0-9]/g, "")
       .slice(0, 10);
-  const storageKey = `${id}${safeExtension}`;
+  const folder =
+    kind.data === "media"
+      ? typeof rawFolderId === "string" && rawFolderId
+        ? accounts.getAssetFolder(c.get("userId"), rawFolderId)
+        : accounts.ensureDefaultAssetFolder(c.get("userId"))
+      : undefined;
+  if (kind.data === "media" && !folder)
+    return c.json(
+      { error: { code: "FOLDER_NOT_FOUND", message: "素材文件夹不存在", retryable: false, requestId } },
+      400,
+    );
+  const storageKey = folder ? `${folder.storagePrefix}${id}${safeExtension}` : `${id}${safeExtension}`;
   const displayName =
     typeof rawDisplayName === "string" && rawDisplayName.trim()
       ? rawDisplayName.trim().slice(0, 80)
@@ -933,7 +956,11 @@ app.openapi(uploadRoute, async (c) => {
   const description =
     typeof rawDescription === "string" && rawDescription.trim() ? rawDescription.trim().slice(0, 300) : undefined;
   const createdAt = new Date().toISOString();
-  await Bun.write(resolve(env.dataDir, "uploads", storageKey), file);
+  const localPath = resolve(env.dataDir, "uploads", storageKey);
+  mkdirSync(dirname(localPath), { recursive: true, mode: 0o700 });
+  await Bun.write(localPath, file);
+  if (folder && ossutils.configured)
+    await ossutils.putLibraryFile({ filePath: localPath, key: storageKey, mimeType: file.type, sizeBytes: file.size });
   accounts.createAsset({
     id,
     ownerUserId: c.get("userId"),
@@ -944,6 +971,7 @@ app.openapi(uploadRoute, async (c) => {
     kind: kind.data,
     displayName,
     description,
+    folderId: folder?.id,
     createdAt,
   });
   return c.json(
@@ -956,6 +984,7 @@ app.openapi(uploadRoute, async (c) => {
         kind: kind.data,
         displayName,
         description,
+        folderId: folder?.id,
         url: `/api/assets/${id}/content`,
         createdAt,
       },
@@ -968,7 +997,7 @@ const assetListRoute = createRoute({
   method: "get",
   path: "/api/assets",
   operationId: "listAssets",
-  request: { query: z.object({ kind: AssetKindSchema.optional() }) },
+  request: { query: z.object({ kind: AssetKindSchema.optional(), folderId: z.string().uuid().optional() }) },
   responses: {
     200: {
       description: "Current user's reusable assets",
@@ -1070,8 +1099,8 @@ app.post("/api/products", async (c) => {
 });
 
 app.openapi(assetListRoute, (c) => {
-  const kind = c.req.valid("query").kind;
-  const assets = accounts.listAssets(c.get("userId"), kind).map((asset) => ({
+  const { kind, folderId } = c.req.valid("query");
+  const assets = accounts.listAssets(c.get("userId"), kind, folderId).map((asset) => ({
     id: asset.id,
     name: asset.displayName,
     originalName: asset.originalName,
@@ -1079,10 +1108,72 @@ app.openapi(assetListRoute, (c) => {
     size: asset.byteSize,
     kind: asset.kind,
     description: asset.description,
+    folderId: asset.folderId,
     url: `/api/assets/${asset.id}/content`,
     createdAt: asset.createdAt,
   }));
   return c.json({ assets }, 200);
+});
+
+const folderResponse = (folder: ReturnType<AccountStore["ensureDefaultAssetFolder"]>) => ({
+  id: folder.id,
+  parentId: folder.parentId,
+  name: folder.name,
+  storagePrefix: folder.storagePrefix,
+  createdAt: folder.createdAt,
+  updatedAt: folder.updatedAt,
+});
+
+app.get("/api/asset-folders", (c) =>
+  c.json({ folders: accounts.listAssetFolders(c.get("userId")).map(folderResponse) }, 200),
+);
+
+app.post("/api/asset-folders", async (c) => {
+  try {
+    const body = (await c.req.json()) as { name?: string; parentId?: string };
+    const folder = accounts.createAssetFolder(c.get("userId"), body.name ?? "", body.parentId);
+    mkdirSync(resolve(env.dataDir, "uploads", folder.storagePrefix), { recursive: true, mode: 0o700 });
+    if (ossutils.configured) await ossutils.ensureDirectory(folder.storagePrefix);
+    return c.json({ folder: folderResponse(folder) }, 201);
+  } catch (error) {
+    if (error instanceof AccountError)
+      return c.json(
+        { error: { code: error.code, message: error.message, retryable: false, requestId: crypto.randomUUID() } },
+        error.status,
+      );
+    throw error;
+  }
+});
+
+app.patch("/api/asset-folders/:folderId", async (c) => {
+  try {
+    const body = (await c.req.json()) as { name?: string };
+    const folder = accounts.renameAssetFolder(c.get("userId"), c.req.param("folderId"), body.name ?? "");
+    return c.json({ folder: folderResponse(folder) }, 200);
+  } catch (error) {
+    if (error instanceof AccountError)
+      return c.json(
+        { error: { code: error.code, message: error.message, retryable: false, requestId: crypto.randomUUID() } },
+        error.status,
+      );
+    throw error;
+  }
+});
+
+app.delete("/api/asset-folders/:folderId", async (c) => {
+  try {
+    const folder = accounts.getAssetFolder(c.get("userId"), c.req.param("folderId"));
+    accounts.deleteAssetFolder(c.get("userId"), c.req.param("folderId"));
+    if (folder && ossutils.configured) await ossutils.deleteObject(folder.storagePrefix).catch(() => undefined);
+    return c.body(null, 204);
+  } catch (error) {
+    if (error instanceof AccountError)
+      return c.json(
+        { error: { code: error.code, message: error.message, retryable: false, requestId: crypto.randomUUID() } },
+        error.status,
+      );
+    throw error;
+  }
 });
 
 const assetContentRoute = createRoute({

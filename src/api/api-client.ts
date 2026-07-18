@@ -1,4 +1,4 @@
-import type { AssetKind, LibraryAsset, LibraryProduct } from "@/entities/types";
+import type { AssetFolder, AssetKind, LibraryAsset, LibraryProduct } from "@/entities/types";
 import { getAuthToken } from "@/features/account/auth-context";
 import { randomUuid } from "@/lib/random-id";
 import { apiBaseUrl, apiUrl } from "./base-url";
@@ -51,14 +51,17 @@ export async function fetchCreationCapabilities() {
     models: import("@/features/ai-creation/ai-creation-composer").CreationModelCapability[];
   }>;
 }
-export async function uploadMediaFile(file: File) {
+export async function uploadMediaFile(file: File, folderId?: string) {
+  if (folderId) return uploadLibraryAsset(file, "media", file.name.replace(/\.[^.]+$/, ""), "", folderId);
   configure();
   const { data } = await uploadMedia({ body: { file }, headers: authHeaders(), throwOnError: true });
   if (!data?.asset) throw new Error("文件上传失败");
   return data.asset;
 }
-export async function fetchLibraryAssets(kind: Exclude<AssetKind, "media">) {
-  const response = await fetch(apiUrl(`/api/assets?kind=${encodeURIComponent(kind)}`), { headers: authHeaders() });
+export async function fetchLibraryAssets(kind: Exclude<AssetKind, "product">, folderId?: string) {
+  const params = new URLSearchParams({ kind });
+  if (folderId) params.set("folderId", folderId);
+  const response = await fetch(apiUrl(`/api/assets?${params}`), { headers: authHeaders() });
   if (!response.ok) throw new Error("资产列表加载失败");
   const data = (await response.json()) as { assets: LibraryAsset[] };
   return data.assets;
@@ -145,15 +148,17 @@ export async function generateRemixProject(input: RemixProjectRequest, idempoten
 }
 export async function uploadLibraryAsset(
   file: File,
-  kind: Exclude<AssetKind, "media">,
+  kind: Exclude<AssetKind, "product">,
   displayName: string,
   description = "",
+  folderId?: string,
 ) {
   const body = new FormData();
   body.set("file", file);
   body.set("kind", kind);
   body.set("displayName", displayName);
   if (description.trim()) body.set("description", description.trim());
+  if (folderId) body.set("folderId", folderId);
   const response = await fetch(apiUrl("/api/uploads"), { method: "POST", headers: authHeaders(), body });
   if (!response.ok) {
     const data = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
@@ -161,6 +166,44 @@ export async function uploadLibraryAsset(
   }
   const data = (await response.json()) as { asset: LibraryAsset & { displayName?: string } };
   return { ...data.asset, name: data.asset.displayName || data.asset.name } as LibraryAsset;
+}
+export async function fetchAssetFolders() {
+  const response = await fetch(apiUrl("/api/asset-folders"), { headers: authHeaders() });
+  if (!response.ok) throw new Error("素材文件夹加载失败");
+  return ((await response.json()) as { folders: AssetFolder[] }).folders;
+}
+export async function createAssetFolder(name: string, parentId?: string) {
+  const response = await fetch(apiUrl("/api/asset-folders"), {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ name, parentId }),
+  });
+  const data = (await response.json().catch(() => null)) as {
+    folder?: AssetFolder;
+    error?: { message?: string };
+  } | null;
+  if (!response.ok || !data?.folder) throw new Error(data?.error?.message || "文件夹创建失败");
+  return data.folder;
+}
+export async function renameAssetFolder(folderId: string, name: string) {
+  const response = await fetch(apiUrl(`/api/asset-folders/${folderId}`), {
+    method: "PATCH",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  const data = (await response.json().catch(() => null)) as {
+    folder?: AssetFolder;
+    error?: { message?: string };
+  } | null;
+  if (!response.ok || !data?.folder) throw new Error(data?.error?.message || "文件夹重命名失败");
+  return data.folder;
+}
+export async function deleteAssetFolder(folderId: string) {
+  const response = await fetch(apiUrl(`/api/asset-folders/${folderId}`), { method: "DELETE", headers: authHeaders() });
+  if (!response.ok) {
+    const data = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
+    throw new Error(data?.error?.message || "文件夹删除失败");
+  }
 }
 export async function requestCancel(jobId: string) {
   configure();

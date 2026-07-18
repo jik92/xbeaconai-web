@@ -464,6 +464,7 @@ select:focus-visible {
   resize: vertical;
 }
 .upload-zone {
+  width: 100%;
   height: 94px;
   border: 1px dashed #bdc8d8;
   border-radius: 8px;
@@ -473,6 +474,7 @@ select:focus-visible {
   padding: 0 22px;
   gap: 12px;
   transition: 0.15s;
+  text-align: left;
 }
 .upload-zone:hover {
   border-color: #6092ff;
@@ -3087,6 +3089,344 @@ td small {
 @keyframes skeleton {
   to {
     background-position: -200% 0;
+  }
+}
+
+/* Shared attachment picker */
+.attachment-picker-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: #11182773;
+}
+.attachment-picker-dialog {
+  width: min(940px, 100%);
+  min-height: 560px;
+  max-height: calc(100vh - 40px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  background: white;
+  box-shadow: 0 24px 80px #10182840;
+}
+.attachment-picker-dialog > header {
+  min-height: 72px;
+  padding: 0 22px;
+  border-bottom: 1px solid #e6e9ee;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.attachment-picker-dialog > header span {
+  color: #246bfd;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+}
+.attachment-picker-dialog > header h2 {
+  margin: 3px 0 0;
+  font-size: 20px;
+}
+.attachment-picker-dialog > header button {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  background: white;
+  color: #7d8796;
+}
+.attachment-source-tabs {
+  margin: 18px 22px 0;
+  display: flex;
+  border-bottom: 1px solid #e6e9ee;
+}
+.attachment-source-tabs button {
+  height: 42px;
+  padding: 0 18px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: white;
+  color: #697386;
+}
+.attachment-source-tabs button.active {
+  border-bottom-color: #246bfd;
+  color: #246bfd;
+  font-weight: 600;
+}
+.attachment-source-tabs svg {
+  width: 17px;
+}
+.attachment-library-panel,
+.attachment-upload-panel {
+  min-height: 0;
+  flex: 1;
+  padding: 16px 22px;
+}
+.attachment-library-panel {
+  display: flex;
+}
+.attachment-directory-layout {
+  min-height: 0;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  border: 1px solid #e1e6ed;
+  border-radius: 9px;
+  overflow: hidden;
+}
+.attachment-folder-tree {
+  padding: 14px 10px;
+  overflow: auto;
+  border-right: 1px solid #e1e6ed;
+  background: #f8fafc;
+}
+.attachment-folder-tree > b {
+  display: block;
+  padding: 0 8px 10px;
+  color: #4d586b;
+  font-size: 11px;
+}
+.attachment-folder-tree nav button {
+  width: 100%;
+  height: 36px;
+  border: 0;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  background: transparent;
+  color: #687387;
+  text-align: left;
+}
+.attachment-folder-tree nav button.active {
+  background: #e7f1ff;
+  color: #246bfd;
+  font-weight: 600;
+}
+.attachment-folder-tree nav svg {
+  width: 16px;
+  flex: none;
+}
+.attachment-folder-tree nav span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.attachment-folder-files {
+  min-width: 0;
+  padding: 14px;
+  overflow: hidden;
+}
+.attachment-breadcrumbs {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  overflow-x: auto;
+  color: #8590a2;
+}
+.attachment-breadcrumbs span {
+  display: flex;
+  align-items: center;
+}
+.attachment-breadcrumbs svg {
+  width: 14px;
+}
+.attachment-breadcrumbs button {
+  border: 0;
+  padding: 4px 6px;
+  white-space: nowrap;
+  background: transparent;
+  color: #5b6980;
+  font-size: 11px;
+}
+.attachment-search {
+  height: 38px;
+  padding: 0 11px;
+  border: 1px solid #dfe4eb;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #8c95a4;
+}
+.attachment-search svg {
+  width: 16px;
+}
+.attachment-search input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+}
+.attachment-grid {
+  max-height: 300px;
+  margin-top: 4px;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.attachment-grid > .attachment-folder-card {
+  background: #fffdf7;
+}
+.attachment-grid > .attachment-folder-card > i {
+  background: #fff5d8;
+  color: #e4a400;
+}
+.attachment-grid > .attachment-folder-card > svg {
+  width: 15px;
+  margin-left: auto;
+  color: #a1a9b5;
+}
+.attachment-grid > button {
+  min-width: 0;
+  min-height: 70px;
+  padding: 10px;
+  position: relative;
+  border: 1px solid #e0e5ec;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  background: white;
+}
+.attachment-grid > button.active {
+  border-color: #246bfd;
+  background: #f5f8ff;
+}
+.attachment-grid > button > i {
+  width: 42px;
+  height: 42px;
+  flex: none;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  background: #edf3ff;
+  color: #4d76c6;
+}
+.attachment-grid > button > i svg {
+  width: 20px;
+}
+.attachment-grid > button > span {
+  min-width: 0;
+}
+.attachment-grid b,
+.attachment-grid small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.attachment-grid b {
+  color: #354056;
+  font-size: 12px;
+}
+.attachment-grid small {
+  margin-top: 5px;
+  color: #929baa;
+  font-size: 9px;
+}
+.attachment-grid > p {
+  grid-column: 1 / -1;
+  padding: 70px 0;
+  color: #929baa;
+  text-align: center;
+}
+.attachment-check {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  width: 16px;
+  color: #246bfd;
+}
+.attachment-upload-panel {
+  display: grid;
+  place-items: center;
+}
+.attachment-upload-panel > button {
+  width: 100%;
+  height: 250px;
+  border: 1px dashed #afbdd1;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  background: #fafcff;
+  color: #66748a;
+}
+.attachment-upload-panel > button > svg {
+  width: 34px;
+  height: 34px;
+  color: #246bfd;
+}
+.attachment-upload-panel > button b {
+  color: #3c485d;
+}
+.attachment-upload-panel > button span {
+  font-size: 11px;
+}
+.attachment-error {
+  margin: 0 22px 10px;
+  color: #d84455;
+  font-size: 11px;
+}
+.attachment-picker-dialog > footer {
+  min-height: 68px;
+  padding: 12px 22px;
+  border-top: 1px solid #e6e9ee;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 9px;
+}
+.attachment-picker-dialog > footer button {
+  height: 38px;
+  padding: 0 16px;
+  border: 1px solid #dce1e8;
+  border-radius: 7px;
+  background: white;
+}
+.attachment-picker-dialog > footer .primary {
+  border-color: #246bfd;
+  background: #246bfd;
+  color: white;
+}
+.attachment-picker-dialog button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+@media (max-width: 600px) {
+  .attachment-picker-layer {
+    padding: 0;
+  }
+  .attachment-picker-dialog {
+    min-height: 100%;
+    max-height: 100%;
+    border-radius: 0;
+  }
+  .attachment-grid {
+    grid-template-columns: 1fr;
+  }
+  .attachment-directory-layout {
+    grid-template-columns: 1fr;
+  }
+  .attachment-folder-tree {
+    max-height: 135px;
+    border-right: 0;
+    border-bottom: 1px solid #e1e6ed;
   }
 }
 .result-preview video,

@@ -44,7 +44,17 @@ export interface MediaAsset {
   kind: "media" | "product" | "portrait" | "voice";
   displayName: string;
   description?: string;
+  folderId?: string;
   createdAt: string;
+}
+export interface AssetFolder {
+  id: string;
+  ownerUserId: string;
+  parentId?: string;
+  name: string;
+  storagePrefix: string;
+  createdAt: string;
+  updatedAt: string;
 }
 export interface ProductRecord {
   id: string;
@@ -168,6 +178,11 @@ export class AccountStore {
         mime_type TEXT NOT NULL,byte_size INTEGER NOT NULL,asset_kind TEXT NOT NULL DEFAULT 'media',display_name TEXT NOT NULL DEFAULT '',
         description TEXT,expires_at TEXT,created_at TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS asset_folders (
+        id TEXT PRIMARY KEY,owner_user_id TEXT NOT NULL REFERENCES users(id),parent_id TEXT REFERENCES asset_folders(id),
+        name TEXT NOT NULL,storage_prefix TEXT NOT NULL UNIQUE,created_at TEXT NOT NULL,updated_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS asset_folders_owner_parent_idx ON asset_folders(owner_user_id,parent_id,name);
       CREATE TABLE IF NOT EXISTS artifacts (
         id TEXT PRIMARY KEY,owner_user_id TEXT NOT NULL REFERENCES users(id),job_id TEXT NOT NULL,storage_key TEXT NOT NULL,
         name TEXT NOT NULL,mime_type TEXT NOT NULL,created_at TEXT NOT NULL
@@ -197,6 +212,8 @@ export class AccountStore {
       this.db.exec("ALTER TABLE media_assets ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0");
     if (!assetColumns.some((column) => column.name === "sharing_scope"))
       this.db.exec("ALTER TABLE media_assets ADD COLUMN sharing_scope TEXT NOT NULL DEFAULT 'private'");
+    if (!assetColumns.some((column) => column.name === "folder_id"))
+      this.db.exec("ALTER TABLE media_assets ADD COLUMN folder_id TEXT REFERENCES asset_folders(id)");
     this.db.exec("UPDATE media_assets SET display_name=original_name WHERE display_name='' OR display_name IS NULL");
     this.db.exec(
       "CREATE INDEX IF NOT EXISTS media_assets_owner_kind_idx ON media_assets(owner_user_id,asset_kind,created_at DESC)",
@@ -225,6 +242,12 @@ export class AccountStore {
           created,
         );
       this.db.query("INSERT INTO user_preferences(user_id,updated_at) VALUES(?,?)").run(id, created);
+      const defaultFolderId = crypto.randomUUID();
+      this.db
+        .query(
+          "INSERT INTO asset_folders(id,owner_user_id,parent_id,name,storage_prefix,created_at,updated_at) VALUES(?,?,NULL,?,?,?,?)",
+        )
+        .run(defaultFolderId, id, "默认", `${id}/materials/${defaultFolderId}/`, created, created);
       this.db
         .query("INSERT INTO notifications(id,user_id,type,title,body,created_at) VALUES(?,?,?,?,?,?)")
         .run(
@@ -479,7 +502,7 @@ export class AccountStore {
   createAsset(asset: MediaAsset) {
     this.db
       .query(
-        "INSERT INTO media_assets(id,owner_user_id,original_name,storage_key,mime_type,byte_size,asset_kind,display_name,description,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO media_assets(id,owner_user_id,original_name,storage_key,mime_type,byte_size,asset_kind,display_name,description,folder_id,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
       )
       .run(
         asset.id,
@@ -491,6 +514,7 @@ export class AccountStore {
         asset.kind,
         asset.displayName,
         asset.description ?? null,
+        asset.folderId ?? null,
         asset.createdAt,
       );
   }
@@ -570,19 +594,25 @@ export class AccountStore {
     }
     return [...groups.values()];
   }
-  listAssets(userId: string, kind?: MediaAsset["kind"]): MediaAsset[] {
+  listAssets(userId: string, kind?: MediaAsset["kind"], folderId?: string): MediaAsset[] {
     const rows = (
-      kind
+      kind && folderId
         ? this.db
             .query(
-              "SELECT id,owner_user_id,storage_key,original_name,mime_type,byte_size,asset_kind,display_name,description,created_at FROM media_assets WHERE owner_user_id=? AND asset_kind=? ORDER BY created_at DESC",
+              "SELECT id,owner_user_id,storage_key,original_name,mime_type,byte_size,asset_kind,display_name,description,folder_id,created_at FROM media_assets WHERE owner_user_id=? AND asset_kind=? AND folder_id=? ORDER BY created_at DESC",
             )
-            .all(userId, kind)
-        : this.db
-            .query(
-              "SELECT id,owner_user_id,storage_key,original_name,mime_type,byte_size,asset_kind,display_name,description,created_at FROM media_assets WHERE owner_user_id=? ORDER BY created_at DESC",
-            )
-            .all(userId)
+            .all(userId, kind, folderId)
+        : kind
+          ? this.db
+              .query(
+                "SELECT id,owner_user_id,storage_key,original_name,mime_type,byte_size,asset_kind,display_name,description,folder_id,created_at FROM media_assets WHERE owner_user_id=? AND asset_kind=? ORDER BY created_at DESC",
+              )
+              .all(userId, kind)
+          : this.db
+              .query(
+                "SELECT id,owner_user_id,storage_key,original_name,mime_type,byte_size,asset_kind,display_name,description,folder_id,created_at FROM media_assets WHERE owner_user_id=? ORDER BY created_at DESC",
+              )
+              .all(userId)
     ) as Array<{
       id: string;
       owner_user_id: string;
@@ -593,6 +623,7 @@ export class AccountStore {
       asset_kind: MediaAsset["kind"];
       display_name: string;
       description: string | null;
+      folder_id: string | null;
       created_at: string;
     }>;
     return rows.map((row) => ({
@@ -605,8 +636,121 @@ export class AccountStore {
       kind: row.asset_kind,
       displayName: row.display_name || row.original_name,
       description: row.description ?? undefined,
+      folderId: row.folder_id ?? undefined,
       createdAt: row.created_at,
     }));
+  }
+  ensureDefaultAssetFolder(userId: string): AssetFolder {
+    const existing = this.db
+      .query("SELECT * FROM asset_folders WHERE owner_user_id=? AND parent_id IS NULL ORDER BY created_at LIMIT 1")
+      .get(userId) as {
+      id: string;
+      owner_user_id: string;
+      parent_id: string | null;
+      name: string;
+      storage_prefix: string;
+      created_at: string;
+      updated_at: string;
+    } | null;
+    if (existing) return this.assetFolder(existing);
+    const id = crypto.randomUUID();
+    const created = now();
+    this.db
+      .query(
+        "INSERT INTO asset_folders(id,owner_user_id,parent_id,name,storage_prefix,created_at,updated_at) VALUES(?,?,NULL,?,?,?,?)",
+      )
+      .run(id, userId, "默认", `${userId}/materials/${id}/`, created, created);
+    return this.getAssetFolder(userId, id)!;
+  }
+  listAssetFolders(userId: string): AssetFolder[] {
+    this.ensureDefaultAssetFolder(userId);
+    const rows = this.db
+      .query("SELECT * FROM asset_folders WHERE owner_user_id=? ORDER BY created_at")
+      .all(userId) as Array<{
+      id: string;
+      owner_user_id: string;
+      parent_id: string | null;
+      name: string;
+      storage_prefix: string;
+      created_at: string;
+      updated_at: string;
+    }>;
+    return rows.map((row) => this.assetFolder(row));
+  }
+  getAssetFolder(userId: string, id: string): AssetFolder | undefined {
+    const row = this.db.query("SELECT * FROM asset_folders WHERE id=? AND owner_user_id=?").get(id, userId) as {
+      id: string;
+      owner_user_id: string;
+      parent_id: string | null;
+      name: string;
+      storage_prefix: string;
+      created_at: string;
+      updated_at: string;
+    } | null;
+    return row ? this.assetFolder(row) : undefined;
+  }
+  createAssetFolder(userId: string, name: string, parentId?: string): AssetFolder {
+    const cleanName = name.trim().slice(0, 80);
+    if (!cleanName) throw new AccountError("INVALID_FOLDER_NAME", "文件夹名称不能为空", 422);
+    const parent = parentId ? this.getAssetFolder(userId, parentId) : undefined;
+    if (parentId && !parent) throw new AccountError("FOLDER_NOT_FOUND", "上级文件夹不存在", 404);
+    const duplicate = this.db
+      .query(
+        "SELECT 1 FROM asset_folders WHERE owner_user_id=? AND name=? AND ((parent_id IS NULL AND ? IS NULL) OR parent_id=?)",
+      )
+      .get(userId, cleanName, parentId ?? null, parentId ?? null);
+    if (duplicate) throw new AccountError("FOLDER_EXISTS", "同级目录下已存在同名文件夹", 409);
+    const id = crypto.randomUUID();
+    const created = now();
+    const storagePrefix = parent ? `${parent.storagePrefix}${id}/` : `${userId}/materials/${id}/`;
+    this.db
+      .query(
+        "INSERT INTO asset_folders(id,owner_user_id,parent_id,name,storage_prefix,created_at,updated_at) VALUES(?,?,?,?,?,?,?)",
+      )
+      .run(id, userId, parentId ?? null, cleanName, storagePrefix, created, created);
+    return this.getAssetFolder(userId, id)!;
+  }
+  renameAssetFolder(userId: string, id: string, name: string): AssetFolder {
+    const folder = this.getAssetFolder(userId, id);
+    if (!folder) throw new AccountError("FOLDER_NOT_FOUND", "文件夹不存在", 404);
+    const cleanName = name.trim().slice(0, 80);
+    if (!cleanName) throw new AccountError("INVALID_FOLDER_NAME", "文件夹名称不能为空", 422);
+    this.db
+      .query("UPDATE asset_folders SET name=?,updated_at=? WHERE id=? AND owner_user_id=?")
+      .run(cleanName, now(), id, userId);
+    return this.getAssetFolder(userId, id)!;
+  }
+  deleteAssetFolder(userId: string, id: string) {
+    const folder = this.getAssetFolder(userId, id);
+    if (!folder) throw new AccountError("FOLDER_NOT_FOUND", "文件夹不存在", 404);
+    const hasChildren = this.db.query("SELECT 1 FROM asset_folders WHERE parent_id=? LIMIT 1").get(id);
+    const hasAssets = this.db.query("SELECT 1 FROM media_assets WHERE folder_id=? LIMIT 1").get(id);
+    if (hasChildren || hasAssets) throw new AccountError("FOLDER_NOT_EMPTY", "请先移出或删除文件夹内的素材", 409);
+    const rootCount = this.db
+      .query("SELECT COUNT(*) AS count FROM asset_folders WHERE owner_user_id=? AND parent_id IS NULL")
+      .get(userId) as { count: number };
+    if (!folder.parentId && rootCount.count <= 1)
+      throw new AccountError("DEFAULT_FOLDER_REQUIRED", "默认文件夹不能删除", 409);
+    this.db.query("DELETE FROM asset_folders WHERE id=? AND owner_user_id=?").run(id, userId);
+  }
+  private assetFolder(row: {
+    id: string;
+    owner_user_id: string;
+    parent_id: string | null;
+    name: string;
+    storage_prefix: string;
+    created_at: string;
+    updated_at: string;
+  }): AssetFolder {
+    return {
+      id: row.id,
+      ownerUserId: row.owner_user_id,
+      parentId: row.parent_id ?? undefined,
+      name: row.name,
+      storagePrefix: row.storage_prefix,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
   }
   ownsAsset(userId: string, id: string) {
     return Boolean(this.db.query("SELECT 1 FROM media_assets WHERE id=? AND owner_user_id=?").get(id, userId));

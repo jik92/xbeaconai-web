@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import TosClient from "@volcengine/tos-sdk";
 import { env, tosConfigured } from "../env";
 
@@ -68,6 +69,37 @@ export class OssUtils {
           this.ready().abortMultipartUpload({ bucket: env.tos.bucket, key, uploadId: upload.UploadId! }),
         ),
     );
+  }
+
+  async ensureDirectory(prefix: string) {
+    if (!this.configured) return;
+    const key = `${prefix.replace(/^\/+/, "").replace(/\/*$/, "")}/`;
+    await this.ready().putObject({
+      bucket: env.tos.bucket,
+      key,
+      body: Buffer.alloc(0),
+      acl: TosClient.ACLType.ACLPrivate,
+      contentType: "application/x-directory",
+    });
+  }
+
+  async putLibraryFile(input: { filePath: string; key: string; mimeType: string; sizeBytes: number }) {
+    if (!this.configured) return;
+    const release = await uploadGate.acquire(input.sizeBytes);
+    try {
+      await this.ready().uploadFile({
+        bucket: env.tos.bucket,
+        key: input.key.replace(/^\/+/, ""),
+        file: input.filePath,
+        partSize: 8 * 1024 * 1024,
+        taskNum: 2,
+        acl: TosClient.ACLType.ACLPrivate,
+        contentType: input.mimeType,
+        serverSideEncryption: "AES256",
+      });
+    } finally {
+      release();
+    }
   }
 
   async putStagedFile(input: PutStagedFileInput) {

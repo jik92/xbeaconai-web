@@ -1,18 +1,42 @@
 // biome-ignore-all lint/a11y/useButtonType: This asset workbench contains no forms.
 // biome-ignore-all lint/a11y/noStaticElementInteractions: Modal backdrops dismiss their dialogs.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AudioLines, Check, FileAudio, Image as ImageIcon, Package, Plus, Search, Upload, X } from "lucide-react";
+import {
+  AudioLines,
+  Check,
+  FileAudio,
+  Files,
+  Folder,
+  FolderPlus,
+  Image as ImageIcon,
+  Package,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  Upload,
+  X,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { fetchLibraryAssets, fetchProducts, uploadLibraryAsset, uploadProduct } from "@/api/api-client";
+import {
+  createAssetFolder,
+  deleteAssetFolder,
+  fetchAssetFolders,
+  fetchLibraryAssets,
+  fetchProducts,
+  renameAssetFolder,
+  uploadLibraryAsset,
+  uploadProduct,
+} from "@/api/api-client";
 import { AuthenticatedMedia } from "@/components/domain/authenticated-media";
 import type { LibraryAsset, LibraryProduct } from "@/entities/types";
 import "./asset-library.css";
 
-type LibraryKind = "product" | "voice";
+type LibraryKind = "media" | "product" | "voice";
 
 export function AssetLibrary({ kind }: { kind: LibraryKind }) {
-  return kind === "product" ? <ProductLibrary /> : <VoiceLibrary />;
+  return kind === "product" ? <ProductLibrary /> : <ReusableAssetLibrary kind={kind} />;
 }
 
 function ProductLibrary() {
@@ -211,7 +235,7 @@ function ProductLibrary() {
   );
 }
 
-function VoiceLibrary() {
+function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -219,18 +243,37 @@ function VoiceLibrary() {
   const [file, setFile] = useState<File | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [selectedFolderId, setSelectedFolderId] = useState("");
+  const { data: folders = [] } = useQuery({
+    queryKey: ["asset-folders"],
+    queryFn: fetchAssetFolders,
+    enabled: kind === "media",
+  });
+  useEffect(() => {
+    if (kind === "media" && !selectedFolderId && folders[0]) setSelectedFolderId(folders[0].id);
+  }, [folders, kind, selectedFolderId]);
   const {
     data = [],
     isLoading,
     error,
-  } = useQuery({ queryKey: ["asset-library", "voice"], queryFn: () => fetchLibraryAssets("voice") });
+  } = useQuery({
+    queryKey: ["asset-library", kind, selectedFolderId],
+    queryFn: () => fetchLibraryAssets(kind, kind === "media" ? selectedFolderId || undefined : undefined),
+    enabled: kind !== "media" || Boolean(selectedFolderId),
+  });
   const upload = useMutation({
     mutationFn: () => {
       if (!file) throw new Error("请选择上传文件");
-      return uploadLibraryAsset(file, "voice", name.trim() || file.name.replace(/\.[^.]+$/, ""), description);
+      return uploadLibraryAsset(
+        file,
+        kind,
+        name.trim() || file.name.replace(/\.[^.]+$/, ""),
+        description,
+        kind === "media" ? selectedFolderId : undefined,
+      );
     },
     onSuccess: (asset) => {
-      void queryClient.invalidateQueries({ queryKey: ["asset-library", "voice"] });
+      void queryClient.invalidateQueries({ queryKey: ["asset-library", kind] });
       setUploadOpen(false);
       setFile(null);
       setName("");
@@ -248,50 +291,134 @@ function VoiceLibrary() {
     localStorage.setItem("studio:selectedVoice", JSON.stringify(asset));
     window.location.assign("/aigc/video-remix");
   };
+  const addFolder = async () => {
+    const folderName = window.prompt("请输入新文件夹名称");
+    if (!folderName?.trim()) return;
+    try {
+      const folder = await createAssetFolder(folderName.trim());
+      await queryClient.invalidateQueries({ queryKey: ["asset-folders"] });
+      setSelectedFolderId(folder.id);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "文件夹创建失败");
+    }
+  };
+  const renameFolder = async (folderId: string, currentName: string) => {
+    const folderName = window.prompt("请输入新的文件夹名称", currentName);
+    if (!folderName?.trim() || folderName.trim() === currentName) return;
+    try {
+      await renameAssetFolder(folderId, folderName.trim());
+      await queryClient.invalidateQueries({ queryKey: ["asset-folders"] });
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "文件夹重命名失败");
+    }
+  };
+  const removeFolder = async (folderId: string) => {
+    if (!window.confirm("确定删除这个空文件夹吗？")) return;
+    try {
+      await deleteAssetFolder(folderId);
+      setSelectedFolderId("");
+      await queryClient.invalidateQueries({ queryKey: ["asset-folders"] });
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "文件夹删除失败");
+    }
+  };
 
   return (
-    <div className="asset-library-page">
-      <LibraryHeader
-        eyebrow="ASSET / VOICE"
-        title="音色库"
-        description="管理配音样本和克隆音色参考，支持 MP3、WAV、M4A、OGG。"
-        count={data.length}
-      />
-      <LibraryToolbar
-        query={query}
-        setQuery={setQuery}
-        title="音色库"
-        uploadLabel="上传音色"
-        onUpload={() => setUploadOpen(true)}
-      />
-      <div className="asset-library-results">
-        <b>{filtered.length}</b> 个匹配结果
-      </div>
-      <section className="asset-library-grid">
-        {filtered.map((asset) => (
-          <button className="library-asset-card" key={asset.id} onClick={() => setSelected(asset)}>
-            <div className="library-asset-preview voice">
-              <FileAudio />
-              <i>试听音色</i>
-            </div>
-            <div>
-              <h3>{asset.name}</h3>
-              <p>{asset.description || asset.originalName}</p>
-              <small>
-                {(asset.size / 1024 / 1024).toFixed(1)} MB · {new Date(asset.createdAt).toLocaleDateString("zh-CN")}
-              </small>
-            </div>
-          </button>
-        ))}
-        <LibraryState
-          loading={isLoading}
-          error={error}
-          empty={!filtered.length}
-          icon={<AudioLines />}
-          emptyText="还没有音色资产"
+    <div className={`asset-library-page ${kind === "media" ? "material-library-page" : ""}`}>
+      {kind === "media" && (
+        <aside className="material-folder-sidebar">
+          <header>
+            <b>全部专辑</b>
+            <button type="button" aria-label="新建文件夹" onClick={() => void addFolder()}>
+              <FolderPlus />
+            </button>
+          </header>
+          <nav>
+            {folders.map((folder) => (
+              <div key={folder.id} className={selectedFolderId === folder.id ? "active" : ""}>
+                <button type="button" onClick={() => setSelectedFolderId(folder.id)}>
+                  <Folder />
+                  <span>{folder.name}</span>
+                </button>
+                <span className="folder-actions">
+                  <button
+                    type="button"
+                    aria-label={`重命名 ${folder.name}`}
+                    onClick={() => void renameFolder(folder.id, folder.name)}
+                  >
+                    <Pencil />
+                  </button>
+                  <button type="button" aria-label={`删除 ${folder.name}`} onClick={() => void removeFolder(folder.id)}>
+                    <Trash2 />
+                  </button>
+                </span>
+              </div>
+            ))}
+          </nav>
+          <footer>
+            <span>用户存储目录</span>
+            <b>{folders.find((folder) => folder.id === selectedFolderId)?.storagePrefix ?? "正在初始化…"}</b>
+          </footer>
+        </aside>
+      )}
+      <div className="material-library-content">
+        <LibraryHeader
+          eyebrow={kind === "voice" ? "ASSET / VOICE" : "ASSET / MEDIA"}
+          title={kind === "voice" ? "音色库" : "素材库"}
+          description={
+            kind === "voice"
+              ? "管理配音样本和克隆音色参考，支持 MP3、WAV、M4A、OGG。"
+              : "集中管理任务中上传的图片、视频和音频，可在所有通用附件入口重复使用。"
+          }
+          count={data.length}
+        />
+        <LibraryToolbar
+          query={query}
+          setQuery={setQuery}
+          title={kind === "voice" ? "音色库" : "素材库"}
+          uploadLabel={kind === "voice" ? "上传音色" : "上传素材"}
           onUpload={() => setUploadOpen(true)}
         />
-      </section>
+        <div className="asset-library-results">
+          <b>{filtered.length}</b> 个匹配结果
+        </div>
+        <section className="asset-library-grid">
+          {filtered.map((asset) => (
+            <button className="library-asset-card" key={asset.id} onClick={() => setSelected(asset)}>
+              <div className={`library-asset-preview ${kind === "voice" ? "voice" : "media"}`}>
+                {kind === "media" && /^(image|video)\//.test(asset.mimeType) ? (
+                  <AuthenticatedMedia url={asset.url} mimeType={asset.mimeType} alt={asset.name} />
+                ) : kind === "voice" ? (
+                  <>
+                    <FileAudio />
+                    <i>试听音色</i>
+                  </>
+                ) : (
+                  <>
+                    <FileAudio />
+                    <i>音频素材</i>
+                  </>
+                )}
+              </div>
+              <div>
+                <h3>{asset.name}</h3>
+                <p>{asset.description || asset.originalName}</p>
+                <small>
+                  {(asset.size / 1024 / 1024).toFixed(1)} MB · {new Date(asset.createdAt).toLocaleDateString("zh-CN")}
+                </small>
+              </div>
+            </button>
+          ))}
+          <LibraryState
+            loading={isLoading}
+            error={error}
+            empty={!filtered.length}
+            icon={kind === "voice" ? <AudioLines /> : <Files />}
+            emptyText={kind === "voice" ? "还没有音色资产" : "还没有通用素材"}
+            onUpload={() => setUploadOpen(true)}
+          />
+        </section>
+      </div>
       {uploadOpen && (
         <div className="asset-modal-layer" role="presentation" onMouseDown={() => setUploadOpen(false)}>
           <aside
@@ -300,11 +427,19 @@ function VoiceLibrary() {
             aria-modal="true"
             onMouseDown={(event) => event.stopPropagation()}
           >
-            <ModalHeader eyebrow="ASSET / VOICE" title="上传音色" onClose={() => setUploadOpen(false)} />
+            <ModalHeader
+              eyebrow={kind === "voice" ? "ASSET / VOICE" : "ASSET / MEDIA"}
+              title={kind === "voice" ? "上传音色" : "上传素材"}
+              onClose={() => setUploadOpen(false)}
+            />
             <label className="asset-file-drop">
               <input
                 type="file"
-                accept="audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/ogg,audio/webm"
+                accept={
+                  kind === "voice"
+                    ? "audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/ogg,audio/webm"
+                    : "image/*,video/*,audio/*"
+                }
                 onChange={(event) => {
                   const next = event.target.files?.[0] || null;
                   setFile(next);
@@ -313,7 +448,11 @@ function VoiceLibrary() {
               />
               <Upload />
               <b>{file?.name || "点击选择文件"}</b>
-              <span>MP3、WAV、M4A、OGG，建议 10–60 秒干声</span>
+              <span>
+                {kind === "voice"
+                  ? "MP3、WAV、M4A、OGG，建议 10–60 秒干声"
+                  : "支持常见图片、视频和音频格式，单文件最大 500MB"}
+              </span>
             </label>
             <label>
               资产名称
@@ -357,8 +496,12 @@ function VoiceLibrary() {
                 <X />
               </button>
             </header>
-            <div className="asset-detail-media voice">
-              <FileAudio />
+            <div className={`asset-detail-media ${kind === "voice" ? "voice" : "media"}`}>
+              {kind === "media" && /^(image|video)\//.test(selected.mimeType) ? (
+                <AuthenticatedMedia url={selected.url} mimeType={selected.mimeType} alt={selected.name} />
+              ) : (
+                <FileAudio />
+              )}
             </div>
             <div className="asset-detail-copy">
               <span>
@@ -369,11 +512,13 @@ function VoiceLibrary() {
                 {selected.mimeType} · {(selected.size / 1024 / 1024).toFixed(2)} MB
               </small>
             </div>
-            <footer>
-              <button className="primary" onClick={() => applyToRemix(selected)}>
-                <AudioLines /> 用于爆款二创
-              </button>
-            </footer>
+            {kind === "voice" && (
+              <footer>
+                <button className="primary" onClick={() => applyToRemix(selected)}>
+                  <AudioLines /> 用于爆款二创
+                </button>
+              </footer>
+            )}
           </aside>
         </div>
       )}

@@ -78,8 +78,17 @@ export interface LibraryAsset {
   size: number;
   kind: AssetKind;
   description?: string;
+  folderId?: string;
   url: string;
   createdAt: string;
+}
+export interface AssetFolder {
+  id: string;
+  parentId?: string;
+  name: string;
+  storagePrefix: string;
+  createdAt: string;
+  updatedAt: string;
 }
 export interface LibraryProduct {
   id: string;

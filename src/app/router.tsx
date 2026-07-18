@@ -41,6 +41,16 @@ const portraitRoute = createRoute({
   component: () =>
     isAssetOpen("portraits") ? <PortraitLibrary /> : <ComingSoonPage config={{ id: "portraits", label: "人像库" }} />,
 });
+const materialRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/assets/materials",
+  component: () =>
+    isAssetOpen("materials") ? (
+      <AssetLibrary kind="media" />
+    ) : (
+      <ComingSoonPage config={{ id: "materials", label: "素材库" }} />
+    ),
+});
 const productRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/assets/products",
@@ -61,7 +71,14 @@ const voiceRoute = createRoute({
       <ComingSoonPage config={{ id: "voices", label: "音色库" }} />
     ),
 });
-const routeTree = rootRoute.addChildren([indexRoute, ...moduleRoutes, portraitRoute, productRoute, voiceRoute]);
+const routeTree = rootRoute.addChildren([
+  indexRoute,
+  ...moduleRoutes,
+  materialRoute,
+  portraitRoute,
+  productRoute,
+  voiceRoute,
+]);
 export const router = createRouter({ routeTree, defaultPreload: "intent" });
 declare module "@tanstack/react-router" {
   interface Register {

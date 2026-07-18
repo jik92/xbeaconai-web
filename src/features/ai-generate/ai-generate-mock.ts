@@ -177,6 +177,32 @@ export class AiGenerateMockStore {
     this.update({ references: [...this.state.references, ...references] });
     return undefined;
   }
+  addAssets(assets: Array<{ id: string; name: string; mimeType: string; size?: number; url?: string }>) {
+    if (this.state.references.length + assets.length > 6) return "最多添加 6 个参考素材";
+    const references = [...this.state.references];
+    for (const asset of assets) {
+      const kind = asset.mimeType.startsWith("image/")
+        ? "image"
+        : asset.mimeType.startsWith("video/")
+          ? "video"
+          : asset.mimeType.startsWith("audio/")
+            ? "audio"
+            : undefined;
+      if (!kind) return "仅支持图片、视频或音频";
+      if (this.state.kind === "video" && references.some((item) => item.kind === kind))
+        return `视频生成每类最多添加 1 个${kind === "image" ? "图片" : kind === "video" ? "视频" : "音频"}参考`;
+      references.push({
+        id: asset.id,
+        name: asset.name,
+        kind,
+        mimeType: asset.mimeType,
+        size: asset.size ?? 0,
+        url: asset.url ?? "",
+      });
+    }
+    this.update({ references });
+    return undefined;
+  }
   removeReference(id: string) {
     const ref = this.state.references.find((item) => item.id === id);
     if (ref) URL.revokeObjectURL(ref.url);
