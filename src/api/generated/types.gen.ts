@@ -56,6 +56,8 @@ export type RechargeOrder = {
     createdAt: string;
 };
 
+export type AssetKind = 'media' | 'product' | 'portrait' | 'voice';
+
 export type Job = {
     id: string;
     moduleId: ModuleId;
@@ -635,6 +637,9 @@ export type GetCreationCapabilitiesResponse = GetCreationCapabilitiesResponses[k
 export type UploadMediaData = {
     body: {
         file: Blob | File;
+        kind?: AssetKind;
+        displayName?: string;
+        description?: string;
     };
     path?: never;
     query?: never;
@@ -668,12 +673,73 @@ export type UploadMediaResponses = {
             name: string;
             mimeType: string;
             size: number;
+            kind: AssetKind;
+            displayName: string;
+            description?: string;
+            url: string;
             createdAt: string;
         };
     };
 };
 
 export type UploadMediaResponse = UploadMediaResponses[keyof UploadMediaResponses];
+
+export type ListAssetsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        kind?: AssetKind;
+    };
+    url: '/api/assets';
+};
+
+export type ListAssetsResponses = {
+    /**
+     * Current user's reusable assets
+     */
+    200: {
+        assets: Array<{
+            id: string;
+            name: string;
+            originalName: string;
+            mimeType: string;
+            size: number;
+            kind: AssetKind;
+            description?: string;
+            url: string;
+            createdAt: string;
+        }>;
+    };
+};
+
+export type ListAssetsResponse = ListAssetsResponses[keyof ListAssetsResponses];
+
+export type GetAssetContentData = {
+    body?: never;
+    path: {
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/assets/{assetId}/content';
+};
+
+export type GetAssetContentErrors = {
+    /**
+     * Not found
+     */
+    404: string;
+};
+
+export type GetAssetContentError = GetAssetContentErrors[keyof GetAssetContentErrors];
+
+export type GetAssetContentResponses = {
+    /**
+     * Asset binary
+     */
+    200: Blob | File;
+};
+
+export type GetAssetContentResponse = GetAssetContentResponses[keyof GetAssetContentResponses];
 
 export type ListJobsData = {
     body?: never;

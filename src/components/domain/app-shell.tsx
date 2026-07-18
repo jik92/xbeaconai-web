@@ -1,5 +1,16 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { Bell, CircleHelp, Coins, Images, PanelLeftClose, PanelLeftOpen, Search, Settings2 } from "lucide-react";
+import {
+  AudioLines,
+  Bell,
+  CircleHelp,
+  Coins,
+  Images,
+  Package,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Search,
+  Settings2,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { listNotifications } from "@/api/generated/sdk.gen";
 import { APP_CONFIG, isAssetOpen, isModuleOpen } from "@/app/config";
@@ -50,7 +61,6 @@ export function AppShell() {
           <BrandLogo className="brand-mark" />
           <div>
             <b>{APP_CONFIG.projectName}</b>
-            <span>CREATIVE OPS</span>
           </div>
         </div>
         <div className="global-search">
@@ -123,42 +133,34 @@ export function AppShell() {
         ))}
         <nav>
           <h3>资产</h3>
-          {isAssetOpen("portraits") ? (
-            <Link
-              to="/assets/portraits"
-              aria-label="人像库"
-              title={sidebarCollapsed ? "人像库" : undefined}
-              className={path === "/assets/portraits" ? "active" : ""}
-            >
-              <Images />
-              <span>人像库</span>
-              <i>1125</i>
-            </Link>
-          ) : (
-            <div
-              className="sidebar-coming-soon"
-              aria-label="人像库 Coming Soon"
-              aria-disabled="true"
-              title="等待产品验收"
-            >
-              <Images />
-              <span>人像库</span>
-              <i>Coming Soon</i>
-            </div>
+          {(
+            [
+              { id: "portraits", path: "/assets/portraits", label: "人像库", icon: Images, badge: "1125" },
+              { id: "products", path: "/assets/products", label: "商品库", icon: Package, badge: undefined },
+              { id: "voices", path: "/assets/voices", label: "音色库", icon: AudioLines, badge: undefined },
+            ] as const
+          ).map((asset) =>
+            isAssetOpen(asset.id) ? (
+              <Link
+                key={asset.id}
+                to={asset.path}
+                aria-label={asset.label}
+                title={sidebarCollapsed ? asset.label : undefined}
+                className={path === asset.path ? "active" : ""}
+              >
+                <asset.icon />
+                <span>{asset.label}</span>
+                {asset.badge && <i>{asset.badge}</i>}
+              </Link>
+            ) : (
+              <div key={asset.id} className="sidebar-coming-soon" aria-disabled="true" title="等待产品验收">
+                <asset.icon />
+                <span>{asset.label}</span>
+                <i>Coming Soon</i>
+              </div>
+            ),
           )}
         </nav>
-        <div className="sidebar-foot">
-          <button
-            type="button"
-            aria-label="偏好设置"
-            title={sidebarCollapsed ? "偏好设置" : undefined}
-            onClick={() => setPanel("preferences")}
-          >
-            <Settings2 />
-            偏好设置
-          </button>
-          <small>{APP_CONFIG.projectName}工作台 v0.1</small>
-        </div>
       </aside>
       <main className="content">
         <Outlet />

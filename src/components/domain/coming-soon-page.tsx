@@ -1,8 +1,9 @@
 import { Clock3 } from "lucide-react";
 import { APP_CONFIG } from "@/app/config";
+import type { AssetFeatureId } from "@/app/config";
 import type { ModuleConfig } from "@/app/routes";
 
-type ComingSoonFeature = Pick<ModuleConfig, "id" | "label"> | { id: "portraits"; label: "人像库" };
+type ComingSoonFeature = Pick<ModuleConfig, "id" | "label"> | { id: AssetFeatureId; label: string };
 
 export function ComingSoonPage({ config }: { config: ComingSoonFeature }) {
   return (

@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "曜作 AI 创作 API",
+    "title": "烽火AI AI 创作 API",
     "version": "0.1.0"
   },
   "components": {
@@ -208,6 +208,15 @@
           "paymentMode",
           "balanceAfter",
           "createdAt"
+        ]
+      },
+      "AssetKind": {
+        "type": "string",
+        "enum": [
+          "media",
+          "product",
+          "portrait",
+          "voice"
         ]
       },
       "Job": {
@@ -1623,6 +1632,17 @@
                   "file": {
                     "type": "string",
                     "format": "binary"
+                  },
+                  "kind": {
+                    "$ref": "#/components/schemas/AssetKind"
+                  },
+                  "displayName": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 300
                   }
                 },
                 "required": [
@@ -1655,6 +1675,18 @@
                         "size": {
                           "type": "number"
                         },
+                        "kind": {
+                          "$ref": "#/components/schemas/AssetKind"
+                        },
+                        "displayName": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        },
                         "createdAt": {
                           "type": "string"
                         }
@@ -1664,6 +1696,9 @@
                         "name",
                         "mimeType",
                         "size",
+                        "kind",
+                        "displayName",
+                        "url",
                         "createdAt"
                       ]
                     }
@@ -1701,6 +1736,123 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assets": {
+      "get": {
+        "operationId": "listAssets",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/AssetKind"
+            },
+            "required": false,
+            "name": "kind",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current user's reusable assets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "assets": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "originalName": {
+                            "type": "string"
+                          },
+                          "mimeType": {
+                            "type": "string"
+                          },
+                          "size": {
+                            "type": "integer"
+                          },
+                          "kind": {
+                            "$ref": "#/components/schemas/AssetKind"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "originalName",
+                          "mimeType",
+                          "size",
+                          "kind",
+                          "url",
+                          "createdAt"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "assets"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assets/{assetId}/content": {
+      "get": {
+        "operationId": "getAssetContent",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "assetId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Asset binary",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
                 }
               }
             }

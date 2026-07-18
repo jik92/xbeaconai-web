@@ -3,8 +3,8 @@
 import { type DefaultError, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { cancelJob, changePassword, createJob, createRechargeOrder, downloadArtifact, getCapabilities, getCreationCapabilities, getCurrentUser, getHealth, getJob, getModels, getPreferences, listJobs, listNotifications, listRechargeOrders, listRechargePackages, login, logout, markAllNotificationsRead, markNotificationRead, type Options, register, retryJob, savePreferences, updateProfile, uploadMedia } from '../sdk.gen';
-import type { CancelJobData, CancelJobError, CancelJobResponse, ChangePasswordData, ChangePasswordError, ChangePasswordResponse, CreateJobData, CreateJobError, CreateJobResponse, CreateRechargeOrderData, CreateRechargeOrderError, CreateRechargeOrderResponse, DownloadArtifactData, DownloadArtifactError, DownloadArtifactResponse, GetCapabilitiesData, GetCapabilitiesResponse, GetCreationCapabilitiesData, GetCreationCapabilitiesResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetHealthData, GetHealthResponse, GetJobData, GetJobError, GetJobResponse, GetModelsData, GetModelsResponse, GetPreferencesData, GetPreferencesResponse, ListJobsData, ListJobsResponse, ListNotificationsData, ListNotificationsResponse, ListRechargeOrdersData, ListRechargeOrdersResponse, ListRechargePackagesData, ListRechargePackagesResponse, LoginData, LoginError, LoginResponse, LogoutData, LogoutError, LogoutResponse, MarkAllNotificationsReadData, MarkAllNotificationsReadResponse, MarkNotificationReadData, MarkNotificationReadError, MarkNotificationReadResponse, RegisterData, RegisterError, RegisterResponse, RetryJobData, RetryJobError, RetryJobResponse, SavePreferencesData, SavePreferencesResponse, UpdateProfileData, UpdateProfileError, UpdateProfileResponse, UploadMediaData, UploadMediaError, UploadMediaResponse } from '../types.gen';
+import { cancelJob, changePassword, createJob, createRechargeOrder, downloadArtifact, getAssetContent, getCapabilities, getCreationCapabilities, getCurrentUser, getHealth, getJob, getModels, getPreferences, listAssets, listJobs, listNotifications, listRechargeOrders, listRechargePackages, login, logout, markAllNotificationsRead, markNotificationRead, type Options, register, retryJob, savePreferences, updateProfile, uploadMedia } from '../sdk.gen';
+import type { CancelJobData, CancelJobError, CancelJobResponse, ChangePasswordData, ChangePasswordError, ChangePasswordResponse, CreateJobData, CreateJobError, CreateJobResponse, CreateRechargeOrderData, CreateRechargeOrderError, CreateRechargeOrderResponse, DownloadArtifactData, DownloadArtifactError, DownloadArtifactResponse, GetAssetContentData, GetAssetContentError, GetAssetContentResponse, GetCapabilitiesData, GetCapabilitiesResponse, GetCreationCapabilitiesData, GetCreationCapabilitiesResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetHealthData, GetHealthResponse, GetJobData, GetJobError, GetJobResponse, GetModelsData, GetModelsResponse, GetPreferencesData, GetPreferencesResponse, ListAssetsData, ListAssetsResponse, ListJobsData, ListJobsResponse, ListNotificationsData, ListNotificationsResponse, ListRechargeOrdersData, ListRechargeOrdersResponse, ListRechargePackagesData, ListRechargePackagesResponse, LoginData, LoginError, LoginResponse, LogoutData, LogoutError, LogoutResponse, MarkAllNotificationsReadData, MarkAllNotificationsReadResponse, MarkNotificationReadData, MarkNotificationReadError, MarkNotificationReadResponse, RegisterData, RegisterError, RegisterResponse, RetryJobData, RetryJobError, RetryJobResponse, SavePreferencesData, SavePreferencesResponse, UpdateProfileData, UpdateProfileError, UpdateProfileResponse, UploadMediaData, UploadMediaError, UploadMediaResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -313,6 +313,36 @@ export const uploadMediaMutation = (options?: Partial<Options<UploadMediaData>>)
     };
     return mutationOptions;
 };
+
+export const listAssetsQueryKey = (options?: Options<ListAssetsData>) => createQueryKey('listAssets', options);
+
+export const listAssetsOptions = (options?: Options<ListAssetsData>) => queryOptions<ListAssetsResponse, DefaultError, ListAssetsResponse, ReturnType<typeof listAssetsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listAssets({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listAssetsQueryKey(options)
+});
+
+export const getAssetContentQueryKey = (options: Options<GetAssetContentData>) => createQueryKey('getAssetContent', options);
+
+export const getAssetContentOptions = (options: Options<GetAssetContentData>) => queryOptions<GetAssetContentResponse, GetAssetContentError, GetAssetContentResponse, ReturnType<typeof getAssetContentQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getAssetContent({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getAssetContentQueryKey(options)
+});
 
 export const listJobsQueryKey = (options?: Options<ListJobsData>) => createQueryKey('listJobs', options);
 

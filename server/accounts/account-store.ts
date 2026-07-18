@@ -41,6 +41,9 @@ export interface MediaAsset {
   originalName: string;
   mimeType: string;
   byteSize: number;
+  kind: "media" | "product" | "portrait" | "voice";
+  displayName: string;
+  description?: string;
   createdAt: string;
 }
 export interface ArtifactRecord {
@@ -153,7 +156,8 @@ export class AccountStore {
       );
       CREATE TABLE IF NOT EXISTS media_assets (
         id TEXT PRIMARY KEY,owner_user_id TEXT NOT NULL REFERENCES users(id),original_name TEXT NOT NULL,storage_key TEXT NOT NULL UNIQUE,
-        mime_type TEXT NOT NULL,byte_size INTEGER NOT NULL,expires_at TEXT,created_at TEXT NOT NULL
+        mime_type TEXT NOT NULL,byte_size INTEGER NOT NULL,asset_kind TEXT NOT NULL DEFAULT 'media',display_name TEXT NOT NULL DEFAULT '',
+        description TEXT,expires_at TEXT,created_at TEXT NOT NULL
       );
       CREATE TABLE IF NOT EXISTS artifacts (
         id TEXT PRIMARY KEY,owner_user_id TEXT NOT NULL REFERENCES users(id),job_id TEXT NOT NULL,storage_key TEXT NOT NULL,
@@ -171,6 +175,17 @@ export class AccountStore {
       this.db.exec("ALTER TABLE jobs ADD COLUMN owner_user_id TEXT");
     if (jobColumns.length)
       this.db.exec("CREATE INDEX IF NOT EXISTS jobs_owner_created_idx ON jobs(owner_user_id,created_at DESC)");
+    const assetColumns = this.db.query("PRAGMA table_info(media_assets)").all() as Array<{ name: string }>;
+    if (!assetColumns.some((column) => column.name === "asset_kind"))
+      this.db.exec("ALTER TABLE media_assets ADD COLUMN asset_kind TEXT NOT NULL DEFAULT 'media'");
+    if (!assetColumns.some((column) => column.name === "display_name"))
+      this.db.exec("ALTER TABLE media_assets ADD COLUMN display_name TEXT NOT NULL DEFAULT ''");
+    if (!assetColumns.some((column) => column.name === "description"))
+      this.db.exec("ALTER TABLE media_assets ADD COLUMN description TEXT");
+    this.db.exec("UPDATE media_assets SET display_name=original_name WHERE display_name='' OR display_name IS NULL");
+    this.db.exec(
+      "CREATE INDEX IF NOT EXISTS media_assets_owner_kind_idx ON media_assets(owner_user_id,asset_kind,created_at DESC)",
+    );
   }
 
   async register(input: { email: string; password: string; displayName: string }) {
@@ -449,7 +464,7 @@ export class AccountStore {
   createAsset(asset: MediaAsset) {
     this.db
       .query(
-        "INSERT INTO media_assets(id,owner_user_id,original_name,storage_key,mime_type,byte_size,created_at) VALUES(?,?,?,?,?,?,?)",
+        "INSERT INTO media_assets(id,owner_user_id,original_name,storage_key,mime_type,byte_size,asset_kind,display_name,description,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
       )
       .run(
         asset.id,
@@ -458,8 +473,49 @@ export class AccountStore {
         asset.storageKey,
         asset.mimeType,
         asset.byteSize,
+        asset.kind,
+        asset.displayName,
+        asset.description ?? null,
         asset.createdAt,
       );
+  }
+  listAssets(userId: string, kind?: MediaAsset["kind"]): MediaAsset[] {
+    const rows = (
+      kind
+        ? this.db
+            .query(
+              "SELECT id,owner_user_id,storage_key,original_name,mime_type,byte_size,asset_kind,display_name,description,created_at FROM media_assets WHERE owner_user_id=? AND asset_kind=? ORDER BY created_at DESC",
+            )
+            .all(userId, kind)
+        : this.db
+            .query(
+              "SELECT id,owner_user_id,storage_key,original_name,mime_type,byte_size,asset_kind,display_name,description,created_at FROM media_assets WHERE owner_user_id=? ORDER BY created_at DESC",
+            )
+            .all(userId)
+    ) as Array<{
+      id: string;
+      owner_user_id: string;
+      storage_key: string;
+      original_name: string;
+      mime_type: string;
+      byte_size: number;
+      asset_kind: MediaAsset["kind"];
+      display_name: string;
+      description: string | null;
+      created_at: string;
+    }>;
+    return rows.map((row) => ({
+      id: row.id,
+      ownerUserId: row.owner_user_id,
+      storageKey: row.storage_key,
+      originalName: row.original_name,
+      mimeType: row.mime_type,
+      byteSize: row.byte_size,
+      kind: row.asset_kind,
+      displayName: row.display_name || row.original_name,
+      description: row.description ?? undefined,
+      createdAt: row.created_at,
+    }));
   }
   ownsAsset(userId: string, id: string) {
     return Boolean(this.db.query("SELECT 1 FROM media_assets WHERE id=? AND owner_user_id=?").get(id, userId));
@@ -467,7 +523,7 @@ export class AccountStore {
   getOwnedAsset(userId: string, id: string) {
     const row = this.db
       .query(
-        "SELECT id,owner_user_id,storage_key,original_name,mime_type,byte_size,created_at FROM media_assets WHERE id=? AND owner_user_id=?",
+        "SELECT id,owner_user_id,storage_key,original_name,mime_type,byte_size,asset_kind,display_name,description,created_at FROM media_assets WHERE id=? AND owner_user_id=?",
       )
       .get(id, userId) as {
       id: string;
@@ -476,6 +532,9 @@ export class AccountStore {
       original_name: string;
       mime_type: string;
       byte_size: number;
+      asset_kind: MediaAsset["kind"];
+      display_name: string;
+      description: string | null;
       created_at: string;
     } | null;
     return row
@@ -486,6 +545,9 @@ export class AccountStore {
           originalName: row.original_name,
           mimeType: row.mime_type,
           byteSize: row.byte_size,
+          kind: row.asset_kind,
+          displayName: row.display_name || row.original_name,
+          description: row.description ?? undefined,
           createdAt: row.created_at,
         }
       : undefined;

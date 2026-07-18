@@ -1,4 +1,5 @@
 // biome-ignore-all lint/a11y/useButtonType: This full-screen workbench contains no forms.
+// biome-ignore-all lint/a11y/noStaticElementInteractions: Modal backdrops dismiss their dialogs.
 import { useQuery } from "@tanstack/react-query";
 import {
   Check,
@@ -24,10 +25,17 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { downloadAuthenticated, fetchModels, submitJob, uploadMediaFile, watchJob } from "@/api/api-client";
+import {
+  downloadAuthenticated,
+  fetchLibraryAssets,
+  fetchJob,
+  fetchModels,
+  submitJob,
+  uploadMediaFile,
+} from "@/api/api-client";
 import type { Job, SeedanceModelId } from "@/api/generated/types.gen";
 import { AuthenticatedMedia } from "@/components/domain/authenticated-media";
-import type { ApiJobResult } from "@/entities/types";
+import type { ApiJobResult, LibraryAsset } from "@/entities/types";
 import "./remix-project.css";
 
 const stages = ["上传配置", "AI 解析", "提示词校对", "分镜校对", "合并成片"];
@@ -117,20 +125,24 @@ function ConfigSidebar({
   description,
   setDescription,
   selectedPortrait,
+  selectedProduct,
+  selectedVoice,
   source,
   uploading,
   onUpload,
-  onNotice,
+  onPick,
 }: {
   mode: "product" | "talking";
   setMode: (mode: "product" | "talking") => void;
   description: string;
   setDescription: (value: string) => void;
   selectedPortrait: SelectedPortrait | null;
+  selectedProduct: LibraryAsset | null;
+  selectedVoice: LibraryAsset | null;
   source: string;
   uploading: boolean;
   onUpload: (file?: File) => void;
-  onNotice: (value: string) => void;
+  onPick: (kind: "product" | "portrait" | "voice") => void;
 }) {
   const fileName = source ? source.split(":").slice(2).join(":") : "";
   return (
@@ -148,22 +160,43 @@ function ConfigSidebar({
         <b>
           商品 <em>*</em>
         </b>
-        <button onClick={() => onNotice("已打开商品库")}>⚙ 商品库</button>
+        <button onClick={() => onPick("product")}>⚙ 商品库</button>
       </div>
-      <button className="config-product" onClick={() => onNotice("已选择演示商品")}>
-        <span className="product-thumb" />
-        <span>{source ? demoProduct : "未选择商品"}</span>
-        <b>{source ? "" : "选择"}</b>
+      <button className="config-product" onClick={() => onPick("product")}>
+        {selectedProduct ? (
+          <span className="product-thumb product-asset-thumb">
+            <AuthenticatedMedia
+              url={selectedProduct.url}
+              mimeType={selectedProduct.mimeType}
+              alt={selectedProduct.name}
+            />
+          </span>
+        ) : (
+          <span className="product-thumb" />
+        )}
+        <span>{selectedProduct?.name || "未选择商品"}</span>
+        <b>{selectedProduct ? "更换" : "选择"}</b>
       </button>
       <div className="config-field-title">
         <b>人像</b>
-        <button onClick={() => onNotice("请在人像库选择人像")}>+ 添加</button>
+        <button onClick={() => onPick("portrait")}>{selectedPortrait ? "更换" : "+ 添加"}</button>
       </div>
-      {source || selectedPortrait ? (
+      {selectedPortrait ? (
         <img className="config-portrait" src={selectedPortrait?.source_url || fallbackPortrait} alt="已选人像" />
       ) : (
         <span className="config-empty">未添加人像</span>
       )}
+      <div className="config-field-title">
+        <b>口播音色</b>
+        <button onClick={() => onPick("voice")}>{selectedVoice ? "更换" : "+ 选择"}</button>
+      </div>
+      <button className="config-voice" onClick={() => onPick("voice")}>
+        <Mic2 />
+        <span>
+          <b>{selectedVoice?.name || "未选择音色"}</b>
+          <small>{selectedVoice?.description || "使用视频原声或从音色库选择"}</small>
+        </span>
+      </button>
       <label className="config-description">
         需求描述
         <textarea
@@ -209,6 +242,67 @@ function ConfigSidebar({
   );
 }
 
+function AssetPickerModal({
+  kind,
+  onClose,
+  onSelect,
+}: {
+  kind: "product" | "voice";
+  onClose: () => void;
+  onSelect: (asset: LibraryAsset) => void;
+}) {
+  const {
+    data = [],
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["asset-library", kind],
+    queryFn: () => fetchLibraryAssets(kind),
+  });
+  const title = kind === "product" ? "选择商品" : "选择口播音色";
+  return (
+    <div className="remix-picker-layer" role="presentation" onMouseDown={onClose}>
+      <aside className="remix-picker" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
+        <header>
+          <div>
+            <small>ASSET LIBRARY</small>
+            <h2>{title}</h2>
+          </div>
+          <button aria-label="关闭" onClick={onClose}>
+            <X />
+          </button>
+        </header>
+        <div className="remix-picker-grid">
+          {data.map((asset) => (
+            <button key={asset.id} onClick={() => onSelect(asset)}>
+              <span className={kind}>
+                {kind === "product" ? (
+                  <AuthenticatedMedia url={asset.url} mimeType={asset.mimeType} alt={asset.name} />
+                ) : (
+                  <Mic2 />
+                )}
+              </span>
+              <b>{asset.name}</b>
+              <small>{asset.description || asset.originalName}</small>
+            </button>
+          ))}
+          {isLoading && <p>正在加载资产…</p>}
+          {error && <p>{error instanceof Error ? error.message : "资产加载失败"}</p>}
+          {!isLoading && !error && !data.length && (
+            <p>资产库还是空的，请先上传一个{kind === "product" ? "商品" : "音色"}。</p>
+          )}
+        </div>
+        <footer>
+          <button onClick={() => window.location.assign(kind === "product" ? "/assets/products" : "/assets/voices")}>
+            <Upload />
+            管理并上传{kind === "product" ? "商品" : "音色"}
+          </button>
+        </footer>
+      </aside>
+    </div>
+  );
+}
+
 function ProjectHistoryDrawer({ open, job, onClose }: { open: boolean; job: Job | null; onClose: () => void }) {
   const rows = useMemo(
     () => [
@@ -245,7 +339,6 @@ function ProjectHistoryDrawer({ open, job, onClose }: { open: boolean; job: Job 
   );
   if (!open) return null;
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: The backdrop dismisses the modal drawer.
     <div className="history-layer" role="presentation" onMouseDown={onClose}>
       <aside
         className="history-drawer"
@@ -326,6 +419,7 @@ export function RemixProject() {
   const [notice, setNotice] = useState("");
   const [job, setJob] = useState<Job | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [picker, setPicker] = useState<"product" | "voice" | null>(null);
   const videoModel: SeedanceModelId = "doubao-seedance-2-0-fast-260128";
   const { data: modelCatalog = [] } = useQuery({ queryKey: ["api-models"], queryFn: fetchModels, staleTime: 60_000 });
   const videoModels = modelCatalog.filter((model) => model.capability === "video-generate" && model.enabled);
@@ -336,25 +430,39 @@ export function RemixProject() {
       return null;
     }
   });
+  const [selectedProduct, setSelectedProduct] = useState<LibraryAsset | null>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("studio:selectedProduct") || "null");
+    } catch {
+      return null;
+    }
+  });
+  const [selectedVoice, setSelectedVoice] = useState<LibraryAsset | null>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("studio:selectedVoice") || "null");
+    } catch {
+      return null;
+    }
+  });
+  const activeJobId = job && (job.status === "queued" || job.status === "processing") ? job.id : null;
 
-  useEffect(
-    () =>
-      job && (job.status === "queued" || job.status === "processing")
-        ? watchJob(
-            job.id,
-            (updated) => {
-              setJob(updated);
-              if (updated.progress >= 35 && !parsed) {
-                setParsed(true);
-                setParsing(false);
-                setStage(2);
-              }
-            },
-            () => setNotice("实时连接已断开，可刷新页面恢复任务"),
-          )
-        : undefined,
-    [job?.id, job?.status, parsed, job],
-  );
+  useEffect(() => {
+    if (!activeJobId) return;
+    const refresh = () => {
+      void fetchJob(activeJobId)
+        .then((updated) => {
+          setJob(updated);
+          if (updated.progress >= 35 && !parsed) {
+            setParsed(true);
+            setParsing(false);
+            setStage(2);
+          }
+        })
+        .catch(() => setNotice("任务状态刷新失败，将在 10 秒后重试"));
+    };
+    const timer = window.setInterval(refresh, 10_000);
+    return () => window.clearInterval(timer);
+  }, [activeJobId, parsed]);
 
   const upload = async (file?: File) => {
     if (!file) return;
@@ -371,8 +479,8 @@ export function RemixProject() {
   };
   const parse = async () => {
     if (parsing) return;
-    if (!source) {
-      setNotice("请先上传分镜视频并选择商品");
+    if (!source || !selectedProduct) {
+      setNotice(source ? "请先从商品库选择商品" : "请先上传分镜视频并选择商品");
       setStage(0);
       return;
     }
@@ -388,7 +496,15 @@ export function RemixProject() {
       const created = await submitJob(
         "video-remix",
         `爆款二创 · ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
-        { source, mode, description, prompt, portrait: selectedPortrait?.name ?? "" },
+        {
+          source,
+          mode,
+          description,
+          prompt,
+          product: `asset:${selectedProduct.id}:${selectedProduct.name}`,
+          portrait: selectedPortrait?.name ?? "",
+          voice: selectedVoice ? `asset:${selectedVoice.id}:${selectedVoice.name}` : "",
+        },
         videoModel,
       );
       setJob(created);
@@ -439,10 +555,15 @@ export function RemixProject() {
           description={description}
           setDescription={setDescription}
           selectedPortrait={selectedPortrait}
+          selectedProduct={selectedProduct}
+          selectedVoice={selectedVoice}
           source={source}
           uploading={uploading}
           onUpload={(file) => void upload(file)}
-          onNotice={setNotice}
+          onPick={(kind) => {
+            if (kind === "portrait") window.location.assign("/assets/portraits");
+            else setPicker(kind);
+          }}
         />
         <section className="remix-workspace">
           {notice && (
@@ -686,12 +807,32 @@ export function RemixProject() {
         </section>
       </div>
       {stage === 0 && (
-        <button className="parse-button" disabled={!source || uploading || parsing} onClick={() => void parse()}>
+        <button
+          className="parse-button"
+          disabled={!source || !selectedProduct || uploading || parsing}
+          onClick={() => void parse()}
+        >
           <Sparkles />
           {parsing ? "解析中" : "视频解析"}
         </button>
       )}
       <ProjectHistoryDrawer open={historyOpen} job={job} onClose={() => setHistoryOpen(false)} />
+      {picker && (
+        <AssetPickerModal
+          kind={picker}
+          onClose={() => setPicker(null)}
+          onSelect={(asset) => {
+            if (picker === "product") {
+              setSelectedProduct(asset);
+              localStorage.setItem("studio:selectedProduct", JSON.stringify(asset));
+            } else {
+              setSelectedVoice(asset);
+              localStorage.setItem("studio:selectedVoice", JSON.stringify(asset));
+            }
+            setPicker(null);
+          }}
+        />
+      )}
     </div>
   );
 }

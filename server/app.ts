@@ -11,7 +11,7 @@ import { creationCapabilities, quoteCreation, validateCreationValues } from "./c
 import { env } from "./env";
 import { buildExecutionPlan, MemoryJobQueue } from "./jobs/memory-job-queue";
 import { InsufficientCreditsError, SqliteJobStore } from "./jobs/sqlite-job-store";
-import { defaultVideoModelId, seedanceModelIds, videoModels } from "./models/video-models";
+import { seedanceModelIds, videoModels } from "./models/video-models";
 import { auditSdkRegistry } from "./sdk-registry";
 import type { JobRecord, StageProvenance } from "./types";
 
@@ -95,6 +95,18 @@ const JobSchema = z
   })
   .openapi("Job");
 const ErrorSchema = z.object({ error: ApiErrorSchema }).openapi("ApiErrorResponse");
+const AssetKindSchema = z.enum(["media", "product", "portrait", "voice"]).openapi("AssetKind");
+const LibraryAssetSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  originalName: z.string(),
+  mimeType: z.string(),
+  size: z.number().int(),
+  kind: AssetKindSchema,
+  description: z.string().optional(),
+  url: z.string(),
+  createdAt: z.string(),
+});
 
 export const store = new SqliteJobStore();
 export const accounts = new AccountStore();
@@ -816,7 +828,14 @@ const uploadRoute = createRoute({
     body: {
       required: true,
       content: {
-        "multipart/form-data": { schema: z.object({ file: z.file().openapi({ type: "string", format: "binary" }) }) },
+        "multipart/form-data": {
+          schema: z.object({
+            file: z.file().openapi({ type: "string", format: "binary" }),
+            kind: AssetKindSchema.optional(),
+            displayName: z.string().max(80).optional(),
+            description: z.string().max(300).optional(),
+          }),
+        },
       },
     },
   },
@@ -831,6 +850,10 @@ const uploadRoute = createRoute({
               name: z.string(),
               mimeType: z.string(),
               size: z.number(),
+              kind: AssetKindSchema,
+              displayName: z.string(),
+              description: z.string().optional(),
+              url: z.string(),
               createdAt: z.string(),
             }),
           }),
@@ -845,6 +868,10 @@ const uploadRoute = createRoute({
 app.openapi(uploadRoute, async (c) => {
   const form = await c.req.formData();
   const file = form.get("file");
+  const rawKind = form.get("kind");
+  const kind = AssetKindSchema.safeParse(rawKind || "media");
+  const rawDisplayName = form.get("displayName");
+  const rawDescription = form.get("description");
   const requestId = crypto.randomUUID();
   if (!(file instanceof File) || file.size === 0)
     return c.json({ error: { code: "INVALID_MEDIA", message: "请选择有效文件", retryable: false, requestId } }, 400);
@@ -880,6 +907,18 @@ app.openapi(uploadRoute, async (c) => {
       },
       415,
     );
+  if (!kind.success)
+    return c.json({ error: { code: "INVALID_ASSET_KIND", message: "资产分类无效", retryable: false, requestId } }, 400);
+  if ((kind.data === "product" || kind.data === "portrait") && !file.type.startsWith("image/"))
+    return c.json(
+      { error: { code: "INVALID_ASSET_MEDIA", message: "商品和人像资产仅支持图片", retryable: false, requestId } },
+      415,
+    );
+  if (kind.data === "voice" && !file.type.startsWith("audio/"))
+    return c.json(
+      { error: { code: "INVALID_ASSET_MEDIA", message: "音色资产仅支持音频", retryable: false, requestId } },
+      415,
+    );
   const id = crypto.randomUUID();
   const safeExtension =
     extensions[file.type] ??
@@ -887,6 +926,13 @@ app.openapi(uploadRoute, async (c) => {
       .replace(/[^.a-zA-Z0-9]/g, "")
       .slice(0, 10);
   const storageKey = `${id}${safeExtension}`;
+  const displayName =
+    typeof rawDisplayName === "string" && rawDisplayName.trim()
+      ? rawDisplayName.trim().slice(0, 80)
+      : file.name.replace(/\.[^.]+$/, "").slice(0, 80);
+  const description =
+    typeof rawDescription === "string" && rawDescription.trim() ? rawDescription.trim().slice(0, 300) : undefined;
+  const createdAt = new Date().toISOString();
   await Bun.write(resolve(env.dataDir, "uploads", storageKey), file);
   accounts.createAsset({
     id,
@@ -895,7 +941,10 @@ app.openapi(uploadRoute, async (c) => {
     originalName: file.name.slice(0, 200),
     mimeType: file.type,
     byteSize: file.size,
-    createdAt: new Date().toISOString(),
+    kind: kind.data,
+    displayName,
+    description,
+    createdAt,
   });
   return c.json(
     {
@@ -904,11 +953,70 @@ app.openapi(uploadRoute, async (c) => {
         name: file.name.slice(0, 200),
         mimeType: file.type || "application/octet-stream",
         size: file.size,
-        createdAt: new Date().toISOString(),
+        kind: kind.data,
+        displayName,
+        description,
+        url: `/api/assets/${id}/content`,
+        createdAt,
       },
     },
     201,
   );
+});
+
+const assetListRoute = createRoute({
+  method: "get",
+  path: "/api/assets",
+  operationId: "listAssets",
+  request: { query: z.object({ kind: AssetKindSchema.optional() }) },
+  responses: {
+    200: {
+      description: "Current user's reusable assets",
+      content: { "application/json": { schema: z.object({ assets: z.array(LibraryAssetSchema) }) } },
+    },
+  },
+});
+app.openapi(assetListRoute, (c) => {
+  const kind = c.req.valid("query").kind;
+  const assets = accounts.listAssets(c.get("userId"), kind).map((asset) => ({
+    id: asset.id,
+    name: asset.displayName,
+    originalName: asset.originalName,
+    mimeType: asset.mimeType,
+    size: asset.byteSize,
+    kind: asset.kind,
+    description: asset.description,
+    url: `/api/assets/${asset.id}/content`,
+    createdAt: asset.createdAt,
+  }));
+  return c.json({ assets }, 200);
+});
+
+const assetContentRoute = createRoute({
+  method: "get",
+  path: "/api/assets/{assetId}/content",
+  operationId: "getAssetContent",
+  request: { params: z.object({ assetId: z.string().uuid() }) },
+  responses: {
+    200: {
+      description: "Asset binary",
+      content: { "application/octet-stream": { schema: z.string().openapi({ format: "binary" }) } },
+    },
+    404: { description: "Not found", content: { "text/plain": { schema: z.string() } } },
+  },
+});
+app.openapi(assetContentRoute, async (c) => {
+  const asset = accounts.getOwnedAsset(c.get("userId"), c.req.valid("param").assetId);
+  if (!asset) return new Response("Not found", { status: 404 });
+  const file = Bun.file(resolve(env.dataDir, "uploads", asset.storageKey));
+  if (!(await file.exists())) return new Response("Not found", { status: 404 });
+  return new Response(file, {
+    headers: {
+      "Content-Type": asset.mimeType || "application/octet-stream",
+      "Content-Disposition": `inline; filename="${asset.originalName.replaceAll('"', "")}"`,
+      "Cache-Control": "private, max-age=300",
+    },
+  });
 });
 
 const listRoute = createRoute({

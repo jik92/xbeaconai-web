@@ -2,7 +2,7 @@ import type { ModuleId } from "@/entities/types";
 
 export type CreationWorkflowId = "video-remix" | "video-create" | "ad-script";
 export type AiToolboxId = Exclude<ModuleId, CreationWorkflowId>;
-export type AssetFeatureId = "portraits";
+export type AssetFeatureId = "portraits" | "products" | "voices";
 
 export interface MenuFeatureConfig {
   readonly creationWorkflow: Readonly<Record<CreationWorkflowId, boolean>>;
@@ -39,7 +39,9 @@ export const APP_CONFIG = {
       kickart: false,
     },
     assets: {
-      portraits: false,
+      portraits: true,
+      products: true,
+      voices: true,
     },
   },
 } as const satisfies PublicAppConfig;

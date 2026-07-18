@@ -58,6 +58,13 @@ export const zRechargeOrder = z.object({
     createdAt: z.string()
 });
 
+export const zAssetKind = z.enum([
+    'media',
+    'product',
+    'portrait',
+    'voice'
+]);
+
 export const zModuleId = z.enum([
     'video-remix',
     'video-create',
@@ -417,7 +424,10 @@ export const zGetCreationCapabilitiesResponse = z.object({
 });
 
 export const zUploadMediaBody = z.object({
-    file: z.string()
+    file: z.string(),
+    kind: zAssetKind.optional(),
+    displayName: z.string().max(80).optional(),
+    description: z.string().max(300).optional()
 });
 
 /**
@@ -429,9 +439,43 @@ export const zUploadMediaResponse = z.object({
         name: z.string(),
         mimeType: z.string(),
         size: z.number(),
+        kind: zAssetKind,
+        displayName: z.string(),
+        description: z.string().optional(),
+        url: z.string(),
         createdAt: z.string()
     })
 });
+
+export const zListAssetsQuery = z.object({
+    kind: zAssetKind.optional()
+});
+
+/**
+ * Current user's reusable assets
+ */
+export const zListAssetsResponse = z.object({
+    assets: z.array(z.object({
+        id: z.uuid(),
+        name: z.string(),
+        originalName: z.string(),
+        mimeType: z.string(),
+        size: z.int(),
+        kind: zAssetKind,
+        description: z.string().optional(),
+        url: z.string(),
+        createdAt: z.string()
+    }))
+});
+
+export const zGetAssetContentPath = z.object({
+    assetId: z.uuid()
+});
+
+/**
+ * Asset binary
+ */
+export const zGetAssetContentResponse = z.string();
 
 export const zListJobsQuery = z.object({
     moduleId: zModuleId.optional()

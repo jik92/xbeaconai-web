@@ -1,5 +1,6 @@
 import { getAuthToken } from "@/features/account/auth-context";
 import { randomUuid } from "@/lib/random-id";
+import type { AssetKind, LibraryAsset } from "@/entities/types";
 import { apiBaseUrl, apiUrl } from "./base-url";
 import { client } from "./generated/client.gen";
 import { cancelJob, createJob, getJob, getModels, listJobs, retryJob, uploadMedia } from "./generated/sdk.gen";
@@ -56,6 +57,31 @@ export async function uploadMediaFile(file: File) {
   if (!data?.asset) throw new Error("文件上传失败");
   return data.asset;
 }
+export async function fetchLibraryAssets(kind: Exclude<AssetKind, "media">) {
+  const response = await fetch(apiUrl(`/api/assets?kind=${encodeURIComponent(kind)}`), { headers: authHeaders() });
+  if (!response.ok) throw new Error("资产列表加载失败");
+  const data = (await response.json()) as { assets: LibraryAsset[] };
+  return data.assets;
+}
+export async function uploadLibraryAsset(
+  file: File,
+  kind: Exclude<AssetKind, "media">,
+  displayName: string,
+  description = "",
+) {
+  const body = new FormData();
+  body.set("file", file);
+  body.set("kind", kind);
+  body.set("displayName", displayName);
+  if (description.trim()) body.set("description", description.trim());
+  const response = await fetch(apiUrl("/api/uploads"), { method: "POST", headers: authHeaders(), body });
+  if (!response.ok) {
+    const data = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
+    throw new Error(data?.error?.message || "资产上传失败");
+  }
+  const data = (await response.json()) as { asset: LibraryAsset & { displayName?: string } };
+  return { ...data.asset, name: data.asset.displayName || data.asset.name } as LibraryAsset;
+}
 export async function requestCancel(jobId: string) {
   configure();
   const { data } = await cancelJob({ path: { jobId }, headers: authHeaders(), throwOnError: true });
@@ -104,7 +130,7 @@ export function watchJob(jobId: string, onChange: (job: Job) => void, onError?: 
           boundary = buffer.indexOf("\n\n");
         }
       }
-    } catch (error) {
+    } catch (_error) {
       if (!controller.signal.aborted) onError?.();
     }
   })();

@@ -68,3 +68,16 @@ export interface ApiJobResult {
   artifacts: ApiArtifact[];
   data?: Record<string, unknown>;
 }
+
+export type AssetKind = "media" | "product" | "portrait" | "voice";
+export interface LibraryAsset {
+  id: string;
+  name: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  kind: AssetKind;
+  description?: string;
+  url: string;
+  createdAt: string;
+}
