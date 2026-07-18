@@ -12,7 +12,8 @@ readonly NGINX_SITE="/etc/nginx/sites-available/xbeaconai-web"
 readonly NPM_REGISTRY="https://registry.npmmirror.com"
 readonly LOCK_FILE="/var/lock/xbeaconai-web-deploy.lock"
 readonly API_HEALTH_URL="http://127.0.0.1:8787/api/health"
-readonly PUBLIC_ORIGIN="${PUBLIC_ORIGIN:-http://118.196.101.57}"
+readonly APP_ORIGIN="${APP_ORIGIN:-http://app.xbeaconai.com}"
+readonly API_ORIGIN="${API_ORIGIN:-http://api.xbeaconai.com}"
 
 log() {
     printf '[%s] %s\n' "$(date '+%F %T')" "$*"
@@ -50,7 +51,7 @@ ensure_runtime_environment() {
     upsert_env "API_HOST" "127.0.0.1"
     upsert_env "API_PORT" "8787"
     upsert_env "YAOZUO_DATA_DIR" "$DATA_DIR"
-    upsert_env "ALLOWED_ORIGINS" "$PUBLIC_ORIGIN"
+    upsert_env "ALLOWED_ORIGINS" "${APP_ORIGIN},${API_ORIGIN}"
     upsert_env "ALLOW_MOCK_FALLBACK" "true"
 }
 
@@ -89,7 +90,7 @@ log "使用国内镜像安装依赖..."
 bun install --frozen-lockfile --registry="$NPM_REGISTRY"
 
 log "构建生产版本..."
-bun run build
+VITE_API_BASE_URL="$API_ORIGIN" bun run build
 
 log "配置并重启 Bun API..."
 ensure_runtime_environment
@@ -113,6 +114,8 @@ systemctl reload nginx
 systemctl is-active --quiet nginx
 
 log "验证公网入口..."
-curl --fail --silent --show-error -H "Origin: $PUBLIC_ORIGIN" http://127.0.0.1/api/health >/dev/null
+curl --fail --silent --show-error -H "Host: app.xbeaconai.com" http://127.0.0.1/ >/dev/null
+curl --fail --silent --show-error -H "Host: api.xbeaconai.com" -H "Origin: $APP_ORIGIN" \
+    http://127.0.0.1/api/health >/dev/null
 
 log "部署完成：$(git rev-parse --short HEAD)"

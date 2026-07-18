@@ -1,11 +1,12 @@
 import { getAuthToken } from "@/features/account/auth-context";
+import { apiBaseUrl, apiUrl } from "./base-url";
 import { client } from "./generated/client.gen";
 import { cancelJob, createJob, getJob, getModels, listJobs, retryJob, uploadMedia } from "./generated/sdk.gen";
 import type { Job, ModuleId, SeedanceModelId } from "./generated/types.gen";
 
 const configure = () =>
   client.setConfig({
-    baseUrl: typeof window === "undefined" ? "http://127.0.0.1:8787" : window.location.origin,
+    baseUrl: apiBaseUrl(),
     headers: authHeaders(),
   });
 const authHeaders = () => {
@@ -42,7 +43,7 @@ export async function submitJob(
   return data;
 }
 export async function fetchCreationCapabilities() {
-  const response = await fetch("/api/creation/capabilities");
+  const response = await fetch(apiUrl("/api/creation/capabilities"));
   if (!response.ok) throw new Error("创作模型目录加载失败");
   return response.json() as Promise<{
     models: import("@/features/ai-creation/ai-creation-composer").CreationModelCapability[];
@@ -77,7 +78,7 @@ export function watchJob(jobId: string, onChange: (job: Job) => void, onError?: 
   const controller = new AbortController();
   void (async () => {
     try {
-      const response = await fetch(`/api/jobs/${jobId}/events`, {
+      const response = await fetch(apiUrl(`/api/jobs/${jobId}/events`), {
         headers: { ...authHeaders(), Accept: "text/event-stream" },
         signal: controller.signal,
       });
@@ -110,7 +111,7 @@ export function watchJob(jobId: string, onChange: (job: Job) => void, onError?: 
 }
 
 export async function authenticatedBlobUrl(url: string) {
-  const response = await fetch(url, { headers: authHeaders() });
+  const response = await fetch(apiUrl(url), { headers: authHeaders() });
   if (!response.ok) throw new Error("结果文件读取失败");
   return URL.createObjectURL(await response.blob());
 }

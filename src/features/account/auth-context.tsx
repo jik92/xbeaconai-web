@@ -1,4 +1,5 @@
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { apiBaseUrl } from "@/api/base-url";
 import { client } from "@/api/generated/client.gen";
 import {
   getCurrentUser,
@@ -16,7 +17,7 @@ export function getAuthToken() {
 
 function configureClient(token = getAuthToken()) {
   client.setConfig({
-    baseUrl: typeof window === "undefined" ? "http://127.0.0.1:8787" : window.location.origin,
+    baseUrl: apiBaseUrl(),
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
 }
