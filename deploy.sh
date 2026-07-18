@@ -95,10 +95,12 @@ ensure_tls_certificate() {
         /etc/letsencrypt/renewal-hooks/deploy/reload-nginx
 }
 
-exec 9>"$LOCK_FILE"
-if ! flock -n 9; then
-    log "已有部署任务正在运行，退出。"
-    exit 1
+if [[ "${DEPLOY_REEXECUTED:-0}" != "1" ]]; then
+    exec 9>"$LOCK_FILE"
+    if ! flock -n 9; then
+        log "已有部署任务正在运行，退出。"
+        exit 1
+    fi
 fi
 
 cd "$PROJECT_DIR"
@@ -108,10 +110,16 @@ if [[ -z "$current_branch" ]]; then
     log "当前处于 detached HEAD，无法安全拉取代码。"
     exit 1
 fi
+starting_revision="$(git rev-parse HEAD)"
 
 log "拉取 origin/${current_branch} 最新代码..."
 git fetch origin "$current_branch"
 git merge --ff-only "origin/${current_branch}"
+updated_revision="$(git rev-parse HEAD)"
+if [[ "$updated_revision" != "$starting_revision" && "${DEPLOY_REEXECUTED:-0}" != "1" ]]; then
+    log "部署脚本已更新，使用新版本重新执行..."
+    exec env DEPLOY_REEXECUTED=1 "$PROJECT_DIR/deploy.sh"
+fi
 
 log "使用国内镜像安装依赖..."
 bun install --frozen-lockfile --registry="$NPM_REGISTRY"
