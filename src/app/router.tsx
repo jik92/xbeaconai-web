@@ -4,6 +4,7 @@ import { ComingSoonPage, ProjectComingSoonPage } from "@/components/domain/comin
 import { ModulePage } from "@/components/domain/module-page";
 import { AiGeneratePage } from "@/features/ai-generate/ai-generate-page";
 import { AssetLibrary } from "@/features/asset-library/asset-library";
+import { MediaUnderstandPage } from "@/features/media-understand/media-understand-page";
 import { PortraitLibrary } from "@/features/portrait-library/portrait-library";
 import { RemixProject } from "@/features/video-remix/remix-project";
 import { isAssetOpen, isModuleOpen } from "./config";
@@ -27,6 +28,8 @@ const moduleRoutes = modules.map((config) =>
         <RemixProject />
       ) : config.id === "ai-generate" ? (
         <AiGeneratePage />
+      ) : config.id === "media-understand" ? (
+        <MediaUnderstandPage />
       ) : (
         <ModulePage config={config} />
       ),

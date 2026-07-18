@@ -1,26 +1,19 @@
 import {
-  ArrowUp,
   CalendarDays,
   Check,
   ChevronDown,
   Download,
-  Expand,
-  FileAudio,
-  FileImage,
-  FileVideo,
   Grid2X2,
   Heart,
   Image,
   MessageSquarePlus,
-  Plus,
   Search,
-  Shrink,
   Sparkles,
-  Trash2,
   Video,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { PromptWorkbench } from "@/components/domain/prompt-workbench";
 import {
   AiGenerateMockStore,
   type GenerateKind,
@@ -237,55 +230,22 @@ export function AiGeneratePage() {
             <ResultCard key={result.id} result={result} store={store} onNotice={setNotice} onPreview={setPreview} />
           ))}
         </section>
-        <section className={`ag-composer ${snapshot.expanded ? "expanded" : ""} ${results.length ? "docked" : ""}`}>
-          <div className="ag-reference-row">
-            <input
-              ref={fileRef}
-              hidden
-              type="file"
-              multiple
-              accept="image/*,video/*,audio/*"
-              onChange={(event) => chooseFiles(Array.from(event.target.files ?? []))}
-            />
-            <button className="ag-add-reference" aria-label="添加参考素材" onClick={() => fileRef.current?.click()}>
-              <Plus />
-              <span>参考</span>
-            </button>
-            {snapshot.references.map((ref) => (
-              <div className="ag-reference" key={ref.id}>
-                {ref.kind === "image" ? <FileImage /> : ref.kind === "video" ? <FileVideo /> : <FileAudio />}
-                <span>
-                  <b>{ref.name}</b>
-                  <small>{ref.kind}</small>
-                </span>
-                <button aria-label={`移除 ${ref.name}`} onClick={() => store.removeReference(ref.id)}>
-                  <Trash2 />
-                </button>
-              </div>
-            ))}
-          </div>
-          <textarea
-            ref={inputRef}
-            aria-label="创作指令"
-            placeholder="使用 @快速调用参考内容，例如：@图片1模仿 @视频1的动作，音色参考 @音频1"
-            value={snapshot.prompt}
-            onChange={(event) => store.setPrompt(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-                event.preventDefault();
-                requestSubmit();
-              }
-            }}
-          />
-          <button
-            className="ag-expand"
-            aria-label={snapshot.expanded ? "收起输入框" : "展开输入框"}
-            onClick={() => store.setExpanded(!snapshot.expanded)}
-          >
-            {snapshot.expanded ? <Shrink /> : <Expand />}
-          </button>
-          <div className="ag-parameters">
-            <div>
+        <PromptWorkbench
+          expanded={snapshot.expanded}
+          docked={Boolean(results.length)}
+          references={snapshot.references}
+          prompt={snapshot.prompt}
+          placeholder="使用 @快速调用参考内容，例如：@图片1模仿 @视频1的动作，音色参考 @音频1"
+          inputLabel="创作指令"
+          inputRef={inputRef}
+          fileInputRef={fileRef}
+          onChooseFiles={chooseFiles}
+          onRemoveReference={(id) => store.removeReference(id)}
+          onPromptChange={(value) => store.setPrompt(value)}
+          onExpandedChange={(value) => store.setExpanded(value)}
+          onSubmit={requestSubmit}
+          controls={
+            <>
               <button onClick={() => setPanel(panel === "kind" ? undefined : "kind")}>
                 {snapshot.kind === "video" ? <Video /> : <Image />}
                 {kindLabel[snapshot.kind]}
@@ -319,11 +279,9 @@ export function AiGeneratePage() {
                 <i />
                 {snapshot.count}个
               </button>
-            </div>
-            <button className="ag-send" aria-label="提交生成" onClick={requestSubmit}>
-              <ArrowUp />
-            </button>
-          </div>
+            </>
+          }
+        >
           {panel === "kind" && (
             <div className="ag-popover ag-kind-panel">
               <button
@@ -430,7 +388,7 @@ export function AiGeneratePage() {
               )}
             </div>
           )}
-        </section>
+        </PromptWorkbench>
         <label className={`ag-manual-confirm ${results.length ? "docked" : ""}`}>
           <input
             type="checkbox"
