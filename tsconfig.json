@@ -18,5 +18,5 @@
     "paths": { "@/*": ["./src/*"] },
     "types": ["bun-types"]
   },
-  "include": ["src", "tests", "vite.config.ts"]
+  "include": ["src", "server", "scripts", "tests", "vite.config.ts"]
 }

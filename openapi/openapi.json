@@ -1,0 +1,1874 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "曜作 AI 创作 API",
+    "version": "0.1.0"
+  },
+  "components": {
+    "schemas": {
+      "AuthResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "tokenType": {
+            "type": "string",
+            "enum": [
+              "Bearer"
+            ]
+          },
+          "expiresAt": {
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserSummary"
+          }
+        },
+        "required": [
+          "token",
+          "tokenType",
+          "expiresAt",
+          "user"
+        ]
+      },
+      "UserSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "avatarText": {
+            "type": "string"
+          },
+          "credits": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "displayName",
+          "avatarText",
+          "credits"
+        ]
+      },
+      "ApiErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "retryable": {
+                "type": "boolean"
+              },
+              "requestId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message",
+              "retryable",
+              "requestId"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "Preferences": {
+        "type": "object",
+        "properties": {
+          "theme": {
+            "type": "string",
+            "enum": [
+              "light",
+              "system"
+            ]
+          },
+          "defaultRatio": {
+            "type": "string",
+            "enum": [
+              "9:16",
+              "16:9",
+              "1:1"
+            ]
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "zh-CN",
+              "en"
+            ]
+          },
+          "taskNotifications": {
+            "type": "boolean"
+          },
+          "autoplayResults": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "theme",
+          "defaultRatio",
+          "language",
+          "taskNotifications",
+          "autoplayResults"
+        ]
+      },
+      "NotificationItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "readAt": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "title",
+          "body",
+          "createdAt"
+        ]
+      },
+      "RechargeOrder": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "packageId": {
+            "type": "string"
+          },
+          "amountCny": {
+            "type": "integer"
+          },
+          "credits": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "succeeded"
+            ]
+          },
+          "paymentMode": {
+            "type": "string",
+            "enum": [
+              "mock"
+            ]
+          },
+          "balanceAfter": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "packageId",
+          "amountCny",
+          "credits",
+          "status",
+          "paymentMode",
+          "balanceAfter",
+          "createdAt"
+        ]
+      },
+      "Job": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "moduleId": {
+            "$ref": "#/components/schemas/ModuleId"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "processing",
+              "succeeded",
+              "partially_succeeded",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "progress": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "stage": {
+            "type": "string"
+          },
+          "overallExecutionMode": {
+            "type": "string",
+            "enum": [
+              "real",
+              "local",
+              "mock",
+              "mixed"
+            ]
+          },
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "videoModel": {
+            "$ref": "#/components/schemas/SeedanceModelId"
+          },
+          "executionPlan": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "capability": {
+                  "type": "string"
+                },
+                "executionMode": {
+                  "type": "string",
+                  "enum": [
+                    "real",
+                    "local",
+                    "mock"
+                  ]
+                },
+                "implementation": {
+                  "type": "string"
+                },
+                "provider": {
+                  "type": "string"
+                },
+                "model": {
+                  "type": "string"
+                },
+                "fallbackReason": {
+                  "type": "string"
+                },
+                "startedAt": {
+                  "type": "string"
+                },
+                "completedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "capability",
+                "executionMode",
+                "implementation",
+                "startedAt"
+              ]
+            }
+          },
+          "provenance": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "capability": {
+                  "type": "string"
+                },
+                "executionMode": {
+                  "type": "string",
+                  "enum": [
+                    "real",
+                    "local",
+                    "mock"
+                  ]
+                },
+                "implementation": {
+                  "type": "string"
+                },
+                "provider": {
+                  "type": "string"
+                },
+                "model": {
+                  "type": "string"
+                },
+                "fallbackReason": {
+                  "type": "string"
+                },
+                "startedAt": {
+                  "type": "string"
+                },
+                "completedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "capability",
+                "executionMode",
+                "implementation",
+                "startedAt"
+              ]
+            }
+          },
+          "result": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "summary": {
+                "type": "string"
+              },
+              "artifacts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "mimeType": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "executionMode": {
+                      "type": "string",
+                      "enum": [
+                        "real",
+                        "local",
+                        "mock",
+                        "mixed"
+                      ]
+                    },
+                    "lineage": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "capability": {
+                            "type": "string"
+                          },
+                          "executionMode": {
+                            "type": "string",
+                            "enum": [
+                              "real",
+                              "local",
+                              "mock"
+                            ]
+                          },
+                          "implementation": {
+                            "type": "string"
+                          },
+                          "provider": {
+                            "type": "string"
+                          },
+                          "model": {
+                            "type": "string"
+                          },
+                          "fallbackReason": {
+                            "type": "string"
+                          },
+                          "startedAt": {
+                            "type": "string"
+                          },
+                          "completedAt": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "capability",
+                          "executionMode",
+                          "implementation",
+                          "startedAt"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "mimeType",
+                    "executionMode",
+                    "lineage"
+                  ]
+                }
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "values": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "generatedAt": {
+                    "type": "string"
+                  },
+                  "mock": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "values",
+                  "generatedAt",
+                  "mock"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "title",
+              "summary",
+              "artifacts"
+            ]
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "retryable": {
+                "type": "boolean"
+              },
+              "requestId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message",
+              "retryable",
+              "requestId"
+            ]
+          },
+          "parentJobId": {
+            "type": "string"
+          },
+          "cancelRequested": {
+            "type": "boolean"
+          },
+          "providerModel": {
+            "$ref": "#/components/schemas/SeedanceModelId"
+          },
+          "providerTaskId": {
+            "type": "string"
+          },
+          "providerStatus": {
+            "type": "string"
+          },
+          "providerSubmittedAt": {
+            "type": "string"
+          },
+          "providerDeadlineAt": {
+            "type": "string"
+          },
+          "providerCancelState": {
+            "type": "string",
+            "enum": [
+              "none",
+              "requested",
+              "unsupported",
+              "failed"
+            ]
+          },
+          "stagingKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "jobSchemaVersion": {
+            "anyOf": [
+              {
+                "type": "number",
+                "enum": [
+                  1
+                ]
+              },
+              {
+                "type": "number",
+                "enum": [
+                  2
+                ]
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "moduleId",
+          "title",
+          "status",
+          "progress",
+          "stage",
+          "overallExecutionMode",
+          "values",
+          "executionPlan",
+          "provenance",
+          "cancelRequested",
+          "stagingKeys",
+          "jobSchemaVersion",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "ModuleId": {
+        "type": "string",
+        "enum": [
+          "video-remix",
+          "video-create",
+          "ad-script",
+          "ai-generate",
+          "video-cut",
+          "media-understand",
+          "video-mashup",
+          "voice-clone",
+          "video-renewal",
+          "subtitle-erase",
+          "video-enhancement",
+          "kickart"
+        ]
+      },
+      "SeedanceModelId": {
+        "type": "string",
+        "enum": [
+          "doubao-seedance-2-0-260128",
+          "doubao-seedance-2-0-mini-260615",
+          "doubao-seedance-2-0-fast-260128"
+        ]
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "description": "Service health",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ok"
+                      ]
+                    },
+                    "mockFallback": {
+                      "type": "boolean"
+                    },
+                    "database": {
+                      "type": "string",
+                      "enum": [
+                        "sqlite"
+                      ]
+                    },
+                    "queue": {
+                      "type": "string",
+                      "enum": [
+                        "memory"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "mockFallback",
+                    "database",
+                    "queue"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "operationId": "register",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 254,
+                    "format": "email"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 10,
+                    "maxLength": 128,
+                    "pattern": "[A-Za-z]"
+                  },
+                  "displayName": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 40
+                  }
+                },
+                "required": [
+                  "email",
+                  "password",
+                  "displayName"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Email exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "operationId": "login",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  }
+                },
+                "required": [
+                  "email",
+                  "password"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Logged in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "operationId": "logout",
+        "responses": {
+          "204": {
+            "description": "Logged out"
+          },
+          "401": {
+            "description": "Invalid token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "operationId": "getCurrentUser",
+        "responses": {
+          "200": {
+            "description": "Current user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user": {
+                      "$ref": "#/components/schemas/UserSummary"
+                    }
+                  },
+                  "required": [
+                    "user"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/account/profile": {
+      "patch": {
+        "operationId": "updateProfile",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 254,
+                    "format": "email"
+                  },
+                  "displayName": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 40
+                  },
+                  "avatarText": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2
+                  }
+                },
+                "required": [
+                  "email",
+                  "displayName",
+                  "avatarText"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user": {
+                      "$ref": "#/components/schemas/UserSummary"
+                    }
+                  },
+                  "required": [
+                    "user"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Email exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/account/change-password": {
+      "post": {
+        "operationId": "changePassword",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "currentPassword": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "newPassword": {
+                    "type": "string",
+                    "minLength": 10,
+                    "maxLength": 128,
+                    "pattern": "[A-Za-z]"
+                  }
+                },
+                "required": [
+                  "currentPassword",
+                  "newPassword"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Password changed"
+          },
+          "400": {
+            "description": "Invalid current password",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/preferences": {
+      "get": {
+        "operationId": "getPreferences",
+        "responses": {
+          "200": {
+            "description": "Preferences",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preferences"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "savePreferences",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Preferences"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved preferences",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preferences"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications": {
+      "get": {
+        "operationId": "listNotifications",
+        "responses": {
+          "200": {
+            "description": "Notifications",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "notifications": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/NotificationItem"
+                      }
+                    },
+                    "unreadCount": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "notifications",
+                    "unreadCount"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications/{notificationId}/read": {
+      "post": {
+        "operationId": "markNotificationRead",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "notificationId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "unreadCount": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "unreadCount"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications/read-all": {
+      "post": {
+        "operationId": "markAllNotificationsRead",
+        "responses": {
+          "200": {
+            "description": "All read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "unreadCount": {
+                      "type": "number",
+                      "enum": [
+                        0
+                      ]
+                    }
+                  },
+                  "required": [
+                    "unreadCount"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recharge/packages": {
+      "get": {
+        "operationId": "listRechargePackages",
+        "responses": {
+          "200": {
+            "description": "Packages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "packages": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "amountCny": {
+                            "type": "integer"
+                          },
+                          "credits": {
+                            "type": "integer"
+                          },
+                          "badge": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "amountCny",
+                          "credits",
+                          "badge"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "packages"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recharge/orders": {
+      "get": {
+        "operationId": "listRechargeOrders",
+        "responses": {
+          "200": {
+            "description": "Orders",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "orders": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RechargeOrder"
+                      }
+                    }
+                  },
+                  "required": [
+                    "orders"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createRechargeOrder",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "packageId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "packageId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Recharged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "order": {
+                      "$ref": "#/components/schemas/RechargeOrder"
+                    },
+                    "user": {
+                      "$ref": "#/components/schemas/UserSummary"
+                    }
+                  },
+                  "required": [
+                    "order",
+                    "user"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Package not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/capabilities": {
+      "get": {
+        "operationId": "getCapabilities",
+        "responses": {
+          "200": {
+            "description": "Executable capabilities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "capabilities": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "capability": {
+                            "type": "string"
+                          },
+                          "executionMode": {
+                            "type": "string",
+                            "enum": [
+                              "real",
+                              "local",
+                              "mock"
+                            ]
+                          },
+                          "provider": {
+                            "type": "string"
+                          },
+                          "model": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "capability",
+                          "executionMode"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "capabilities"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models": {
+      "get": {
+        "operationId": "getModels",
+        "responses": {
+          "200": {
+            "description": "Approved model catalog",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "models": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "provider": {
+                            "type": "string"
+                          },
+                          "capability": {
+                            "type": "string"
+                          },
+                          "executionMode": {
+                            "type": "string",
+                            "enum": [
+                              "real"
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "tags": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "referenceCapabilities": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "image",
+                                "video",
+                                "audio"
+                              ]
+                            }
+                          },
+                          "defaults": {
+                            "type": "object",
+                            "properties": {
+                              "resolution": {
+                                "type": "string",
+                                "enum": [
+                                  "480p",
+                                  "720p"
+                                ]
+                              },
+                              "ratio": {
+                                "type": "string"
+                              },
+                              "duration": {
+                                "type": "integer"
+                              },
+                              "generateAudio": {
+                                "type": "boolean"
+                              },
+                              "watermark": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "resolution",
+                              "ratio",
+                              "duration",
+                              "generateAudio",
+                              "watermark"
+                            ]
+                          },
+                          "isDefault": {
+                            "type": "boolean"
+                          },
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "realTestStatus": {
+                            "type": "string",
+                            "enum": [
+                              "verified",
+                              "pending",
+                              "failed"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "provider",
+                          "capability",
+                          "executionMode",
+                          "name",
+                          "description",
+                          "tags",
+                          "referenceCapabilities",
+                          "defaults",
+                          "isDefault",
+                          "enabled",
+                          "realTestStatus"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "models"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/uploads": {
+      "post": {
+        "operationId": "uploadMedia",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Uploaded media",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "asset": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "mimeType": {
+                          "type": "string"
+                        },
+                        "size": {
+                          "type": "number"
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "mimeType",
+                        "size",
+                        "createdAt"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "asset"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid upload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Upload too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs": {
+      "get": {
+        "operationId": "listJobs",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/ModuleId"
+            },
+            "required": false,
+            "name": "moduleId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Jobs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jobs": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Job"
+                      }
+                    }
+                  },
+                  "required": [
+                    "jobs"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/{moduleId}/jobs": {
+      "post": {
+        "operationId": "createJob",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/ModuleId"
+            },
+            "required": true,
+            "name": "moduleId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "values": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "videoModel": {
+                    "$ref": "#/components/schemas/SeedanceModelId"
+                  },
+                  "allowMockFallback": {
+                    "type": "boolean",
+                    "default": true
+                  }
+                },
+                "required": [
+                  "title",
+                  "values"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid model or referenced asset",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{jobId}": {
+      "get": {
+        "operationId": "getJob",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "jobId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{jobId}/cancel": {
+      "post": {
+        "operationId": "cancelJob",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "jobId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cancelled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{jobId}/retry": {
+      "post": {
+        "operationId": "retryJob",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "jobId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Retry accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Retry blocked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{jobId}/events": {
+      "get": {
+        "operationId": "watchJobEvents",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "jobId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Server-sent job updates",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/artifacts/{artifactId}": {
+      "get": {
+        "operationId": "downloadArtifact",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "artifactId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Artifact binary",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

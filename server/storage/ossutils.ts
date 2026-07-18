@@ -1,0 +1,115 @@
+import TosClient from "@volcengine/tos-sdk";
+import { env, tosConfigured } from "../env";
+
+export interface PutStagedFileInput {
+  filePath: string;
+  sizeBytes: number;
+  sha256: string;
+  mimeType: string;
+  jobId: string;
+  extension: string;
+  signal?: AbortSignal;
+}
+
+const MAX_ACTIVE_UPLOAD_BYTES = 500 * 1024 * 1024;
+const MAX_ACTIVE_UPLOADS = 2;
+
+class WeightedUploadGate {
+  private activeBytes = 0;
+  private activeCount = 0;
+  private readonly waiting: Array<() => void> = [];
+
+  async acquire(bytes: number) {
+    while (this.activeCount >= MAX_ACTIVE_UPLOADS || this.activeBytes + bytes > MAX_ACTIVE_UPLOAD_BYTES) {
+      await new Promise<void>((resolve) => this.waiting.push(resolve));
+    }
+    this.activeCount += 1;
+    this.activeBytes += bytes;
+    return () => {
+      this.activeCount -= 1;
+      this.activeBytes -= bytes;
+      this.waiting.splice(0).forEach((resolve) => resolve());
+    };
+  }
+}
+
+const uploadGate = new WeightedUploadGate();
+
+export class OssUtils {
+  readonly configured = tosConfigured;
+  private readonly client?: TosClient;
+
+  constructor() {
+    if (!this.configured) return;
+    this.client = new TosClient({
+      accessKeyId: env.tos.accessKeyId,
+      accessKeySecret: env.tos.accessKeySecret,
+      region: env.tos.region,
+      endpoint: env.tos.endpoint,
+      bucket: env.tos.bucket,
+      secure: true,
+      requestTimeout: 120_000,
+      connectionTimeout: 15_000,
+      maxRetryCount: 2,
+    });
+  }
+
+  private ready() {
+    if (!this.client) throw new Error("TOS_NOT_CONFIGURED");
+    return this.client;
+  }
+
+  private async abortDanglingUploads(key: string) {
+    const response = await this.ready().listMultipartUploads({ bucket: env.tos.bucket, prefix: key });
+    await Promise.allSettled((response.data.Uploads ?? []).filter((upload) => upload.Key === key && upload.UploadId).map((upload) => this.ready().abortMultipartUpload({ bucket: env.tos.bucket, key, uploadId: upload.UploadId! })));
+  }
+
+  async putStagedFile(input: PutStagedFileInput) {
+    if(input.signal?.aborted)throw new Error("TOS_UPLOAD_ABORTED");
+    const release = await uploadGate.acquire(input.sizeBytes);
+    const safeExtension = input.extension.replace(/[^a-zA-Z0-9.]/g, "").slice(0, 10) || ".bin";
+    const key = `seedance-staging/active/${input.jobId}/${crypto.randomUUID()}${safeExtension.startsWith(".") ? safeExtension : `.${safeExtension}`}`;
+    let uploadId: string | undefined;
+    const cancelSource = TosClient.CancelToken.source();
+    const abort = () => cancelSource.cancel("upload aborted");
+    input.signal?.addEventListener("abort", abort, { once: true });
+    try {
+      const response = await this.ready().uploadFile({
+        bucket: env.tos.bucket,
+        key,
+        file: input.filePath,
+        partSize: 8 * 1024 * 1024,
+        taskNum: 2,
+        acl: TosClient.ACLType.ACLPrivate,
+        contentType: input.mimeType,
+        serverSideEncryption: "AES256",
+        meta: { sha256: input.sha256, "cleanup-ready": "false" },
+        cancelToken: cancelSource.token,
+        uploadEventChange: (event) => { uploadId = event.uploadId || uploadId; },
+      });
+      return { key, etag: response.data.ETag };
+    } catch (error) {
+      if (uploadId) await this.ready().abortMultipartUpload({ bucket: env.tos.bucket, key, uploadId }).catch(() => undefined);
+      await this.abortDanglingUploads(key).catch(() => undefined);
+      await this.ready().deleteObject({ bucket: env.tos.bucket, key }).catch(() => undefined);
+      throw error;
+    } finally {
+      input.signal?.removeEventListener("abort", abort);
+      release();
+    }
+  }
+
+  createSignedReadUrl(key: string, expiresSeconds = 24 * 60 * 60) {
+    return this.ready().getPreSignedUrl({ bucket: env.tos.bucket, key, method: "GET", expires: expiresSeconds });
+  }
+
+  headObject(key: string) { return this.ready().headObject({ bucket: env.tos.bucket, key }); }
+  async markCleanupReady(key: string) {
+    await this.ready().putObjectTagging({ bucket: env.tos.bucket, key, tagSet: { Tags: [{ Key: "cleanup-ready", Value: "true" }] } });
+  }
+  async deleteObject(key: string) { let lastError:unknown;for(let attempt=0;attempt<4;attempt+=1){try{await this.ready().deleteObject({ bucket: env.tos.bucket, key });return}catch(error){lastError=error;if(attempt<3)await Bun.sleep(300*2**attempt)}}throw lastError; }
+  async deleteMany(keys: string[]) { await Promise.allSettled(keys.map((key) => this.deleteObject(key))); }
+  async countDanglingUploads(prefix = "seedance-staging/") { const response=await this.ready().listMultipartUploads({bucket:env.tos.bucket,prefix});return (response.data.Uploads??[]).length; }
+}
+
+export const ossutils = new OssUtils();

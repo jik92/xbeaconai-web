@@ -18,7 +18,7 @@
 - AIHubMix 视频生成文档说明 Seedance 2.0 通过 `/v1/videos` 创建任务，并通过 `extra_body.content` 接收图片、视频和音频参考。
 - Seedance 使用 `extra_body.ratio`、`extra_body.duration`、`generate_audio` 和 `watermark` 等模型级参数。当前 Wan 适配器固定发送的 `seconds: "2"` 与 `size: "1280x720"` 不能直接复用。
 - `doubao-seedance-2-0-fast-260128` 已完成真实创建、轮询、下载和 FFprobe 验证；测试产物为 H.264/AAC 可播放视频。
-- 火山引擎 TOS 官方地域表确认上海地域为 `cn-shanghai`，公网 Endpoint 为 `tos-cn-shanghai.volces.com`；本项目使用私有 Bucket `xbeacon` 作为 Seedance 参考素材中转。
+- 火山引擎账号实测确认 Bucket `xbeacon` 实际位于 `cn-beijing`，公网 Endpoint 为 `tos-cn-beijing.volces.com`；用户已批准从原上海预案切换到北京，并将公开 Bucket Policy 收紧为私有。
 
 ## 范围
 
@@ -126,7 +126,7 @@ interface OssUtils {
 }
 ```
 
-配置变量为 `TOS_ACCESS_KEY_ID`、`TOS_SECRET_ACCESS_KEY`、`TOS_REGION=cn-shanghai`、`TOS_ENDPOINT=tos-cn-shanghai.volces.com`、`TOS_BUCKET=xbeacon`。密钥只写入被 Git 忽略的 `.env`，示例文件仅保留占位符。启动时只报告配置是否完整，不打印值。
+配置变量为 `TOS_ACCESS_KEY_ID`、`TOS_SECRET_ACCESS_KEY`、`TOS_REGION=cn-beijing`、`TOS_ENDPOINT=tos-cn-beijing.volces.com`、`TOS_BUCKET=xbeacon`。密钥只写入被 Git 忽略的 `.env`，示例文件仅保留占位符。启动时只报告配置是否完整，不打印值。
 
 Bucket 必须保持私有。对象 Key 使用 `seedance-staging/<job UUID>/<random UUID>.<ext>`，不包含邮箱、用户 ID、原文件名或提示词。TOS 凭证采用独立最小权限策略，只允许 `xbeacon/seedance-staging/*` 前缀所需的 Put/Get/Head/Delete 和分片上传操作，不授予其他 Bucket、其他前缀、ACL 或策略管理权限。若当前凭证未达到此前缀级限制，报告为生产阻断项。
 
@@ -266,4 +266,4 @@ Evidence 每条记录模型 ID、非敏感请求摘要、Mini 实际接受的完
 - 三款 Seedance 都有本轮覆盖文本、图片、视频和音频参考的真实全链路证据；若 Provider 不支持，能力目录和报告如实收窄。
 - 失败时任务明确失败，不发生隐式模型切换或 Mock。
 - 规范 `GET /api/models`、OpenAPI、生成 SDK、后端校验器、前端选项、SDK registry 和能力报告对模型集合的描述一致。
-- TOS 上海 `xbeacon` 的上传、私有读取、签名 URL和删除实测通过；仅已确认上游终态且标记 `cleanup-ready` 的暂存对象具备 24 小时兜底清理，活动对象不会被生命周期误删；未满足则不能标记生产就绪。
+- TOS 北京 `xbeacon` 的上传、私有读取、签名 URL和删除实测通过；仅已确认上游终态且标记 `cleanup-ready` 的暂存对象具备 24 小时兜底清理，活动对象不会被生命周期误删；未满足则不能标记生产就绪。

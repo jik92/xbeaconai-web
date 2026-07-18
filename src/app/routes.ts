@@ -32,8 +32,7 @@ export const modules: ModuleConfig[] = [
   module({ id:"ai-generate", path:"/tools/ai-generate", label:"AI 创作", group:"AI 工具箱", icon:Sparkles, eyebrow:"多模态灵感画布", description:"通过连续对话生成图片、视频概念与营销文案，支持参考素材和版本追问。", steps:["描述创意","选择模型","连续迭代"], fields:[
     {id:"prompt",label:"创作指令",kind:"textarea",required:true,placeholder:"描述主体、场景、风格、镜头和用途…"},
     {id:"type",label:"生成类型",kind:"segmented",required:true,options:["图片","视频","营销文案"]},
-    {id:"references",label:"参考素材",kind:"asset-group",hint:"最多添加 4 个图片或视频参考"},
-    {id:"model",label:"创作模型",kind:"select",required:true,options:["曜影 Pro","曜图 4.0","极速草稿"]},
+    {id:"references",label:"参考素材",kind:"asset-group",hint:"视频模式每类最多 1 个图片、视频和音频参考"},
   ], action:"发送创作指令", cost:6, duration:"约 30–90 秒", result:{kind:"conversation",label:"对话作品",actions:["继续追问","创建变体","收藏作品","下载"]}, tips:["描述主体、环境、光线和镜头语言","可引用上一版结果继续调整","参考素材只用于控制构图和风格"] }),
   module({ id:"video-cut", path:"/tools/video-cut", label:"视频分割", group:"AI 工具箱", icon:Scissors, eyebrow:"镜头级智能切分", description:"识别镜头边界、静音区间或固定时长，将长视频拆成可复用片段。", steps:["上传长视频","设置切分","导出片段"], fields:[
     {id:"source",label:"待分割视频",kind:"video",required:true,hint:"支持最长 3 小时的视频"},

@@ -5,19 +5,32 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "dev:all": "bun run --parallel dev:api dev",
+    "dev:api": "bun --hot server/index.ts",
+    "api": "bun server/index.ts",
+    "start": "NODE_ENV=production bun server/index.ts",
+    "api:spec": "bun scripts/export-openapi.ts",
+    "api:generate": "bun scripts/generate-api-client.ts",
+    "test:models": "bun scripts/test-model-sdks.ts",
+    "test:seedance:multimodal": "bun scripts/test-seedance-multimodal.ts",
+    "test:tos": "bun scripts/test-tos-sdk.ts",
+    "test:ffmpeg": "bun scripts/test-ffmpeg-sdk.ts",
     "build": "tsc -b && vite build",
     "typecheck": "tsc --noEmit",
     "test": "bun test tests/unit",
     "e2e": "playwright test"
   },
   "dependencies": {
+    "@hono/zod-openapi": "^1.5.1",
     "@tanstack/react-query": "^5.101.2",
     "@tanstack/react-router": "^1.170.18",
     "@tanstack/react-table": "^8.21.3",
     "@tanstack/react-virtual": "^3.14.6",
+    "@volcengine/tos-sdk": "^2.9.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dexie": "^4.4.4",
+    "hono": "^4.12.30",
     "lucide-react": "^1.24.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
@@ -26,6 +39,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@hey-api/openapi-ts": "^0.99.0",
     "@playwright/test": "^1.61.1",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/jest-dom": "^6.9.1",
@@ -37,7 +51,7 @@
     "bun-types": "^1.3.14",
     "happy-dom": "^20.10.6",
     "tailwindcss": "^4.3.3",
-    "typescript": "^7.0.2",
+    "typescript": "6.0.3",
     "vite": "^8.1.5"
   }
 }
