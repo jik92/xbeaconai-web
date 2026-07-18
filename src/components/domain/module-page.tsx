@@ -14,7 +14,9 @@ import {
   ImagePlus,
   LoaderCircle,
   Play,
+  Plus,
   RotateCcw,
+  Search,
   Sparkles,
   UploadCloud,
   WandSparkles,
@@ -47,6 +49,8 @@ const statusMap: Record<Job["status"], string> = {
   cancelled: "已取消",
 };
 const emptyJobs: Job[] = [];
+const toolboxDisplayName = (config: ModuleConfig) =>
+  config.id === "video-cut" ? "AI视频分割" : config.id === "video-mashup" ? "素材混剪" : config.label;
 function UploadField({
   field,
   value,
@@ -287,6 +291,394 @@ function BusinessField({
   );
 }
 
+function ToolboxUploadTile({
+  field,
+  value,
+  onChange,
+  multiple = false,
+}: {
+  field: FieldSpec;
+  value: string;
+  onChange: (value: string) => void;
+  multiple?: boolean;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+  const names = value.startsWith("assets:")
+    ? (() => {
+        try {
+          return (JSON.parse(value.slice(7)) as Array<{ name: string }>).map((item) => item.name);
+        } catch {
+          return [];
+        }
+      })()
+    : value.startsWith("asset:")
+      ? [value.split(":").slice(2).join(":")]
+      : [];
+  return (
+    <label className={`tool-upload-tile ${value ? "has-file" : ""}`}>
+      <input
+        className="sr-only"
+        type="file"
+        accept={
+          field.kind === "audio"
+            ? "audio/*"
+            : field.kind === "image"
+              ? "image/*"
+              : multiple
+                ? "video/*,image/*"
+                : "video/*"
+        }
+        multiple={multiple}
+        onChange={(event) => {
+          const files = [...(event.target.files ?? [])];
+          if (!files.length) return;
+          setUploading(true);
+          setError("");
+          void Promise.all(files.map(uploadMediaFile))
+            .then((assets) => {
+              if (multiple)
+                onChange(
+                  `assets:${JSON.stringify(assets.map((asset) => ({ id: asset.id, name: asset.name, mimeType: asset.mimeType })))}`,
+                );
+              else onChange(`asset:${assets[0].id}:${assets[0].name}`);
+            })
+            .catch((reason) => setError(reason instanceof Error ? reason.message : "上传失败"))
+            .finally(() => setUploading(false));
+        }}
+      />
+      {uploading ? <LoaderCircle className="animate-spin" /> : value ? <Check /> : <Plus />}
+      {names.length > 0 && <small>{names.length > 1 ? `已选择 ${names.length} 个素材` : names[0]}</small>}
+      {error && <small className="tool-upload-error">{error}</small>}
+    </label>
+  );
+}
+
+function ToolboxSwitch({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={value === "true"}
+      className={`tool-switch ${value === "true" ? "active" : ""}`}
+      onClick={() => onChange(value === "true" ? "" : "true")}
+    >
+      <i />
+    </button>
+  );
+}
+
+function ToolboxCreatorForm({
+  config,
+  values,
+  setValue,
+  submitted,
+  running,
+  hydrated,
+  onCancel,
+  onSubmit,
+}: {
+  config: ModuleConfig;
+  values: Record<string, string>;
+  setValue: (id: string, value: string) => void;
+  submitted: boolean;
+  running: boolean;
+  hydrated: boolean;
+  onCancel: () => void;
+  onSubmit: () => void;
+}) {
+  const field = (id: string) => config.fields.find((item) => item.id === id) as FieldSpec;
+  const requiredLabel = (text: string, required = false) => (
+    <span className="tool-form-label">
+      {required && <em>*</em>}
+      {text}：
+    </span>
+  );
+  const select = (id: string, placeholder = "请选择") => {
+    const item = field(id);
+    return (
+      <select value={values[id] ?? ""} onChange={(event) => setValue(id, event.target.value)}>
+        {!item.defaultValue && (
+          <option value="" disabled>
+            {placeholder}
+          </option>
+        )}
+        {item.options?.map((option) => (
+          <option key={option}>{option}</option>
+        ))}
+      </select>
+    );
+  };
+  const segments = (id: string) => (
+    <div className="tool-segments">
+      {field(id).options?.map((option) => (
+        <button
+          type="button"
+          key={option}
+          className={values[id] === option ? "active" : ""}
+          onClick={() => setValue(id, option)}
+        >
+          {option}
+        </button>
+      ))}
+    </div>
+  );
+  const upload = (id: string, multiple = false) => (
+    <ToolboxUploadTile
+      field={field(id)}
+      value={values[id] ?? ""}
+      onChange={(value) => setValue(id, value)}
+      multiple={multiple}
+    />
+  );
+  const invalid = (id: string) => submitted && field(id).required && !values[id];
+  let content: React.ReactNode;
+
+  if (config.id === "video-cut") {
+    content = (
+      <div className="tool-simple-form video-cut-form">
+        <p>分割后排序：按原始播放顺序</p>
+        <p>分割后命名：原始文件名 + 切片序号</p>
+        <div className={`tool-form-row ${invalid("method") ? "invalid" : ""}`}>
+          {requiredLabel("分割策略", true)}
+          {select("method", "请选择分割策略")}
+        </div>
+        <div className="tool-form-row compact-row">
+          {requiredLabel("自动保存")}
+          <ToolboxSwitch value={values.autoSave ?? ""} onChange={(value) => setValue("autoSave", value)} />
+        </div>
+        <div className={`tool-form-row upload-row ${invalid("source") ? "invalid" : ""}`}>
+          {requiredLabel("选择视频", true)}
+          {upload("source")}
+        </div>
+      </div>
+    );
+  } else if (config.id === "video-mashup") {
+    content = (
+      <div className="mashup-form">
+        <section className="mashup-left">
+          <div className="gold-template">
+            <b>黄金模板：</b>
+            <button type="button">选择</button>
+          </div>
+          <div className="video-group-card">
+            <div className="video-group-head">
+              <b>视频组-1</b>
+              {requiredLabel("画面类型", true)}
+              {select("pictureType")}
+              <span>分镜贴纸：</span>
+              <ToolboxSwitch value={values.shotSticker ?? ""} onChange={(value) => setValue("shotSticker", value)} />
+            </div>
+            <div className={`material-pick ${invalid("assets") ? "invalid" : ""}`}>
+              {requiredLabel("选择素材", true)}
+              {upload("assets", true)}
+            </div>
+          </div>
+          <button type="button" className="add-video-group">
+            <Plus /> 添加视频组
+          </button>
+        </section>
+        <section className="mashup-right">
+          <div className={`tool-form-row ${invalid("taskName") ? "invalid" : ""}`}>
+            {requiredLabel("任务名称", true)}
+            <input value={values.taskName ?? ""} onChange={(event) => setValue("taskName", event.target.value)} />
+          </div>
+          <div className="tool-form-row">
+            {requiredLabel("组合模式")}
+            {segments("combinationMode")}
+          </div>
+          <div className="tool-form-row combo-summary">
+            {requiredLabel("混剪组合")}
+            <span>
+              <b>外观样式</b>
+              <small>商品信息</small>
+            </span>
+          </div>
+          <div className="tool-form-row">
+            {requiredLabel("分辨率")}
+            {segments("resolution")}
+          </div>
+          <div className="tool-form-row short-input">
+            {requiredLabel("最多生成数量")}
+            <input
+              type="number"
+              min="1"
+              max="20"
+              value={values.count ?? "1"}
+              onChange={(event) => setValue("count", event.target.value)}
+            />
+          </div>
+          <div className={`tool-form-row save-location ${invalid("saveLocation") ? "invalid" : ""}`}>
+            {requiredLabel("保存位置", true)}
+            {select("saveLocation")}
+            <button type="button">设为默认</button>
+          </div>
+          <div className="tool-form-row compact-row">
+            {requiredLabel("自动采纳")}
+            <ToolboxSwitch value={values.autoAccept ?? ""} onChange={(value) => setValue("autoAccept", value)} />
+          </div>
+          <div className="tool-form-row compact-row">
+            {requiredLabel("全局贴纸")}
+            <ToolboxSwitch value={values.globalSticker ?? ""} onChange={(value) => setValue("globalSticker", value)} />
+          </div>
+        </section>
+      </div>
+    );
+  } else if (config.id === "voice-clone") {
+    content = (
+      <div className="tool-simple-form voice-clone-form">
+        <div className="tool-form-row compact-row">
+          {requiredLabel("自动保存")}
+          <ToolboxSwitch value={values.autoSave ?? ""} onChange={(value) => setValue("autoSave", value)} />
+        </div>
+        <div className={`tool-form-row upload-row ${invalid("sample") ? "invalid" : ""}`}>
+          {requiredLabel("原始音频", true)}
+          {upload("sample")}
+        </div>
+        <div className={`tool-form-row textarea-row ${invalid("transcript") ? "invalid" : ""}`}>
+          {requiredLabel("音频转换文本", true)}
+          <div>
+            <textarea
+              maxLength={1000}
+              value={values.transcript ?? ""}
+              placeholder="请输入音频转换文本"
+              onChange={(event) => setValue("transcript", event.target.value)}
+            />
+            <small>{(values.transcript ?? "").length} / 1000</small>
+          </div>
+        </div>
+        <div className="tool-form-row speed-row">
+          {requiredLabel("音色速度", true)}
+          <input
+            type="range"
+            min="0.5"
+            max="2"
+            step="0.1"
+            value={values.speed ?? "1.0"}
+            onChange={(event) => setValue("speed", event.target.value)}
+          />
+          <input
+            type="number"
+            min="0.5"
+            max="2"
+            step="0.1"
+            value={values.speed ?? "1.0"}
+            onChange={(event) => setValue("speed", event.target.value)}
+          />
+        </div>
+        <div className="tool-form-row">
+          {requiredLabel("语言选择", true)}
+          {select("language")}
+        </div>
+        <div className="tool-form-row">
+          {requiredLabel("配音风格", true)}
+          {select("style")}
+        </div>
+      </div>
+    );
+  } else if (config.id === "video-renewal") {
+    content = (
+      <div className="tool-simple-form renewal-form">
+        <div className="tool-form-row compact-row">
+          {requiredLabel("自动保存")}
+          <ToolboxSwitch value={values.autoSave ?? ""} onChange={(value) => setValue("autoSave", value)} />
+        </div>
+        <div className={`tool-form-row upload-row ${invalid("source") ? "invalid" : ""}`}>
+          {requiredLabel("选择视频", true)}
+          {upload("source")}
+        </div>
+      </div>
+    );
+  } else if (config.id === "subtitle-erase") {
+    content = (
+      <div className="subtitle-form">
+        <section>
+          <div className="subtitle-preview">
+            <span>{values.source ? "拖动白色选框，框住需要擦除的字幕区域" : "请先选择视频"}</span>
+            {values.source && <i />}
+          </div>
+          <p>拖拽白色选框，框住需要擦除的字幕区域</p>
+        </section>
+        <section className="subtitle-settings">
+          <div className={`tool-form-row upload-row ${invalid("source") ? "invalid" : ""}`}>
+            {requiredLabel("选择视频", true)}
+            {upload("source")}
+          </div>
+          <div className="tool-form-row compact-row">
+            {requiredLabel("自动保存")}
+            <ToolboxSwitch value={values.autoSave ?? ""} onChange={(value) => setValue("autoSave", value)} />
+          </div>
+        </section>
+      </div>
+    );
+  } else if (config.id === "video-enhancement") {
+    content = (
+      <div className="tool-simple-form enhancement-form">
+        <div className="tool-form-row">
+          {requiredLabel("模式", true)}
+          {select("mode")}
+        </div>
+        <div className="tool-form-row">
+          {requiredLabel("使用场景", true)}
+          {select("scene")}
+        </div>
+        <div className="tool-form-row">
+          {requiredLabel("帧率", true)}
+          {select("fps")}
+        </div>
+        <div className="tool-form-row">
+          {requiredLabel("分辨率", true)}
+          {select("resolution")}
+        </div>
+        <div className="tool-form-row compact-row">
+          {requiredLabel("自动保存")}
+          <ToolboxSwitch value={values.autoSave ?? ""} onChange={(value) => setValue("autoSave", value)} />
+        </div>
+        <div className={`tool-form-row upload-row ${invalid("source") ? "invalid" : ""}`}>
+          {requiredLabel("选择视频", true)}
+          {upload("source")}
+        </div>
+      </div>
+    );
+  } else {
+    content = (
+      <div className="tool-simple-form kickart-form">
+        <div className="tool-form-row">
+          {requiredLabel("模式", true)}
+          {segments("mode")}
+        </div>
+        <div className={`tool-form-row upload-row ${invalid("master") ? "invalid" : ""}`}>
+          {requiredLabel("参考视频", true)}
+          {upload("master")}
+        </div>
+        <div className="tool-form-row product-mode-row">
+          {requiredLabel("商品信息")}
+          {segments("productType")}
+        </div>
+        <div className={`tool-form-row upload-row ${invalid("productImage") ? "invalid" : ""}`}>
+          {requiredLabel("商品图")}
+          {upload("productImage")}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="tool-creator-content">{content}</div>
+      <footer className="tool-creator-footer">
+        <button type="button" onClick={onCancel}>
+          取消
+        </button>
+        <button type="button" className="primary" disabled={running || !hydrated} onClick={onSubmit}>
+          {running ? <LoaderCircle className="animate-spin" /> : null}
+          {running ? "提交中…" : "确定"}
+        </button>
+      </footer>
+    </>
+  );
+}
+
 function TaskTable({
   tasks,
   retry,
@@ -336,6 +728,26 @@ function TaskTable({
             <em>{i.getValue()}%</em>
           </div>
         ),
+      }),
+      column.display({
+        id: "resultCount",
+        header: "结果数",
+        cell: (i) => i.row.original.result?.artifacts.length ?? "—",
+      }),
+      column.display({
+        id: "creator",
+        header: "创建人",
+        cell: () => "当前用户",
+      }),
+      column.display({
+        id: "createdAt",
+        header: "创建时间",
+        cell: (i) => new Date(i.row.original.createdAt).toLocaleString(),
+      }),
+      column.display({
+        id: "updatedAt",
+        header: "更新时间",
+        cell: (i) => new Date(i.row.original.updatedAt).toLocaleString(),
       }),
       column.display({
         id: "actions",
@@ -459,7 +871,12 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
     Object.fromEntries(
       config.fields.map((field) => [
         field.id,
-        field.kind === "number" ? String(field.min ?? 1) : field.kind === "segmented" ? (field.options?.[0] ?? "") : "",
+        field.defaultValue ??
+          (field.kind === "number"
+            ? String(field.min ?? 1)
+            : field.kind === "segmented"
+              ? (field.options?.[0] ?? "")
+              : ""),
       ]),
     );
   const [tasks, setTasks] = useState<Job[]>([]);
@@ -474,6 +891,13 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
   const [apiError, setApiError] = useState("");
   const [actionNotice, setActionNotice] = useState("");
   const [videoModel, setVideoModel] = useState<SeedanceModelId>("doubao-seedance-2-0-fast-260128");
+  const [creatorOpen, setCreatorOpen] = useState(false);
+  const [taskNameFilter, setTaskNameFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [dateFromFilter, setDateFromFilter] = useState("");
+  const [dateToFilter, setDateToFilter] = useState("");
+  const [appliedFilters, setAppliedFilters] = useState({ name: "", status: "", from: "", to: "" });
+  const setValue = (id: string, value: string) => setValues((old) => ({ ...old, [id]: value }));
   const { data: restored = emptyJobs } = useQuery({
     queryKey: ["api-tasks", config.id],
     queryFn: () => fetchJobs(config.id as ModuleId),
@@ -501,7 +925,7 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
     setHydrated(false);
     void db.drafts.get(config.id).then((draft) => {
       if (!active) return;
-      setValues(draft?.values ?? initialValues());
+      setValues({ ...initialValues(), ...(draft?.values ?? {}) });
       setHydrated(true);
     });
     return () => {
@@ -513,12 +937,20 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
     const timer = setTimeout(() => void db.drafts.put({ id: config.id, values, updatedAt: Date.now() }), 250);
     return () => clearTimeout(timer);
   }, [config.id, hydrated, values]);
+  useEffect(() => {
+    if (!creatorOpen || config.id !== "video-mashup" || values.taskName) return;
+    const now = new Date();
+    const pad = (value: number) => String(value).padStart(2, "0");
+    setValue(
+      "taskName",
+      `混剪_${now.getFullYear()}.${pad(now.getMonth() + 1)}.${pad(now.getDate())}_${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`,
+    );
+  }, [config.id, creatorOpen, values.taskName]);
   const splitAt = Math.ceil(config.fields.length / 2);
   const stepFields = [config.fields.slice(0, splitAt), config.fields.slice(splitAt)];
   const visibleFields = stepFields[currentStep] ?? [];
   const missing = config.fields.filter((field) => field.required && !values[field.id]);
   const missingVisible = visibleFields.filter((field) => field.required && !values[field.id]);
-  const setValue = (id: string, value: string) => setValues((old) => ({ ...old, [id]: value }));
   const next = () => {
     setSubmitted(true);
     if (missingVisible.length) return;
@@ -542,6 +974,13 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
     "kickart",
   ]);
   const selectableModels = modelCatalog.filter((model) => model.capability === "video-generate" && model.enabled);
+  const filteredTasks = tasks.filter(
+    (task) =>
+      (!appliedFilters.name || task.title.toLowerCase().includes(appliedFilters.name.toLowerCase())) &&
+      (!appliedFilters.status || task.status === appliedFilters.status) &&
+      (!appliedFilters.from || new Date(task.createdAt) >= new Date(`${appliedFilters.from}T00:00:00`)) &&
+      (!appliedFilters.to || new Date(task.createdAt) <= new Date(`${appliedFilters.to}T23:59:59.999`)),
+  );
   const submit = async () => {
     setSubmitted(true);
     if (missing.length) return;
@@ -550,11 +989,15 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
     try {
       const job = await submitJob(
         config.id as ModuleId,
-        `${config.label} · ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
+        values.taskName ||
+          `${config.label} · ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
         { ...values, __scenario: scenario },
         usesSeedance ? videoModel : undefined,
       );
       setTasks((old) => [job, ...old.filter((x) => x.id !== job.id)]);
+      setCreatorOpen(false);
+      setCurrentStep(0);
+      setSubmitted(false);
     } catch (error) {
       setApiError(error instanceof Error ? error.message : "任务提交失败");
     } finally {
@@ -614,244 +1057,359 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
     if (/再次|重新|调整|改写|变体|替换|编辑|继续/.test(action)) {
       setSelectedTask(null);
       setCurrentStep(0);
+      setCreatorOpen(true);
       setActionNotice(`已进入“${action}”配置状态`);
       return;
     }
     setActionNotice(`${action}已打开，可继续查看结果细节`);
   };
   return (
-    <div className="module-page">
-      <header className="page-head">
-        <div>
-          <span>{config.eyebrow}</span>
-          <h1>{config.label}</h1>
-          <p>{config.description}</p>
-        </div>
-        <div className="head-chip">
-          <WandSparkles size={16} /> API 异步工作流
-        </div>
-      </header>
-      <div className="workspace-grid">
-        <section className="work-card">
-          <div className="steps">
-            {config.steps.map((step, index) => (
-              <button
-                type="button"
-                className={index === currentStep ? "active" : index < currentStep ? "done" : ""}
-                key={step}
-                onClick={() => index < currentStep && setCurrentStep(index)}
-              >
-                <i>{index < currentStep ? <Check size={12} /> : index + 1}</i>
-                {step}
-                {index < config.steps.length - 1 && <ChevronRight />}
+    <div className="module-page tool-task-page">
+      {creatorOpen && (
+        <div className="creator-backdrop" onMouseDown={() => setCreatorOpen(false)}>
+          <section className={`creator-dialog creator-${config.id}`} onMouseDown={(event) => event.stopPropagation()}>
+            <header className="creator-head">
+              <div>
+                <h2>{toolboxDisplayName(config)}</h2>
+                {config.id === "subtitle-erase" && (
+                  <span>
+                    字幕擦除 · 精细擦除 <small>仅擦除框选区域内的字幕</small>
+                  </span>
+                )}
+              </div>
+              <button type="button" aria-label="关闭新建窗口" onClick={() => setCreatorOpen(false)}>
+                <X />
               </button>
-            ))}
-          </div>
-          {currentStep < 2 ? (
-            <div className="form-stack">
-              {hydrated ? (
-                visibleFields.map((field) => (
-                  <BusinessField
-                    key={field.id}
-                    field={field}
-                    value={values[field.id] ?? ""}
-                    onChange={(value) => setValue(field.id, value)}
-                    invalid={Boolean(submitted && field.required && !values[field.id])}
-                  />
-                ))
-              ) : (
+            </header>
+            <div className="creator-body">
+              <ToolboxCreatorForm
+                config={config}
+                values={values}
+                setValue={setValue}
+                submitted={submitted}
+                running={running}
+                hydrated={hydrated}
+                onCancel={() => setCreatorOpen(false)}
+                onSubmit={() => void submit()}
+              />
+              {apiError && <div className="tool-creator-error">{apiError}</div>}
+              {false && (
                 <>
-                  <div className="form-skeleton" />
-                  <div className="form-skeleton" />
-                  <div className="form-skeleton wide" />
+                  <div className="workspace-grid legacy-creator-body" aria-hidden="true">
+                    <section className="work-card">
+                      <div className="steps">
+                        {config.steps.map((step, index) => (
+                          <button
+                            type="button"
+                            className={index === currentStep ? "active" : index < currentStep ? "done" : ""}
+                            key={step}
+                            onClick={() => index < currentStep && setCurrentStep(index)}
+                          >
+                            <i>{index < currentStep ? <Check size={12} /> : index + 1}</i>
+                            {step}
+                            {index < config.steps.length - 1 && <ChevronRight />}
+                          </button>
+                        ))}
+                      </div>
+                      {currentStep < 2 ? (
+                        <div className="form-stack">
+                          {hydrated ? (
+                            visibleFields.map((field) => (
+                              <BusinessField
+                                key={field.id}
+                                field={field}
+                                value={values[field.id] ?? ""}
+                                onChange={(value) => setValue(field.id, value)}
+                                invalid={Boolean(submitted && field.required && !values[field.id])}
+                              />
+                            ))
+                          ) : (
+                            <>
+                              <div className="form-skeleton" />
+                              <div className="form-skeleton" />
+                              <div className="form-skeleton wide" />
+                            </>
+                          )}
+                          {usesSeedance && (
+                            <div className="engine-panel">
+                              <span>视频生成引擎</span>
+                              <div className="model-cards">
+                                {selectableModels.map((model) => (
+                                  <button
+                                    type="button"
+                                    key={model.id}
+                                    className={videoModel === model.id ? "active" : ""}
+                                    onClick={() => setVideoModel(model.id as SeedanceModelId)}
+                                  >
+                                    <b>{model.name}</b>
+                                    <small>{model.description}</small>
+                                    <em>{model.tags.join(" · ")}</em>
+                                  </button>
+                                ))}
+                              </div>
+                              {!selectableModels.length && (
+                                <small className="field-error">
+                                  三款 Seedance 尚未全部通过真实基线测试，当前不可提交真实视频生成。
+                                </small>
+                              )}
+                            </div>
+                          )}
+                          {localVideoModules.has(config.id) && (
+                            <div className="engine-panel local-engine">
+                              <span>生成引擎</span>
+                              <b>本地处理，不使用视频生成模型</b>
+                              <small>该工具使用 FFmpeg 或本地滤镜，不会发起 Seedance 付费请求。</small>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="review-panel">
+                          <div className="review-head">
+                            <span>
+                              <Check size={18} />
+                            </span>
+                            <div>
+                              <h3>确认创作配置</h3>
+                              <p>检查以下信息，确认后任务将进入异步生成队列。</p>
+                            </div>
+                          </div>
+                          <dl>
+                            {config.fields.map((field) => (
+                              <div key={field.id}>
+                                <dt>{field.label}</dt>
+                                <dd>{values[field.id] || "未设置"}</dd>
+                              </div>
+                            ))}
+                            {usesSeedance && (
+                              <div>
+                                <dt>视频模型</dt>
+                                <dd>{selectableModels.find((model) => model.id === videoModel)?.name ?? videoModel}</dd>
+                              </div>
+                            )}
+                          </dl>
+                          <button type="button" className="edit-config" onClick={() => setCurrentStep(0)}>
+                            返回修改内容
+                          </button>
+                        </div>
+                      )}
+                      {currentStep === 1 && (
+                        <>
+                          <button className="advanced" onClick={() => setAdvanced((v) => !v)}>
+                            <span>高级设置</span>
+                            <small>{advanced ? "收起" : "展开更多生成参数"}</small>
+                          </button>
+                          {advanced && (
+                            <div className="advanced-panel">
+                              <label>
+                                生成策略
+                                <select>
+                                  <option>创意优先</option>
+                                  <option>稳定优先</option>
+                                </select>
+                              </label>
+                              <label>
+                                测试场景
+                                <select value={scenario} onChange={(e) => setScenario(e.target.value)}>
+                                  <option value="success">正常完成</option>
+                                  <option value="fail-analysis">素材分析失败</option>
+                                  <option value="partial-batch">批量任务部分成功</option>
+                                  <option value="insufficient-credits">创作点不足</option>
+                                </select>
+                              </label>
+                            </div>
+                          )}
+                        </>
+                      )}
+                      {apiError && <div className="field-error">{apiError}</div>}
+                      <div className="submit-bar">
+                        <div>
+                          <b>
+                            {currentStep === 2 ? `预计消耗 ${config.cost} 创作点` : `第 ${currentStep + 1} 步，共 3 步`}
+                          </b>
+                          <small>
+                            {hydrated ? "已自动保存草稿" : "正在恢复草稿…"} · {config.duration}
+                          </small>
+                        </div>
+                        <div className="wizard-actions">
+                          {currentStep > 0 && (
+                            <button type="button" className="secondary" onClick={back}>
+                              <ArrowLeft />
+                              上一步
+                            </button>
+                          )}
+                          {currentStep < 2 ? (
+                            <button type="button" disabled={!hydrated} onClick={next}>
+                              下一步
+                              <ArrowRight />
+                            </button>
+                          ) : (
+                            <button
+                              disabled={running || !hydrated || (usesSeedance && !selectableModels.length)}
+                              onClick={submit}
+                            >
+                              {running ? <LoaderCircle className="animate-spin" /> : <WandSparkles />}
+                              {running ? "正在提交…" : config.action}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </section>
+                    <aside className="guide-card">
+                      <div className="visual">
+                        <config.icon size={42} />
+                        <span />
+                        <span />
+                      </div>
+                      <h3>获得更好的结果</h3>
+                      <ol>
+                        {config.tips.map((tip) => (
+                          <li key={tip}>{tip}</li>
+                        ))}
+                      </ol>
+                      <div className="safe-note">
+                        <Clock3 size={17} />
+                        <span>
+                          <b>异步生成</b>
+                          <small>{config.duration}</small>
+                        </span>
+                      </div>
+                    </aside>
+                  </div>
+                  {config.id === "ai-generate" && (
+                    <section className="asset-section">
+                      <div className="section-title">
+                        <div>
+                          <span>灵感素材</span>
+                          <h2>从已有素材开始</h2>
+                        </div>
+                        <button type="button" onClick={() => setActionNotice("素材库已展开，可点击下方素材引用")}>
+                          查看素材库
+                        </button>
+                      </div>
+                      <AssetStrip
+                        onSelect={(asset) => {
+                          setValue(
+                            "references",
+                            `assets:${JSON.stringify([{ id: `library-${asset.id}`, name: asset.name, mimeType: "image/png" }])}`,
+                          );
+                          setActionNotice(`已引用 ${asset.name}`);
+                        }}
+                      />
+                    </section>
+                  )}
+                  {actionNotice && (
+                    <div className="safe-note">
+                      <Sparkles size={17} />
+                      <span>
+                        <b>{actionNotice}</b>
+                        <small>操作已完成</small>
+                      </span>
+                    </div>
+                  )}
                 </>
               )}
-              {usesSeedance && (
-                <div className="engine-panel">
-                  <span>视频生成引擎</span>
-                  <div className="model-cards">
-                    {selectableModels.map((model) => (
-                      <button
-                        type="button"
-                        key={model.id}
-                        className={videoModel === model.id ? "active" : ""}
-                        onClick={() => setVideoModel(model.id as SeedanceModelId)}
-                      >
-                        <b>{model.name}</b>
-                        <small>{model.description}</small>
-                        <em>{model.tags.join(" · ")}</em>
-                      </button>
-                    ))}
-                  </div>
-                  {!selectableModels.length && (
-                    <small className="field-error">
-                      三款 Seedance 尚未全部通过真实基线测试，当前不可提交真实视频生成。
-                    </small>
-                  )}
-                </div>
-              )}
-              {localVideoModules.has(config.id) && (
-                <div className="engine-panel local-engine">
-                  <span>生成引擎</span>
-                  <b>本地处理，不使用视频生成模型</b>
-                  <small>该工具使用 FFmpeg 或本地滤镜，不会发起 Seedance 付费请求。</small>
-                </div>
-              )}
             </div>
-          ) : (
-            <div className="review-panel">
-              <div className="review-head">
-                <span>
-                  <Check size={18} />
-                </span>
-                <div>
-                  <h3>确认创作配置</h3>
-                  <p>检查以下信息，确认后任务将进入异步生成队列。</p>
-                </div>
-              </div>
-              <dl>
-                {config.fields.map((field) => (
-                  <div key={field.id}>
-                    <dt>{field.label}</dt>
-                    <dd>{values[field.id] || "未设置"}</dd>
-                  </div>
-                ))}
-                {usesSeedance && (
-                  <div>
-                    <dt>视频模型</dt>
-                    <dd>{selectableModels.find((model) => model.id === videoModel)?.name ?? videoModel}</dd>
-                  </div>
-                )}
-              </dl>
-              <button type="button" className="edit-config" onClick={() => setCurrentStep(0)}>
-                返回修改内容
-              </button>
-            </div>
-          )}
-          {currentStep === 1 && (
-            <>
-              <button className="advanced" onClick={() => setAdvanced((v) => !v)}>
-                <span>高级设置</span>
-                <small>{advanced ? "收起" : "展开更多生成参数"}</small>
-              </button>
-              {advanced && (
-                <div className="advanced-panel">
-                  <label>
-                    生成策略
-                    <select>
-                      <option>创意优先</option>
-                      <option>稳定优先</option>
-                    </select>
-                  </label>
-                  <label>
-                    测试场景
-                    <select value={scenario} onChange={(e) => setScenario(e.target.value)}>
-                      <option value="success">正常完成</option>
-                      <option value="fail-analysis">素材分析失败</option>
-                      <option value="partial-batch">批量任务部分成功</option>
-                      <option value="insufficient-credits">创作点不足</option>
-                    </select>
-                  </label>
-                </div>
-              )}
-            </>
-          )}
-          {apiError && <div className="field-error">{apiError}</div>}
-          <div className="submit-bar">
-            <div>
-              <b>{currentStep === 2 ? `预计消耗 ${config.cost} 创作点` : `第 ${currentStep + 1} 步，共 3 步`}</b>
-              <small>
-                {hydrated ? "已自动保存草稿" : "正在恢复草稿…"} · {config.duration}
-              </small>
-            </div>
-            <div className="wizard-actions">
-              {currentStep > 0 && (
-                <button type="button" className="secondary" onClick={back}>
-                  <ArrowLeft />
-                  上一步
-                </button>
-              )}
-              {currentStep < 2 ? (
-                <button type="button" disabled={!hydrated} onClick={next}>
-                  下一步
-                  <ArrowRight />
-                </button>
-              ) : (
-                <button disabled={running || !hydrated || (usesSeedance && !selectableModels.length)} onClick={submit}>
-                  {running ? <LoaderCircle className="animate-spin" /> : <WandSparkles />}
-                  {running ? "正在提交…" : config.action}
-                </button>
-              )}
-            </div>
-          </div>
-        </section>
-        <aside className="guide-card">
-          <div className="visual">
-            <config.icon size={42} />
-            <span />
-            <span />
-          </div>
-          <h3>获得更好的结果</h3>
-          <ol>
-            {config.tips.map((tip) => (
-              <li key={tip}>{tip}</li>
-            ))}
-          </ol>
-          <div className="safe-note">
-            <Clock3 size={17} />
-            <span>
-              <b>异步生成</b>
-              <small>{config.duration}</small>
-            </span>
-          </div>
-        </aside>
-      </div>
-      {config.id === "ai-generate" && (
-        <section className="asset-section">
-          <div className="section-title">
-            <div>
-              <span>灵感素材</span>
-              <h2>从已有素材开始</h2>
-            </div>
-            <button type="button" onClick={() => setActionNotice("素材库已展开，可点击下方素材引用")}>
-              查看素材库
-            </button>
-          </div>
-          <AssetStrip
-            onSelect={(asset) => {
-              setValue(
-                "references",
-                `assets:${JSON.stringify([{ id: `library-${asset.id}`, name: asset.name, mimeType: "image/png" }])}`,
-              );
-              setActionNotice(`已引用 ${asset.name}`);
-            }}
-          />
-        </section>
-      )}
-      {actionNotice && (
-        <div className="safe-note">
-          <Sparkles size={17} />
-          <span>
-            <b>{actionNotice}</b>
-            <small>操作已完成</small>
-          </span>
+          </section>
         </div>
       )}
       <section className="tasks-section">
-        <div className="section-title">
+        <div className="task-page-title">
           <div>
-            <span>任务中心</span>
-            <h2>最近创作</h2>
+            <span>AI 工具箱</span>
+            <h1>{toolboxDisplayName(config)}任务</h1>
+            <p>查看任务状态、处理进度和生成结果。</p>
           </div>
-          <small>共 {tasks.length} 个任务</small>
         </div>
-        {tasks.length ? (
-          <TaskTable tasks={tasks} retry={retry} preview={setSelectedTask} cancel={cancel} />
+        <div className="task-filters">
+          <label>
+            <span>任务名称</span>
+            <input
+              value={taskNameFilter}
+              onChange={(event) => setTaskNameFilter(event.target.value)}
+              placeholder="请输入"
+            />
+          </label>
+          <label>
+            <span>处理状态</span>
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+              <option value="">不限</option>
+              <option value="queued">排队中</option>
+              <option value="processing">生成中</option>
+              <option value="succeeded">已完成</option>
+              <option value="partially_succeeded">部分完成</option>
+              <option value="failed">失败</option>
+              <option value="cancelled">已取消</option>
+            </select>
+          </label>
+          <label>
+            <span>创建人</span>
+            <select defaultValue="current">
+              <option value="current">当前用户</option>
+            </select>
+          </label>
+          <label className="date-filter">
+            <span>创建时间</span>
+            <input
+              type="date"
+              aria-label="开始日期"
+              value={dateFromFilter}
+              onChange={(event) => setDateFromFilter(event.target.value)}
+            />
+            <i>至</i>
+            <input
+              type="date"
+              aria-label="结束日期"
+              value={dateToFilter}
+              onChange={(event) => setDateToFilter(event.target.value)}
+            />
+          </label>
+          <div className="filter-actions">
+            <button
+              type="button"
+              className="reset-filter"
+              onClick={() => {
+                setTaskNameFilter("");
+                setStatusFilter("");
+                setDateFromFilter("");
+                setDateToFilter("");
+                setAppliedFilters({ name: "", status: "", from: "", to: "" });
+              }}
+            >
+              重置
+            </button>
+            <button
+              type="button"
+              className="query-filter"
+              onClick={() =>
+                setAppliedFilters({
+                  name: taskNameFilter.trim(),
+                  status: statusFilter,
+                  from: dateFromFilter,
+                  to: dateToFilter,
+                })
+              }
+            >
+              <Search />
+              查询
+            </button>
+          </div>
+        </div>
+        <div className="task-toolbar">
+          <button type="button" className="new-task-button" onClick={() => setCreatorOpen(true)}>
+            <Plus />
+            {toolboxDisplayName(config)}
+          </button>
+          <small>共 {filteredTasks.length} 个任务</small>
+        </div>
+        {filteredTasks.length ? (
+          <TaskTable tasks={filteredTasks} retry={retry} preview={setSelectedTask} cancel={cancel} />
         ) : (
           <div className="empty">
             <X size={24} />
-            <b>还没有创作记录</b>
-            <span>完成上方配置并提交，任务进度会显示在这里</span>
+            <b>{tasks.length ? "没有符合条件的任务" : "暂无数据"}</b>
+            <span>
+              {tasks.length ? "请调整筛选条件后重新查询" : `点击“${toolboxDisplayName(config)}”创建第一个任务`}
+            </span>
           </div>
         )}
       </section>
