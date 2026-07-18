@@ -9,11 +9,13 @@ readonly ENV_FILE="/etc/xbeaconai-web.env"
 readonly SERVICE_NAME="xbeaconai-web-api.service"
 readonly SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}"
 readonly NGINX_SITE="/etc/nginx/sites-available/xbeaconai-web"
+readonly CERTBOT_WEB_ROOT="/var/www/certbot"
+readonly CERTIFICATE_PATH="/etc/letsencrypt/live/app.xbeaconai.com/fullchain.pem"
 readonly NPM_REGISTRY="https://registry.npmmirror.com"
 readonly LOCK_FILE="/var/lock/xbeaconai-web-deploy.lock"
 readonly API_HEALTH_URL="http://127.0.0.1:8787/api/health"
-readonly APP_ORIGIN="${APP_ORIGIN:-http://app.xbeaconai.com}"
-readonly API_ORIGIN="${API_ORIGIN:-http://api.xbeaconai.com}"
+readonly APP_ORIGIN="${APP_ORIGIN:-https://app.xbeaconai.com}"
+readonly API_ORIGIN="${API_ORIGIN:-https://api.xbeaconai.com}"
 
 log() {
     printf '[%s] %s\n' "$(date '+%F %T')" "$*"
@@ -68,6 +70,30 @@ wait_for_api() {
     return 1
 }
 
+ensure_tls_certificate() {
+    install -d -m 0755 "$CERTBOT_WEB_ROOT"
+    if ! command -v certbot >/dev/null 2>&1; then
+        log "安装 Certbot..."
+        apt-get update
+        DEBIAN_FRONTEND=noninteractive apt-get install -y certbot
+    fi
+    if [[ ! -f "$CERTIFICATE_PATH" ]]; then
+        log "安装 HTTP 引导配置以申请 TLS 证书..."
+        install -m 0644 "$PROJECT_DIR/deploy/nginx-xbeaconai-web-bootstrap.conf" "$NGINX_SITE"
+        ln -sfn "$NGINX_SITE" /etc/nginx/sites-enabled/xbeaconai-web
+        nginx -t
+        systemctl reload nginx
+    fi
+    log "检查 App/API TLS 证书..."
+    certbot certonly --webroot --webroot-path "$CERTBOT_WEB_ROOT" \
+        --cert-name app.xbeaconai.com \
+        --domain app.xbeaconai.com --domain api.xbeaconai.com \
+        --non-interactive --agree-tos --register-unsafely-without-email --keep-until-expiring
+    install -d -m 0755 /etc/letsencrypt/renewal-hooks/deploy
+    install -m 0755 "$PROJECT_DIR/deploy/certbot-reload-nginx.sh" \
+        /etc/letsencrypt/renewal-hooks/deploy/reload-nginx
+}
+
 exec 9>"$LOCK_FILE"
 if ! flock -n 9; then
     log "已有部署任务正在运行，退出。"
@@ -106,7 +132,9 @@ rsync -a --delete "$PROJECT_DIR/dist/" "$WEB_ROOT/"
 find "$WEB_ROOT" -type d -exec chmod 0755 {} +
 find "$WEB_ROOT" -type f -exec chmod 0644 {} +
 
-log "配置 /api 反向代理并重载 Nginx..."
+ensure_tls_certificate
+
+log "配置 HTTPS 双域名和 /api 反向代理..."
 install -m 0644 "$PROJECT_DIR/deploy/nginx-xbeaconai-web.conf" "$NGINX_SITE"
 ln -sfn "$NGINX_SITE" /etc/nginx/sites-enabled/xbeaconai-web
 nginx -t
@@ -114,8 +142,9 @@ systemctl reload nginx
 systemctl is-active --quiet nginx
 
 log "验证公网入口..."
-curl --fail --silent --show-error -H "Host: app.xbeaconai.com" http://127.0.0.1/ >/dev/null
-curl --fail --silent --show-error -H "Host: api.xbeaconai.com" -H "Origin: $APP_ORIGIN" \
-    http://127.0.0.1/api/health >/dev/null
+curl --fail --silent --show-error --resolve app.xbeaconai.com:443:127.0.0.1 \
+    https://app.xbeaconai.com/ >/dev/null
+curl --fail --silent --show-error --resolve api.xbeaconai.com:443:127.0.0.1 -H "Origin: $APP_ORIGIN" \
+    https://api.xbeaconai.com/api/health >/dev/null
 
 log "部署完成：$(git rev-parse --short HEAD)"
