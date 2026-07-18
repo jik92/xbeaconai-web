@@ -49,7 +49,7 @@ for (const module of modules) {
 test("closed creation workflows show Coming Soon while AI tools stay open", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveURL(/\/tools\/ai-generate$/);
-  await expect(page.getByRole("heading",{name:"AI 创作",exact:true})).toBeVisible();
+  await expect(page.locator(".ag-composer")).toBeVisible();
   for(const module of modules.filter(item=>item.group==="创作工作流")){
     await expect(page.getByLabel(`${module.label} Coming Soon`)).toBeVisible();
     await expect(page.getByRole("link",{name:module.label,exact:true})).toHaveCount(0);
@@ -59,7 +59,7 @@ test("closed creation workflows show Coming Soon while AI tools stay open", asyn
   }
 });
 
-test("AI creation composer matches the product configuration flow without a paid request",async({page},testInfo)=>{
+test.skip("legacy AI creation composer matches the product configuration flow without a paid request",async({page},testInfo)=>{
   test.skip(testInfo.project.name!=="desktop","Composer interaction contract is exercised once on desktop");
   await page.goto("/tools/ai-generate");
   await expect(page.getByRole("heading",{name:"AI 创作",exact:true})).toBeVisible();
@@ -108,7 +108,7 @@ test("AI creation composer matches the product configuration flow without a paid
   await expect(page.getByText("本地处理，不使用视频生成模型")).toBeVisible();
 });
 
-test("AI creation image Mock submission completes through the async queue",async({page},testInfo)=>{
+test.skip("legacy AI creation image Mock submission completes through the async queue",async({page},testInfo)=>{
   test.skip(testInfo.project.name!=="desktop","Mock creation submission is exercised once on desktop");
   await page.goto("/tools/ai-generate");
   const headers=await authorization(page);
@@ -120,6 +120,19 @@ test("AI creation image Mock submission completes through the async queue",async
   await expect(page.locator(".task-kind.mock").first()).toBeVisible();
   const after=await (await page.request.get("/api/auth/me",{headers})).json() as {user:{credits:number}};
   expect(after.user.credits).toBe(before.user.credits-70);
+});
+
+test("AI creation replica completes its browser-only Mock workflow",async({page},testInfo)=>{
+  test.skip(testInfo.project.name!=="desktop","AI creation replica is exercised once on desktop");
+  await page.goto("/tools/ai-generate");
+  const businessRequests:string[]=[];page.on("request",request=>{if(/\/api\/(models|uploads|[^/]+\/jobs)|\/openapi\.json/.test(request.url()))businessRequests.push(request.url())});
+  const composer=page.locator(".ag-composer");await expect(composer).toBeVisible();expect(Math.round((await composer.boundingBox())!.width)).toBe(900);expect(Math.round((await composer.boundingBox())!.height)).toBe(204);
+  await expect(page.getByRole("button",{name:/字节Seedance 2.0/})).toBeVisible();await expect(page.getByText("全能参考",{exact:true})).toBeVisible();await expect(page.getByRole("button",{name:/9:16.*720P/})).toBeVisible();await expect(page.getByRole("button",{name:/5s.*1个/})).toBeVisible();await expect(page.getByText("提交前手动确认")).toBeVisible();
+  await page.getByRole("button",{name:"视频生成",exact:true}).click();await page.getByRole("button",{name:"图片生成",exact:true}).click();await expect(page.getByRole("button",{name:/字节Seedream 4.0/})).toBeVisible();await page.getByRole("button",{name:"图片生成",exact:true}).click();await page.getByRole("button",{name:"视频生成",exact:true}).last().click();
+  await page.getByRole("button",{name:/字节Seedance 2.0/}).click();await expect(page.getByRole("dialog",{name:"选择生成模型"})).toBeVisible();await expect(page.getByText("字节Seedance 2.0 Mini")).toBeVisible();await page.getByText("字节Seedance 2.0 Fast").click();
+  await page.getByRole("button",{name:/9:16/}).click();await page.getByRole("button",{name:"16:9"}).click();await page.getByRole("button",{name:/5s.*1个/}).click();await page.getByRole("button",{name:"2个"}).click();await page.getByRole("button",{name:"10s"}).click();
+  await page.getByLabel("创作指令").fill("一只猫在雨夜穿过霓虹街道");await page.getByText("提交前手动确认").click();await page.getByRole("button",{name:"提交生成"}).click();await expect(page.getByRole("dialog",{name:"确认提交生成"})).toBeVisible();await page.getByRole("button",{name:"确认提交 Mock"}).click();
+  await expect(page.getByText("Mock 作品")).toBeVisible({timeout:3000});await page.getByRole("button",{name:"查看结果"}).click();await expect(page.getByRole("dialog",{name:"Mock 结果预览"})).toBeVisible();await page.getByRole("button",{name:"关闭"}).click();await page.getByRole("button",{name:"继续追问"}).click();await expect(page.getByLabel("创作指令")).toHaveValue(/继续优化/);expect(businessRequests).toEqual([]);
 });
 
 test("required field validation blocks an incomplete task", async ({ page }) => {
@@ -151,7 +164,7 @@ test("人像库 loads, filters and opens a portrait dossier", async ({ page }) =
 
 test("account workspace supports registration, settings, recharge and password lifecycle",async({page},testInfo)=>{
   test.skip(testInfo.project.name!=="desktop","Account lifecycle is exercised once on desktop");
-  await page.goto("/tools/ai-generate");
+  await page.goto("/tools/video-cut");
   await expect(page.getByRole("button",{name:"创作中心"})).toHaveCount(0);
   await page.getByRole("button",{name:"个人账号"}).click();
   await page.getByRole("button",{name:"退出登录"}).click();
@@ -162,7 +175,7 @@ test("account workspace supports registration, settings, recharge and password l
   await page.getByPlaceholder("name@example.com").fill(email);
   await page.getByPlaceholder("至少 10 位，包含字母和数字").fill(testPassword);
   await page.getByRole("button",{name:"创建账号并登录"}).click();
-  await expect(page.getByRole("heading",{name:"AI 创作",exact:true})).toBeVisible();
+  await expect(page.getByRole("heading",{name:"视频分割",exact:true})).toBeVisible();
 
   await page.getByRole("button",{name:"帮助"}).click();
   await expect(page.getByRole("heading",{name:"使用帮助"})).toBeVisible();
@@ -206,7 +219,7 @@ test("account workspace supports registration, settings, recharge and password l
   await page.getByPlaceholder("name@example.com").fill(email);
   await page.getByPlaceholder("输入密码").fill("Changed12345");
   await page.getByRole("button",{name:"登录工作台"}).click();
-  await expect(page.getByRole("heading",{name:"AI 创作",exact:true})).toBeVisible();
+  await expect(page.getByRole("heading",{name:"视频分割",exact:true})).toBeVisible();
 });
 
 test("口播脚本 completes from validated brief to result preview", async ({ page }) => {
@@ -252,7 +265,7 @@ test("every generic result action is executable end to end", async ({ page, cont
   await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin:"http://127.0.0.1:4173" });
   await page.goto("/tools/ai-generate");
   const headers=await authorization(page);
-  const generic=modules.filter(module=>module.id!=="video-remix"&&isModuleOpen(module.id));
+  const generic=modules.filter(module=>module.id!=="video-remix"&&module.id!=="ai-generate"&&isModuleOpen(module.id));
   const jobs=await Promise.all(generic.map(async module=>{
     const title=`action-matrix-${module.id}-${Date.now()}`;
     const response=await page.request.post(`/api/${module.id}/jobs`,{headers:{...headers,"Idempotency-Key":crypto.randomUUID()},data:{title,values:{type:"图片"},allowMockFallback:true}});
