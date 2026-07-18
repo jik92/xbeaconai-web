@@ -143,11 +143,7 @@ export function AiGeneratePage() {
     fileRef = useRef<HTMLInputElement>(null),
     inputRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
-    document.body.classList.add("ai-generate-route");
-    return () => {
-      document.body.classList.remove("ai-generate-route");
-      store.dispose();
-    };
+    return () => store.dispose();
   }, [store]);
   useEffect(() => {
     if (!notice) return;

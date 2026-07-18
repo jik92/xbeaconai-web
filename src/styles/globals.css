@@ -64,6 +64,10 @@ select:focus-visible {
   grid-template-columns: 208px 1fr;
   grid-template-rows: 56px 1fr;
   background: var(--canvas);
+  transition: grid-template-columns 160ms ease;
+}
+.app-frame.sidebar-collapsed {
+  grid-template-columns: 60px 1fr;
 }
 .topbar {
   grid-column: 1 / -1;
@@ -233,6 +237,9 @@ select:focus-visible {
   gap: 7px;
   font-size: 12px;
 }
+.collapse svg {
+  flex: none;
+}
 .sidebar nav h3 {
   font-size: 11px;
   color: #9aa3b2;
@@ -254,8 +261,11 @@ select:focus-visible {
   font-size: 13px;
   transition: 0.15s;
 }
-.sidebar nav a svg {
+.sidebar nav a svg,
+.sidebar-coming-soon svg {
   width: 17px;
+  height: 17px;
+  flex: none;
 }
 .sidebar nav a:hover {
   background: #f6f8fb;
@@ -298,6 +308,27 @@ select:focus-visible {
   display: block;
   padding: 8px 10px 0;
   color: #afb6c2;
+}
+.sidebar-collapsed .sidebar {
+  padding-inline: 6px;
+}
+.sidebar-collapsed .collapse {
+  width: 100%;
+}
+.sidebar-collapsed .collapse span,
+.sidebar-collapsed .sidebar nav h3,
+.sidebar-collapsed .sidebar nav a span,
+.sidebar-collapsed .sidebar nav a i,
+.sidebar-collapsed .sidebar-coming-soon span,
+.sidebar-collapsed .sidebar-coming-soon i,
+.sidebar-collapsed .sidebar-foot small {
+  display: none;
+}
+.sidebar-collapsed .sidebar nav a,
+.sidebar-collapsed .sidebar-coming-soon,
+.sidebar-collapsed .sidebar-foot button {
+  justify-content: center;
+  padding-inline: 0;
 }
 .content {
   min-width: 0;
@@ -822,27 +853,6 @@ td small {
   color: #9aa4b2;
 }
 @media (max-width: 1050px) {
-  .app-frame {
-    grid-template-columns: 64px 1fr;
-  }
-  .brand {
-    width: 46px;
-  }
-  .brand > div:last-child,
-  .sidebar nav h3,
-  .sidebar nav a span,
-  .sidebar nav a i,
-  .sidebar-coming-soon span,
-  .sidebar-coming-soon i,
-  .collapse,
-  .sidebar-foot {
-    display: none;
-  }
-  .sidebar nav a,
-  .sidebar-coming-soon {
-    justify-content: center;
-    padding: 0;
-  }
   .workspace-grid {
     grid-template-columns: 1fr;
   }

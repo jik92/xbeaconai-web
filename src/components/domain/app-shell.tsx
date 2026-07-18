@@ -1,5 +1,5 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { Bell, CircleHelp, Coins, Images, PanelLeftClose, Search, Settings2 } from "lucide-react";
+import { Bell, CircleHelp, Coins, Images, PanelLeftClose, PanelLeftOpen, Search, Settings2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { listNotifications } from "@/api/generated/sdk.gen";
 import { APP_CONFIG, isAssetOpen, isModuleOpen } from "@/app/config";
@@ -13,7 +13,10 @@ export function AppShell() {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const { status, user } = useAuth();
   const [panel, setPanel] = useState<WorkspacePanel>(),
-    [unread, setUnread] = useState(0);
+    [unread, setUnread] = useState(0),
+    [sidebarCollapsed, setSidebarCollapsed] = useState(
+      () => window.localStorage.getItem("sidebar-collapsed") === "true",
+    );
   useEffect(() => {
     if (status !== "authenticated") setPanel(undefined);
   }, [status]);
@@ -27,6 +30,9 @@ export function AppShell() {
     const timer = window.setInterval(refresh, 5_000);
     return () => window.clearInterval(timer);
   }, [status]);
+  useEffect(() => {
+    window.localStorage.setItem("sidebar-collapsed", String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
   if (status === "loading")
     return (
       <main className="auth-page">
@@ -38,7 +44,7 @@ export function AppShell() {
     );
   if (status === "anonymous" || !user) return <AuthScreen />;
   return (
-    <div className="app-frame">
+    <div className={`app-frame${sidebarCollapsed ? " sidebar-collapsed" : ""}`}>
       <header className="topbar">
         <div className="brand">
           <BrandLogo className="brand-mark" />
@@ -70,9 +76,16 @@ export function AppShell() {
         </div>
       </header>
       <aside className="sidebar">
-        <button className="collapse">
-          <PanelLeftClose size={16} />
-          收起导航
+        <button
+          type="button"
+          className="collapse"
+          aria-label={sidebarCollapsed ? "展开导航" : "收起导航"}
+          aria-expanded={!sidebarCollapsed}
+          title={sidebarCollapsed ? "展开导航" : "收起导航"}
+          onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
+        >
+          {sidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+          <span>{sidebarCollapsed ? "展开导航" : "收起导航"}</span>
         </button>
         {(["创作工作流", "AI 工具箱"] as const).map((group) => (
           <nav key={group}>
@@ -81,7 +94,13 @@ export function AppShell() {
               .filter((m) => m.group === group)
               .map((m) =>
                 isModuleOpen(m.id) ? (
-                  <Link key={m.id} to={m.path} aria-label={m.label} className={path === m.path ? "active" : ""}>
+                  <Link
+                    key={m.id}
+                    to={m.path}
+                    aria-label={m.label}
+                    title={sidebarCollapsed ? m.label : undefined}
+                    className={path === m.path ? "active" : ""}
+                  >
                     <m.icon />
                     <span>{m.label}</span>
                     {m.id === "video-remix" && <i>HOT</i>}
@@ -92,7 +111,7 @@ export function AppShell() {
                     className="sidebar-coming-soon"
                     aria-label={`${m.label} Coming Soon`}
                     aria-disabled="true"
-                    title="等待产品验收"
+                    title={sidebarCollapsed ? `${m.label}（即将上线）` : "等待产品验收"}
                   >
                     <m.icon />
                     <span>{m.label}</span>
@@ -105,7 +124,12 @@ export function AppShell() {
         <nav>
           <h3>资产</h3>
           {isAssetOpen("portraits") ? (
-            <Link to="/assets/portraits" aria-label="人像库" className={path === "/assets/portraits" ? "active" : ""}>
+            <Link
+              to="/assets/portraits"
+              aria-label="人像库"
+              title={sidebarCollapsed ? "人像库" : undefined}
+              className={path === "/assets/portraits" ? "active" : ""}
+            >
               <Images />
               <span>人像库</span>
               <i>1125</i>
@@ -124,7 +148,12 @@ export function AppShell() {
           )}
         </nav>
         <div className="sidebar-foot">
-          <button onClick={() => setPanel("preferences")}>
+          <button
+            type="button"
+            aria-label="偏好设置"
+            title={sidebarCollapsed ? "偏好设置" : undefined}
+            onClick={() => setPanel("preferences")}
+          >
             <Settings2 />
             偏好设置
           </button>
