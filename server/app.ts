@@ -976,6 +976,99 @@ const assetListRoute = createRoute({
     },
   },
 });
+
+const productResponse = (product: ReturnType<AccountStore["listProducts"]>[number]) => ({
+  id: product.id,
+  name: product.name,
+  description: product.description,
+  sharingScope: product.sharingScope,
+  createdAt: product.createdAt,
+  images: product.images.map((asset) => ({
+    id: asset.id,
+    name: asset.displayName,
+    originalName: asset.originalName,
+    mimeType: asset.mimeType,
+    size: asset.byteSize,
+    kind: asset.kind,
+    description: asset.description,
+    url: `/api/assets/${asset.id}/content`,
+    createdAt: asset.createdAt,
+  })),
+});
+
+app.get("/api/products", (c) => c.json({ products: accounts.listProducts(c.get("userId")).map(productResponse) }, 200));
+
+app.post("/api/products", async (c) => {
+  const requestId = crypto.randomUUID();
+  const form = await c.req.formData();
+  const files = form.getAll("files").filter((item): item is File => item instanceof File && item.size > 0);
+  const name = String(form.get("productName") ?? "")
+    .trim()
+    .slice(0, 200);
+  const description = String(form.get("description") ?? "")
+    .trim()
+    .slice(0, 1_000);
+  const sharingScope = String(form.get("sharingScope") ?? "private") as "private" | "team" | "organization";
+  if (!name || !files.length || files.length > 8)
+    return c.json(
+      { error: { code: "INVALID_PRODUCT", message: "请填写商品名称并上传 1–8 张商品图", retryable: false, requestId } },
+      400,
+    );
+  if (!(["private", "team", "organization"] as string[]).includes(sharingScope))
+    return c.json(
+      { error: { code: "INVALID_SHARING_SCOPE", message: "共享范围无效", retryable: false, requestId } },
+      400,
+    );
+  const extensions: Record<string, string> = { "image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp" };
+  if (files.some((file) => !extensions[file.type] || file.size > 20 * 1024 * 1024))
+    return c.json(
+      {
+        error: {
+          code: "INVALID_PRODUCT_IMAGE",
+          message: "商品图仅支持 PNG、JPG、WEBP，单张不超过 20MB",
+          retryable: false,
+          requestId,
+        },
+      },
+      415,
+    );
+  const productId = crypto.randomUUID();
+  const createdAt = new Date().toISOString();
+  const images = files.map((file) => ({
+    id: crypto.randomUUID(),
+    ownerUserId: c.get("userId"),
+    storageKey: `${crypto.randomUUID()}${extensions[file.type]}`,
+    originalName: file.name.slice(0, 200),
+    mimeType: file.type,
+    byteSize: file.size,
+    kind: "product" as const,
+    displayName: name,
+    description: description || undefined,
+    createdAt,
+  }));
+  await Promise.all(
+    images.map((asset, index) => Bun.write(resolve(env.dataDir, "uploads", asset.storageKey), files[index])),
+  );
+  accounts.createProductAssets(
+    {
+      id: productId,
+      ownerUserId: c.get("userId"),
+      name,
+      description: description || undefined,
+      sharingScope,
+      createdAt,
+    },
+    images,
+  );
+  const product = accounts.listProducts(c.get("userId")).find((item) => item.id === productId);
+  if (!product)
+    return c.json(
+      { error: { code: "PRODUCT_CREATE_FAILED", message: "商品创建失败", retryable: true, requestId } },
+      500,
+    );
+  return c.json({ product: productResponse(product) }, 201);
+});
+
 app.openapi(assetListRoute, (c) => {
   const kind = c.req.valid("query").kind;
   const assets = accounts.listAssets(c.get("userId"), kind).map((asset) => ({
@@ -1031,6 +1124,168 @@ const listRoute = createRoute({
 app.openapi(listRoute, (c) =>
   c.json({ jobs: store.list(c.get("userId"), c.req.valid("query").moduleId as ModuleId | undefined) }, 200),
 );
+
+const remixFileSchema = z.object({
+  id: z.union([z.number(), z.string()]).nullable().optional(),
+  filename: z.string().min(1).max(200),
+  objectKey: z.string().min(1),
+  fileMd5: z.string().nullable().optional(),
+  fileUrl: z.string().min(1),
+  coverUrl: z.string().min(1),
+  fileType: z.enum(["IMAGE", "VIDEO", "AUDIO"]),
+  metaId: z.string().nullable().optional(),
+  assetId: z.string().nullable().optional(),
+  duration: z.number().nonnegative().nullable().optional(),
+  durationSec: z.number().nonnegative().nullable().optional(),
+  arkVideoUrl: z.string().nullable().optional(),
+  aiDescription: z.string().nullable().optional(),
+  reasoningEffort: z.enum(["low", "medium", "high"]).optional(),
+});
+const remixProjectRequestSchema = z.object({
+  projectName: z.string().trim().min(1).max(80),
+  product: z.object({
+    id: z.union([z.number(), z.string()]).nullable(),
+    productName: z.string().min(1).max(200),
+    productImages: z.array(remixFileSchema).min(1).max(20),
+    productFormMetaList: z.array(z.unknown()).nullable().optional(),
+    productFormDesc: z.string().nullable().optional(),
+  }),
+  demand: z.string().max(2_000).default(""),
+  rawMaterialFiles: z.array(remixFileSchema).min(1).max(20),
+  portraitAssets: z
+    .array(
+      z.object({
+        id: z.union([z.number(), z.string()]).nullable().optional(),
+        assetName: z.string().min(1).max(100),
+        fileInfo: z.array(
+          z.object({
+            fileUrl: z.string().url(),
+            coverUrl: z.string().url(),
+            fileType: z.literal("IMAGE"),
+            assetId: z.string().nullable().optional(),
+          }),
+        ),
+        description: z.string().max(1_000).default(""),
+        gender: z.string().max(20).default(""),
+        age: z.number().int().min(0).max(150).nullable().optional(),
+        occupation: z.string().max(100).default(""),
+      }),
+    )
+    .max(10)
+    .default([]),
+});
+
+app.post("/api/video-remix/project/generate", async (c) => {
+  const requestId = crypto.randomUUID();
+  const parsed = remixProjectRequestSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success)
+    return c.json(
+      { error: { code: "INVALID_REMIX_REQUEST", message: "爆款二创请求参数无效", retryable: false, requestId } },
+      400,
+    );
+  if (!isModuleOpen("video-remix"))
+    return c.json(
+      { error: { code: "FEATURE_NOT_OPEN", message: "该功能正在验收，暂未开放", retryable: false, requestId } },
+      403,
+    );
+  const ownerUserId = c.get("userId");
+  const productAssetIds = parsed.data.product.productImages.map((file) => file.metaId).filter(Boolean) as string[];
+  const videoAssetIds = parsed.data.rawMaterialFiles.map((file) => file.objectKey);
+  const assets = [...productAssetIds, ...videoAssetIds].map((id) => accounts.getOwnedAsset(ownerUserId, id));
+  if (!productAssetIds.length || assets.some((asset) => !asset))
+    return c.json(
+      { error: { code: "ASSET_NOT_AVAILABLE", message: "引用的商品或视频素材不存在", retryable: false, requestId } },
+      422,
+    );
+  if (
+    assets
+      .slice(0, productAssetIds.length)
+      .some((asset) => asset?.kind !== "product" || !asset.mimeType.startsWith("image/"))
+  )
+    return c.json(
+      { error: { code: "INVALID_PRODUCT_ASSET", message: "商品素材必须是商品库图片", retryable: false, requestId } },
+      422,
+    );
+  if (assets.slice(productAssetIds.length).some((asset) => !asset?.mimeType.startsWith("video/")))
+    return c.json(
+      { error: { code: "INVALID_VIDEO_ASSET", message: "分镜素材必须全部为视频", retryable: false, requestId } },
+      422,
+    );
+  const productAsset = assets[0];
+  const videoAsset = assets[productAssetIds.length];
+  if (!productAsset || !videoAsset)
+    return c.json(
+      { error: { code: "ASSET_NOT_AVAILABLE", message: "引用的商品或视频素材不存在", retryable: false, requestId } },
+      422,
+    );
+  const values = {
+    workflowPhase: "analysis",
+    source: `asset:${videoAsset.id}:${videoAsset.originalName}`,
+    product: `asset:${productAsset.id}:${parsed.data.product.productName}`,
+    productName: parsed.data.product.productName,
+    productImageAssetIds: JSON.stringify(productAssetIds),
+    description: parsed.data.demand,
+    prompt: parsed.data.demand,
+    portrait: parsed.data.portraitAssets[0]?.assetName ?? "",
+    projectRequest: JSON.stringify(parsed.data),
+  };
+  const idempotencyKey = c.req.header("Idempotency-Key")?.trim().slice(0, 128);
+  if (idempotencyKey) {
+    const existing = store.getByIdempotencyKey(ownerUserId, idempotencyKey);
+    if (existing) return c.json(existing, 202);
+  }
+  const createdAt = new Date().toISOString();
+  const id = crypto.randomUUID();
+  const job: JobRecord = {
+    id,
+    ownerUserId,
+    moduleId: "video-remix",
+    title: parsed.data.projectName,
+    status: "queued",
+    progress: 0,
+    stage: "排队中",
+    overallExecutionMode: "real",
+    values,
+    executionPlan: [
+      {
+        id: "plan:0:media-probe",
+        capability: "media-probe",
+        executionMode: "local",
+        implementation: "ffprobe-local",
+        startedAt: "",
+      },
+      {
+        id: "plan:1:speech-transcribe",
+        capability: "speech-transcribe",
+        executionMode: "real",
+        implementation: "aihubmix-transcription",
+        provider: "aihubmix",
+        model: "gpt-4o-transcribe-diarize",
+        startedAt: "",
+      },
+      {
+        id: "plan:2:video-understand",
+        capability: "video-understand",
+        executionMode: "real",
+        implementation: "gemini-video-analysis",
+        provider: "aihubmix",
+        model: env.videoAnalysisModel,
+        startedAt: "",
+      },
+    ],
+    provenance: [],
+    idempotencyKey,
+    cancelRequested: false,
+    providerCancelState: "none",
+    stagingKeys: [],
+    jobSchemaVersion: 2,
+    createdAt,
+    updatedAt: createdAt,
+  };
+  store.create(job);
+  queue.enqueue(id);
+  return c.json(job, 202);
+});
 
 const createJobRoute = createRoute({
   method: "post",

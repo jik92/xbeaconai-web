@@ -13,6 +13,7 @@
     "api:generate": "bun scripts/generate-api-client.ts",
     "test:models": "bun scripts/test-model-sdks.ts",
     "test:seedance:multimodal": "bun scripts/test-seedance-multimodal.ts",
+    "test:video-analysis": "bun scripts/test-video-analysis.ts",
     "test:tos": "bun scripts/test-tos-sdk.ts",
     "test:ffmpeg": "bun scripts/test-ffmpeg-sdk.ts",
     "build": "tsc -b && vite build",

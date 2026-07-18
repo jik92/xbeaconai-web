@@ -81,3 +81,11 @@ export interface LibraryAsset {
   url: string;
   createdAt: string;
 }
+export interface LibraryProduct {
+  id: string;
+  name: string;
+  description?: string;
+  sharingScope: "private" | "team" | "organization";
+  images: LibraryAsset[];
+  createdAt: string;
+}

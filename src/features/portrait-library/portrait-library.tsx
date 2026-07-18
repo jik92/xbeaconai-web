@@ -95,6 +95,9 @@ export function PortraitLibrary() {
         profession: selected.profession,
         source_url: selected.source_url,
         index: selected.index,
+        description: selected.description,
+        gender: selected.gender,
+        age: selected.age,
       }),
     );
     window.location.assign("/aigc/video-remix");

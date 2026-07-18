@@ -46,6 +46,15 @@ export interface MediaAsset {
   description?: string;
   createdAt: string;
 }
+export interface ProductRecord {
+  id: string;
+  ownerUserId: string;
+  name: string;
+  description?: string;
+  sharingScope: "private" | "team" | "organization";
+  images: MediaAsset[];
+  createdAt: string;
+}
 export interface ArtifactRecord {
   id: string;
   ownerUserId: string;
@@ -182,6 +191,12 @@ export class AccountStore {
       this.db.exec("ALTER TABLE media_assets ADD COLUMN display_name TEXT NOT NULL DEFAULT ''");
     if (!assetColumns.some((column) => column.name === "description"))
       this.db.exec("ALTER TABLE media_assets ADD COLUMN description TEXT");
+    if (!assetColumns.some((column) => column.name === "product_group_id"))
+      this.db.exec("ALTER TABLE media_assets ADD COLUMN product_group_id TEXT");
+    if (!assetColumns.some((column) => column.name === "sort_order"))
+      this.db.exec("ALTER TABLE media_assets ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0");
+    if (!assetColumns.some((column) => column.name === "sharing_scope"))
+      this.db.exec("ALTER TABLE media_assets ADD COLUMN sharing_scope TEXT NOT NULL DEFAULT 'private'");
     this.db.exec("UPDATE media_assets SET display_name=original_name WHERE display_name='' OR display_name IS NULL");
     this.db.exec(
       "CREATE INDEX IF NOT EXISTS media_assets_owner_kind_idx ON media_assets(owner_user_id,asset_kind,created_at DESC)",
@@ -478,6 +493,82 @@ export class AccountStore {
         asset.description ?? null,
         asset.createdAt,
       );
+  }
+  createProductAssets(product: Omit<ProductRecord, "images">, images: MediaAsset[]) {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const insert = this.db.query(
+        "INSERT INTO media_assets(id,owner_user_id,original_name,storage_key,mime_type,byte_size,asset_kind,display_name,description,product_group_id,sort_order,sharing_scope,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+      );
+      images.forEach((asset, index) => {
+        insert.run(
+          asset.id,
+          asset.ownerUserId,
+          asset.originalName,
+          asset.storageKey,
+          asset.mimeType,
+          asset.byteSize,
+          "product",
+          product.name,
+          product.description ?? null,
+          product.id,
+          index,
+          product.sharingScope,
+          asset.createdAt,
+        );
+      });
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+  listProducts(userId: string): ProductRecord[] {
+    const rows = this.db
+      .query(
+        "SELECT id,owner_user_id,storage_key,original_name,mime_type,byte_size,display_name,description,product_group_id,sort_order,sharing_scope,created_at FROM media_assets WHERE owner_user_id=? AND asset_kind='product' ORDER BY created_at DESC,sort_order ASC",
+      )
+      .all(userId) as Array<{
+      id: string;
+      owner_user_id: string;
+      storage_key: string;
+      original_name: string;
+      mime_type: string;
+      byte_size: number;
+      display_name: string;
+      description: string | null;
+      product_group_id: string | null;
+      sort_order: number;
+      sharing_scope: ProductRecord["sharingScope"];
+      created_at: string;
+    }>;
+    const groups = new Map<string, ProductRecord>();
+    for (const row of rows) {
+      const groupId = row.product_group_id ?? row.id;
+      const product = groups.get(groupId) ?? {
+        id: groupId,
+        ownerUserId: row.owner_user_id,
+        name: row.display_name || row.original_name,
+        description: row.description ?? undefined,
+        sharingScope: row.sharing_scope,
+        images: [],
+        createdAt: row.created_at,
+      };
+      product.images.push({
+        id: row.id,
+        ownerUserId: row.owner_user_id,
+        storageKey: row.storage_key,
+        originalName: row.original_name,
+        mimeType: row.mime_type,
+        byteSize: row.byte_size,
+        kind: "product",
+        displayName: row.display_name || row.original_name,
+        description: row.description ?? undefined,
+        createdAt: row.created_at,
+      });
+      groups.set(groupId, product);
+    }
+    return [...groups.values()];
   }
   listAssets(userId: string, kind?: MediaAsset["kind"]): MediaAsset[] {
     const rows = (

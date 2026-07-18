@@ -24,6 +24,7 @@ export const env = {
   blockAiOutbound: process.env.BLOCK_AI_OUTBOUND === "true",
   openaiBaseUrl: process.env.OPENAI_BASE_URL ?? "",
   openaiKey: process.env.OPENAI_KEY ?? "",
+  videoAnalysisModel: process.env.VIDEO_ANALYSIS_MODEL ?? "gemini-3.5-flash",
   tos: {
     accessKeyId: process.env.TOS_ACCESS_KEY_ID ?? "",
     accessKeySecret: process.env.TOS_SECRET_ACCESS_KEY ?? "",

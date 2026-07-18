@@ -1,6 +1,6 @@
+import type { AssetKind, LibraryAsset, LibraryProduct } from "@/entities/types";
 import { getAuthToken } from "@/features/account/auth-context";
 import { randomUuid } from "@/lib/random-id";
-import type { AssetKind, LibraryAsset } from "@/entities/types";
 import { apiBaseUrl, apiUrl } from "./base-url";
 import { client } from "./generated/client.gen";
 import { cancelJob, createJob, getJob, getModels, listJobs, retryJob, uploadMedia } from "./generated/sdk.gen";
@@ -62,6 +62,86 @@ export async function fetchLibraryAssets(kind: Exclude<AssetKind, "media">) {
   if (!response.ok) throw new Error("资产列表加载失败");
   const data = (await response.json()) as { assets: LibraryAsset[] };
   return data.assets;
+}
+export async function fetchProducts() {
+  const response = await fetch(apiUrl("/api/products"), { headers: authHeaders() });
+  if (!response.ok) throw new Error("商品列表加载失败");
+  return ((await response.json()) as { products: LibraryProduct[] }).products;
+}
+export async function uploadProduct(input: {
+  files: File[];
+  name: string;
+  description: string;
+  sharingScope: LibraryProduct["sharingScope"];
+}) {
+  const body = new FormData();
+  input.files.forEach((file) => {
+    body.append("files", file);
+  });
+  body.set("productName", input.name);
+  body.set("description", input.description);
+  body.set("sharingScope", input.sharingScope);
+  const response = await fetch(apiUrl("/api/products"), { method: "POST", headers: authHeaders(), body });
+  const data = (await response.json().catch(() => null)) as {
+    product?: LibraryProduct;
+    error?: { message?: string };
+  } | null;
+  if (!response.ok || !data?.product) throw new Error(data?.error?.message || "商品上传失败");
+  return data.product;
+}
+interface RemixMaterialFile {
+  id?: number | string | null;
+  filename: string;
+  objectKey: string;
+  fileMd5?: string | null;
+  fileUrl: string;
+  coverUrl: string;
+  fileType: "IMAGE" | "VIDEO" | "AUDIO";
+  metaId?: string | null;
+  assetId?: string | null;
+  duration?: number | null;
+  durationSec?: number | null;
+  arkVideoUrl?: string | null;
+  aiDescription?: string | null;
+  reasoningEffort?: "low" | "medium" | "high";
+}
+export interface RemixProjectRequest {
+  projectName: string;
+  product: {
+    id: number | string | null;
+    productName: string;
+    productImages: RemixMaterialFile[];
+    productFormMetaList: unknown[] | null;
+    productFormDesc: string | null;
+  };
+  demand: string;
+  rawMaterialFiles: RemixMaterialFile[];
+  portraitAssets: Array<{
+    id?: number | string | null;
+    assetName: string;
+    fileInfo: Array<{
+      fileUrl: string;
+      coverUrl: string;
+      fileType: "IMAGE";
+      assetId?: string | null;
+    }>;
+    description: string;
+    gender: string;
+    age?: number | null;
+    occupation: string;
+  }>;
+}
+export async function generateRemixProject(input: RemixProjectRequest, idempotencyKey = randomUuid()) {
+  const response = await fetch(apiUrl("/api/video-remix/project/generate"), {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify(input),
+  });
+  const data = (await response.json().catch(() => null)) as Job | { error?: { message?: string } } | null;
+  if (!response.ok)
+    throw new Error(data && "error" in data ? data.error?.message || "视频解析提交失败" : "视频解析提交失败");
+  if (!data || !("status" in data)) throw new Error("视频解析响应无效");
+  return data;
 }
 export async function uploadLibraryAsset(
   file: File,

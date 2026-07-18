@@ -27,15 +27,15 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import {
   downloadAuthenticated,
-  fetchLibraryAssets,
   fetchJob,
-  fetchModels,
-  submitJob,
+  fetchLibraryAssets,
+  fetchProducts,
+  generateRemixProject,
   uploadMediaFile,
 } from "@/api/api-client";
-import type { Job, SeedanceModelId } from "@/api/generated/types.gen";
+import type { Job } from "@/api/generated/types.gen";
 import { AuthenticatedMedia } from "@/components/domain/authenticated-media";
-import type { ApiJobResult, LibraryAsset } from "@/entities/types";
+import type { ApiJobResult, LibraryAsset, LibraryProduct } from "@/entities/types";
 import "./remix-project.css";
 
 const stages = ["上传配置", "AI 解析", "提示词校对", "分镜校对", "合并成片"];
@@ -48,32 +48,10 @@ interface SelectedPortrait {
   profession: string;
   source_url: string;
   index: number;
+  description?: string;
+  gender?: string;
+  age?: number;
 }
-
-const promptText = `### 第一部分：全局基础设定
-约束条件：人物动作自然流畅，面部无扭曲变形；场景真实有生活感，无多余杂物穿模；精准还原商品外观，禁止错误生成；仅精准还原参考图产品 LOGO 与原有印刷文字，禁止额外生成任何字幕、底部字幕、旁白字幕，不新增任何文字，杜绝双层字幕。
-人物形象：中年男性，利落短发，身穿藏蓝色带白色小翅膀logo的翻领POLO衫，搭配黑色西裤、黑色皮带与黑色皮鞋，领口佩戴黑色领夹麦，外形沉稳接地气。
-人物神态：面部充满自然微表情，每3-4秒自然眨眼一次，眼球缓慢转动，目光柔和平视镜头，眼神有光不空洞；嘴角松弛柔和，面部肌肉放松不紧绷；杜绝面瘫脸、杜绝机械假脸、五官动态自然柔和；说话时眉眼轻微微动，神态生活化接地气，去掉AI虚拟质感，呈现真人真实鲜活神态，表情生动不死板。
-商品形态：高端休闲复古草帽，草编材质帽身配皮质装饰带，装饰带上有高端复古标识，帽檐弧度自然挺括，面料透气有质感，采用透明密封塑料袋独立包装。
-镜头视角：全片采用平视视角拍摄，镜头稳定无晃动，模拟真人手机实拍视角。
-背景描述：大型钢结构仓储空间，顶部为钢结构桁架搭配采光板与LED照明灯管，两侧摆放蓝橙配色的重型仓储货架，货架上堆满整箱货物；地面有浑浊黄褐色积水，水面上整齐散落大量独立包装的休闲复古草帽，多名身穿黑色工作服的工作人员弯腰整理积水里的货物，仓库尽头是敞开的大门，可看到室外景物。
-光线分析：顶部冷白色工业照明结合从仓库大门射入的自然天光，光线明亮均匀，无强烈硬阴影，呈现真实仓库原生光线氛围，水面有自然光线反射。
-音色设定：中年男性偏低沉的接地气音色，语速稍快，情绪饱满有感染力，符合带货场景的真实表达状态。
-画质要求：1080P高清分辨率，色彩真实自然，无过度滤镜修饰，呈现原生实拍的真实质感。
-视频总时长：15秒
-
----
-
-### 第二部分：分镜内容
-
-分镜 01
-人物动作描述：中年男性站在仓库积水区域，正对镜头，双臂微微向身体两侧摊开，手势示意身后的积水地面。
-画面口播文案：完了姐妹们，昨天一场大雨，仓库进水了。
-人物说话神态：自然眨眼，眉头微蹙，神情略带焦虑惋惜。
-音色语气设定：语气焦急带点无奈，语速稍快。
-分镜时长：3秒
-景别：近景
-画面构图：人物居中，上半身占据画面主要区域，身后露出部分积水地面与堆放的货物。`;
 
 function WorkflowHeader({
   stage,
@@ -124,6 +102,8 @@ function ConfigSidebar({
   setMode,
   description,
   setDescription,
+  projectName,
+  setProjectName,
   selectedPortrait,
   selectedProduct,
   selectedVoice,
@@ -136,8 +116,10 @@ function ConfigSidebar({
   setMode: (mode: "product" | "talking") => void;
   description: string;
   setDescription: (value: string) => void;
+  projectName: string;
+  setProjectName: (value: string) => void;
   selectedPortrait: SelectedPortrait | null;
-  selectedProduct: LibraryAsset | null;
+  selectedProduct: LibraryProduct | null;
   selectedVoice: LibraryAsset | null;
   source: string;
   uploading: boolean;
@@ -155,7 +137,14 @@ function ConfigSidebar({
           纯口播模式
         </button>
       </div>
-      <input className="remix-project-name" aria-label="项目名称" maxLength={30} placeholder="项目名称（选填）" />
+      <input
+        className="remix-project-name"
+        aria-label="项目名称"
+        maxLength={30}
+        placeholder="项目名称（选填）"
+        value={projectName}
+        onChange={(event) => setProjectName(event.target.value)}
+      />
       <div className="config-field-title">
         <b>
           商品 <em>*</em>
@@ -166,8 +155,8 @@ function ConfigSidebar({
         {selectedProduct ? (
           <span className="product-thumb product-asset-thumb">
             <AuthenticatedMedia
-              url={selectedProduct.url}
-              mimeType={selectedProduct.mimeType}
+              url={selectedProduct.images[0]?.url || ""}
+              mimeType={selectedProduct.images[0]?.mimeType || "image/png"}
               alt={selectedProduct.name}
             />
           </span>
@@ -303,6 +292,64 @@ function AssetPickerModal({
   );
 }
 
+function ProductPickerModal({
+  onClose,
+  onSelect,
+}: {
+  onClose: () => void;
+  onSelect: (product: LibraryProduct) => void;
+}) {
+  const {
+    data = [],
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["product-library"],
+    queryFn: fetchProducts,
+  });
+  return (
+    <div className="remix-picker-layer" role="presentation" onMouseDown={onClose}>
+      <aside className="remix-picker" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
+        <header>
+          <div>
+            <small>PRODUCT LIBRARY</small>
+            <h2>选择商品</h2>
+          </div>
+          <button aria-label="关闭" onClick={onClose}>
+            <X />
+          </button>
+        </header>
+        <div className="remix-picker-grid">
+          {data.map((product) => (
+            <button key={product.id} onClick={() => onSelect(product)}>
+              <span className="product">
+                <AuthenticatedMedia
+                  url={product.images[0]?.url || ""}
+                  mimeType={product.images[0]?.mimeType || "image/png"}
+                  alt={product.name}
+                />
+              </span>
+              <b>{product.name}</b>
+              <small>
+                {product.images.length} 张商品图 · {product.description || "暂无形态描述"}
+              </small>
+            </button>
+          ))}
+          {isLoading && <p>正在加载商品…</p>}
+          {error && <p>{error instanceof Error ? error.message : "商品加载失败"}</p>}
+          {!isLoading && !error && !data.length && <p>商品库还是空的，请先创建商品并上传图片。</p>}
+        </div>
+        <footer>
+          <button onClick={() => window.location.assign("/assets/products")}>
+            <Upload />
+            管理并上传商品
+          </button>
+        </footer>
+      </aside>
+    </div>
+  );
+}
+
 function ProjectHistoryDrawer({ open, job, onClose }: { open: boolean; job: Job | null; onClose: () => void }) {
   const rows = useMemo(
     () => [
@@ -410,19 +457,17 @@ export function RemixProject() {
   const [parsed, setParsed] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [prompt, setPrompt] = useState(promptText);
+  const [prompt, setPrompt] = useState("");
   const [source, setSource] = useState("");
   const [uploading, setUploading] = useState(false);
   const [mode, setMode] = useState<"product" | "talking">("product");
+  const [projectName, setProjectName] = useState("");
   const [description, setDescription] = useState("");
   const [compare, setCompare] = useState(false);
   const [notice, setNotice] = useState("");
   const [job, setJob] = useState<Job | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [picker, setPicker] = useState<"product" | "voice" | null>(null);
-  const videoModel: SeedanceModelId = "doubao-seedance-2-0-fast-260128";
-  const { data: modelCatalog = [] } = useQuery({ queryKey: ["api-models"], queryFn: fetchModels, staleTime: 60_000 });
-  const videoModels = modelCatalog.filter((model) => model.capability === "video-generate" && model.enabled);
   const [selectedPortrait] = useState<SelectedPortrait | null>(() => {
     try {
       return JSON.parse(localStorage.getItem("studio:selectedPortrait") || "null");
@@ -430,9 +475,22 @@ export function RemixProject() {
       return null;
     }
   });
-  const [selectedProduct, setSelectedProduct] = useState<LibraryAsset | null>(() => {
+  const [selectedProduct, setSelectedProduct] = useState<LibraryProduct | null>(() => {
     try {
-      return JSON.parse(localStorage.getItem("studio:selectedProduct") || "null");
+      const stored = JSON.parse(localStorage.getItem("studio:selectedProduct") || "null") as
+        | LibraryProduct
+        | LibraryAsset
+        | null;
+      if (!stored) return null;
+      if ("images" in stored) return stored;
+      return {
+        id: stored.id,
+        name: stored.name,
+        description: stored.description,
+        sharingScope: "private",
+        images: [stored],
+        createdAt: stored.createdAt,
+      };
     } catch {
       return null;
     }
@@ -452,7 +510,16 @@ export function RemixProject() {
       void fetchJob(activeJobId)
         .then((updated) => {
           setJob(updated);
-          if (updated.progress >= 35 && !parsed) {
+          const generatedPrompt =
+            updated.values.analysisPrompt ||
+            updated.result?.artifacts.find((artifact) => artifact.mimeType === "text/markdown" && artifact.text)?.text;
+          if (generatedPrompt) setPrompt(generatedPrompt);
+          if (updated.status === "failed") {
+            setParsing(false);
+            setNotice(updated.error?.message || "视频解析失败，请稍后重试");
+            return;
+          }
+          if (updated.status === "succeeded" && generatedPrompt && !parsed) {
             setParsed(true);
             setParsing(false);
             setStage(2);
@@ -460,6 +527,7 @@ export function RemixProject() {
         })
         .catch(() => setNotice("任务状态刷新失败，将在 10 秒后重试"));
     };
+    refresh();
     const timer = window.setInterval(refresh, 10_000);
     return () => window.clearInterval(timer);
   }, [activeJobId, parsed]);
@@ -484,29 +552,75 @@ export function RemixProject() {
       setStage(0);
       return;
     }
-    if (!videoModels.some((model) => model.id === videoModel)) {
-      setNotice("Seedance 模型尚未通过真实基线验证");
-      return;
-    }
     setParsed(false);
     setParsing(true);
     setStage(1);
     setNotice("");
     try {
-      const created = await submitJob(
-        "video-remix",
-        `爆款二创 · ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
-        {
-          source,
-          mode,
-          description,
-          prompt,
-          product: `asset:${selectedProduct.id}:${selectedProduct.name}`,
-          portrait: selectedPortrait?.name ?? "",
-          voice: selectedVoice ? `asset:${selectedVoice.id}:${selectedVoice.name}` : "",
+      const sourceAssetId = source.split(":", 3)[1];
+      if (!sourceAssetId) throw new Error("视频素材标识无效，请重新上传");
+      const videoName = source.split(":").slice(2).join(":");
+      const videoUrl = `/api/assets/${sourceAssetId}/content`;
+      const portraitAssetId = selectedPortrait?.source_url.match(/\/([^/]+)\.png(?:\?|$)/)?.[1] ?? null;
+      const created = await generateRemixProject({
+        projectName:
+          projectName.trim() ||
+          `爆款二创 · ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
+        product: {
+          id: selectedProduct.id,
+          productName: selectedProduct.name,
+          productImages: selectedProduct.images.map((image) => ({
+            id: null,
+            filename: image.originalName,
+            objectKey: image.id,
+            fileMd5: null,
+            fileUrl: image.url,
+            coverUrl: image.url,
+            fileType: "IMAGE",
+            metaId: image.id,
+            assetId: null,
+            duration: null,
+            durationSec: null,
+            arkVideoUrl: null,
+            aiDescription: selectedProduct.description ?? null,
+          })),
+          productFormMetaList: null,
+          productFormDesc: selectedProduct.description ?? null,
         },
-        videoModel,
-      );
+        demand: description,
+        rawMaterialFiles: [
+          {
+            filename: videoName,
+            objectKey: sourceAssetId,
+            fileMd5: null,
+            fileUrl: videoUrl,
+            coverUrl: videoUrl,
+            fileType: "VIDEO",
+            duration: null,
+            reasoningEffort: "high",
+          },
+        ],
+        portraitAssets: selectedPortrait
+          ? [
+              {
+                id: selectedPortrait.index,
+                assetName: selectedPortrait.name,
+                fileInfo: [
+                  {
+                    fileUrl: selectedPortrait.source_url,
+                    coverUrl: selectedPortrait.source_url,
+                    fileType: "IMAGE",
+                    assetId: portraitAssetId,
+                  },
+                ],
+                description: selectedPortrait.description ?? "",
+                gender: selectedPortrait.gender ?? "",
+                age: selectedPortrait.age,
+                occupation: selectedPortrait.profession,
+              },
+            ]
+          : [],
+      });
       setJob(created);
     } catch (error) {
       setParsing(false);
@@ -527,8 +641,9 @@ export function RemixProject() {
     setParsing(false);
     setEditing(false);
     setSource("");
+    setProjectName("");
     setDescription("");
-    setPrompt(promptText);
+    setPrompt("");
     setJob(null);
     setNotice("");
   };
@@ -554,6 +669,8 @@ export function RemixProject() {
           setMode={setMode}
           description={description}
           setDescription={setDescription}
+          projectName={projectName}
+          setProjectName={setProjectName}
           selectedPortrait={selectedPortrait}
           selectedProduct={selectedProduct}
           selectedVoice={selectedVoice}
@@ -817,18 +934,23 @@ export function RemixProject() {
         </button>
       )}
       <ProjectHistoryDrawer open={historyOpen} job={job} onClose={() => setHistoryOpen(false)} />
-      {picker && (
+      {picker === "product" && (
+        <ProductPickerModal
+          onClose={() => setPicker(null)}
+          onSelect={(product) => {
+            setSelectedProduct(product);
+            localStorage.setItem("studio:selectedProduct", JSON.stringify(product));
+            setPicker(null);
+          }}
+        />
+      )}
+      {picker === "voice" && (
         <AssetPickerModal
-          kind={picker}
+          kind="voice"
           onClose={() => setPicker(null)}
           onSelect={(asset) => {
-            if (picker === "product") {
-              setSelectedProduct(asset);
-              localStorage.setItem("studio:selectedProduct", JSON.stringify(asset));
-            } else {
-              setSelectedVoice(asset);
-              localStorage.setItem("studio:selectedVoice", JSON.stringify(asset));
-            }
+            setSelectedVoice(asset);
+            localStorage.setItem("studio:selectedVoice", JSON.stringify(asset));
             setPicker(null);
           }}
         />

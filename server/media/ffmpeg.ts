@@ -81,6 +81,29 @@ export async function extractAudio(input: string, output: string) {
   return output;
 }
 
+export async function extractCompressedAudio(input: string, output: string) {
+  await outputDir(output);
+  await run("ffmpeg", ["-y", "-i", input, "-vn", "-c:a", "libmp3lame", "-b:a", "128k", output]);
+  return output;
+}
+
+export async function normalizeReferenceImage(input: string, output: string) {
+  await outputDir(output);
+  await run("ffmpeg", [
+    "-y",
+    "-i",
+    input,
+    "-vf",
+    "scale=1600:-2:force_original_aspect_ratio=decrease",
+    "-frames:v",
+    "1",
+    "-q:v",
+    "3",
+    output,
+  ]);
+  return output;
+}
+
 export async function splitFixed(input: string, pattern: string) {
   await outputDir(pattern);
   await run("ffmpeg", [
