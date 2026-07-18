@@ -1,3 +1,5 @@
+import { randomUuid } from "@/lib/random-id";
+
 export type GenerateKind = "video" | "image";
 export type GenerateModel = "seedance-2.0" | "seedance-2.0-mini" | "seedance-2.0-fast" | "seedream-4.0";
 export type ReferenceKind = "image" | "video" | "audio";
@@ -83,7 +85,7 @@ export class AiGenerateMockStore {
   private timers = new Map<string, ReturnType<typeof setTimeout>[]>();
   private state: GenerateSnapshot;
   constructor() {
-    const id = crypto.randomUUID();
+    const id = randomUuid();
     this.state = {
       conversations: [{ id, title: "默认创作", createdAt: now(), results: [] }],
       activeId: id,
@@ -151,7 +153,7 @@ export class AiGenerateMockStore {
   }
   newConversation() {
     this.revokeReferences();
-    const id = crypto.randomUUID();
+    const id = randomUuid();
     this.update({
       conversations: [{ id, title: "默认创作", createdAt: now(), results: [] }, ...this.state.conversations],
       activeId: id,
@@ -165,7 +167,7 @@ export class AiGenerateMockStore {
     const error = validateGenerateReferences(this.state.references, files, this.state.kind);
     if (error) return error;
     const references = files.map((file) => ({
-      id: crypto.randomUUID(),
+      id: randomUuid(),
       name: file.name,
       kind: referenceKind(file)!,
       mimeType: file.type,
@@ -187,7 +189,7 @@ export class AiGenerateMockStore {
     const prompt = this.state.prompt.trim();
     if (!prompt) return false;
     const conversationId = this.state.activeId,
-      id = crypto.randomUUID(),
+      id = randomUuid(),
       referenceNames = this.state.references.map((item) => item.name),
       createdAt = now(),
       result: GenerateResult = {
@@ -251,7 +253,7 @@ export class AiGenerateMockStore {
     if (!result) return;
     const variant = {
       ...result,
-      id: crypto.randomUUID(),
+      id: randomUuid(),
       title: `${result.title} · 变体 ${result.variant + 1}`,
       createdAt: now(),
       variant: result.variant + 1,

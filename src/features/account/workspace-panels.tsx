@@ -25,6 +25,7 @@ import {
   updateProfile,
 } from "@/api/generated/sdk.gen";
 import type { NotificationItem, Preferences, RechargeOrder } from "@/api/generated/types.gen";
+import { randomUuid } from "@/lib/random-id";
 import { apiErrorMessage, useAuth } from "./auth-context";
 
 export type WorkspacePanel = "help" | "preferences" | "notifications" | "recharge" | "account" | "profile" | "security";
@@ -249,7 +250,7 @@ function RechargePanel() {
     try {
       const { data } = await createRechargeOrder({
         body: { packageId },
-        headers: { "Idempotency-Key": crypto.randomUUID() },
+        headers: { "Idempotency-Key": randomUuid() },
         throwOnError: true,
       });
       if (data) {

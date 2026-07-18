@@ -26,6 +26,7 @@ import {
   uploadMediaFile,
 } from "@/api/api-client";
 import type { Job, SeedanceModelId } from "@/api/generated/types.gen";
+import { randomUuid } from "@/lib/random-id";
 import "./ai-creation-composer.css";
 
 export interface CreationModelCapability {
@@ -239,7 +240,7 @@ export function AiCreationComposer() {
   const model = models.find((item) => item.id === draft.modelId && item.kind === kind);
   const fileInput = useRef<HTMLInputElement>(null);
   const promptRef = useRef<HTMLTextAreaElement>(null);
-  const requestKey = useRef(crypto.randomUUID());
+  const requestKey = useRef(randomUuid());
   const { data: tasks = [] } = useQuery({
     queryKey: ["api-tasks", "ai-generate"],
     queryFn: () => fetchJobs("ai-generate"),
@@ -302,7 +303,7 @@ export function AiCreationComposer() {
     setKind(next);
     setPanel(null);
     setError("");
-    requestKey.current = crypto.randomUUID();
+    requestKey.current = randomUuid();
   };
   const addDemo = (source: "library" | "portrait") => {
     const mimeType = "image/png";
@@ -388,7 +389,7 @@ export function AiCreationComposer() {
         kind === "video" ? (draft.modelId as SeedanceModelId) : undefined,
         requestKey.current,
       );
-      requestKey.current = crypto.randomUUID();
+      requestKey.current = randomUuid();
       setShowReview(false);
       toast.success(kind === "video" ? "视频任务已提交，可在下方查看状态" : "创作任务已提交");
     } catch (reason) {

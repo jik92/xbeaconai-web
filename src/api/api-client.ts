@@ -1,4 +1,5 @@
 import { getAuthToken } from "@/features/account/auth-context";
+import { randomUuid } from "@/lib/random-id";
 import { apiBaseUrl, apiUrl } from "./base-url";
 import { client } from "./generated/client.gen";
 import { cancelJob, createJob, getJob, getModels, listJobs, retryJob, uploadMedia } from "./generated/sdk.gen";
@@ -30,7 +31,7 @@ export async function submitJob(
   title: string,
   values: Record<string, string>,
   videoModel?: SeedanceModelId,
-  idempotencyKey = crypto.randomUUID(),
+  idempotencyKey = randomUuid(),
 ) {
   configure();
   const { data } = await createJob({

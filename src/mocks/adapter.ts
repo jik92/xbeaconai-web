@@ -1,5 +1,6 @@
 import type { MockTask, ModuleId } from "@/entities/types";
 import { db } from "@/lib/db";
+import { randomUuid } from "@/lib/random-id";
 import { transitionTask } from "./task-machine";
 
 export type MockScenario = "success" | "fail-analysis" | "partial-batch" | "insufficient-credits";
@@ -23,7 +24,7 @@ export async function runMockTask(
   signal?: AbortSignal,
 ) {
   let task: MockTask = {
-    id: crypto.randomUUID(),
+    id: randomUuid(),
     moduleId,
     title,
     status: "draft",
