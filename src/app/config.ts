@@ -23,23 +23,23 @@ export const APP_CONFIG = {
   projectName: "烽火AI",
   menuFeatures: {
     creationWorkflow: {
-      "video-remix": false,
+      "video-remix": true,
       "video-create": false,
       "ad-script": false,
     },
     aiToolbox: {
       "ai-generate": true,
-      "video-cut": true,
-      "media-understand": true,
-      "video-mashup": true,
-      "voice-clone": true,
-      "video-renewal": true,
-      "subtitle-erase": true,
-      "video-enhancement": true,
-      kickart: true,
+      "video-cut": false,
+      "media-understand": false,
+      "video-mashup": false,
+      "voice-clone": false,
+      "video-renewal": false,
+      "subtitle-erase": false,
+      "video-enhancement": false,
+      kickart: false,
     },
     assets: {
-      portraits: true,
+      portraits: false,
     },
   },
 } as const satisfies PublicAppConfig;
