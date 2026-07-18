@@ -1,10 +1,11 @@
 import { app, queue } from "./app";
 import { env } from "./env";
 import { resolve, sep } from "node:path";
+import { APP_CONFIG } from "../src/app/config";
 
 queue.start();
 
-console.log(`曜作 API ready at http://${env.host}:${env.port}`);
+console.log(`${APP_CONFIG.projectName} API ready at http://${env.host}:${env.port}`);
 console.log(`OpenAPI: http://${env.host}:${env.port}/openapi.json`);
 
 const distRoot = resolve("dist");

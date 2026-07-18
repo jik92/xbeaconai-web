@@ -1,5 +1,6 @@
 import { Clapperboard, Film, FileText, Sparkles, Scissors, ScanSearch, Shuffle, AudioLines, Wrench, Eraser, BadgeCheck, Layers3, type LucideIcon } from "lucide-react";
 import type { ModuleId } from "@/entities/types";
+import { resolveHomeDestination } from "./config";
 
 export type FieldKind = "video" | "audio" | "image" | "text" | "textarea" | "select" | "segmented" | "number" | "checkbox" | "region" | "asset-group";
 export interface FieldSpec { id: string; label: string; kind: FieldKind; required?: boolean; hint?: string; placeholder?: string; options?: string[]; min?: number; max?: number; unit?: string; }
@@ -87,4 +88,5 @@ export const modules: ModuleConfig[] = [
   ], action:"启动批量裂变", cost:18, duration:"约 8–20 分钟", result:{kind:"variant-matrix",label:"裂变矩阵",actions:["矩阵对比","筛选版本","批量下载","继续裂变"]}, tips:["建议一次只测试 1–2 个核心变量","目标人群组会影响标题与表达","生成后先筛选再进入发布流程"] }),
 ];
 
-export const defaultPath = modules[0].path;
+export const homeDestination = resolveHomeDestination(modules);
+export const defaultPath = homeDestination.kind === "route" ? homeDestination.path : "/";

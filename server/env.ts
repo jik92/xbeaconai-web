@@ -16,6 +16,7 @@ export const env = {
   databasePath: resolve(dataDir, "yaozuo.sqlite"),
   allowMockFallback: process.env.ALLOW_MOCK_FALLBACK !== "false",
   forceMock: process.env.FORCE_MOCK === "true",
+  blockAiOutbound: process.env.BLOCK_AI_OUTBOUND === "true",
   openaiBaseUrl: process.env.OPENAI_BASE_URL ?? "",
   openaiKey: process.env.OPENAI_KEY ?? "",
   tos: {

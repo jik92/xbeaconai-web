@@ -1,5 +1,6 @@
 import { Database } from "bun:sqlite";
 import { env } from "../env";
+import { APP_CONFIG } from "../../src/app/config";
 
 export interface UserSummary { id:string; email:string; displayName:string; avatarText:string; credits:number }
 export interface Preferences { theme:"light"|"system"; defaultRatio:"9:16"|"16:9"|"1:1"; language:"zh-CN"|"en"; taskNotifications:boolean; autoplayResults:boolean }
@@ -69,6 +70,10 @@ export class AccountStore {
         id TEXT PRIMARY KEY,owner_user_id TEXT NOT NULL REFERENCES users(id),job_id TEXT NOT NULL,storage_key TEXT NOT NULL,
         name TEXT NOT NULL,mime_type TEXT NOT NULL,created_at TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS credit_charges (
+        id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),job_id TEXT NOT NULL UNIQUE,
+        amount INTEGER NOT NULL CHECK(amount>0),balance_after INTEGER NOT NULL CHECK(balance_after>=0),created_at TEXT NOT NULL
+      );
       CREATE INDEX IF NOT EXISTS artifacts_owner_idx ON artifacts(owner_user_id,id);
       CREATE TABLE IF NOT EXISTS migration_state (key TEXT PRIMARY KEY,value TEXT NOT NULL,updated_at TEXT NOT NULL);
     `);
@@ -83,7 +88,7 @@ export class AccountStore {
       this.db.exec("BEGIN IMMEDIATE");
       this.db.query("INSERT INTO users(id,email,password_hash,display_name,avatar_text,created_at,updated_at) VALUES(?,?,?,?,?,?,?)").run(id,email,passwordHash,input.displayName.trim(),input.displayName.trim().slice(0,2)||"曜",created,created);
       this.db.query("INSERT INTO user_preferences(user_id,updated_at) VALUES(?,?)").run(id,created);
-      this.db.query("INSERT INTO notifications(id,user_id,type,title,body,created_at) VALUES(?,?,?,?,?,?)").run(crypto.randomUUID(),id,"welcome","欢迎来到曜作","账号已创建，可以开始你的第一个创作任务。",created);
+      this.db.query("INSERT INTO notifications(id,user_id,type,title,body,created_at) VALUES(?,?,?,?,?,?)").run(crypto.randomUUID(),id,"welcome",`欢迎来到${APP_CONFIG.projectName}`,"账号已创建，可以开始你的第一个创作任务。",created);
       const legacy=this.db.query("SELECT value FROM migration_state WHERE key='legacy_owner_user_id'").get() as {value:string}|null;
       if(!legacy){this.db.query("INSERT INTO migration_state(key,value,updated_at) VALUES('legacy_owner_user_id',?,?)").run(id,created);this.db.query("UPDATE jobs SET owner_user_id=? WHERE owner_user_id IS NULL").run(id);claimedLegacy=true}
       this.db.exec("COMMIT");

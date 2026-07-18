@@ -34,6 +34,7 @@ interface JobRow {
 }
 
 const parse = <T>(value: string | null, fallback: T): T => value ? JSON.parse(value) as T : fallback;
+export class InsufficientCreditsError extends Error {}
 
 export class SqliteJobStore {
   readonly db: Database;
@@ -149,6 +150,21 @@ export class SqliteJobStore {
       JSON.stringify(job.stagingKeys), job.jobSchemaVersion,
     );
     return job;
+  }
+
+  createCharged(job:JobRecord,credits:number):JobRecord{
+    if(!Number.isInteger(credits)||credits<=0)return this.create(job);
+    this.db.exec("BEGIN IMMEDIATE");
+    try{
+      const user=this.db.query("SELECT credits FROM users WHERE id=?").get(job.ownerUserId) as {credits:number}|null;
+      if(!user||user.credits<credits)throw new InsufficientCreditsError("创作点不足");
+      const balance=user.credits-credits;
+      this.create(job);
+      this.db.query("UPDATE users SET credits=?,updated_at=? WHERE id=?").run(balance,job.createdAt,job.ownerUserId);
+      this.db.query("INSERT INTO credit_charges(id,user_id,job_id,amount,balance_after,created_at) VALUES(?,?,?,?,?,?)").run(crypto.randomUUID(),job.ownerUserId,job.id,credits,balance,job.createdAt);
+      this.db.exec("COMMIT");
+      return job;
+    }catch(error){this.db.exec("ROLLBACK");throw error}
   }
 
   get(id: string): JobRecord | undefined {

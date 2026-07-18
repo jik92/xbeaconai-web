@@ -4,7 +4,7 @@ import { streamSSE } from "hono/streaming";
 import { readFileSync } from "node:fs";
 import { env } from "./env";
 import { extname, resolve } from "node:path";
-import { SqliteJobStore } from "./jobs/sqlite-job-store";
+import { InsufficientCreditsError, SqliteJobStore } from "./jobs/sqlite-job-store";
 import { MemoryJobQueue, buildExecutionPlan } from "./jobs/memory-job-queue";
 import type { JobRecord, StageProvenance } from "./types";
 import type { ModuleId } from "../src/entities/types";
@@ -12,6 +12,8 @@ import { auditSdkRegistry } from "./sdk-registry";
 import { AccountError, AccountStore, rechargePackages, type Preferences } from "./accounts/account-store";
 import { authenticate, issueToken } from "./accounts/auth";
 import { defaultVideoModelId, seedanceModelIds, videoModels } from "./models/video-models";
+import { creationCapabilities, quoteCreation, validateCreationValues } from "./creation/capabilities";
+import { APP_CONFIG, isModuleOpen } from "../src/app/config";
 
 const moduleIds = ["video-remix","video-create","ad-script","ai-generate","video-cut","media-understand","video-mashup","voice-clone","video-renewal","subtitle-erase","video-enhancement","kickart"] as const;
 const ModuleSchema = z.enum(moduleIds).openapi("ModuleId");
@@ -48,7 +50,7 @@ export const accounts = new AccountStore();
 export const queue = new MemoryJobQueue(store,accounts);
 type AppEnv={Variables:{userId:string;sessionId:string}};
 const app = new OpenAPIHono<AppEnv>();
-const publicApiPaths=new Set(["/api/health","/api/capabilities","/api/models","/api/auth/register","/api/auth/login","/api/auth/logout"]);
+const publicApiPaths=new Set(["/api/health","/api/capabilities","/api/models","/api/creation/capabilities","/api/auth/register","/api/auth/login","/api/auth/logout"]);
 
 function referencedAssetIds(values:Record<string,string>){
   const ids=new Set<string>();
@@ -152,6 +154,10 @@ app.openapi(capabilitiesRoute,(c)=>{
 const modelsRoute=createRoute({method:"get",path:"/api/models",operationId:"getModels",responses:{200:{description:"Approved model catalog",content:{"application/json":{schema:z.object({models:z.array(z.object({id:z.string(),provider:z.string(),capability:z.string(),executionMode:z.literal("real"),name:z.string(),description:z.string(),tags:z.array(z.string()),referenceCapabilities:z.array(z.enum(["image","video","audio"])),defaults:z.object({resolution:z.enum(["480p","720p"]),ratio:z.string(),duration:z.number().int(),generateAudio:z.boolean(),watermark:z.boolean()}),isDefault:z.boolean(),enabled:z.boolean(),realTestStatus:z.enum(["verified","pending","failed"])}))})}}}}});
 app.openapi(modelsRoute,(c)=>{const verified=getVerifiedSdkIds();const registry=auditSdkRegistry();const otherModels=registry.filter(item=>item.kind==="model"&&item.capability!=="video-generate"&&verified.has(item.id)).map(item=>({id:item.model!,provider:item.provider!,capability:item.capability,executionMode:"real" as const,name:item.model!,description:"已验证模型",tags:[],referenceCapabilities:[] as Array<"image"|"video"|"audio">,defaults:{resolution:"720p" as const,ratio:"16:9",duration:5,generateAudio:false,watermark:false},isDefault:false,enabled:true,realTestStatus:"verified" as const}));const videos=videoModels.map(model=>{const sdk=registry.find(item=>item.model===model.id);const passed=Boolean(sdk&&verified.has(sdk.id));return{...model,executionMode:"real" as const,enabled:env.forceMock||passed,realTestStatus:passed?"verified" as const:"pending" as const}});return c.json({models:[...otherModels,...videos]},200)});
 
+const creationModelSchema=z.object({id:z.string(),kind:z.enum(["image","video"]),displayName:z.string(),description:z.string(),badges:z.array(z.string()),enabled:z.boolean(),disabledReason:z.string().optional(),executionMode:z.enum(["real","mock"]),isDefault:z.boolean(),supportedRatios:z.array(z.string()),supportedResolutions:z.array(z.string()),supportedDurations:z.array(z.number().int()),maxOutputs:z.number().int(),supportsSeed:z.boolean(),referenceModes:z.array(z.string()),acceptedReferenceKinds:z.array(z.string()),pricing:z.object({baseCredits:z.number().int(),perOutputCredits:z.number().int()}),dimensions:z.record(z.string(),z.record(z.string(),z.object({width:z.number().int(),height:z.number().int()}))).optional()});
+const creationCapabilitiesRoute=createRoute({method:"get",path:"/api/creation/capabilities",operationId:"getCreationCapabilities",responses:{200:{description:"AI creation composer model capabilities",content:{"application/json":{schema:z.object({models:z.array(creationModelSchema)})}}}}});
+app.openapi(creationCapabilitiesRoute,c=>c.json({models:creationCapabilities(videoModelEnabled)},200));
+
 const uploadRoute = createRoute({
   method: "post", path: "/api/uploads", operationId: "uploadMedia",
   request: { body: { required: true, content: { "multipart/form-data": { schema: z.object({ file: z.file().openapi({ type: "string", format: "binary" }) }) } } } },
@@ -181,12 +187,21 @@ app.openapi(uploadRoute, async (c) => {
 const listRoute = createRoute({ method: "get", path: "/api/jobs", operationId: "listJobs", request: { query: z.object({ moduleId: ModuleSchema.optional() }) }, responses: { 200: { description: "Jobs", content: { "application/json": { schema: z.object({ jobs: z.array(JobSchema) }) } } } } });
 app.openapi(listRoute, (c) => c.json({ jobs: store.list(c.get("userId"),c.req.valid("query").moduleId as ModuleId | undefined) }, 200));
 
-const createJobRoute = createRoute({ method: "post", path: "/api/{moduleId}/jobs", operationId: "createJob", request: { params: z.object({ moduleId: ModuleSchema }), body: { content: { "application/json": { schema: z.object({ title: z.string().min(1).max(200), values: z.record(z.string(), z.string()), videoModel:VideoModelIdSchema.optional(),allowMockFallback: z.boolean().default(true) }) } }, required: true } }, responses: { 202: { description: "Accepted", content: { "application/json": { schema: JobSchema } } }, 401: { description: "Unauthorized", content: { "application/json": { schema: ErrorSchema } } }, 422: { description: "Invalid model or referenced asset", content: { "application/json": { schema: ErrorSchema } } } } });
+const createJobRoute = createRoute({ method: "post", path: "/api/{moduleId}/jobs", operationId: "createJob", request: { params: z.object({ moduleId: ModuleSchema }), body: { content: { "application/json": { schema: z.object({ title: z.string().min(1).max(200), values: z.record(z.string(), z.string()), videoModel:VideoModelIdSchema.optional(),allowMockFallback: z.boolean().default(true) }) } }, required: true } }, responses: { 202: { description: "Accepted", content: { "application/json": { schema: JobSchema } } }, 401: { description: "Unauthorized", content: { "application/json": { schema: ErrorSchema } } },403:{description:"Feature not open",content:{"application/json":{schema:ErrorSchema}}}, 422: { description: "Invalid model or referenced asset", content: { "application/json": { schema: ErrorSchema } } } } });
 app.openapi(createJobRoute, (c) => {
   const moduleId = c.req.valid("param").moduleId as ModuleId;
+  if(!isModuleOpen(moduleId))return c.json({error:{code:"FEATURE_NOT_OPEN",message:"该功能正在验收，暂未开放",retryable:false,requestId:crypto.randomUUID()}},403);
   const body = c.req.valid("json");
   const ownerUserId=c.get("userId");
   const needsVideoModel=moduleId==="video-remix"||(moduleId==="ai-generate"&&body.values.type==="视频");
+  let creationQuote=0;
+  if(moduleId==="ai-generate"&&body.values.creationKind){
+    const models=creationCapabilities(videoModelEnabled);const validationError=validateCreationValues(body.values,models);
+    if(validationError)return c.json({error:{code:"INVALID_CREATION_CONFIG",message:validationError,retryable:false,requestId:crypto.randomUUID()}},422);
+    creationQuote=quoteCreation(body.values,models);const user=accounts.getUser(ownerUserId);
+    if(!user||user.credits<creationQuote)return c.json({error:{code:"INSUFFICIENT_CREDITS",message:`本次预计消耗 ${creationQuote} 创作点，当前余额不足`,retryable:false,requestId:crypto.randomUUID()}},422);
+    if(body.values.creationKind==="video"&&body.videoModel!==body.values.modelId)return c.json({error:{code:"INVALID_VIDEO_MODEL",message:"视频模型与创作配置不一致",retryable:false,requestId:crypto.randomUUID()}},422);
+  }
   if(needsVideoModel&&!body.videoModel)return c.json({error:{code:"INVALID_VIDEO_MODEL",message:"请选择 Seedance 视频模型",retryable:false,requestId:crypto.randomUUID()}},422);
   if(body.videoModel&&!videoModelEnabled(body.videoModel))return c.json({error:{code:"VIDEO_MODEL_NOT_VERIFIED",message:"该 Seedance 模型尚未通过本轮真实基线验证",retryable:false,requestId:crypto.randomUUID()}},422);
   if(!needsVideoModel&&body.videoModel)return c.json({error:{code:"INVALID_VIDEO_MODEL",message:"当前本地处理模式不使用视频生成模型",retryable:false,requestId:crypto.randomUUID()}},422);
@@ -201,7 +216,7 @@ app.openapi(createJobRoute, (c) => {
   const id = crypto.randomUUID();
   const executionPlan: StageProvenance[] = buildExecutionPlan(moduleId, body.values, body.videoModel);
   const job: JobRecord = { id,ownerUserId, moduleId, title: body.title, status: "queued", progress: 0, stage: "排队中", overallExecutionMode: "mock", values: body.values, videoModel:body.videoModel,executionPlan, provenance: [], idempotencyKey, cancelRequested: false,providerCancelState:"none",stagingKeys:[],jobSchemaVersion:2,createdAt: now, updatedAt: now };
-  store.create(job);
+  try{if(creationQuote>0)store.createCharged(job,creationQuote);else store.create(job)}catch(error){if(error instanceof InsufficientCreditsError)return c.json({error:{code:"INSUFFICIENT_CREDITS",message:"创作点余额发生变化，请刷新后重试",retryable:false,requestId:crypto.randomUUID()}},422);throw error}
   queue.enqueue(id);
   return c.json(job, 202);
 });
@@ -221,10 +236,11 @@ app.openapi(cancelRoute, (c) => {
   return c.json(store.update(id, { cancelRequested: true, stage: "正在取消" })!, 200);
 });
 
-const retryRoute = createRoute({ method: "post", path: "/api/jobs/{jobId}/retry", operationId: "retryJob", request: { params: z.object({ jobId: z.string().uuid() }) }, responses: { 202: { description: "Retry accepted", content: { "application/json": { schema: JobSchema } } }, 404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },409:{description:"Retry blocked",content:{"application/json":{schema:ErrorSchema}}} } });
+const retryRoute = createRoute({ method: "post", path: "/api/jobs/{jobId}/retry", operationId: "retryJob", request: { params: z.object({ jobId: z.string().uuid() }) }, responses: { 202: { description: "Retry accepted", content: { "application/json": { schema: JobSchema } } },403:{description:"Feature not open",content:{"application/json":{schema:ErrorSchema}}}, 404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },409:{description:"Retry blocked",content:{"application/json":{schema:ErrorSchema}}} } });
 app.openapi(retryRoute, (c) => {
   const source = store.getOwned(c.req.valid("param").jobId,c.get("userId"));
   if (!source) return c.json({ error: { code: "NOT_FOUND", message: "任务不存在", retryable: false, requestId: crypto.randomUUID() } }, 404);
+  if(!isModuleOpen(source.moduleId))return c.json({error:{code:"FEATURE_NOT_OPEN",message:"该功能正在验收，暂未开放",retryable:false,requestId:crypto.randomUUID()}},403);
   if(source.executionPlan.some(stage=>stage.model==="wan2.6-t2v"))return c.json({error:{code:"MODEL_SELECTION_REQUIRED",message:"Wan 已停用，请返回配置页选择 Seedance 后创建新任务",retryable:false,requestId:crypto.randomUUID()}},409);
   if(source.providerTaskId&&!["completed","succeeded","failed","cancelled","expired"].includes(source.providerStatus??""))return c.json({error:{code:"UPSTREAM_STILL_RUNNING",message:"上游任务仍在运行或核对中，暂不能重复提交",retryable:false,requestId:crypto.randomUUID()}},409);
   const now = new Date().toISOString();
@@ -262,6 +278,6 @@ app.openapi(artifactRoute, async (c) => {
   return new Response(file, { headers: { "Content-Type": artifact.mime_type || "application/octet-stream", "Content-Disposition": `inline; filename="${artifact.name.replaceAll('"','')}"` } });
 });
 
-app.doc("/openapi.json", { openapi: "3.1.0", info: { title: "曜作 AI 创作 API", version: "0.1.0" } });
+app.doc("/openapi.json", { openapi: "3.1.0", info: { title: `${APP_CONFIG.projectName} AI 创作 API`, version: "0.1.0" } });
 
 export { app };

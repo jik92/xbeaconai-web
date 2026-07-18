@@ -35,7 +35,7 @@ export const uiFeatureRegistry: UiFeatureEntry[] = modules.flatMap((module) => {
     shared(module.id,"wizard-next","localState"),shared(module.id,"wizard-back","localState"),shared(module.id,"edit-config","localState"),shared(module.id,"advanced-settings","localState"),
     shared(module.id,"submit-job","createJob"),shared(module.id,"cancel-job","cancelJob"),shared(module.id,"retry-job","retryJob"),shared(module.id,"view-result","getJob"),shared(module.id,"export-row","getJob"),
     ...module.result.actions.map((action):UiFeatureEntry=>({id:`${module.id}:result:${action}`,moduleId:module.id,feature:`result:${module.result.kind}`,action,apiOperationId:action.includes("下载")||action.includes("导出")?"artifactDownload":"resultAction",e2eCaseId:`${module.id}-result-actions`,requiresUpload:false})),
-    ...(module.id==="ai-generate"?[shared(module.id,"open-asset-library","localState"),shared(module.id,"select-video-model","getModels")]:[]),
+    ...(module.id==="ai-generate"?[shared(module.id,"switch-creation-kind","localState"),shared(module.id,"open-asset-library","localState"),shared(module.id,"open-portrait-library","localState"),shared(module.id,"upload-reference","uploadMedia"),shared(module.id,"select-creation-model","getCreationCapabilities"),shared(module.id,"set-reference-mode","localState"),shared(module.id,"set-output-size","localState"),shared(module.id,"set-output-count","localState"),shared(module.id,"set-seed","localState"),shared(module.id,"manual-confirm","localState")]:[]),
   ];
 });
 

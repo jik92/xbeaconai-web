@@ -1,6 +1,7 @@
 import type { ModuleId } from "../../src/entities/types";
 import type { JobRecord, JobResult, StageProvenance } from "../types";
 import { env } from "../env";
+import { APP_CONFIG } from "../../src/app/config";
 import { aihubmix } from "../providers/aihubmix";
 import { extname, relative, resolve } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
@@ -119,7 +120,7 @@ export function buildExecutionPlan(moduleId: ModuleId, values: Record<string,str
     } else if (!env.forceMock && aihubmix.configured && capability === "multimodal-generate") {
       const type = values.type ?? "营销文案";
       executionMode = "real";
-      if (type === "图片" && verifiedSdkIds.has("aihubmix-image")) { implementation = "aihubmix-image"; model = "gpt-image-1-mini"; }
+      if (type === "图片" && values.modelId === "gpt-image-1-mini" && verifiedSdkIds.has("aihubmix-image")) { implementation = "aihubmix-image"; model = "gpt-image-1-mini"; }
       else if (type === "视频" && videoModel) { implementation = "aihubmix-video"; model = videoModel; }
       else if (type !== "图片" && type !== "视频" && verifiedSdkIds.has("aihubmix-text")) { implementation = "aihubmix-text"; model = "gpt-4.1-nano-free"; }
       else { executionMode="mock";implementation="yaozuo-mock-provider";model=undefined; }
@@ -152,6 +153,8 @@ export class MemoryJobQueue {
   private active = 0;
 
   constructor(readonly store: SqliteJobStore, private readonly accounts?:AccountStore, private readonly concurrency = 2) {}
+
+  state(){return {pending:this.pending.length,queued:this.queued.size,active:this.active}}
 
   start() {
     void this.recoverObjectCleanup();
@@ -386,14 +389,14 @@ export class MemoryJobQueue {
       this.change(id, { stage: label, progress: Math.round(8 + index / stages.length * 82), provenance: [...provenance, stage], overallExecutionMode: "mixed" });
       try {
         if(stage.executionMode==="real"&&stage.implementation==="aihubmix-text"){
-          const response=await aihubmix.generateText(`你是曜作创作助手。为 ${job.moduleId} 执行 ${capability}。用户配置：${JSON.stringify(job.values)}。输出简洁中文结果。`,stage.model);
+          const response=await aihubmix.generateText(`你是${APP_CONFIG.projectName}创作助手。为 ${job.moduleId} 执行 ${capability}。用户配置：${JSON.stringify(job.values)}。输出简洁中文结果。`,stage.model);
           produced.push({id:crypto.randomUUID(),name:`${capability}.txt`,mimeType:"text/plain",text:response.text,executionMode:"real"});
         }else if(stage.executionMode==="real"&&stage.implementation==="aihubmix-image"){
           const response=await aihubmix.generateImage(job.values.prompt||"A polished product advertising image, clean studio lighting",stage.model);
           const bytes=response.b64_json?Uint8Array.from(atob(response.b64_json),character=>character.charCodeAt(0)):await fetch(response.url!).then(item=>item.bytes());
           const name=`${id}-${capability}.png`;await Bun.write(resolve(env.dataDir,"results",name),bytes);produced.push({id:crypto.randomUUID(),name,mimeType:"image/png",url:`/api/artifacts/${name}`,executionMode:"real"});
         }else if(stage.executionMode==="real"&&stage.implementation==="aihubmix-audio"){
-          const response=await aihubmix.synthesizeSpeech(job.values.topic||job.values.prompt||"曜作智能创作结果已生成。",stage.model);const name=`${id}-${capability}.wav`;await Bun.write(resolve(env.dataDir,"results",name),response.bytes);produced.push({id:crypto.randomUUID(),name,mimeType:"audio/wav",url:`/api/artifacts/${name}`,executionMode:"real"});
+          const response=await aihubmix.synthesizeSpeech(job.values.topic||job.values.prompt||`${APP_CONFIG.projectName}智能创作结果已生成。`,stage.model);const name=`${id}-${capability}.wav`;await Bun.write(resolve(env.dataDir,"results",name),response.bytes);produced.push({id:crypto.randomUUID(),name,mimeType:"audio/wav",url:`/api/artifacts/${name}`,executionMode:"real"});
         }else if(stage.executionMode==="real"&&stage.implementation==="aihubmix-video"){
           if(!isSeedanceModelId(stage.model))throw new SeedanceFlowError("INVALID_VIDEO_MODEL","视频模型无效",false);
           const response=await this.runSeedance(job,stage.model);const name=`${id}-${capability}.mp4`;await Bun.write(resolve(env.dataDir,"results",name),response.bytes);await probeMedia(resolve(env.dataDir,"results",name));produced.push({id:crypto.randomUUID(),name,mimeType:"video/mp4",url:`/api/artifacts/${name}`,executionMode:"real"});

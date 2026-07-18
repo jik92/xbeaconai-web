@@ -585,6 +585,53 @@ export type GetModelsResponses = {
 
 export type GetModelsResponse = GetModelsResponses[keyof GetModelsResponses];
 
+export type GetCreationCapabilitiesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/creation/capabilities';
+};
+
+export type GetCreationCapabilitiesResponses = {
+    /**
+     * AI creation composer model capabilities
+     */
+    200: {
+        models: Array<{
+            id: string;
+            kind: 'image' | 'video';
+            displayName: string;
+            description: string;
+            badges: Array<string>;
+            enabled: boolean;
+            disabledReason?: string;
+            executionMode: 'real' | 'mock';
+            isDefault: boolean;
+            supportedRatios: Array<string>;
+            supportedResolutions: Array<string>;
+            supportedDurations: Array<number>;
+            maxOutputs: number;
+            supportsSeed: boolean;
+            referenceModes: Array<string>;
+            acceptedReferenceKinds: Array<string>;
+            pricing: {
+                baseCredits: number;
+                perOutputCredits: number;
+            };
+            dimensions?: {
+                [key: string]: {
+                    [key: string]: {
+                        width: number;
+                        height: number;
+                    };
+                };
+            };
+        }>;
+    };
+};
+
+export type GetCreationCapabilitiesResponse = GetCreationCapabilitiesResponses[keyof GetCreationCapabilitiesResponses];
+
 export type UploadMediaData = {
     body: {
         file: Blob | File;
@@ -670,6 +717,10 @@ export type CreateJobErrors = {
      */
     401: ApiErrorResponse;
     /**
+     * Feature not open
+     */
+    403: ApiErrorResponse;
+    /**
      * Invalid model or referenced asset
      */
     422: ApiErrorResponse;
@@ -750,6 +801,10 @@ export type RetryJobData = {
 };
 
 export type RetryJobErrors = {
+    /**
+     * Feature not open
+     */
+    403: ApiErrorResponse;
     /**
      * Not found
      */

@@ -39,6 +39,7 @@ export class AihubmixClient {
 
   private async request(path: string, init: RequestInit = {}) {
     if (!this.configured) throw new Error("AIHUBMIX_NOT_CONFIGURED");
+    if (env.blockAiOutbound) throw new Error(`AI_OUTBOUND_BLOCKED:${path}`);
     const method=(init.method??"GET").toUpperCase();
     const retryableMethod=method==="GET"||method==="HEAD"||method==="DELETE";
     const attempts=retryableMethod?4:1;

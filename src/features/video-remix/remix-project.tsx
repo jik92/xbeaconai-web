@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AuthenticatedMedia } from "@/components/domain/authenticated-media";
 import type { Job, SeedanceModelId } from "@/api/generated/types.gen";
 import type { ApiJobResult } from "@/entities/types";
+import { APP_CONFIG } from "@/app/config";
 
 const stages = ["上传配置", "AI 解析", "提示词校对", "分镜校对", "合并成片"];
 interface SelectedPortrait { name:string; profession:string; source_url:string; index:number }
@@ -92,7 +93,7 @@ export function RemixProject() {
       <div className="project-tools"><button onClick={()=>setHistoryOpen(value=>!value)}><History/>项目记录</button><button onClick={reset}><Plus/>新建</button></div>
     </header>
     {historyOpen&&<div className="safe-note"><History/><span><b>{job?.title??"暂无当前项目任务"}</b><small>{job?`${job.stage} · ${job.progress}% · ${job.overallExecutionMode}`:"完成上传并解析后将显示项目记录"}</small></span></div>}
-    {notice&&<div className="safe-note"><Sparkles/><span><b>{notice}</b><small>{job?`任务 ${job.id.slice(0,8)} · ${job.stage} ${job.progress}%`:"曜作工作台"}</small></span></div>}
+    {notice&&<div className="safe-note"><Sparkles/><span><b>{notice}</b><small>{job?`任务 ${job.id.slice(0,8)} · ${job.stage} ${job.progress}%`:`${APP_CONFIG.projectName}工作台`}</small></span></div>}
 
     {stage===0&&<main className="setup-stage"><section><h2>上传爆款参考</h2><p>上传一条已验证的爆款视频，AI 将提取人物、商品、场景与分镜结构。</p><label className="large-drop"><input id="remix-source" type="file" accept="video/*" onChange={event=>void upload(event.target.files?.[0])}/>{uploading?<LoaderCircle className="animate-spin"/>:<UploadCloud/>}<b>{uploading?"正在上传…":source?source.split(":").slice(2).join(":"):"上传爆款视频"}</b><span>{source?"已安全上传，可重新选择":"MP4/MOV，最大 500MB"}</span></label><div className="engine-panel"><span>视频生成引擎</span><div className="model-cards">{videoModels.map(model=><button type="button" key={model.id} className={videoModel===model.id?"active":""} onClick={()=>setVideoModel(model.id as SeedanceModelId)}><b>{model.name}</b><small>{model.description}</small><em>{model.tags.join(" · ")}</em></button>)}</div>{!videoModels.length&&<small className="field-error">Seedance 尚未完成真实基线验证，暂不能提交生成。</small>}</div></section><section><h3>创作模式</h3><div className="mode-cards"><button className={mode==="product"?"active":""} onClick={()=>setMode("product")}><Video/><b>含商品模式</b><span>保留商品展示逻辑并替换人物</span></button><button className={mode==="talking"?"active":""} onClick={()=>setMode("talking")}><UserRound/><b>纯口播模式</b><span>聚焦人物表达和口播脚本</span></button></div>{selectedPortrait&&<div className="selected-portrait"><img src={selectedPortrait.source_url} alt={selectedPortrait.name}/><div><small>已从人像库带入</small><b>{selectedPortrait.profession}</b><span>{selectedPortrait.name}</span></div><Check/></div>}<label>需求描述<textarea value={description} onChange={event=>setDescription(event.target.value)} placeholder="描述商品卖点、目标人群和希望调整的表达风格…"/></label></section></main>}
 

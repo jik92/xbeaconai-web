@@ -384,6 +384,38 @@ export const zGetModelsResponse = z.object({
     }))
 });
 
+/**
+ * AI creation composer model capabilities
+ */
+export const zGetCreationCapabilitiesResponse = z.object({
+    models: z.array(z.object({
+        id: z.string(),
+        kind: z.enum(['image', 'video']),
+        displayName: z.string(),
+        description: z.string(),
+        badges: z.array(z.string()),
+        enabled: z.boolean(),
+        disabledReason: z.string().optional(),
+        executionMode: z.enum(['real', 'mock']),
+        isDefault: z.boolean(),
+        supportedRatios: z.array(z.string()),
+        supportedResolutions: z.array(z.string()),
+        supportedDurations: z.array(z.int()),
+        maxOutputs: z.int(),
+        supportsSeed: z.boolean(),
+        referenceModes: z.array(z.string()),
+        acceptedReferenceKinds: z.array(z.string()),
+        pricing: z.object({
+            baseCredits: z.int(),
+            perOutputCredits: z.int()
+        }),
+        dimensions: z.record(z.string(), z.record(z.string(), z.object({
+            width: z.int(),
+            height: z.int()
+        }))).optional()
+    }))
+});
+
 export const zUploadMediaBody = z.object({
     file: z.string()
 });

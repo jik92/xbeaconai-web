@@ -1452,6 +1452,164 @@
         }
       }
     },
+    "/api/creation/capabilities": {
+      "get": {
+        "operationId": "getCreationCapabilities",
+        "responses": {
+          "200": {
+            "description": "AI creation composer model capabilities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "models": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "image",
+                              "video"
+                            ]
+                          },
+                          "displayName": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "badges": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "disabledReason": {
+                            "type": "string"
+                          },
+                          "executionMode": {
+                            "type": "string",
+                            "enum": [
+                              "real",
+                              "mock"
+                            ]
+                          },
+                          "isDefault": {
+                            "type": "boolean"
+                          },
+                          "supportedRatios": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "supportedResolutions": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "supportedDurations": {
+                            "type": "array",
+                            "items": {
+                              "type": "integer"
+                            }
+                          },
+                          "maxOutputs": {
+                            "type": "integer"
+                          },
+                          "supportsSeed": {
+                            "type": "boolean"
+                          },
+                          "referenceModes": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "acceptedReferenceKinds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "pricing": {
+                            "type": "object",
+                            "properties": {
+                              "baseCredits": {
+                                "type": "integer"
+                              },
+                              "perOutputCredits": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "baseCredits",
+                              "perOutputCredits"
+                            ]
+                          },
+                          "dimensions": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "object",
+                                "properties": {
+                                  "width": {
+                                    "type": "integer"
+                                  },
+                                  "height": {
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "width",
+                                  "height"
+                                ]
+                              }
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "displayName",
+                          "description",
+                          "badges",
+                          "enabled",
+                          "executionMode",
+                          "isDefault",
+                          "supportedRatios",
+                          "supportedResolutions",
+                          "supportedDurations",
+                          "maxOutputs",
+                          "supportsSeed",
+                          "referenceModes",
+                          "acceptedReferenceKinds",
+                          "pricing"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "models"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/uploads": {
       "post": {
         "operationId": "uploadMedia",
@@ -1656,6 +1814,16 @@
               }
             }
           },
+          "403": {
+            "description": "Feature not open",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Invalid model or referenced asset",
             "content": {
@@ -1766,6 +1934,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature not open",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
             }

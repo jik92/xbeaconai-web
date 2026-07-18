@@ -1,6 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { aihubmix } from "../server/providers/aihubmix";
+import { APP_CONFIG } from "../src/app/config";
 import { auditSdkRegistry } from "../server/sdk-registry";
 import { probeMedia } from "../server/media/ffmpeg";
 import { isSeedanceModelId } from "../server/models/video-models";
@@ -41,7 +42,7 @@ for (const entry of selected) {
   try {
     let result: Record<string, unknown>;
     if (entry.capability === "text-generate") {
-      const response = await aihubmix.generateText("只回复：曜作接口测试成功", entry.model);
+      const response = await aihubmix.generateText(`只回复：${APP_CONFIG.projectName}接口测试成功`, entry.model);
       result = { characters: response.text.length, model: response.model, nonEmpty: Boolean(response.text.trim()) };
     } else if (entry.capability === "image-generate") {
       const response = await aihubmix.generateImage("A simple orange circle centered on a clean white background, flat icon", entry.model);
@@ -49,7 +50,7 @@ for (const entry of selected) {
       const path = resolve(outputDir, `${entry.id}.png`); await Bun.write(path, bytes);
       const media = await probeMedia(path); result = { bytes: bytes.byteLength, width: media.streams[0]?.width, height: media.streams[0]?.height };
     } else if (entry.capability === "audio-generate") {
-      const response = await aihubmix.synthesizeSpeech("曜作音频接口测试成功。", entry.model);
+      const response = await aihubmix.synthesizeSpeech(`${APP_CONFIG.projectName}音频接口测试成功。`, entry.model);
       const path = resolve(outputDir, `${entry.id}.wav`); await Bun.write(path, response.bytes);
       const media = await probeMedia(path); result = { bytes: response.bytes.byteLength, duration: media.format.duration, codec: media.streams[0]?.codec_name };
     } else if (entry.capability === "video-generate") {

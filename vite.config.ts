@@ -2,9 +2,14 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath, URL } from "node:url";
+import { APP_CONFIG } from "./src/app/config";
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    { name:"project-name",transformIndexHtml:(html)=>html.replaceAll("%PROJECT_NAME%",APP_CONFIG.projectName) },
+    react(),
+    tailwindcss(),
+  ],
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   server: {
     proxy: {
