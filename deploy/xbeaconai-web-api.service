@@ -1,0 +1,18 @@
+[Unit]
+Description=xBeacon AI web API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/build/xbeaconai-web
+Environment=NODE_ENV=production
+EnvironmentFile=/etc/xbeaconai-web.env
+ExecStart=/usr/local/bin/bun run start
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

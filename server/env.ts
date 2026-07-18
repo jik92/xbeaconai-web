@@ -2,6 +2,11 @@ import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 
 const dataDir = resolve(process.env.YAOZUO_DATA_DIR ?? ".data");
+const apiPort = Number(process.env.API_PORT ?? 8787);
+const configuredAllowedOrigins = (process.env.ALLOWED_ORIGINS ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 const generatedJwtSecret = crypto.randomUUID().replaceAll("-", "") + crypto.randomUUID().replaceAll("-", "");
 if (!process.env.JWT_SECRET) console.warn("JWT_SECRET 未配置：当前进程使用临时开发密钥，重启后所有登录会话失效。");
 if (process.env.NODE_ENV === "production" && !process.env.JWT_SECRET) throw new Error("生产启动必须配置 JWT_SECRET");
@@ -11,7 +16,7 @@ mkdirSync(resolve(dataDir, "results"), { recursive: true, mode: 0o700 });
 
 export const env = {
   host: process.env.API_HOST ?? "127.0.0.1",
-  port: Number(process.env.API_PORT ?? 8787),
+  port: apiPort,
   dataDir,
   databasePath: resolve(dataDir, "yaozuo.sqlite"),
   allowMockFallback: process.env.ALLOW_MOCK_FALLBACK !== "false",
@@ -33,8 +38,9 @@ export const env = {
     "http://localhost:5173",
     "http://127.0.0.1:4173",
     "http://localhost:4173",
-    `http://127.0.0.1:${Number(process.env.API_PORT ?? 8787)}`,
-    `http://localhost:${Number(process.env.API_PORT ?? 8787)}`,
+    `http://127.0.0.1:${apiPort}`,
+    `http://localhost:${apiPort}`,
+    ...configuredAllowedOrigins,
   ]),
 };
 
