@@ -17,6 +17,11 @@
     "test:ffmpeg": "bun scripts/test-ffmpeg-sdk.ts",
     "build": "tsc -b && vite build",
     "typecheck": "tsc --noEmit",
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "check": "biome check .",
+    "check:fix": "biome check --write .",
     "test": "bun test tests/unit",
     "e2e": "playwright test"
   },
@@ -39,6 +44,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.4",
     "@hey-api/openapi-ts": "^0.99.0",
     "@playwright/test": "^1.61.1",
     "@tailwindcss/vite": "^4.3.3",

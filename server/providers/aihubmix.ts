@@ -33,57 +33,81 @@ export interface SeedanceVideoInput {
 }
 
 export class AihubmixClient {
-  constructor(private readonly baseUrl = env.openaiBaseUrl || "https://aihubmix.com", private readonly apiKey = env.openaiKey) {}
+  constructor(
+    private readonly baseUrl = env.openaiBaseUrl || "https://aihubmix.com",
+    private readonly apiKey = env.openaiKey,
+  ) {}
 
-  get configured() { return Boolean(this.apiKey && this.baseUrl); }
+  get configured() {
+    return Boolean(this.apiKey && this.baseUrl);
+  }
 
   private async request(path: string, init: RequestInit = {}) {
     if (!this.configured) throw new Error("AIHUBMIX_NOT_CONFIGURED");
     if (env.blockAiOutbound) throw new Error(`AI_OUTBOUND_BLOCKED:${path}`);
-    const method=(init.method??"GET").toUpperCase();
-    const retryableMethod=method==="GET"||method==="HEAD"||method==="DELETE";
-    const attempts=retryableMethod?4:1;
-    let lastError:unknown;
-    for(let attempt=0;attempt<attempts;attempt+=1){
-      try{
+    const method = (init.method ?? "GET").toUpperCase();
+    const retryableMethod = method === "GET" || method === "HEAD" || method === "DELETE";
+    const attempts = retryableMethod ? 4 : 1;
+    let lastError: unknown;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      try {
         const response = await fetch(new URL(path, this.baseUrl), {
           ...init,
           headers: { Authorization: `Bearer ${this.apiKey}`, ...init.headers },
           signal: init.signal ?? AbortSignal.timeout(120_000),
         });
-        if(response.ok)return response;
+        if (response.ok) return response;
         const message = (await response.text()).slice(0, 1000);
-        const error=new Error(`AIHUBMIX_${response.status}: ${message}`);
-        if(!retryableMethod||![408,429,500,502,503,504].includes(response.status)){Object.assign(error,{safeRetry:false});throw error}
-        lastError=error;
-      }catch(error){lastError=error;if(!retryableMethod||(error instanceof Error&&(error as Error&{safeRetry?:boolean}).safeRetry===false)||attempt===attempts-1)throw error}
-      await Bun.sleep(500*2**attempt);
+        const error = new Error(`AIHUBMIX_${response.status}: ${message}`);
+        if (!retryableMethod || ![408, 429, 500, 502, 503, 504].includes(response.status)) {
+          Object.assign(error, { safeRetry: false });
+          throw error;
+        }
+        lastError = error;
+      } catch (error) {
+        lastError = error;
+        if (
+          !retryableMethod ||
+          (error instanceof Error && (error as Error & { safeRetry?: boolean }).safeRetry === false) ||
+          attempt === attempts - 1
+        )
+          throw error;
+      }
+      await Bun.sleep(500 * 2 ** attempt);
     }
     throw lastError;
   }
 
   async listModels() {
-    const body = await this.request("/api/v1/models").then((response) => response.json()) as { data?: AihubmixModel[] };
+    const body = (await this.request("/api/v1/models").then((response) => response.json())) as {
+      data?: AihubmixModel[];
+    };
     return body.data ?? [];
   }
 
   async generateText(prompt: string, model = "gpt-4.1-nano-free") {
-    const body = await this.request("/v1/chat/completions", {
+    const body = (await this.request("/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ model, messages: [{ role: "user", content: prompt }], max_tokens: 160, temperature: 0.4 }),
-    }).then((response) => response.json()) as { choices?: Array<{ message?: { content?: string } }>; model?: string; usage?: unknown };
+    }).then((response) => response.json())) as {
+      choices?: Array<{ message?: { content?: string } }>;
+      model?: string;
+      usage?: unknown;
+    };
     const text = body.choices?.[0]?.message?.content;
     if (!text) throw new Error("AIHUBMIX_INVALID_TEXT_RESULT");
     return { text, model: body.model ?? model, usage: body.usage };
   }
 
   async generateImage(prompt: string, model = "gpt-image-1-mini") {
-    const body = await this.request("/v1/images/generations", {
+    const body = (await this.request("/v1/images/generations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ model, prompt, n: 1, size: "1024x1024", quality: "low" }),
-    }).then((response) => response.json()) as { data?: Array<{ b64_json?: string; url?: string; revised_prompt?: string }> };
+    }).then((response) => response.json())) as {
+      data?: Array<{ b64_json?: string; url?: string; revised_prompt?: string }>;
+    };
     const item = body.data?.[0];
     if (!item?.b64_json && !item?.url) throw new Error("AIHUBMIX_INVALID_IMAGE_RESULT");
     return item;
@@ -101,12 +125,14 @@ export class AihubmixClient {
   }
 
   async createSeedanceVideo(input: SeedanceVideoInput) {
-    const content = input.references?.map((reference) => reference.kind === "image"
-      ? { type: "image_url", image_url: { url: reference.url }, role: "reference_image" }
-      : reference.kind === "video"
-        ? { type: "video_url", video_url: { url: reference.url }, role: "reference_video" }
-        : { type: "audio_url", audio_url: { url: reference.url }, role: "reference_audio" });
-    const task = await this.request("/v1/videos", {
+    const content = input.references?.map((reference) =>
+      reference.kind === "image"
+        ? { type: "image_url", image_url: { url: reference.url }, role: "reference_image" }
+        : reference.kind === "video"
+          ? { type: "video_url", video_url: { url: reference.url }, role: "reference_video" }
+          : { type: "audio_url", audio_url: { url: reference.url }, role: "reference_audio" },
+    );
+    const task = (await this.request("/v1/videos", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -122,14 +148,15 @@ export class AihubmixClient {
         },
       }),
       signal: AbortSignal.timeout(180_000),
-    }).then((response) => response.json()) as VideoTask;
+    }).then((response) => response.json())) as VideoTask;
     if (!task.id) throw new Error("AIHUBMIX_INVALID_VIDEO_TASK");
     return task;
   }
 
   async getVideo(id: string) {
-    return this.request(`/v1/videos/${encodeURIComponent(id)}`)
-      .then((response) => response.json()) as Promise<VideoTask>;
+    return this.request(`/v1/videos/${encodeURIComponent(id)}`).then((response) =>
+      response.json(),
+    ) as Promise<VideoTask>;
   }
 
   async cancelVideo(id: string) {
@@ -147,7 +174,8 @@ export class AihubmixClient {
     while (Date.now() - started < timeoutMs) {
       const task = await this.getVideo(id);
       if (["completed", "succeeded"].includes(task.status)) return task;
-      if (["failed", "cancelled", "expired"].includes(task.status)) throw new Error(`AIHUBMIX_VIDEO_${task.status}: ${JSON.stringify(task.error ?? {})}`);
+      if (["failed", "cancelled", "expired"].includes(task.status))
+        throw new Error(`AIHUBMIX_VIDEO_${task.status}: ${JSON.stringify(task.error ?? {})}`);
       await Bun.sleep(5_000);
     }
     throw new Error("AIHUBMIX_VIDEO_TIMEOUT");

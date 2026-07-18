@@ -36,7 +36,7 @@ export const APP_CONFIG = {
       "video-renewal": true,
       "subtitle-erase": true,
       "video-enhancement": true,
-      "kickart": true,
+      kickart: true,
     },
     assets: {
       portraits: true,
@@ -56,7 +56,7 @@ const MODULE_GROUP = {
   "video-renewal": "aiToolbox",
   "subtitle-erase": "aiToolbox",
   "video-enhancement": "aiToolbox",
-  "kickart": "aiToolbox",
+  kickart: "aiToolbox",
 } as const satisfies Record<ModuleId, "creationWorkflow" | "aiToolbox">;
 
 export function isModuleOpen(moduleId: ModuleId, config: PublicAppConfig = APP_CONFIG): boolean {

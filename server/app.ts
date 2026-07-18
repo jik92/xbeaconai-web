@@ -1,168 +1,842 @@
-import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
+import { readFileSync } from "node:fs";
+import { extname, resolve } from "node:path";
+import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
-import { readFileSync } from "node:fs";
-import { env } from "./env";
-import { extname, resolve } from "node:path";
-import { InsufficientCreditsError, SqliteJobStore } from "./jobs/sqlite-job-store";
-import { MemoryJobQueue, buildExecutionPlan } from "./jobs/memory-job-queue";
-import type { JobRecord, StageProvenance } from "./types";
-import type { ModuleId } from "../src/entities/types";
-import { auditSdkRegistry } from "./sdk-registry";
-import { AccountError, AccountStore, rechargePackages, type Preferences } from "./accounts/account-store";
-import { authenticate, issueToken } from "./accounts/auth";
-import { defaultVideoModelId, seedanceModelIds, videoModels } from "./models/video-models";
-import { creationCapabilities, quoteCreation, validateCreationValues } from "./creation/capabilities";
 import { APP_CONFIG, isModuleOpen } from "../src/app/config";
+import type { ModuleId } from "../src/entities/types";
+import { AccountError, AccountStore, type Preferences, rechargePackages } from "./accounts/account-store";
+import { authenticate, issueToken } from "./accounts/auth";
+import { creationCapabilities, quoteCreation, validateCreationValues } from "./creation/capabilities";
+import { env } from "./env";
+import { buildExecutionPlan, MemoryJobQueue } from "./jobs/memory-job-queue";
+import { InsufficientCreditsError, SqliteJobStore } from "./jobs/sqlite-job-store";
+import { defaultVideoModelId, seedanceModelIds, videoModels } from "./models/video-models";
+import { auditSdkRegistry } from "./sdk-registry";
+import type { JobRecord, StageProvenance } from "./types";
 
-const moduleIds = ["video-remix","video-create","ad-script","ai-generate","video-cut","media-understand","video-mashup","voice-clone","video-renewal","subtitle-erase","video-enhancement","kickart"] as const;
+const moduleIds = [
+  "video-remix",
+  "video-create",
+  "ad-script",
+  "ai-generate",
+  "video-cut",
+  "media-understand",
+  "video-mashup",
+  "voice-clone",
+  "video-renewal",
+  "subtitle-erase",
+  "video-enhancement",
+  "kickart",
+] as const;
 const ModuleSchema = z.enum(moduleIds).openapi("ModuleId");
 const VideoModelIdSchema = z.enum(seedanceModelIds).openapi("SeedanceModelId");
-const JobStatusSchema = z.enum(["queued","processing","succeeded","partially_succeeded","failed","cancelled"]);
+const JobStatusSchema = z.enum(["queued", "processing", "succeeded", "partially_succeeded", "failed", "cancelled"]);
 const StageSchema = z.object({
-  id: z.string(), capability: z.string(), executionMode: z.enum(["real","local","mock"]),
-  implementation: z.string(), provider: z.string().optional(), model: z.string().optional(),
-  fallbackReason: z.string().optional(), startedAt: z.string(), completedAt: z.string().optional(),
+  id: z.string(),
+  capability: z.string(),
+  executionMode: z.enum(["real", "local", "mock"]),
+  implementation: z.string(),
+  provider: z.string().optional(),
+  model: z.string().optional(),
+  fallbackReason: z.string().optional(),
+  startedAt: z.string(),
+  completedAt: z.string().optional(),
 });
-const ApiErrorSchema = z.object({ code: z.string(), message: z.string(), retryable: z.boolean(), requestId: z.string() });
+const ApiErrorSchema = z.object({
+  code: z.string(),
+  message: z.string(),
+  retryable: z.boolean(),
+  requestId: z.string(),
+});
 const ArtifactSchema = z.object({
-  id:z.string(), name:z.string(), mimeType:z.string(), url:z.string().optional(), text:z.string().optional(),
-  executionMode:z.enum(["real","local","mock","mixed"]), lineage:z.array(StageSchema),
+  id: z.string(),
+  name: z.string(),
+  mimeType: z.string(),
+  url: z.string().optional(),
+  text: z.string().optional(),
+  executionMode: z.enum(["real", "local", "mock", "mixed"]),
+  lineage: z.array(StageSchema),
 });
 const JobResultSchema = z.object({
-  kind:z.string(), title:z.string(), summary:z.string(), artifacts:z.array(ArtifactSchema),
-  data:z.object({values:z.record(z.string(),z.string()),generatedAt:z.string(),mock:z.boolean()}).optional(),
+  kind: z.string(),
+  title: z.string(),
+  summary: z.string(),
+  artifacts: z.array(ArtifactSchema),
+  data: z.object({ values: z.record(z.string(), z.string()), generatedAt: z.string(), mock: z.boolean() }).optional(),
 });
-const JobSchema = z.object({
-  id: z.string(), moduleId: ModuleSchema, title: z.string(), status: JobStatusSchema,
-  progress: z.number().int().min(0).max(100), stage: z.string(),
-  overallExecutionMode: z.enum(["real","local","mock","mixed"]),
-  values: z.record(z.string(), z.string()), videoModel: VideoModelIdSchema.optional(), executionPlan: z.array(StageSchema), provenance: z.array(StageSchema),
-  result: JobResultSchema.optional(), error: ApiErrorSchema.optional(), parentJobId: z.string().optional(),
-  cancelRequested: z.boolean(), providerModel:VideoModelIdSchema.optional(),providerTaskId:z.string().optional(),providerStatus:z.string().optional(),
-  providerSubmittedAt:z.string().optional(),providerDeadlineAt:z.string().optional(),providerCancelState:z.enum(["none","requested","unsupported","failed"]).optional(),
-  stagingKeys:z.array(z.string()),jobSchemaVersion:z.union([z.literal(1),z.literal(2)]),createdAt: z.string(), updatedAt: z.string(),
-}).openapi("Job");
+const JobSchema = z
+  .object({
+    id: z.string(),
+    moduleId: ModuleSchema,
+    title: z.string(),
+    status: JobStatusSchema,
+    progress: z.number().int().min(0).max(100),
+    stage: z.string(),
+    overallExecutionMode: z.enum(["real", "local", "mock", "mixed"]),
+    values: z.record(z.string(), z.string()),
+    videoModel: VideoModelIdSchema.optional(),
+    executionPlan: z.array(StageSchema),
+    provenance: z.array(StageSchema),
+    result: JobResultSchema.optional(),
+    error: ApiErrorSchema.optional(),
+    parentJobId: z.string().optional(),
+    cancelRequested: z.boolean(),
+    providerModel: VideoModelIdSchema.optional(),
+    providerTaskId: z.string().optional(),
+    providerStatus: z.string().optional(),
+    providerSubmittedAt: z.string().optional(),
+    providerDeadlineAt: z.string().optional(),
+    providerCancelState: z.enum(["none", "requested", "unsupported", "failed"]).optional(),
+    stagingKeys: z.array(z.string()),
+    jobSchemaVersion: z.union([z.literal(1), z.literal(2)]),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+  })
+  .openapi("Job");
 const ErrorSchema = z.object({ error: ApiErrorSchema }).openapi("ApiErrorResponse");
 
 export const store = new SqliteJobStore();
 export const accounts = new AccountStore();
-export const queue = new MemoryJobQueue(store,accounts);
-type AppEnv={Variables:{userId:string;sessionId:string}};
+export const queue = new MemoryJobQueue(store, accounts);
+type AppEnv = { Variables: { userId: string; sessionId: string } };
 const app = new OpenAPIHono<AppEnv>();
-const publicApiPaths=new Set(["/api/health","/api/capabilities","/api/models","/api/creation/capabilities","/api/auth/register","/api/auth/login","/api/auth/logout"]);
+const publicApiPaths = new Set([
+  "/api/health",
+  "/api/capabilities",
+  "/api/models",
+  "/api/creation/capabilities",
+  "/api/auth/register",
+  "/api/auth/login",
+  "/api/auth/logout",
+]);
 
-function referencedAssetIds(values:Record<string,string>){
-  const ids=new Set<string>();
-  for(const value of Object.values(values)){
-    if(value.startsWith("asset:")){const id=value.split(":",3)[1];if(id)ids.add(id)}
-    if(value.startsWith("assets:"))try{
-      const items=JSON.parse(value.slice(7)) as Array<{id?:unknown}>;
-      for(const item of items)if(typeof item?.id==="string"&&!item.id.startsWith("library-"))ids.add(item.id);
-    }catch{/* invalid structured values are handled as ordinary form values */}
+function referencedAssetIds(values: Record<string, string>) {
+  const ids = new Set<string>();
+  for (const value of Object.values(values)) {
+    if (value.startsWith("asset:")) {
+      const id = value.split(":", 3)[1];
+      if (id) ids.add(id);
+    }
+    if (value.startsWith("assets:"))
+      try {
+        const items = JSON.parse(value.slice(7)) as Array<{ id?: unknown }>;
+        for (const item of items) if (typeof item?.id === "string" && !item.id.startsWith("library-")) ids.add(item.id);
+      } catch {
+        /* invalid structured values are handled as ordinary form values */
+      }
   }
   return [...ids];
 }
 
 function getVerifiedSdkIds(): Set<string> {
   const verified = new Set<string>();
-  for (const file of ["capabilities.json","ffmpeg-capabilities.json"]) try {
-    const body = JSON.parse(readFileSync(resolve(env.dataDir,file),"utf8")) as {entries?:Array<{id:string;status:string}>};
-    for (const item of body.entries??[]) if (item.status==="verified"||item.status==="local") verified.add(item.id);
-  } catch { /* report not generated yet */ }
+  for (const file of ["capabilities.json", "ffmpeg-capabilities.json"])
+    try {
+      const body = JSON.parse(readFileSync(resolve(env.dataDir, file), "utf8")) as {
+        entries?: Array<{ id: string; status: string }>;
+      };
+      for (const item of body.entries ?? [])
+        if (item.status === "verified" || item.status === "local") verified.add(item.id);
+    } catch {
+      /* report not generated yet */
+    }
   return verified;
 }
 
-function videoModelEnabled(modelId:string){if(env.forceMock)return true;const sdk=auditSdkRegistry().find(item=>item.model===modelId&&item.capability==="video-generate");return Boolean(sdk&&getVerifiedSdkIds().has(sdk.id))}
+function videoModelEnabled(modelId: string) {
+  if (env.forceMock) return true;
+  const sdk = auditSdkRegistry().find((item) => item.model === modelId && item.capability === "video-generate");
+  return Boolean(sdk && getVerifiedSdkIds().has(sdk.id));
+}
 
-app.use("/api/*", cors({
-  origin: (origin) => env.allowedOrigins.has(origin) ? origin : "",
-  allowHeaders: ["Content-Type", "Authorization", "Idempotency-Key", "Last-Event-ID"],
-  allowMethods: ["GET", "POST", "PATCH", "PUT", "OPTIONS"],
-  credentials: false,
-}));
+app.use(
+  "/api/*",
+  cors({
+    origin: (origin) => (env.allowedOrigins.has(origin) ? origin : ""),
+    allowHeaders: ["Content-Type", "Authorization", "Idempotency-Key", "Last-Event-ID"],
+    allowMethods: ["GET", "POST", "PATCH", "PUT", "OPTIONS"],
+    credentials: false,
+  }),
+);
 
-app.use("*",async(c,next)=>{await next();c.header("X-Content-Type-Options","nosniff");c.header("Referrer-Policy","no-referrer");c.header("X-Frame-Options","DENY");c.header("Permissions-Policy","camera=(), geolocation=(), microphone=(self)");c.header("Content-Security-Policy","default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")});
+app.use("*", async (c, next) => {
+  await next();
+  c.header("X-Content-Type-Options", "nosniff");
+  c.header("Referrer-Policy", "no-referrer");
+  c.header("X-Frame-Options", "DENY");
+  c.header("Permissions-Policy", "camera=(), geolocation=(), microphone=(self)");
+  c.header(
+    "Content-Security-Policy",
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+  );
+});
 
 app.use("/api/*", async (c, next) => {
   const origin = c.req.header("Origin");
-  if (origin && !env.allowedOrigins.has(origin)) return c.json({ error: { code: "ORIGIN_NOT_ALLOWED", message: "请求来源不受信任", retryable: false, requestId: crypto.randomUUID() } }, 403);
-  if(c.req.method==="OPTIONS"||publicApiPaths.has(c.req.path))return next();
-  const identity=await authenticate(accounts,c.req.header("Authorization"));
-  if(!identity)return c.json({error:{code:"AUTHENTICATION_FAILED",message:"登录已失效，请重新登录",retryable:false,requestId:crypto.randomUUID()}},401);
-  c.set("userId",identity.user.id);c.set("sessionId",identity.sessionId);
+  if (origin && !env.allowedOrigins.has(origin))
+    return c.json(
+      {
+        error: {
+          code: "ORIGIN_NOT_ALLOWED",
+          message: "请求来源不受信任",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      403,
+    );
+  if (c.req.method === "OPTIONS" || publicApiPaths.has(c.req.path)) return next();
+  const identity = await authenticate(accounts, c.req.header("Authorization"));
+  if (!identity)
+    return c.json(
+      {
+        error: {
+          code: "AUTHENTICATION_FAILED",
+          message: "登录已失效，请重新登录",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      401,
+    );
+  c.set("userId", identity.user.id);
+  c.set("sessionId", identity.sessionId);
   await next();
 });
 
-const healthRoute = createRoute({ method: "get", path: "/api/health", operationId: "getHealth", responses: { 200: { description: "Service health", content: { "application/json": { schema: z.object({ status: z.literal("ok"), mockFallback: z.boolean(), database: z.literal("sqlite"), queue: z.literal("memory") }) } } } } });
-app.openapi(healthRoute, (c) => c.json({ status: "ok" as const, mockFallback: env.allowMockFallback, database: "sqlite" as const, queue: "memory" as const }, 200));
+const healthRoute = createRoute({
+  method: "get",
+  path: "/api/health",
+  operationId: "getHealth",
+  responses: {
+    200: {
+      description: "Service health",
+      content: {
+        "application/json": {
+          schema: z.object({
+            status: z.literal("ok"),
+            mockFallback: z.boolean(),
+            database: z.literal("sqlite"),
+            queue: z.literal("memory"),
+          }),
+        },
+      },
+    },
+  },
+});
+app.openapi(healthRoute, (c) =>
+  c.json(
+    {
+      status: "ok" as const,
+      mockFallback: env.allowMockFallback,
+      database: "sqlite" as const,
+      queue: "memory" as const,
+    },
+    200,
+  ),
+);
 
-const UserSchema=z.object({id:z.string().uuid(),email:z.string().email(),displayName:z.string(),avatarText:z.string(),credits:z.number().int().nonnegative()}).openapi("UserSummary");
-const AuthSchema=z.object({token:z.string(),tokenType:z.literal("Bearer"),expiresAt:z.string(),user:UserSchema}).openapi("AuthResponse");
-const PasswordSchema=z.string().min(10).max(128).regex(/[A-Za-z]/,"密码必须包含字母").regex(/[0-9]/,"密码必须包含数字");
-const authRate=new Map<string,{count:number;reset:number}>();
-function rateLimited(key:string){const time=Date.now(),entry=authRate.get(key);if(!entry||entry.reset<time){authRate.set(key,{count:1,reset:time+60_000});return false}entry.count+=1;return entry.count>env.authRateLimitMax}
+const UserSchema = z
+  .object({
+    id: z.string().uuid(),
+    email: z.string().email(),
+    displayName: z.string(),
+    avatarText: z.string(),
+    credits: z.number().int().nonnegative(),
+  })
+  .openapi("UserSummary");
+const AuthSchema = z
+  .object({ token: z.string(), tokenType: z.literal("Bearer"), expiresAt: z.string(), user: UserSchema })
+  .openapi("AuthResponse");
+const PasswordSchema = z
+  .string()
+  .min(10)
+  .max(128)
+  .regex(/[A-Za-z]/, "密码必须包含字母")
+  .regex(/[0-9]/, "密码必须包含数字");
+const authRate = new Map<string, { count: number; reset: number }>();
+function rateLimited(key: string) {
+  const time = Date.now(),
+    entry = authRate.get(key);
+  if (!entry || entry.reset < time) {
+    authRate.set(key, { count: 1, reset: time + 60_000 });
+    return false;
+  }
+  entry.count += 1;
+  return entry.count > env.authRateLimitMax;
+}
 
-const registerRoute=createRoute({method:"post",path:"/api/auth/register",operationId:"register",request:{body:{required:true,content:{"application/json":{schema:z.object({email:z.string().email().max(254),password:PasswordSchema,displayName:z.string().trim().min(2).max(40)})}}}},responses:{201:{description:"Registered",content:{"application/json":{schema:AuthSchema}}},409:{description:"Email exists",content:{"application/json":{schema:ErrorSchema}}},422:{description:"Validation error",content:{"application/json":{schema:ErrorSchema}}},429:{description:"Rate limited",content:{"application/json":{schema:ErrorSchema}}}}});
-app.openapi(registerRoute,async(c)=>{if(rateLimited(`register:${c.req.header("x-forwarded-for")??"local"}`))return c.json({error:{code:"RATE_LIMITED",message:"操作过于频繁，请稍后再试",retryable:true,requestId:crypto.randomUUID()}},429);try{const registration=await accounts.register(c.req.valid("json"));if(registration.claimedLegacy)queue.recoverOwned(registration.user.id);return c.json(await issueToken(accounts,registration.user),201)}catch(error){if(error instanceof AccountError&&error.status===409)return c.json({error:{code:error.code,message:error.message,retryable:false,requestId:crypto.randomUUID()}},409);throw error}});
-
-const loginRoute=createRoute({method:"post",path:"/api/auth/login",operationId:"login",request:{body:{required:true,content:{"application/json":{schema:z.object({email:z.string().email(),password:z.string().min(1).max(128)})}}}},responses:{200:{description:"Logged in",content:{"application/json":{schema:AuthSchema}}},401:{description:"Invalid credentials",content:{"application/json":{schema:ErrorSchema}}},429:{description:"Rate limited",content:{"application/json":{schema:ErrorSchema}}}}});
-app.openapi(loginRoute,async(c)=>{if(rateLimited(`login:${c.req.header("x-forwarded-for")??"local"}`))return c.json({error:{code:"RATE_LIMITED",message:"登录尝试过多，请稍后再试",retryable:true,requestId:crypto.randomUUID()}},429);try{const body=c.req.valid("json"),user=await accounts.verifyCredentials(body.email,body.password);return c.json(await issueToken(accounts,user),200)}catch(error){if(error instanceof AccountError)return c.json({error:{code:error.code,message:error.message,retryable:false,requestId:crypto.randomUUID()}},401);throw error}});
-
-const logoutRoute=createRoute({method:"post",path:"/api/auth/logout",operationId:"logout",responses:{204:{description:"Logged out"},401:{description:"Invalid token",content:{"application/json":{schema:ErrorSchema}}}}});
-app.openapi(logoutRoute,async(c)=>{const identity=await authenticate(accounts,c.req.header("Authorization"),true);if(!identity)return c.json({error:{code:"AUTHENTICATION_FAILED",message:"登录凭据无效",retryable:false,requestId:crypto.randomUUID()}},401);accounts.revokeSession(identity.sessionId);return c.body(null,204)});
-
-const meRoute=createRoute({method:"get",path:"/api/auth/me",operationId:"getCurrentUser",responses:{200:{description:"Current user",content:{"application/json":{schema:z.object({user:UserSchema})}}},401:{description:"Unauthorized",content:{"application/json":{schema:ErrorSchema}}}}});
-app.openapi(meRoute,(c)=>c.json({user:accounts.getUser(c.get("userId"))!},200));
-
-const profileRoute=createRoute({method:"patch",path:"/api/account/profile",operationId:"updateProfile",request:{body:{required:true,content:{"application/json":{schema:z.object({email:z.string().email().max(254),displayName:z.string().trim().min(2).max(40),avatarText:z.string().trim().min(1).max(2)})}}}},responses:{200:{description:"Updated profile",content:{"application/json":{schema:z.object({user:UserSchema})}}},409:{description:"Email exists",content:{"application/json":{schema:ErrorSchema}}}}});
-app.openapi(profileRoute,(c)=>{try{return c.json({user:accounts.updateProfile(c.get("userId"),c.req.valid("json"))},200)}catch(error){if(error instanceof AccountError)return c.json({error:{code:error.code,message:error.message,retryable:false,requestId:crypto.randomUUID()}},409);throw error}});
-
-const changePasswordRoute=createRoute({method:"post",path:"/api/account/change-password",operationId:"changePassword",request:{body:{required:true,content:{"application/json":{schema:z.object({currentPassword:z.string().min(1).max(128),newPassword:PasswordSchema})}}}},responses:{204:{description:"Password changed"},400:{description:"Invalid current password",content:{"application/json":{schema:ErrorSchema}}}}});
-app.openapi(changePasswordRoute,async(c)=>{try{const body=c.req.valid("json");await accounts.changePassword(c.get("userId"),body.currentPassword,body.newPassword);return c.body(null,204)}catch(error){if(error instanceof AccountError)return c.json({error:{code:error.code,message:error.message,retryable:false,requestId:crypto.randomUUID()}},400);throw error}});
-
-const PreferencesSchema=z.object({theme:z.enum(["light","system"]),defaultRatio:z.enum(["9:16","16:9","1:1"]),language:z.enum(["zh-CN","en"]),taskNotifications:z.boolean(),autoplayResults:z.boolean()}).openapi("Preferences");
-const preferencesGetRoute=createRoute({method:"get",path:"/api/preferences",operationId:"getPreferences",responses:{200:{description:"Preferences",content:{"application/json":{schema:PreferencesSchema}}}}});
-app.openapi(preferencesGetRoute,c=>c.json(accounts.getPreferences(c.get("userId")),200));
-const preferencesPutRoute=createRoute({method:"put",path:"/api/preferences",operationId:"savePreferences",request:{body:{required:true,content:{"application/json":{schema:PreferencesSchema}}}},responses:{200:{description:"Saved preferences",content:{"application/json":{schema:PreferencesSchema}}}}});
-app.openapi(preferencesPutRoute,c=>c.json(accounts.savePreferences(c.get("userId"),c.req.valid("json") as Preferences),200));
-
-const NotificationSchema=z.object({id:z.string().uuid(),type:z.string(),title:z.string(),body:z.string(),readAt:z.string().optional(),createdAt:z.string()}).openapi("NotificationItem");
-const notificationsRoute=createRoute({method:"get",path:"/api/notifications",operationId:"listNotifications",responses:{200:{description:"Notifications",content:{"application/json":{schema:z.object({notifications:z.array(NotificationSchema),unreadCount:z.number().int()})}}}}});
-app.openapi(notificationsRoute,c=>c.json(accounts.listNotifications(c.get("userId")),200));
-const readNotificationRoute=createRoute({method:"post",path:"/api/notifications/{notificationId}/read",operationId:"markNotificationRead",request:{params:z.object({notificationId:z.string().uuid()})},responses:{200:{description:"Read",content:{"application/json":{schema:z.object({unreadCount:z.number().int()})}}},404:{description:"Not found",content:{"application/json":{schema:ErrorSchema}}}}});
-app.openapi(readNotificationRoute,c=>{try{return c.json({unreadCount:accounts.markNotification(c.get("userId"),c.req.valid("param").notificationId)},200)}catch(error){return c.json({error:{code:"NOT_FOUND",message:"通知不存在",retryable:false,requestId:crypto.randomUUID()}},404)}});
-const readAllRoute=createRoute({method:"post",path:"/api/notifications/read-all",operationId:"markAllNotificationsRead",responses:{200:{description:"All read",content:{"application/json":{schema:z.object({unreadCount:z.literal(0)})}}}}});
-app.openapi(readAllRoute,c=>c.json({unreadCount:accounts.markAllNotifications(c.get("userId")) as 0},200));
-
-const PackageSchema=z.object({id:z.string(),name:z.string(),amountCny:z.number().int(),credits:z.number().int(),badge:z.string()});
-const OrderSchema=z.object({id:z.string().uuid(),packageId:z.string(),amountCny:z.number().int(),credits:z.number().int(),status:z.literal("succeeded"),paymentMode:z.literal("mock"),balanceAfter:z.number().int(),createdAt:z.string()}).openapi("RechargeOrder");
-const packagesRoute=createRoute({method:"get",path:"/api/recharge/packages",operationId:"listRechargePackages",responses:{200:{description:"Packages",content:{"application/json":{schema:z.object({packages:z.array(PackageSchema)})}}}}});
-app.openapi(packagesRoute,c=>c.json({packages:[...rechargePackages]},200));
-const ordersRoute=createRoute({method:"get",path:"/api/recharge/orders",operationId:"listRechargeOrders",responses:{200:{description:"Orders",content:{"application/json":{schema:z.object({orders:z.array(OrderSchema)})}}}}});
-app.openapi(ordersRoute,c=>c.json({orders:accounts.listOrders(c.get("userId"))},200));
-const createOrderRoute=createRoute({method:"post",path:"/api/recharge/orders",operationId:"createRechargeOrder",request:{body:{required:true,content:{"application/json":{schema:z.object({packageId:z.string()})}}}},responses:{201:{description:"Recharged",content:{"application/json":{schema:z.object({order:OrderSchema,user:UserSchema})}}},400:{description:"Missing key",content:{"application/json":{schema:ErrorSchema}}},404:{description:"Package not found",content:{"application/json":{schema:ErrorSchema}}},409:{description:"Idempotency conflict",content:{"application/json":{schema:ErrorSchema}}}}});
-app.openapi(createOrderRoute,c=>{const key=c.req.header("Idempotency-Key")?.slice(0,128);if(!key)return c.json({error:{code:"IDEMPOTENCY_KEY_REQUIRED",message:"缺少幂等键",retryable:false,requestId:crypto.randomUUID()}},400);try{const order=accounts.recharge(c.get("userId"),c.req.valid("json").packageId,key);return c.json({order,user:accounts.getUser(c.get("userId"))!},201)}catch(error){if(error instanceof AccountError&&error.status===404)return c.json({error:{code:error.code,message:error.message,retryable:false,requestId:crypto.randomUUID()}},404);if(error instanceof AccountError)return c.json({error:{code:error.code,message:error.message,retryable:false,requestId:crypto.randomUUID()}},409);throw error}});
-
-const capabilitiesRoute = createRoute({ method:"get",path:"/api/capabilities",operationId:"getCapabilities",responses:{200:{description:"Executable capabilities",content:{"application/json":{schema:z.object({capabilities:z.array(z.object({id:z.string(),capability:z.string(),executionMode:z.enum(["real","local","mock"]),provider:z.string().optional(),model:z.string().optional()}))})}}}}});
-app.openapi(capabilitiesRoute,(c)=>{
-  const verified = getVerifiedSdkIds();
-  const capabilities=auditSdkRegistry().filter(item=>item.kind==="mock"||verified.has(item.id)).map(item=>({id:item.id,capability:item.capability,executionMode:(item.kind==="model"?"real":item.kind==="ffmpeg"?"local":"mock") as "real"|"local"|"mock",provider:item.provider,model:item.model}));
-  return c.json({capabilities},200);
+const registerRoute = createRoute({
+  method: "post",
+  path: "/api/auth/register",
+  operationId: "register",
+  request: {
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: z.object({
+            email: z.string().email().max(254),
+            password: PasswordSchema,
+            displayName: z.string().trim().min(2).max(40),
+          }),
+        },
+      },
+    },
+  },
+  responses: {
+    201: { description: "Registered", content: { "application/json": { schema: AuthSchema } } },
+    409: { description: "Email exists", content: { "application/json": { schema: ErrorSchema } } },
+    422: { description: "Validation error", content: { "application/json": { schema: ErrorSchema } } },
+    429: { description: "Rate limited", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(registerRoute, async (c) => {
+  if (rateLimited(`register:${c.req.header("x-forwarded-for") ?? "local"}`))
+    return c.json(
+      {
+        error: {
+          code: "RATE_LIMITED",
+          message: "操作过于频繁，请稍后再试",
+          retryable: true,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      429,
+    );
+  try {
+    const registration = await accounts.register(c.req.valid("json"));
+    if (registration.claimedLegacy) queue.recoverOwned(registration.user.id);
+    return c.json(await issueToken(accounts, registration.user), 201);
+  } catch (error) {
+    if (error instanceof AccountError && error.status === 409)
+      return c.json(
+        { error: { code: error.code, message: error.message, retryable: false, requestId: crypto.randomUUID() } },
+        409,
+      );
+    throw error;
+  }
 });
 
-const modelsRoute=createRoute({method:"get",path:"/api/models",operationId:"getModels",responses:{200:{description:"Approved model catalog",content:{"application/json":{schema:z.object({models:z.array(z.object({id:z.string(),provider:z.string(),capability:z.string(),executionMode:z.literal("real"),name:z.string(),description:z.string(),tags:z.array(z.string()),referenceCapabilities:z.array(z.enum(["image","video","audio"])),defaults:z.object({resolution:z.enum(["480p","720p"]),ratio:z.string(),duration:z.number().int(),generateAudio:z.boolean(),watermark:z.boolean()}),isDefault:z.boolean(),enabled:z.boolean(),realTestStatus:z.enum(["verified","pending","failed"])}))})}}}}});
-app.openapi(modelsRoute,(c)=>{const verified=getVerifiedSdkIds();const registry=auditSdkRegistry();const otherModels=registry.filter(item=>item.kind==="model"&&item.capability!=="video-generate"&&verified.has(item.id)).map(item=>({id:item.model!,provider:item.provider!,capability:item.capability,executionMode:"real" as const,name:item.model!,description:"已验证模型",tags:[],referenceCapabilities:[] as Array<"image"|"video"|"audio">,defaults:{resolution:"720p" as const,ratio:"16:9",duration:5,generateAudio:false,watermark:false},isDefault:false,enabled:true,realTestStatus:"verified" as const}));const videos=videoModels.map(model=>{const sdk=registry.find(item=>item.model===model.id);const passed=Boolean(sdk&&verified.has(sdk.id));return{...model,executionMode:"real" as const,enabled:env.forceMock||passed,realTestStatus:passed?"verified" as const:"pending" as const}});return c.json({models:[...otherModels,...videos]},200)});
+const loginRoute = createRoute({
+  method: "post",
+  path: "/api/auth/login",
+  operationId: "login",
+  request: {
+    body: {
+      required: true,
+      content: {
+        "application/json": { schema: z.object({ email: z.string().email(), password: z.string().min(1).max(128) }) },
+      },
+    },
+  },
+  responses: {
+    200: { description: "Logged in", content: { "application/json": { schema: AuthSchema } } },
+    401: { description: "Invalid credentials", content: { "application/json": { schema: ErrorSchema } } },
+    429: { description: "Rate limited", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(loginRoute, async (c) => {
+  if (rateLimited(`login:${c.req.header("x-forwarded-for") ?? "local"}`))
+    return c.json(
+      {
+        error: {
+          code: "RATE_LIMITED",
+          message: "登录尝试过多，请稍后再试",
+          retryable: true,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      429,
+    );
+  try {
+    const body = c.req.valid("json"),
+      user = await accounts.verifyCredentials(body.email, body.password);
+    return c.json(await issueToken(accounts, user), 200);
+  } catch (error) {
+    if (error instanceof AccountError)
+      return c.json(
+        { error: { code: error.code, message: error.message, retryable: false, requestId: crypto.randomUUID() } },
+        401,
+      );
+    throw error;
+  }
+});
 
-const creationModelSchema=z.object({id:z.string(),kind:z.enum(["image","video"]),displayName:z.string(),description:z.string(),badges:z.array(z.string()),enabled:z.boolean(),disabledReason:z.string().optional(),executionMode:z.enum(["real","mock"]),isDefault:z.boolean(),supportedRatios:z.array(z.string()),supportedResolutions:z.array(z.string()),supportedDurations:z.array(z.number().int()),maxOutputs:z.number().int(),supportsSeed:z.boolean(),referenceModes:z.array(z.string()),acceptedReferenceKinds:z.array(z.string()),pricing:z.object({baseCredits:z.number().int(),perOutputCredits:z.number().int()}),dimensions:z.record(z.string(),z.record(z.string(),z.object({width:z.number().int(),height:z.number().int()}))).optional()});
-const creationCapabilitiesRoute=createRoute({method:"get",path:"/api/creation/capabilities",operationId:"getCreationCapabilities",responses:{200:{description:"AI creation composer model capabilities",content:{"application/json":{schema:z.object({models:z.array(creationModelSchema)})}}}}});
-app.openapi(creationCapabilitiesRoute,c=>c.json({models:creationCapabilities(videoModelEnabled)},200));
+const logoutRoute = createRoute({
+  method: "post",
+  path: "/api/auth/logout",
+  operationId: "logout",
+  responses: {
+    204: { description: "Logged out" },
+    401: { description: "Invalid token", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(logoutRoute, async (c) => {
+  const identity = await authenticate(accounts, c.req.header("Authorization"), true);
+  if (!identity)
+    return c.json(
+      {
+        error: {
+          code: "AUTHENTICATION_FAILED",
+          message: "登录凭据无效",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      401,
+    );
+  accounts.revokeSession(identity.sessionId);
+  return c.body(null, 204);
+});
+
+const meRoute = createRoute({
+  method: "get",
+  path: "/api/auth/me",
+  operationId: "getCurrentUser",
+  responses: {
+    200: { description: "Current user", content: { "application/json": { schema: z.object({ user: UserSchema }) } } },
+    401: { description: "Unauthorized", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(meRoute, (c) => c.json({ user: accounts.getUser(c.get("userId"))! }, 200));
+
+const profileRoute = createRoute({
+  method: "patch",
+  path: "/api/account/profile",
+  operationId: "updateProfile",
+  request: {
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: z.object({
+            email: z.string().email().max(254),
+            displayName: z.string().trim().min(2).max(40),
+            avatarText: z.string().trim().min(1).max(2),
+          }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: "Updated profile",
+      content: { "application/json": { schema: z.object({ user: UserSchema }) } },
+    },
+    409: { description: "Email exists", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(profileRoute, (c) => {
+  try {
+    return c.json({ user: accounts.updateProfile(c.get("userId"), c.req.valid("json")) }, 200);
+  } catch (error) {
+    if (error instanceof AccountError)
+      return c.json(
+        { error: { code: error.code, message: error.message, retryable: false, requestId: crypto.randomUUID() } },
+        409,
+      );
+    throw error;
+  }
+});
+
+const changePasswordRoute = createRoute({
+  method: "post",
+  path: "/api/account/change-password",
+  operationId: "changePassword",
+  request: {
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: z.object({ currentPassword: z.string().min(1).max(128), newPassword: PasswordSchema }),
+        },
+      },
+    },
+  },
+  responses: {
+    204: { description: "Password changed" },
+    400: { description: "Invalid current password", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(changePasswordRoute, async (c) => {
+  try {
+    const body = c.req.valid("json");
+    await accounts.changePassword(c.get("userId"), body.currentPassword, body.newPassword);
+    return c.body(null, 204);
+  } catch (error) {
+    if (error instanceof AccountError)
+      return c.json(
+        { error: { code: error.code, message: error.message, retryable: false, requestId: crypto.randomUUID() } },
+        400,
+      );
+    throw error;
+  }
+});
+
+const PreferencesSchema = z
+  .object({
+    theme: z.enum(["light", "system"]),
+    defaultRatio: z.enum(["9:16", "16:9", "1:1"]),
+    language: z.enum(["zh-CN", "en"]),
+    taskNotifications: z.boolean(),
+    autoplayResults: z.boolean(),
+  })
+  .openapi("Preferences");
+const preferencesGetRoute = createRoute({
+  method: "get",
+  path: "/api/preferences",
+  operationId: "getPreferences",
+  responses: { 200: { description: "Preferences", content: { "application/json": { schema: PreferencesSchema } } } },
+});
+app.openapi(preferencesGetRoute, (c) => c.json(accounts.getPreferences(c.get("userId")), 200));
+const preferencesPutRoute = createRoute({
+  method: "put",
+  path: "/api/preferences",
+  operationId: "savePreferences",
+  request: { body: { required: true, content: { "application/json": { schema: PreferencesSchema } } } },
+  responses: {
+    200: { description: "Saved preferences", content: { "application/json": { schema: PreferencesSchema } } },
+  },
+});
+app.openapi(preferencesPutRoute, (c) =>
+  c.json(accounts.savePreferences(c.get("userId"), c.req.valid("json") as Preferences), 200),
+);
+
+const NotificationSchema = z
+  .object({
+    id: z.string().uuid(),
+    type: z.string(),
+    title: z.string(),
+    body: z.string(),
+    readAt: z.string().optional(),
+    createdAt: z.string(),
+  })
+  .openapi("NotificationItem");
+const notificationsRoute = createRoute({
+  method: "get",
+  path: "/api/notifications",
+  operationId: "listNotifications",
+  responses: {
+    200: {
+      description: "Notifications",
+      content: {
+        "application/json": {
+          schema: z.object({ notifications: z.array(NotificationSchema), unreadCount: z.number().int() }),
+        },
+      },
+    },
+  },
+});
+app.openapi(notificationsRoute, (c) => c.json(accounts.listNotifications(c.get("userId")), 200));
+const readNotificationRoute = createRoute({
+  method: "post",
+  path: "/api/notifications/{notificationId}/read",
+  operationId: "markNotificationRead",
+  request: { params: z.object({ notificationId: z.string().uuid() }) },
+  responses: {
+    200: {
+      description: "Read",
+      content: { "application/json": { schema: z.object({ unreadCount: z.number().int() }) } },
+    },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(readNotificationRoute, (c) => {
+  try {
+    return c.json(
+      { unreadCount: accounts.markNotification(c.get("userId"), c.req.valid("param").notificationId) },
+      200,
+    );
+  } catch (error) {
+    return c.json(
+      { error: { code: "NOT_FOUND", message: "通知不存在", retryable: false, requestId: crypto.randomUUID() } },
+      404,
+    );
+  }
+});
+const readAllRoute = createRoute({
+  method: "post",
+  path: "/api/notifications/read-all",
+  operationId: "markAllNotificationsRead",
+  responses: {
+    200: {
+      description: "All read",
+      content: { "application/json": { schema: z.object({ unreadCount: z.literal(0) }) } },
+    },
+  },
+});
+app.openapi(readAllRoute, (c) => c.json({ unreadCount: accounts.markAllNotifications(c.get("userId")) as 0 }, 200));
+
+const PackageSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  amountCny: z.number().int(),
+  credits: z.number().int(),
+  badge: z.string(),
+});
+const OrderSchema = z
+  .object({
+    id: z.string().uuid(),
+    packageId: z.string(),
+    amountCny: z.number().int(),
+    credits: z.number().int(),
+    status: z.literal("succeeded"),
+    paymentMode: z.literal("mock"),
+    balanceAfter: z.number().int(),
+    createdAt: z.string(),
+  })
+  .openapi("RechargeOrder");
+const packagesRoute = createRoute({
+  method: "get",
+  path: "/api/recharge/packages",
+  operationId: "listRechargePackages",
+  responses: {
+    200: {
+      description: "Packages",
+      content: { "application/json": { schema: z.object({ packages: z.array(PackageSchema) }) } },
+    },
+  },
+});
+app.openapi(packagesRoute, (c) => c.json({ packages: [...rechargePackages] }, 200));
+const ordersRoute = createRoute({
+  method: "get",
+  path: "/api/recharge/orders",
+  operationId: "listRechargeOrders",
+  responses: {
+    200: {
+      description: "Orders",
+      content: { "application/json": { schema: z.object({ orders: z.array(OrderSchema) }) } },
+    },
+  },
+});
+app.openapi(ordersRoute, (c) => c.json({ orders: accounts.listOrders(c.get("userId")) }, 200));
+const createOrderRoute = createRoute({
+  method: "post",
+  path: "/api/recharge/orders",
+  operationId: "createRechargeOrder",
+  request: {
+    body: { required: true, content: { "application/json": { schema: z.object({ packageId: z.string() }) } } },
+  },
+  responses: {
+    201: {
+      description: "Recharged",
+      content: { "application/json": { schema: z.object({ order: OrderSchema, user: UserSchema }) } },
+    },
+    400: { description: "Missing key", content: { "application/json": { schema: ErrorSchema } } },
+    404: { description: "Package not found", content: { "application/json": { schema: ErrorSchema } } },
+    409: { description: "Idempotency conflict", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(createOrderRoute, (c) => {
+  const key = c.req.header("Idempotency-Key")?.slice(0, 128);
+  if (!key)
+    return c.json(
+      {
+        error: {
+          code: "IDEMPOTENCY_KEY_REQUIRED",
+          message: "缺少幂等键",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      400,
+    );
+  try {
+    const order = accounts.recharge(c.get("userId"), c.req.valid("json").packageId, key);
+    return c.json({ order, user: accounts.getUser(c.get("userId"))! }, 201);
+  } catch (error) {
+    if (error instanceof AccountError && error.status === 404)
+      return c.json(
+        { error: { code: error.code, message: error.message, retryable: false, requestId: crypto.randomUUID() } },
+        404,
+      );
+    if (error instanceof AccountError)
+      return c.json(
+        { error: { code: error.code, message: error.message, retryable: false, requestId: crypto.randomUUID() } },
+        409,
+      );
+    throw error;
+  }
+});
+
+const capabilitiesRoute = createRoute({
+  method: "get",
+  path: "/api/capabilities",
+  operationId: "getCapabilities",
+  responses: {
+    200: {
+      description: "Executable capabilities",
+      content: {
+        "application/json": {
+          schema: z.object({
+            capabilities: z.array(
+              z.object({
+                id: z.string(),
+                capability: z.string(),
+                executionMode: z.enum(["real", "local", "mock"]),
+                provider: z.string().optional(),
+                model: z.string().optional(),
+              }),
+            ),
+          }),
+        },
+      },
+    },
+  },
+});
+app.openapi(capabilitiesRoute, (c) => {
+  const verified = getVerifiedSdkIds();
+  const capabilities = auditSdkRegistry()
+    .filter((item) => item.kind === "mock" || verified.has(item.id))
+    .map((item) => ({
+      id: item.id,
+      capability: item.capability,
+      executionMode: (item.kind === "model" ? "real" : item.kind === "ffmpeg" ? "local" : "mock") as
+        | "real"
+        | "local"
+        | "mock",
+      provider: item.provider,
+      model: item.model,
+    }));
+  return c.json({ capabilities }, 200);
+});
+
+const modelsRoute = createRoute({
+  method: "get",
+  path: "/api/models",
+  operationId: "getModels",
+  responses: {
+    200: {
+      description: "Approved model catalog",
+      content: {
+        "application/json": {
+          schema: z.object({
+            models: z.array(
+              z.object({
+                id: z.string(),
+                provider: z.string(),
+                capability: z.string(),
+                executionMode: z.literal("real"),
+                name: z.string(),
+                description: z.string(),
+                tags: z.array(z.string()),
+                referenceCapabilities: z.array(z.enum(["image", "video", "audio"])),
+                defaults: z.object({
+                  resolution: z.enum(["480p", "720p"]),
+                  ratio: z.string(),
+                  duration: z.number().int(),
+                  generateAudio: z.boolean(),
+                  watermark: z.boolean(),
+                }),
+                isDefault: z.boolean(),
+                enabled: z.boolean(),
+                realTestStatus: z.enum(["verified", "pending", "failed"]),
+              }),
+            ),
+          }),
+        },
+      },
+    },
+  },
+});
+app.openapi(modelsRoute, (c) => {
+  const verified = getVerifiedSdkIds();
+  const registry = auditSdkRegistry();
+  const otherModels = registry
+    .filter((item) => item.kind === "model" && item.capability !== "video-generate" && verified.has(item.id))
+    .map((item) => ({
+      id: item.model!,
+      provider: item.provider!,
+      capability: item.capability,
+      executionMode: "real" as const,
+      name: item.model!,
+      description: "已验证模型",
+      tags: [],
+      referenceCapabilities: [] as Array<"image" | "video" | "audio">,
+      defaults: { resolution: "720p" as const, ratio: "16:9", duration: 5, generateAudio: false, watermark: false },
+      isDefault: false,
+      enabled: true,
+      realTestStatus: "verified" as const,
+    }));
+  const videos = videoModels.map((model) => {
+    const sdk = registry.find((item) => item.model === model.id);
+    const passed = Boolean(sdk && verified.has(sdk.id));
+    return {
+      ...model,
+      executionMode: "real" as const,
+      enabled: env.forceMock || passed,
+      realTestStatus: passed ? ("verified" as const) : ("pending" as const),
+    };
+  });
+  return c.json({ models: [...otherModels, ...videos] }, 200);
+});
+
+const creationModelSchema = z.object({
+  id: z.string(),
+  kind: z.enum(["image", "video"]),
+  displayName: z.string(),
+  description: z.string(),
+  badges: z.array(z.string()),
+  enabled: z.boolean(),
+  disabledReason: z.string().optional(),
+  executionMode: z.enum(["real", "mock"]),
+  isDefault: z.boolean(),
+  supportedRatios: z.array(z.string()),
+  supportedResolutions: z.array(z.string()),
+  supportedDurations: z.array(z.number().int()),
+  maxOutputs: z.number().int(),
+  supportsSeed: z.boolean(),
+  referenceModes: z.array(z.string()),
+  acceptedReferenceKinds: z.array(z.string()),
+  pricing: z.object({ baseCredits: z.number().int(), perOutputCredits: z.number().int() }),
+  dimensions: z
+    .record(z.string(), z.record(z.string(), z.object({ width: z.number().int(), height: z.number().int() })))
+    .optional(),
+});
+const creationCapabilitiesRoute = createRoute({
+  method: "get",
+  path: "/api/creation/capabilities",
+  operationId: "getCreationCapabilities",
+  responses: {
+    200: {
+      description: "AI creation composer model capabilities",
+      content: { "application/json": { schema: z.object({ models: z.array(creationModelSchema) }) } },
+    },
+  },
+});
+app.openapi(creationCapabilitiesRoute, (c) => c.json({ models: creationCapabilities(videoModelEnabled) }, 200));
 
 const uploadRoute = createRoute({
-  method: "post", path: "/api/uploads", operationId: "uploadMedia",
-  request: { body: { required: true, content: { "multipart/form-data": { schema: z.object({ file: z.file().openapi({ type: "string", format: "binary" }) }) } } } },
+  method: "post",
+  path: "/api/uploads",
+  operationId: "uploadMedia",
+  request: {
+    body: {
+      required: true,
+      content: {
+        "multipart/form-data": { schema: z.object({ file: z.file().openapi({ type: "string", format: "binary" }) }) },
+      },
+    },
+  },
   responses: {
-    201: { description: "Uploaded media", content: { "application/json": { schema: z.object({ asset: z.object({ id: z.string(), name: z.string(), mimeType: z.string(), size: z.number(), createdAt: z.string() }) }) } } },
+    201: {
+      description: "Uploaded media",
+      content: {
+        "application/json": {
+          schema: z.object({
+            asset: z.object({
+              id: z.string(),
+              name: z.string(),
+              mimeType: z.string(),
+              size: z.number(),
+              createdAt: z.string(),
+            }),
+          }),
+        },
+      },
+    },
     400: { description: "Invalid upload", content: { "application/json": { schema: ErrorSchema } } },
     413: { description: "Upload too large", content: { "application/json": { schema: ErrorSchema } } },
     415: { description: "Unsupported media type", content: { "application/json": { schema: ErrorSchema } } },
@@ -172,112 +846,470 @@ app.openapi(uploadRoute, async (c) => {
   const form = await c.req.formData();
   const file = form.get("file");
   const requestId = crypto.randomUUID();
-  if (!(file instanceof File) || file.size === 0) return c.json({ error: { code: "INVALID_MEDIA", message: "请选择有效文件", retryable: false, requestId } }, 400);
-  if (file.size > 500 * 1024 * 1024) return c.json({ error: { code: "UPLOAD_TOO_LARGE", message: "文件不能超过 500MB", retryable: false, requestId } }, 413);
-  const extensions:Record<string,string>={"image/png":".png","image/jpeg":".jpg","image/webp":".webp","image/gif":".gif","video/mp4":".mp4","video/quicktime":".mov","video/webm":".webm","audio/mpeg":".mp3","audio/wav":".wav","audio/x-wav":".wav","audio/ogg":".ogg","audio/mp4":".m4a","audio/webm":".webm"};
-  if (!extensions[file.type]) return c.json({ error: { code:"UNSUPPORTED_MEDIA_TYPE",message:"仅支持常见图片、视频和音频格式",retryable:false,requestId } },415);
+  if (!(file instanceof File) || file.size === 0)
+    return c.json({ error: { code: "INVALID_MEDIA", message: "请选择有效文件", retryable: false, requestId } }, 400);
+  if (file.size > 500 * 1024 * 1024)
+    return c.json(
+      { error: { code: "UPLOAD_TOO_LARGE", message: "文件不能超过 500MB", retryable: false, requestId } },
+      413,
+    );
+  const extensions: Record<string, string> = {
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+    "video/mp4": ".mp4",
+    "video/quicktime": ".mov",
+    "video/webm": ".webm",
+    "audio/mpeg": ".mp3",
+    "audio/wav": ".wav",
+    "audio/x-wav": ".wav",
+    "audio/ogg": ".ogg",
+    "audio/mp4": ".m4a",
+    "audio/webm": ".webm",
+  };
+  if (!extensions[file.type])
+    return c.json(
+      {
+        error: {
+          code: "UNSUPPORTED_MEDIA_TYPE",
+          message: "仅支持常见图片、视频和音频格式",
+          retryable: false,
+          requestId,
+        },
+      },
+      415,
+    );
   const id = crypto.randomUUID();
-  const safeExtension = extensions[file.type] ?? extname(file.name).replace(/[^.a-zA-Z0-9]/g, "").slice(0, 10);
-  const storageKey=`${id}${safeExtension}`;
+  const safeExtension =
+    extensions[file.type] ??
+    extname(file.name)
+      .replace(/[^.a-zA-Z0-9]/g, "")
+      .slice(0, 10);
+  const storageKey = `${id}${safeExtension}`;
   await Bun.write(resolve(env.dataDir, "uploads", storageKey), file);
-  accounts.createAsset({id,ownerUserId:c.get("userId"),storageKey,originalName:file.name.slice(0,200),mimeType:file.type,byteSize:file.size,createdAt:new Date().toISOString()});
-  return c.json({ asset: { id, name: file.name.slice(0, 200), mimeType: file.type || "application/octet-stream", size: file.size, createdAt: new Date().toISOString() } }, 201);
+  accounts.createAsset({
+    id,
+    ownerUserId: c.get("userId"),
+    storageKey,
+    originalName: file.name.slice(0, 200),
+    mimeType: file.type,
+    byteSize: file.size,
+    createdAt: new Date().toISOString(),
+  });
+  return c.json(
+    {
+      asset: {
+        id,
+        name: file.name.slice(0, 200),
+        mimeType: file.type || "application/octet-stream",
+        size: file.size,
+        createdAt: new Date().toISOString(),
+      },
+    },
+    201,
+  );
 });
 
-const listRoute = createRoute({ method: "get", path: "/api/jobs", operationId: "listJobs", request: { query: z.object({ moduleId: ModuleSchema.optional() }) }, responses: { 200: { description: "Jobs", content: { "application/json": { schema: z.object({ jobs: z.array(JobSchema) }) } } } } });
-app.openapi(listRoute, (c) => c.json({ jobs: store.list(c.get("userId"),c.req.valid("query").moduleId as ModuleId | undefined) }, 200));
+const listRoute = createRoute({
+  method: "get",
+  path: "/api/jobs",
+  operationId: "listJobs",
+  request: { query: z.object({ moduleId: ModuleSchema.optional() }) },
+  responses: {
+    200: { description: "Jobs", content: { "application/json": { schema: z.object({ jobs: z.array(JobSchema) }) } } },
+  },
+});
+app.openapi(listRoute, (c) =>
+  c.json({ jobs: store.list(c.get("userId"), c.req.valid("query").moduleId as ModuleId | undefined) }, 200),
+);
 
-const createJobRoute = createRoute({ method: "post", path: "/api/{moduleId}/jobs", operationId: "createJob", request: { params: z.object({ moduleId: ModuleSchema }), body: { content: { "application/json": { schema: z.object({ title: z.string().min(1).max(200), values: z.record(z.string(), z.string()), videoModel:VideoModelIdSchema.optional(),allowMockFallback: z.boolean().default(true) }) } }, required: true } }, responses: { 202: { description: "Accepted", content: { "application/json": { schema: JobSchema } } }, 401: { description: "Unauthorized", content: { "application/json": { schema: ErrorSchema } } },403:{description:"Feature not open",content:{"application/json":{schema:ErrorSchema}}}, 422: { description: "Invalid model or referenced asset", content: { "application/json": { schema: ErrorSchema } } } } });
+const createJobRoute = createRoute({
+  method: "post",
+  path: "/api/{moduleId}/jobs",
+  operationId: "createJob",
+  request: {
+    params: z.object({ moduleId: ModuleSchema }),
+    body: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            title: z.string().min(1).max(200),
+            values: z.record(z.string(), z.string()),
+            videoModel: VideoModelIdSchema.optional(),
+            allowMockFallback: z.boolean().default(true),
+          }),
+        },
+      },
+      required: true,
+    },
+  },
+  responses: {
+    202: { description: "Accepted", content: { "application/json": { schema: JobSchema } } },
+    401: { description: "Unauthorized", content: { "application/json": { schema: ErrorSchema } } },
+    403: { description: "Feature not open", content: { "application/json": { schema: ErrorSchema } } },
+    422: { description: "Invalid model or referenced asset", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
 app.openapi(createJobRoute, (c) => {
   const moduleId = c.req.valid("param").moduleId as ModuleId;
-  if(!isModuleOpen(moduleId))return c.json({error:{code:"FEATURE_NOT_OPEN",message:"该功能正在验收，暂未开放",retryable:false,requestId:crypto.randomUUID()}},403);
+  if (!isModuleOpen(moduleId))
+    return c.json(
+      {
+        error: {
+          code: "FEATURE_NOT_OPEN",
+          message: "该功能正在验收，暂未开放",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      403,
+    );
   const body = c.req.valid("json");
-  const ownerUserId=c.get("userId");
-  const needsVideoModel=moduleId==="video-remix"||(moduleId==="ai-generate"&&body.values.type==="视频");
-  let creationQuote=0;
-  if(moduleId==="ai-generate"&&body.values.creationKind){
-    const models=creationCapabilities(videoModelEnabled);const validationError=validateCreationValues(body.values,models);
-    if(validationError)return c.json({error:{code:"INVALID_CREATION_CONFIG",message:validationError,retryable:false,requestId:crypto.randomUUID()}},422);
-    creationQuote=quoteCreation(body.values,models);const user=accounts.getUser(ownerUserId);
-    if(!user||user.credits<creationQuote)return c.json({error:{code:"INSUFFICIENT_CREDITS",message:`本次预计消耗 ${creationQuote} 创作点，当前余额不足`,retryable:false,requestId:crypto.randomUUID()}},422);
-    if(body.values.creationKind==="video"&&body.videoModel!==body.values.modelId)return c.json({error:{code:"INVALID_VIDEO_MODEL",message:"视频模型与创作配置不一致",retryable:false,requestId:crypto.randomUUID()}},422);
+  const ownerUserId = c.get("userId");
+  const needsVideoModel = moduleId === "video-remix" || (moduleId === "ai-generate" && body.values.type === "视频");
+  let creationQuote = 0;
+  if (moduleId === "ai-generate" && body.values.creationKind) {
+    const models = creationCapabilities(videoModelEnabled);
+    const validationError = validateCreationValues(body.values, models);
+    if (validationError)
+      return c.json(
+        {
+          error: {
+            code: "INVALID_CREATION_CONFIG",
+            message: validationError,
+            retryable: false,
+            requestId: crypto.randomUUID(),
+          },
+        },
+        422,
+      );
+    creationQuote = quoteCreation(body.values, models);
+    const user = accounts.getUser(ownerUserId);
+    if (!user || user.credits < creationQuote)
+      return c.json(
+        {
+          error: {
+            code: "INSUFFICIENT_CREDITS",
+            message: `本次预计消耗 ${creationQuote} 创作点，当前余额不足`,
+            retryable: false,
+            requestId: crypto.randomUUID(),
+          },
+        },
+        422,
+      );
+    if (body.values.creationKind === "video" && body.videoModel !== body.values.modelId)
+      return c.json(
+        {
+          error: {
+            code: "INVALID_VIDEO_MODEL",
+            message: "视频模型与创作配置不一致",
+            retryable: false,
+            requestId: crypto.randomUUID(),
+          },
+        },
+        422,
+      );
   }
-  if(needsVideoModel&&!body.videoModel)return c.json({error:{code:"INVALID_VIDEO_MODEL",message:"请选择 Seedance 视频模型",retryable:false,requestId:crypto.randomUUID()}},422);
-  if(body.videoModel&&!videoModelEnabled(body.videoModel))return c.json({error:{code:"VIDEO_MODEL_NOT_VERIFIED",message:"该 Seedance 模型尚未通过本轮真实基线验证",retryable:false,requestId:crypto.randomUUID()}},422);
-  if(!needsVideoModel&&body.videoModel)return c.json({error:{code:"INVALID_VIDEO_MODEL",message:"当前本地处理模式不使用视频生成模型",retryable:false,requestId:crypto.randomUUID()}},422);
-  const unavailableAsset=referencedAssetIds(body.values).find(id=>!accounts.ownsAsset(ownerUserId,id));
-  if(unavailableAsset)return c.json({error:{code:"ASSET_NOT_AVAILABLE",message:"引用的素材不存在或不属于当前账号",retryable:false,requestId:crypto.randomUUID()}},422);
-  const idempotencyKey = c.req.header("Idempotency-Key")?.trim().slice(0,128);
+  if (needsVideoModel && !body.videoModel)
+    return c.json(
+      {
+        error: {
+          code: "INVALID_VIDEO_MODEL",
+          message: "请选择 Seedance 视频模型",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      422,
+    );
+  if (body.videoModel && !videoModelEnabled(body.videoModel))
+    return c.json(
+      {
+        error: {
+          code: "VIDEO_MODEL_NOT_VERIFIED",
+          message: "该 Seedance 模型尚未通过本轮真实基线验证",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      422,
+    );
+  if (!needsVideoModel && body.videoModel)
+    return c.json(
+      {
+        error: {
+          code: "INVALID_VIDEO_MODEL",
+          message: "当前本地处理模式不使用视频生成模型",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      422,
+    );
+  const unavailableAsset = referencedAssetIds(body.values).find((id) => !accounts.ownsAsset(ownerUserId, id));
+  if (unavailableAsset)
+    return c.json(
+      {
+        error: {
+          code: "ASSET_NOT_AVAILABLE",
+          message: "引用的素材不存在或不属于当前账号",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      422,
+    );
+  const idempotencyKey = c.req.header("Idempotency-Key")?.trim().slice(0, 128);
   if (idempotencyKey) {
-    const existing = store.getByIdempotencyKey(ownerUserId,idempotencyKey);
+    const existing = store.getByIdempotencyKey(ownerUserId, idempotencyKey);
     if (existing) return c.json(existing, 202);
   }
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
   const executionPlan: StageProvenance[] = buildExecutionPlan(moduleId, body.values, body.videoModel);
-  const job: JobRecord = { id,ownerUserId, moduleId, title: body.title, status: "queued", progress: 0, stage: "排队中", overallExecutionMode: "mock", values: body.values, videoModel:body.videoModel,executionPlan, provenance: [], idempotencyKey, cancelRequested: false,providerCancelState:"none",stagingKeys:[],jobSchemaVersion:2,createdAt: now, updatedAt: now };
-  try{if(creationQuote>0)store.createCharged(job,creationQuote);else store.create(job)}catch(error){if(error instanceof InsufficientCreditsError)return c.json({error:{code:"INSUFFICIENT_CREDITS",message:"创作点余额发生变化，请刷新后重试",retryable:false,requestId:crypto.randomUUID()}},422);throw error}
+  const job: JobRecord = {
+    id,
+    ownerUserId,
+    moduleId,
+    title: body.title,
+    status: "queued",
+    progress: 0,
+    stage: "排队中",
+    overallExecutionMode: "mock",
+    values: body.values,
+    videoModel: body.videoModel,
+    executionPlan,
+    provenance: [],
+    idempotencyKey,
+    cancelRequested: false,
+    providerCancelState: "none",
+    stagingKeys: [],
+    jobSchemaVersion: 2,
+    createdAt: now,
+    updatedAt: now,
+  };
+  try {
+    if (creationQuote > 0) store.createCharged(job, creationQuote);
+    else store.create(job);
+  } catch (error) {
+    if (error instanceof InsufficientCreditsError)
+      return c.json(
+        {
+          error: {
+            code: "INSUFFICIENT_CREDITS",
+            message: "创作点余额发生变化，请刷新后重试",
+            retryable: false,
+            requestId: crypto.randomUUID(),
+          },
+        },
+        422,
+      );
+    throw error;
+  }
   queue.enqueue(id);
   return c.json(job, 202);
 });
 
-const getJobRoute = createRoute({ method: "get", path: "/api/jobs/{jobId}", operationId: "getJob", request: { params: z.object({ jobId: z.string().uuid() }) }, responses: { 200: { description: "Job", content: { "application/json": { schema: JobSchema } } }, 404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } } } });
+const getJobRoute = createRoute({
+  method: "get",
+  path: "/api/jobs/{jobId}",
+  operationId: "getJob",
+  request: { params: z.object({ jobId: z.string().uuid() }) },
+  responses: {
+    200: { description: "Job", content: { "application/json": { schema: JobSchema } } },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
 app.openapi(getJobRoute, (c) => {
-  const job = store.getOwned(c.req.valid("param").jobId,c.get("userId"));
-  return job ? c.json(job, 200) : c.json({ error: { code: "NOT_FOUND", message: "任务不存在", retryable: false, requestId: crypto.randomUUID() } }, 404);
+  const job = store.getOwned(c.req.valid("param").jobId, c.get("userId"));
+  return job
+    ? c.json(job, 200)
+    : c.json(
+        { error: { code: "NOT_FOUND", message: "任务不存在", retryable: false, requestId: crypto.randomUUID() } },
+        404,
+      );
 });
 
-const cancelRoute = createRoute({ method: "post", path: "/api/jobs/{jobId}/cancel", operationId: "cancelJob", request: { params: z.object({ jobId: z.string().uuid() }) }, responses: { 200: { description: "Cancelled", content: { "application/json": { schema: JobSchema } } }, 404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } } } });
+const cancelRoute = createRoute({
+  method: "post",
+  path: "/api/jobs/{jobId}/cancel",
+  operationId: "cancelJob",
+  request: { params: z.object({ jobId: z.string().uuid() }) },
+  responses: {
+    200: { description: "Cancelled", content: { "application/json": { schema: JobSchema } } },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
 app.openapi(cancelRoute, (c) => {
   const id = c.req.valid("param").jobId;
-  const job = store.getOwned(id,c.get("userId"));
-  if (!job) return c.json({ error: { code: "NOT_FOUND", message: "任务不存在", retryable: false, requestId: crypto.randomUUID() } }, 404);
-  if (job.status === "queued") return c.json(store.update(id, { status:"cancelled",cancelRequested:true,stage:"已取消" })!,200);
+  const job = store.getOwned(id, c.get("userId"));
+  if (!job)
+    return c.json(
+      { error: { code: "NOT_FOUND", message: "任务不存在", retryable: false, requestId: crypto.randomUUID() } },
+      404,
+    );
+  if (job.status === "queued")
+    return c.json(store.update(id, { status: "cancelled", cancelRequested: true, stage: "已取消" })!, 200);
   return c.json(store.update(id, { cancelRequested: true, stage: "正在取消" })!, 200);
 });
 
-const retryRoute = createRoute({ method: "post", path: "/api/jobs/{jobId}/retry", operationId: "retryJob", request: { params: z.object({ jobId: z.string().uuid() }) }, responses: { 202: { description: "Retry accepted", content: { "application/json": { schema: JobSchema } } },403:{description:"Feature not open",content:{"application/json":{schema:ErrorSchema}}}, 404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },409:{description:"Retry blocked",content:{"application/json":{schema:ErrorSchema}}} } });
+const retryRoute = createRoute({
+  method: "post",
+  path: "/api/jobs/{jobId}/retry",
+  operationId: "retryJob",
+  request: { params: z.object({ jobId: z.string().uuid() }) },
+  responses: {
+    202: { description: "Retry accepted", content: { "application/json": { schema: JobSchema } } },
+    403: { description: "Feature not open", content: { "application/json": { schema: ErrorSchema } } },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },
+    409: { description: "Retry blocked", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
 app.openapi(retryRoute, (c) => {
-  const source = store.getOwned(c.req.valid("param").jobId,c.get("userId"));
-  if (!source) return c.json({ error: { code: "NOT_FOUND", message: "任务不存在", retryable: false, requestId: crypto.randomUUID() } }, 404);
-  if(!isModuleOpen(source.moduleId))return c.json({error:{code:"FEATURE_NOT_OPEN",message:"该功能正在验收，暂未开放",retryable:false,requestId:crypto.randomUUID()}},403);
-  if(source.executionPlan.some(stage=>stage.model==="wan2.6-t2v"))return c.json({error:{code:"MODEL_SELECTION_REQUIRED",message:"Wan 已停用，请返回配置页选择 Seedance 后创建新任务",retryable:false,requestId:crypto.randomUUID()}},409);
-  if(source.providerTaskId&&!["completed","succeeded","failed","cancelled","expired"].includes(source.providerStatus??""))return c.json({error:{code:"UPSTREAM_STILL_RUNNING",message:"上游任务仍在运行或核对中，暂不能重复提交",retryable:false,requestId:crypto.randomUUID()}},409);
+  const source = store.getOwned(c.req.valid("param").jobId, c.get("userId"));
+  if (!source)
+    return c.json(
+      { error: { code: "NOT_FOUND", message: "任务不存在", retryable: false, requestId: crypto.randomUUID() } },
+      404,
+    );
+  if (!isModuleOpen(source.moduleId))
+    return c.json(
+      {
+        error: {
+          code: "FEATURE_NOT_OPEN",
+          message: "该功能正在验收，暂未开放",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      403,
+    );
+  if (source.executionPlan.some((stage) => stage.model === "wan2.6-t2v"))
+    return c.json(
+      {
+        error: {
+          code: "MODEL_SELECTION_REQUIRED",
+          message: "Wan 已停用，请返回配置页选择 Seedance 后创建新任务",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      409,
+    );
+  if (
+    source.providerTaskId &&
+    !["completed", "succeeded", "failed", "cancelled", "expired"].includes(source.providerStatus ?? "")
+  )
+    return c.json(
+      {
+        error: {
+          code: "UPSTREAM_STILL_RUNNING",
+          message: "上游任务仍在运行或核对中，暂不能重复提交",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      409,
+    );
   const now = new Date().toISOString();
-  const retry: JobRecord = { ...source, id: crypto.randomUUID(), title: `${source.title}（重试）`, status: "queued", progress: 0, stage: "排队中", provenance: [], result: undefined, error: undefined, parentJobId: source.id, idempotencyKey:undefined, cancelRequested: false,providerTaskId:undefined,providerStatus:undefined,providerSubmittedAt:undefined,providerDeadlineAt:undefined,providerCancelState:"none",stagingKeys:[],createdAt: now, updatedAt: now };
-  store.create(retry); queue.enqueue(retry.id); return c.json(retry, 202);
+  const retry: JobRecord = {
+    ...source,
+    id: crypto.randomUUID(),
+    title: `${source.title}（重试）`,
+    status: "queued",
+    progress: 0,
+    stage: "排队中",
+    provenance: [],
+    result: undefined,
+    error: undefined,
+    parentJobId: source.id,
+    idempotencyKey: undefined,
+    cancelRequested: false,
+    providerTaskId: undefined,
+    providerStatus: undefined,
+    providerSubmittedAt: undefined,
+    providerDeadlineAt: undefined,
+    providerCancelState: "none",
+    stagingKeys: [],
+    createdAt: now,
+    updatedAt: now,
+  };
+  store.create(retry);
+  queue.enqueue(retry.id);
+  return c.json(retry, 202);
 });
 
-const eventsRoute=createRoute({method:"get",path:"/api/jobs/{jobId}/events",operationId:"watchJobEvents",request:{params:z.object({jobId:z.string().uuid()})},responses:{200:{description:"Server-sent job updates",content:{"text/event-stream":{schema:z.string()}}},404:{description:"Not found",content:{"application/json":{schema:ErrorSchema}}}}});
+const eventsRoute = createRoute({
+  method: "get",
+  path: "/api/jobs/{jobId}/events",
+  operationId: "watchJobEvents",
+  request: { params: z.object({ jobId: z.string().uuid() }) },
+  responses: {
+    200: { description: "Server-sent job updates", content: { "text/event-stream": { schema: z.string() } } },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
 app.openapi(eventsRoute, (c) => {
   const id = c.req.valid("param").jobId;
-  if (!store.getOwned(id,c.get("userId"))) return c.json({ error: { code: "NOT_FOUND", message: "任务不存在", retryable: false, requestId: crypto.randomUUID() } }, 404);
+  if (!store.getOwned(id, c.get("userId")))
+    return c.json(
+      { error: { code: "NOT_FOUND", message: "任务不存在", retryable: false, requestId: crypto.randomUUID() } },
+      404,
+    );
   return streamSSE(c, async (stream) => {
     let eventId = 0;
     const send = async (job: JobRecord) => {
       eventId += 1;
-      await stream.writeSSE({ id: String(eventId), event: job.status === "succeeded" || job.status === "failed" || job.status === "cancelled" ? "job.completed" : "job.updated", data: JSON.stringify(job) });
+      await stream.writeSSE({
+        id: String(eventId),
+        event:
+          job.status === "succeeded" || job.status === "failed" || job.status === "cancelled"
+            ? "job.completed"
+            : "job.updated",
+        data: JSON.stringify(job),
+      });
     };
     await send(store.get(id)!);
     const unsubscribe = queue.subscribe(id, (job) => void send(job));
     while (!stream.aborted) {
       const job = store.get(id);
-      if (!job || ["succeeded","partially_succeeded","failed","cancelled"].includes(job.status)) break;
+      if (!job || ["succeeded", "partially_succeeded", "failed", "cancelled"].includes(job.status)) break;
       await stream.sleep(1000);
     }
     unsubscribe();
   });
 });
 
-const artifactRoute=createRoute({method:"get",path:"/api/artifacts/{artifactId}",operationId:"downloadArtifact",request:{params:z.object({artifactId:z.string().uuid()})},responses:{200:{description:"Artifact binary",content:{"application/octet-stream":{schema:z.string().openapi({format:"binary"})}}},404:{description:"Not found",content:{"text/plain":{schema:z.string()}}}}});
+const artifactRoute = createRoute({
+  method: "get",
+  path: "/api/artifacts/{artifactId}",
+  operationId: "downloadArtifact",
+  request: { params: z.object({ artifactId: z.string().uuid() }) },
+  responses: {
+    200: {
+      description: "Artifact binary",
+      content: { "application/octet-stream": { schema: z.string().openapi({ format: "binary" }) } },
+    },
+    404: { description: "Not found", content: { "text/plain": { schema: z.string() } } },
+  },
+});
 app.openapi(artifactRoute, async (c) => {
-  const artifact=accounts.getArtifact(c.get("userId"),c.req.valid("param").artifactId);
-  if(!artifact)return new Response("Not found",{status:404});
+  const artifact = accounts.getArtifact(c.get("userId"), c.req.valid("param").artifactId);
+  if (!artifact) return new Response("Not found", { status: 404 });
   const file = Bun.file(resolve(env.dataDir, "results", artifact.storage_key));
-  if (!await file.exists()) return new Response("Not found", { status: 404 });
-  return new Response(file, { headers: { "Content-Type": artifact.mime_type || "application/octet-stream", "Content-Disposition": `inline; filename="${artifact.name.replaceAll('"','')}"` } });
+  if (!(await file.exists())) return new Response("Not found", { status: 404 });
+  return new Response(file, {
+    headers: {
+      "Content-Type": artifact.mime_type || "application/octet-stream",
+      "Content-Disposition": `inline; filename="${artifact.name.replaceAll('"', "")}"`,
+    },
+  });
 });
 
-app.doc("/openapi.json", { openapi: "3.1.0", info: { title: `${APP_CONFIG.projectName} AI 创作 API`, version: "0.1.0" } });
+app.doc("/openapi.json", {
+  openapi: "3.1.0",
+  info: { title: `${APP_CONFIG.projectName} AI 创作 API`, version: "0.1.0" },
+});
 
 export { app };

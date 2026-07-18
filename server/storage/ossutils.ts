@@ -61,11 +61,17 @@ export class OssUtils {
 
   private async abortDanglingUploads(key: string) {
     const response = await this.ready().listMultipartUploads({ bucket: env.tos.bucket, prefix: key });
-    await Promise.allSettled((response.data.Uploads ?? []).filter((upload) => upload.Key === key && upload.UploadId).map((upload) => this.ready().abortMultipartUpload({ bucket: env.tos.bucket, key, uploadId: upload.UploadId! })));
+    await Promise.allSettled(
+      (response.data.Uploads ?? [])
+        .filter((upload) => upload.Key === key && upload.UploadId)
+        .map((upload) =>
+          this.ready().abortMultipartUpload({ bucket: env.tos.bucket, key, uploadId: upload.UploadId! }),
+        ),
+    );
   }
 
   async putStagedFile(input: PutStagedFileInput) {
-    if(input.signal?.aborted)throw new Error("TOS_UPLOAD_ABORTED");
+    if (input.signal?.aborted) throw new Error("TOS_UPLOAD_ABORTED");
     const release = await uploadGate.acquire(input.sizeBytes);
     const safeExtension = input.extension.replace(/[^a-zA-Z0-9.]/g, "").slice(0, 10) || ".bin";
     const key = `seedance-staging/active/${input.jobId}/${crypto.randomUUID()}${safeExtension.startsWith(".") ? safeExtension : `.${safeExtension}`}`;
@@ -85,13 +91,20 @@ export class OssUtils {
         serverSideEncryption: "AES256",
         meta: { sha256: input.sha256, "cleanup-ready": "false" },
         cancelToken: cancelSource.token,
-        uploadEventChange: (event) => { uploadId = event.uploadId || uploadId; },
+        uploadEventChange: (event) => {
+          uploadId = event.uploadId || uploadId;
+        },
       });
       return { key, etag: response.data.ETag };
     } catch (error) {
-      if (uploadId) await this.ready().abortMultipartUpload({ bucket: env.tos.bucket, key, uploadId }).catch(() => undefined);
+      if (uploadId)
+        await this.ready()
+          .abortMultipartUpload({ bucket: env.tos.bucket, key, uploadId })
+          .catch(() => undefined);
       await this.abortDanglingUploads(key).catch(() => undefined);
-      await this.ready().deleteObject({ bucket: env.tos.bucket, key }).catch(() => undefined);
+      await this.ready()
+        .deleteObject({ bucket: env.tos.bucket, key })
+        .catch(() => undefined);
       throw error;
     } finally {
       input.signal?.removeEventListener("abort", abort);
@@ -103,13 +116,36 @@ export class OssUtils {
     return this.ready().getPreSignedUrl({ bucket: env.tos.bucket, key, method: "GET", expires: expiresSeconds });
   }
 
-  headObject(key: string) { return this.ready().headObject({ bucket: env.tos.bucket, key }); }
-  async markCleanupReady(key: string) {
-    await this.ready().putObjectTagging({ bucket: env.tos.bucket, key, tagSet: { Tags: [{ Key: "cleanup-ready", Value: "true" }] } });
+  headObject(key: string) {
+    return this.ready().headObject({ bucket: env.tos.bucket, key });
   }
-  async deleteObject(key: string) { let lastError:unknown;for(let attempt=0;attempt<4;attempt+=1){try{await this.ready().deleteObject({ bucket: env.tos.bucket, key });return}catch(error){lastError=error;if(attempt<3)await Bun.sleep(300*2**attempt)}}throw lastError; }
-  async deleteMany(keys: string[]) { await Promise.allSettled(keys.map((key) => this.deleteObject(key))); }
-  async countDanglingUploads(prefix = "seedance-staging/") { const response=await this.ready().listMultipartUploads({bucket:env.tos.bucket,prefix});return (response.data.Uploads??[]).length; }
+  async markCleanupReady(key: string) {
+    await this.ready().putObjectTagging({
+      bucket: env.tos.bucket,
+      key,
+      tagSet: { Tags: [{ Key: "cleanup-ready", Value: "true" }] },
+    });
+  }
+  async deleteObject(key: string) {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      try {
+        await this.ready().deleteObject({ bucket: env.tos.bucket, key });
+        return;
+      } catch (error) {
+        lastError = error;
+        if (attempt < 3) await Bun.sleep(300 * 2 ** attempt);
+      }
+    }
+    throw lastError;
+  }
+  async deleteMany(keys: string[]) {
+    await Promise.allSettled(keys.map((key) => this.deleteObject(key)));
+  }
+  async countDanglingUploads(prefix = "seedance-staging/") {
+    const response = await this.ready().listMultipartUploads({ bucket: env.tos.bucket, prefix });
+    return (response.data.Uploads ?? []).length;
+  }
 }
 
 export const ossutils = new OssUtils();

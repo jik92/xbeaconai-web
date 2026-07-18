@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite";
+import type { ModuleId } from "../../src/entities/types";
 import { env } from "../env";
 import type { JobRecord, JobResult, JobStatus, StageProvenance } from "../types";
-import type { ModuleId } from "../../src/entities/types";
 
 interface JobRow {
   id: string;
@@ -33,7 +33,7 @@ interface JobRow {
   updated_at: string;
 }
 
-const parse = <T>(value: string | null, fallback: T): T => value ? JSON.parse(value) as T : fallback;
+const parse = <T>(value: string | null, fallback: T): T => (value ? (JSON.parse(value) as T) : fallback);
 export class InsufficientCreditsError extends Error {}
 
 export class SqliteJobStore {
@@ -72,27 +72,45 @@ export class SqliteJobStore {
         created_at TEXT NOT NULL
       );
     `);
-    const columns = this.db.query("PRAGMA table_info(jobs)").all() as Array<{name:string}>;
-    if (!columns.some((column) => column.name === "idempotency_key")) this.db.exec("ALTER TABLE jobs ADD COLUMN idempotency_key TEXT");
-    if (!columns.some((column) => column.name === "owner_user_id")) this.db.exec("ALTER TABLE jobs ADD COLUMN owner_user_id TEXT");
+    const columns = this.db.query("PRAGMA table_info(jobs)").all() as Array<{ name: string }>;
+    if (!columns.some((column) => column.name === "idempotency_key"))
+      this.db.exec("ALTER TABLE jobs ADD COLUMN idempotency_key TEXT");
+    if (!columns.some((column) => column.name === "owner_user_id"))
+      this.db.exec("ALTER TABLE jobs ADD COLUMN owner_user_id TEXT");
     const additions = [
-      ["video_model", "TEXT"], ["provider_model", "TEXT"], ["provider_task_id", "TEXT"],
-      ["provider_status", "TEXT"], ["provider_submitted_at", "TEXT"], ["provider_deadline_at", "TEXT"],
-      ["provider_cancel_state", "TEXT"], ["staging_keys_json", "TEXT NOT NULL DEFAULT '[]'"],
+      ["video_model", "TEXT"],
+      ["provider_model", "TEXT"],
+      ["provider_task_id", "TEXT"],
+      ["provider_status", "TEXT"],
+      ["provider_submitted_at", "TEXT"],
+      ["provider_deadline_at", "TEXT"],
+      ["provider_cancel_state", "TEXT"],
+      ["staging_keys_json", "TEXT NOT NULL DEFAULT '[]'"],
       ["job_schema_version", "INTEGER NOT NULL DEFAULT 1"],
     ] as const;
-    for (const [name, definition] of additions) if (!columns.some((column) => column.name === name)) this.db.exec(`ALTER TABLE jobs ADD COLUMN ${name} ${definition}`);
-    this.db.exec("DROP INDEX IF EXISTS jobs_idempotency_idx; CREATE UNIQUE INDEX jobs_idempotency_idx ON jobs(owner_user_id,idempotency_key) WHERE idempotency_key IS NOT NULL");
+    for (const [name, definition] of additions)
+      if (!columns.some((column) => column.name === name))
+        this.db.exec(`ALTER TABLE jobs ADD COLUMN ${name} ${definition}`);
+    this.db.exec(
+      "DROP INDEX IF EXISTS jobs_idempotency_idx; CREATE UNIQUE INDEX jobs_idempotency_idx ON jobs(owner_user_id,idempotency_key) WHERE idempotency_key IS NOT NULL",
+    );
     this.retireWanJobs();
   }
 
   private retireWanJobs() {
     const now = new Date().toISOString();
-    const error = JSON.stringify({ code: "MODEL_RETIRED", message: "Wan 已停止支持，请重新选择 Seedance 模型创建任务", retryable: false, requestId: crypto.randomUUID() });
+    const error = JSON.stringify({
+      code: "MODEL_RETIRED",
+      message: "Wan 已停止支持，请重新选择 Seedance 模型创建任务",
+      retryable: false,
+      requestId: crypto.randomUUID(),
+    });
     this.db.exec("BEGIN IMMEDIATE");
     try {
-      this.db.query(`UPDATE jobs SET status='failed',stage='模型已停用',error_json=?,updated_at=?
-        WHERE status IN ('queued','processing') AND (execution_plan_json LIKE '%wan2.6-t2v%' OR provenance_json LIKE '%wan2.6-t2v%')`).run(error, now);
+      this.db
+        .query(`UPDATE jobs SET status='failed',stage='模型已停用',error_json=?,updated_at=?
+        WHERE status IN ('queued','processing') AND (execution_plan_json LIKE '%wan2.6-t2v%' OR provenance_json LIKE '%wan2.6-t2v%')`)
+        .run(error, now);
       this.db.exec("COMMIT");
     } catch (error) {
       this.db.exec("ROLLBACK");
@@ -133,38 +151,66 @@ export class SqliteJobStore {
   }
 
   create(job: JobRecord): JobRecord {
-    this.db.query(`INSERT INTO jobs (
+    this.db
+      .query(`INSERT INTO jobs (
       id,module_id,title,status,progress,stage,overall_execution_mode,values_json,
       execution_plan_json,provenance_json,result_json,error_json,parent_job_id,
       cancel_requested,created_at,updated_at,idempotency_key,owner_user_id,video_model,
       provider_model,provider_task_id,provider_status,provider_submitted_at,provider_deadline_at,
       provider_cancel_state,staging_keys_json,job_schema_version
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
-      job.id, job.moduleId, job.title, job.status, job.progress, job.stage,
-      job.overallExecutionMode, JSON.stringify(job.values), JSON.stringify(job.executionPlan),
-      JSON.stringify(job.provenance), job.result ? JSON.stringify(job.result) : null,
-      job.error ? JSON.stringify(job.error) : null, job.parentJobId ?? null,
-      job.cancelRequested ? 1 : 0, job.createdAt, job.updatedAt, job.idempotencyKey ?? null, job.ownerUserId,
-      job.videoModel ?? null, job.providerModel ?? null, job.providerTaskId ?? null, job.providerStatus ?? null,
-      job.providerSubmittedAt ?? null, job.providerDeadlineAt ?? null, job.providerCancelState ?? "none",
-      JSON.stringify(job.stagingKeys), job.jobSchemaVersion,
-    );
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(
+        job.id,
+        job.moduleId,
+        job.title,
+        job.status,
+        job.progress,
+        job.stage,
+        job.overallExecutionMode,
+        JSON.stringify(job.values),
+        JSON.stringify(job.executionPlan),
+        JSON.stringify(job.provenance),
+        job.result ? JSON.stringify(job.result) : null,
+        job.error ? JSON.stringify(job.error) : null,
+        job.parentJobId ?? null,
+        job.cancelRequested ? 1 : 0,
+        job.createdAt,
+        job.updatedAt,
+        job.idempotencyKey ?? null,
+        job.ownerUserId,
+        job.videoModel ?? null,
+        job.providerModel ?? null,
+        job.providerTaskId ?? null,
+        job.providerStatus ?? null,
+        job.providerSubmittedAt ?? null,
+        job.providerDeadlineAt ?? null,
+        job.providerCancelState ?? "none",
+        JSON.stringify(job.stagingKeys),
+        job.jobSchemaVersion,
+      );
     return job;
   }
 
-  createCharged(job:JobRecord,credits:number):JobRecord{
-    if(!Number.isInteger(credits)||credits<=0)return this.create(job);
+  createCharged(job: JobRecord, credits: number): JobRecord {
+    if (!Number.isInteger(credits) || credits <= 0) return this.create(job);
     this.db.exec("BEGIN IMMEDIATE");
-    try{
-      const user=this.db.query("SELECT credits FROM users WHERE id=?").get(job.ownerUserId) as {credits:number}|null;
-      if(!user||user.credits<credits)throw new InsufficientCreditsError("创作点不足");
-      const balance=user.credits-credits;
+    try {
+      const user = this.db.query("SELECT credits FROM users WHERE id=?").get(job.ownerUserId) as {
+        credits: number;
+      } | null;
+      if (!user || user.credits < credits) throw new InsufficientCreditsError("创作点不足");
+      const balance = user.credits - credits;
       this.create(job);
-      this.db.query("UPDATE users SET credits=?,updated_at=? WHERE id=?").run(balance,job.createdAt,job.ownerUserId);
-      this.db.query("INSERT INTO credit_charges(id,user_id,job_id,amount,balance_after,created_at) VALUES(?,?,?,?,?,?)").run(crypto.randomUUID(),job.ownerUserId,job.id,credits,balance,job.createdAt);
+      this.db.query("UPDATE users SET credits=?,updated_at=? WHERE id=?").run(balance, job.createdAt, job.ownerUserId);
+      this.db
+        .query("INSERT INTO credit_charges(id,user_id,job_id,amount,balance_after,created_at) VALUES(?,?,?,?,?,?)")
+        .run(crypto.randomUUID(), job.ownerUserId, job.id, credits, balance, job.createdAt);
       this.db.exec("COMMIT");
       return job;
-    }catch(error){this.db.exec("ROLLBACK");throw error}
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
   }
 
   get(id: string): JobRecord | undefined {
@@ -172,46 +218,92 @@ export class SqliteJobStore {
     return row ? this.fromRow(row) : undefined;
   }
 
-  getOwned(id: string,ownerUserId:string): JobRecord | undefined { const job=this.get(id);return job?.ownerUserId===ownerUserId?job:undefined }
+  getOwned(id: string, ownerUserId: string): JobRecord | undefined {
+    const job = this.get(id);
+    return job?.ownerUserId === ownerUserId ? job : undefined;
+  }
 
-  getByIdempotencyKey(ownerUserId:string,key: string): JobRecord | undefined {
-    const row = this.db.query("SELECT * FROM jobs WHERE owner_user_id=? AND idempotency_key = ?").get(ownerUserId,key) as JobRow | null;
+  getByIdempotencyKey(ownerUserId: string, key: string): JobRecord | undefined {
+    const row = this.db
+      .query("SELECT * FROM jobs WHERE owner_user_id=? AND idempotency_key = ?")
+      .get(ownerUserId, key) as JobRow | null;
     return row ? this.fromRow(row) : undefined;
   }
 
-  list(ownerUserId:string,moduleId?: ModuleId): JobRecord[] {
+  list(ownerUserId: string, moduleId?: ModuleId): JobRecord[] {
     const rows = moduleId
-      ? this.db.query("SELECT * FROM jobs WHERE owner_user_id=? AND module_id = ? ORDER BY created_at DESC LIMIT 100").all(ownerUserId,moduleId)
+      ? this.db
+          .query("SELECT * FROM jobs WHERE owner_user_id=? AND module_id = ? ORDER BY created_at DESC LIMIT 100")
+          .all(ownerUserId, moduleId)
       : this.db.query("SELECT * FROM jobs WHERE owner_user_id=? ORDER BY created_at DESC LIMIT 100").all(ownerUserId);
     return (rows as JobRow[]).map((row) => this.fromRow(row));
   }
 
   recoverable(): JobRecord[] {
-    return (this.db.query("SELECT * FROM jobs WHERE status IN ('queued','processing') ORDER BY created_at ASC").all() as JobRow[])
-      .map((row) => this.fromRow(row));
+    return (
+      this.db
+        .query("SELECT * FROM jobs WHERE status IN ('queued','processing') ORDER BY created_at ASC")
+        .all() as JobRow[]
+    ).map((row) => this.fromRow(row));
   }
 
   update(id: string, patch: Partial<JobRecord>): JobRecord | undefined {
     const current = this.get(id);
     if (!current) return undefined;
     const next = { ...current, ...patch, updatedAt: new Date().toISOString() };
-    this.db.query(`UPDATE jobs SET status=?,progress=?,stage=?,overall_execution_mode=?,values_json=?,video_model=?,
+    this.db
+      .query(`UPDATE jobs SET status=?,progress=?,stage=?,overall_execution_mode=?,values_json=?,video_model=?,
       execution_plan_json=?,provenance_json=?,result_json=?,error_json=?,cancel_requested=?,provider_model=?,
       provider_task_id=?,provider_status=?,provider_submitted_at=?,provider_deadline_at=?,provider_cancel_state=?,
-      staging_keys_json=?,job_schema_version=?,updated_at=? WHERE id=?`).run(
-      next.status, next.progress, next.stage, next.overallExecutionMode,
-      JSON.stringify(next.values), next.videoModel ?? null,
-      JSON.stringify(next.executionPlan), JSON.stringify(next.provenance),
-      next.result ? JSON.stringify(next.result) : null, next.error ? JSON.stringify(next.error) : null,
-      next.cancelRequested ? 1 : 0, next.providerModel ?? null, next.providerTaskId ?? null,
-      next.providerStatus ?? null, next.providerSubmittedAt ?? null, next.providerDeadlineAt ?? null,
-      next.providerCancelState ?? "none", JSON.stringify(next.stagingKeys), next.jobSchemaVersion, next.updatedAt, id,
-    );
+      staging_keys_json=?,job_schema_version=?,updated_at=? WHERE id=?`)
+      .run(
+        next.status,
+        next.progress,
+        next.stage,
+        next.overallExecutionMode,
+        JSON.stringify(next.values),
+        next.videoModel ?? null,
+        JSON.stringify(next.executionPlan),
+        JSON.stringify(next.provenance),
+        next.result ? JSON.stringify(next.result) : null,
+        next.error ? JSON.stringify(next.error) : null,
+        next.cancelRequested ? 1 : 0,
+        next.providerModel ?? null,
+        next.providerTaskId ?? null,
+        next.providerStatus ?? null,
+        next.providerSubmittedAt ?? null,
+        next.providerDeadlineAt ?? null,
+        next.providerCancelState ?? "none",
+        JSON.stringify(next.stagingKeys),
+        next.jobSchemaVersion,
+        next.updatedAt,
+        id,
+      );
     return next;
   }
 
-  scheduleObjectCleanup(jobId:string,key:string,error:unknown){const time=new Date().toISOString();this.db.query(`INSERT INTO object_cleanup(object_key,job_id,attempts,last_error,next_attempt_at,created_at) VALUES(?,?,1,?,?,?) ON CONFLICT(object_key) DO UPDATE SET attempts=attempts+1,last_error=excluded.last_error,next_attempt_at=excluded.next_attempt_at`).run(key,jobId,String(error).slice(0,500),time,time)}
-  pendingObjectCleanup(){return this.db.query("SELECT object_key,job_id,attempts FROM object_cleanup WHERE next_attempt_at<=? ORDER BY created_at LIMIT 100").all(new Date().toISOString()) as Array<{object_key:string;job_id:string;attempts:number}>}
-  completeObjectCleanup(key:string){this.db.query("DELETE FROM object_cleanup WHERE object_key=?").run(key)}
-  deferObjectCleanup(key:string,error:unknown,attempts:number){const delay=Math.min(60*60_000,2**Math.min(attempts,8)*5_000);this.db.query("UPDATE object_cleanup SET attempts=attempts+1,last_error=?,next_attempt_at=? WHERE object_key=?").run(String(error).slice(0,500),new Date(Date.now()+delay).toISOString(),key)}
+  scheduleObjectCleanup(jobId: string, key: string, error: unknown) {
+    const time = new Date().toISOString();
+    this.db
+      .query(
+        `INSERT INTO object_cleanup(object_key,job_id,attempts,last_error,next_attempt_at,created_at) VALUES(?,?,1,?,?,?) ON CONFLICT(object_key) DO UPDATE SET attempts=attempts+1,last_error=excluded.last_error,next_attempt_at=excluded.next_attempt_at`,
+      )
+      .run(key, jobId, String(error).slice(0, 500), time, time);
+  }
+  pendingObjectCleanup() {
+    return this.db
+      .query(
+        "SELECT object_key,job_id,attempts FROM object_cleanup WHERE next_attempt_at<=? ORDER BY created_at LIMIT 100",
+      )
+      .all(new Date().toISOString()) as Array<{ object_key: string; job_id: string; attempts: number }>;
+  }
+  completeObjectCleanup(key: string) {
+    this.db.query("DELETE FROM object_cleanup WHERE object_key=?").run(key);
+  }
+  deferObjectCleanup(key: string, error: unknown, attempts: number) {
+    const delay = Math.min(60 * 60_000, 2 ** Math.min(attempts, 8) * 5_000);
+    this.db
+      .query("UPDATE object_cleanup SET attempts=attempts+1,last_error=?,next_attempt_at=? WHERE object_key=?")
+      .run(String(error).slice(0, 500), new Date(Date.now() + delay).toISOString(), key);
+  }
 }

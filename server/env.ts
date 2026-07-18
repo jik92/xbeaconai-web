@@ -38,7 +38,9 @@ export const env = {
   ]),
 };
 
-export const tosConfigured = Boolean(env.tos.accessKeyId && env.tos.accessKeySecret && env.tos.region && env.tos.endpoint && env.tos.bucket);
+export const tosConfigured = Boolean(
+  env.tos.accessKeyId && env.tos.accessKeySecret && env.tos.region && env.tos.endpoint && env.tos.bucket,
+);
 
 if (env.host !== "127.0.0.1" && env.host !== "localhost" && env.host !== "::1") {
   throw new Error("Local development API refuses to bind a non-loopback host");
