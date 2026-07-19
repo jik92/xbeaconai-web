@@ -23,6 +23,18 @@ bun install
 bun run dev:all
 ```
 
+也可以使用项目统一命令：
+
+```bash
+make run-dev
+make lint
+make test
+make ci
+```
+
+`make ci` 会执行 Biome 格式/静态检查和单元测试；它不运行需要外部密钥、
+TOS 或 FFmpeg 的专项能力测试。完整验证中的类型检查和生产构建仍可单独运行。
+
 访问 `http://127.0.0.1:5173`。API 与 OpenAPI 默认位于 `http://127.0.0.1:8787`。
 
 也可以分别运行：

@@ -1,6 +1,20 @@
 BUN ?= bun
 
-.PHONY: run-server
-run-server:
-	@command -v $(BUN) >/dev/null 2>&1 || { echo "Error: Bun is not installed or not in PATH." >&2; exit 1; }
+.PHONY: _check_bun run-dev run-server lint test ci
+
+_check_bun:
+	@command -v $(BUN) >/dev/null 2>&1 || { echo "Error: Bun ('$(BUN)') not found. Please install Bun or set BUN=/path/to/bun." >&2; exit 1; }
+
+run-dev: _check_bun
 	$(BUN) run dev:all
+
+run-server: run-dev
+
+lint: _check_bun
+	$(BUN) run format:check
+	$(BUN) run lint
+
+test: _check_bun
+	$(BUN) run test
+
+ci: lint test
