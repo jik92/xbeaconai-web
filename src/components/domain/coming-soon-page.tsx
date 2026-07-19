@@ -1,6 +1,6 @@
 import { Clock3 } from "lucide-react";
-import { APP_CONFIG } from "@/app/config";
 import type { AssetFeatureId } from "@/app/config";
+import { APP_CONFIG } from "@/app/config";
 import type { ModuleConfig } from "@/app/routes";
 
 type ComingSoonFeature = Pick<ModuleConfig, "id" | "label"> | { id: AssetFeatureId; label: string };
