@@ -58,6 +58,24 @@ export async function uploadMediaFile(file: File, folderId?: string) {
   if (!data?.asset) throw new Error("文件上传失败");
   return data.asset;
 }
+export async function importDouyinVideo(input: {
+  url: string;
+  displayName?: string;
+  folderId?: string;
+  authorized: true;
+}) {
+  const response = await fetch(apiUrl("/api/imports/douyin"), {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const data = (await response.json().catch(() => null)) as {
+    asset?: LibraryAsset;
+    error?: { message?: string };
+  } | null;
+  if (!response.ok || !data?.asset) throw new Error(data?.error?.message || "抖音视频导入失败");
+  return data.asset;
+}
 export async function fetchLibraryAssets(kind: Exclude<AssetKind, "product">, folderId?: string) {
   const params = new URLSearchParams({ kind });
   if (folderId) params.set("folderId", folderId);

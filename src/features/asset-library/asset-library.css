@@ -182,6 +182,48 @@
   gap: 7px;
   background: #fff;
 }
+.douyin-import-trigger {
+  height: 36px;
+  margin: -6px 0 14px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #c9dafa;
+  border-radius: 7px;
+  color: #195fe4;
+  background: #f3f7ff;
+  font-size: 12px;
+}
+.douyin-import-trigger svg {
+  width: 15px;
+}
+.douyin-import-note,
+.douyin-import-limit {
+  margin: -2px 0 14px;
+  color: #667186;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.douyin-import-limit {
+  display: block;
+  margin: 10px 0 0;
+  color: #8a94a5;
+}
+.douyin-authorization {
+  flex-direction: row !important;
+  align-items: flex-start !important;
+  gap: 8px;
+  margin-top: 16px;
+  color: #434e61;
+  font-size: 12px;
+  font-weight: 500;
+}
+.douyin-authorization input {
+  width: 15px;
+  height: 15px;
+  margin: 1px 0 0;
+}
 .asset-library-page .primary {
   color: #fff;
   background: #246bfd;

@@ -10,6 +10,13 @@ import { authenticate, issueToken } from "./accounts/auth";
 import { creationCapabilities, quoteCreation, validateCreationValues } from "./creation/capabilities";
 import { env } from "./env";
 import { buildExecutionPlan, MemoryJobQueue } from "./jobs/memory-job-queue";
+import {
+  assertImportAuthorization,
+  DouyinImportError,
+  parseDouyinShareUrl,
+  persistImportVideo,
+  resolveDouyinVideo,
+} from "./imports/douyin-video";
 import { InsufficientCreditsError, SqliteJobStore } from "./jobs/sqlite-job-store";
 import { seedanceModelIds, videoModels } from "./models/video-models";
 import { auditSdkRegistry } from "./sdk-registry";
@@ -875,6 +882,77 @@ const uploadRoute = createRoute({
     413: { description: "Upload too large", content: { "application/json": { schema: ErrorSchema } } },
     415: { description: "Unsupported media type", content: { "application/json": { schema: ErrorSchema } } },
   },
+});
+
+const douyinImportRoute = createRoute({
+  method: "post",
+  path: "/api/imports/douyin",
+  operationId: "importDouyinVideo",
+  request: {
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: z.object({
+            url: z.string().min(1).max(2_000),
+            displayName: z.string().max(80).optional(),
+            folderId: z.string().uuid().optional(),
+            authorized: z.literal(true),
+          }),
+        },
+      },
+    },
+  },
+  responses: {
+    201: {
+      description: "Imported video",
+      content: { "application/json": { schema: z.object({ asset: LibraryAssetSchema }) } },
+    },
+    400: { description: "Invalid import", content: { "application/json": { schema: ErrorSchema } } },
+    413: { description: "Video too large", content: { "application/json": { schema: ErrorSchema } } },
+    422: { description: "Import unavailable", content: { "application/json": { schema: ErrorSchema } } },
+    502: { description: "Provider failed", content: { "application/json": { schema: ErrorSchema } } },
+    503: { description: "Importer unavailable", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(douyinImportRoute, async (c) => {
+  const body = c.req.valid("json");
+  const requestId = crypto.randomUUID();
+  try {
+    assertImportAuthorization(body.authorized);
+    parseDouyinShareUrl(body.url);
+    const folder = body.folderId
+      ? accounts.getAssetFolder(c.get("userId"), body.folderId)
+      : accounts.ensureDefaultAssetFolder(c.get("userId"));
+    if (!folder)
+      return c.json(
+        { error: { code: "FOLDER_NOT_FOUND", message: "素材文件夹不存在", retryable: false, requestId } },
+        400,
+      );
+    const video = await resolveDouyinVideo(body.url);
+    const asset = await persistImportVideo(video, c.get("userId"), folder, body.displayName, {
+      dataDir: env.dataDir,
+      ossutils,
+      accounts,
+    });
+    return c.json({ asset }, 201);
+  } catch (error) {
+    if (error instanceof DouyinImportError) {
+      const payload = {
+        error: { code: error.code, message: error.message, retryable: error.status >= 500, requestId },
+      };
+      if (error.status === 400) return c.json(payload, 400);
+      if (error.status === 413) return c.json(payload, 413);
+      if (error.status === 422) return c.json(payload, 422);
+      if (error.status === 503) return c.json(payload, 503);
+      return c.json(payload, 502);
+    }
+    console.error("Douyin import failed", error);
+    return c.json(
+      { error: { code: "DOUYIN_VIDEO_IMPORT_FAILED", message: "抖音视频导入失败", retryable: true, requestId } },
+      502,
+    );
+  }
 });
 app.openapi(uploadRoute, async (c) => {
   const form = await c.req.formData();

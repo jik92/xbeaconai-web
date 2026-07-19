@@ -9,6 +9,7 @@ import {
   Folder,
   FolderPlus,
   Image as ImageIcon,
+  Link,
   Package,
   Pencil,
   Plus,
@@ -25,6 +26,7 @@ import {
   fetchAssetFolders,
   fetchLibraryAssets,
   fetchProducts,
+  importDouyinVideo,
   renameAssetFolder,
   uploadLibraryAsset,
   uploadProduct,
@@ -239,10 +241,14 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [douyinImportOpen, setDouyinImportOpen] = useState(false);
   const [selected, setSelected] = useState<LibraryAsset | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [douyinUrl, setDouyinUrl] = useState("");
+  const [douyinName, setDouyinName] = useState("");
+  const [douyinAuthorized, setDouyinAuthorized] = useState(false);
   const [selectedFolderId, setSelectedFolderId] = useState("");
   const { data: folders = [] } = useQuery({
     queryKey: ["asset-folders"],
@@ -278,6 +284,26 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
       setFile(null);
       setName("");
       setDescription("");
+      setSelected(asset);
+    },
+  });
+  const douyinImport = useMutation({
+    mutationFn: () => {
+      if (!douyinUrl.trim()) throw new Error("请输入抖音分享链接");
+      if (!douyinAuthorized) throw new Error("请确认你拥有该视频的下载和使用授权");
+      return importDouyinVideo({
+        url: douyinUrl.trim(),
+        displayName: douyinName.trim() || undefined,
+        folderId: selectedFolderId || undefined,
+        authorized: true,
+      });
+    },
+    onSuccess: (asset) => {
+      void queryClient.invalidateQueries({ queryKey: ["asset-library", "media"] });
+      setDouyinImportOpen(false);
+      setDouyinUrl("");
+      setDouyinName("");
+      setDouyinAuthorized(false);
       setSelected(asset);
     },
   });
@@ -379,6 +405,11 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
           uploadLabel={kind === "voice" ? "上传音色" : "上传素材"}
           onUpload={() => setUploadOpen(true)}
         />
+        {kind === "media" && (
+          <button className="douyin-import-trigger" type="button" onClick={() => setDouyinImportOpen(true)}>
+            <Link /> 从抖音导入
+          </button>
+        )}
         <div className="asset-library-results">
           <b>{filtered.length}</b> 个匹配结果
         </div>
@@ -478,6 +509,58 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
               pending={upload.isPending}
               onCancel={() => setUploadOpen(false)}
               onConfirm={() => upload.mutate()}
+            />
+          </aside>
+        </div>
+      )}
+      {douyinImportOpen && kind === "media" && (
+        <div className="asset-modal-layer" role="presentation" onMouseDown={() => setDouyinImportOpen(false)}>
+          <aside
+            className="asset-upload-modal douyin-import-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="douyin-import-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <ModalHeader eyebrow="ASSET / DOUYIN" title="从抖音导入视频" onClose={() => setDouyinImportOpen(false)} />
+            <p className="douyin-import-note">
+              仅支持公开的抖音分享链接。导入的视频将保存到当前文件夹，可在创作中重复使用。
+            </p>
+            <label>
+              抖音分享链接 <em>*</em>
+              <input
+                value={douyinUrl}
+                maxLength={2000}
+                onChange={(event) => setDouyinUrl(event.target.value)}
+                placeholder="https://v.douyin.com/..."
+              />
+            </label>
+            <label>
+              素材名称
+              <input
+                value={douyinName}
+                maxLength={80}
+                onChange={(event) => setDouyinName(event.target.value)}
+                placeholder="选填：便于识别的名称"
+              />
+            </label>
+            <label className="douyin-authorization">
+              <input
+                type="checkbox"
+                checked={douyinAuthorized}
+                onChange={(event) => setDouyinAuthorized(event.target.checked)}
+              />
+              <span>我确认拥有该视频的下载、保存和使用授权。</span>
+            </label>
+            <small className="douyin-import-limit">
+              仅导入 MP4 视频，单个文件最大 500MB。平台拒绝访问时会提示失败。
+            </small>
+            {douyinImport.error && <p className="asset-upload-error">{douyinImport.error.message}</p>}
+            <ModalFooter
+              disabled={!douyinUrl.trim() || !douyinAuthorized || douyinImport.isPending}
+              pending={douyinImport.isPending}
+              onCancel={() => setDouyinImportOpen(false)}
+              onConfirm={() => douyinImport.mutate()}
             />
           </aside>
         </div>
