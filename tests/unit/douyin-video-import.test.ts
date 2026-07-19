@@ -101,14 +101,14 @@ describe("Douyin video import persistence", () => {
     const row = accounts.db
       .query("SELECT owner_user_id, asset_kind, folder_id, byte_size, storage_key FROM media_assets WHERE id=?")
       .get(asset.id) as Record<string, unknown> | undefined;
-    expect(row).not.toBeNull();
-    expect(row!.owner_user_id).toBe(TEST_USER_ID);
-    expect(row!.asset_kind).toBe("media");
-    expect(row!.folder_id).toBe(TEST_FOLDER_ID);
-    expect(row!.byte_size).toBe(8);
+    if (!row) throw new Error("AC-003 persistence test: asset not found in media_assets after persistImportVideo");
+    expect(row.owner_user_id).toBe(TEST_USER_ID);
+    expect(row.asset_kind).toBe("media");
+    expect(row.folder_id).toBe(TEST_FOLDER_ID);
+    expect(row.byte_size).toBe(8);
 
     // File exists on disk
-    const storageKey = row!.storage_key as string;
+    const storageKey = row.storage_key as string;
     expect(storageKey).toStartWith("test/");
     expect(storageKey).toEndWith(".mp4");
     const file = Bun.file(resolve(TEST_DATA_DIR, "uploads", storageKey));
