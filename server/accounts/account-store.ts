@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import { APP_CONFIG } from "../../src/app/config";
+import { APP_CONFIG } from "../../web/app/config";
 import { env } from "../env";
 
 export interface UserSummary {

@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
+import { Worker } from "bullmq";
 import { extractAudio, extractFrame, generateSampleVideo, probeMedia } from "../server/media/ffmpeg";
 import { type SeedanceModelId, seedanceModelIds } from "../server/models/video-models";
 
@@ -20,8 +21,16 @@ await Bun.write(
   resolve(tempDir, "capabilities.json"),
   `${JSON.stringify({ ...capabilityReport, entries: (capabilityReport.entries ?? []).filter((entry) => entry.id.startsWith("aihubmix-seedance-")) }, null, 2)}\n`,
 );
-const [{ app, queue }, { env }] = await Promise.all([import("../server/app"), import("../server/env")]);
-queue.start();
+const [{ accounts, app, queue, store }, { env }, { JobProcessor }, { createWorkerRedisConnection }] = await Promise.all(
+  [import("../server/app"), import("../server/env"), import("../worker/job-processor"), import("../worker/redis")],
+);
+const processor = new JobProcessor(store, accounts);
+const workerRedis = createWorkerRedisConnection();
+const worker = new Worker<{ jobId: string }>(env.redisQueueName, (job) => processor.process(job.data.jobId), {
+  connection: workerRedis,
+  concurrency: 1,
+});
+await worker.waitUntilReady();
 
 const outputDir = resolve("artifacts/api-tests/seedance-multimodal");
 await mkdir(outputDir, { recursive: true });
@@ -165,6 +174,9 @@ try {
       );
     }
 } finally {
+  await worker.close();
+  await workerRedis.quit();
+  await queue.close();
   await rm(tempDir, { recursive: true, force: true });
 }
 

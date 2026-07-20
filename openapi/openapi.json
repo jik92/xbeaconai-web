@@ -648,7 +648,7 @@
                     "queue": {
                       "type": "string",
                       "enum": [
-                        "memory"
+                        "bullmq"
                       ]
                     }
                   },

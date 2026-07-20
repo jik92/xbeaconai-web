@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import type { ModuleId } from "../../src/entities/types";
+import type { ModuleId } from "../../web/entities/types";
 import { env } from "../env";
 import type { JobRecord, JobResult, JobStatus, StageProvenance } from "../types";
 

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { basename, resolve } from "node:path";
 import { extractCompressedAudio, probeMedia } from "../server/media/ffmpeg";
 import { analyzeVideoWithGemini, transcribeMediaWithAihubmix } from "../server/providers/gemini-video-analysis";
-import { buildVideoAnalysisPrompt } from "../src/features/video-remix/video-analysis-prompt";
+import { buildVideoAnalysisPrompt } from "../web/features/video-remix/video-analysis-prompt";
 
 const videoPath = resolve(process.argv[2] ?? "");
 if (!process.argv[2]) throw new Error("用法：bun scripts/test-video-analysis.ts <video-path> [model]");

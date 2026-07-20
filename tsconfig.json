@@ -15,8 +15,8 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "paths": { "@/*": ["./src/*"] },
+    "paths": { "@/*": ["./web/*"] },
     "types": ["bun-types"]
   },
-  "include": ["src", "server", "scripts", "tests", "vite.config.ts"]
+  "include": ["web", "server", "worker", "shared", "scripts", "tests", "vite.config.ts"]
 }

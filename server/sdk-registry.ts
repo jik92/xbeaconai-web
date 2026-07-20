@@ -172,7 +172,7 @@ export const sdkRegistry: SdkRegistryEntry[] = [
   },
   {
     id: "mock-multimodal",
-    implementationPath: "server/jobs/memory-job-queue.ts",
+    implementationPath: "worker/job-processor.ts",
     kind: "mock",
     capability: "fallback-all",
     provider: "yaozuo-mock",

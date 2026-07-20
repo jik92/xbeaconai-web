@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { buildVideoAnalysisPrompt } from "../../src/features/video-remix/video-analysis-prompt";
+import { buildVideoAnalysisPrompt } from "../../web/features/video-remix/video-analysis-prompt";
 
 describe("buildVideoAnalysisPrompt", () => {
   test("is deterministic and includes the full reverse-analysis contract", () => {

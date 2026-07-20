@@ -4,7 +4,7 @@ import { probeMedia } from "../server/media/ffmpeg";
 import { isSeedanceModelId, seedanceModelIds } from "../server/models/video-models";
 import { aihubmix } from "../server/providers/aihubmix";
 import { auditSdkRegistry } from "../server/sdk-registry";
-import { APP_CONFIG } from "../src/app/config";
+import { APP_CONFIG } from "../web/app/config";
 
 type Status = "verified" | "unauthorized" | "unsupported" | "failed";
 interface Evidence {

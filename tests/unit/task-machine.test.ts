@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { MockTask } from "../../src/entities/types";
-import { transitionTask } from "../../src/mocks/task-machine";
+import type { MockTask } from "../../web/entities/types";
+import { transitionTask } from "../../web/mocks/task-machine";
 
 function task(status: MockTask["status"] = "draft", progress = 0): MockTask {
   return {

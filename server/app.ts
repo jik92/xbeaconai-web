@@ -3,8 +3,8 @@ import { dirname, extname, resolve } from "node:path";
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
-import { APP_CONFIG, isModuleOpen } from "../src/app/config";
-import type { ModuleId } from "../src/entities/types";
+import { APP_CONFIG, isModuleOpen } from "../web/app/config";
+import type { ModuleId } from "../web/entities/types";
 import {
   AccountError,
   AccountStore,
@@ -15,7 +15,7 @@ import {
 import { authenticate, issueToken } from "./accounts/auth";
 import { creationCapabilities, quoteCreation, validateCreationValues } from "./creation/capabilities";
 import { env } from "./env";
-import { buildExecutionPlan, MemoryJobQueue } from "./jobs/memory-job-queue";
+import { BullJobQueue } from "./jobs/bull-job-queue";
 import { InsufficientCreditsError, SqliteJobStore } from "./jobs/sqlite-job-store";
 import { seedanceModelIds, videoModels } from "./models/video-models";
 import { auditSdkRegistry } from "./sdk-registry";
@@ -145,7 +145,7 @@ const DirectUploadInitSchema = z.object({
 
 export const store = new SqliteJobStore();
 export const accounts = new AccountStore();
-export const queue = new MemoryJobQueue(store, accounts);
+export const queue = new BullJobQueue();
 type AppEnv = { Variables: { userId: string; sessionId: string } };
 const app = new OpenAPIHono<AppEnv>();
 const publicApiPaths = new Set([
@@ -265,7 +265,7 @@ const healthRoute = createRoute({
             status: z.literal("ok"),
             mockFallback: z.boolean(),
             database: z.literal("sqlite"),
-            queue: z.literal("memory"),
+            queue: z.literal("bullmq"),
           }),
         },
       },
@@ -278,7 +278,7 @@ app.openapi(healthRoute, (c) =>
       status: "ok" as const,
       mockFallback: env.allowMockFallback,
       database: "sqlite" as const,
-      queue: "memory" as const,
+      queue: "bullmq" as const,
     },
     200,
   ),
@@ -361,7 +361,13 @@ app.openapi(registerRoute, async (c) => {
         ossutils.ensureDirectory(`${registration.user.id}/`),
         ossutils.ensureDirectory(materialFolder.storagePrefix),
       ]).catch((error) => console.error("Failed to initialize user TOS directories", error));
-    if (registration.claimedLegacy) queue.recoverOwned(registration.user.id);
+    if (registration.claimedLegacy)
+      await Promise.all(
+        store
+          .recoverable()
+          .filter((job) => job.ownerUserId === registration.user.id)
+          .map((job) => queue.enqueue(job.id)),
+      );
     return c.json(await issueToken(accounts, registration.user), 201);
   } catch (error) {
     if (error instanceof AccountError && error.status === 409)
@@ -1680,7 +1686,7 @@ app.post("/api/video-remix/project/generate", async (c) => {
     updatedAt: createdAt,
   };
   store.create(job);
-  queue.enqueue(id);
+  await queue.enqueue(id);
   return c.json(job, 202);
 });
 
@@ -1711,7 +1717,7 @@ const createJobRoute = createRoute({
     422: { description: "Invalid model or referenced asset", content: { "application/json": { schema: ErrorSchema } } },
   },
 });
-app.openapi(createJobRoute, (c) => {
+app.openapi(createJobRoute, async (c) => {
   const moduleId = c.req.valid("param").moduleId as ModuleId;
   if (!isModuleOpen(moduleId))
     return c.json(
@@ -1827,7 +1833,6 @@ app.openapi(createJobRoute, (c) => {
   }
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
-  const executionPlan: StageProvenance[] = buildExecutionPlan(moduleId, body.values, body.videoModel);
   const job: JobRecord = {
     id,
     ownerUserId,
@@ -1839,7 +1844,7 @@ app.openapi(createJobRoute, (c) => {
     overallExecutionMode: "mock",
     values: body.values,
     videoModel: body.videoModel,
-    executionPlan,
+    executionPlan: [],
     provenance: [],
     idempotencyKey,
     cancelRequested: false,
@@ -1867,7 +1872,7 @@ app.openapi(createJobRoute, (c) => {
       );
     throw error;
   }
-  queue.enqueue(id);
+  await queue.enqueue(id);
   return c.json(job, 202);
 });
 
@@ -1901,7 +1906,7 @@ const cancelRoute = createRoute({
     404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },
   },
 });
-app.openapi(cancelRoute, (c) => {
+app.openapi(cancelRoute, async (c) => {
   const id = c.req.valid("param").jobId;
   const job = store.getOwned(id, c.get("userId"));
   if (!job)
@@ -1909,9 +1914,12 @@ app.openapi(cancelRoute, (c) => {
       { error: { code: "NOT_FOUND", message: "任务不存在", retryable: false, requestId: crypto.randomUUID() } },
       404,
     );
-  if (job.status === "queued")
-    return c.json(store.update(id, { status: "cancelled", cancelRequested: true, stage: "已取消" })!, 200);
-  return c.json(store.update(id, { cancelRequested: true, stage: "正在取消" })!, 200);
+  if (job.status === "queued") {
+    const cancelled = store.update(id, { status: "cancelled", cancelRequested: true, stage: "已取消" }) ?? job;
+    await queue.remove(id).catch(() => undefined);
+    return c.json(cancelled, 200);
+  }
+  return c.json(store.update(id, { cancelRequested: true, stage: "正在取消" }) ?? job, 200);
 });
 
 const retryRoute = createRoute({
@@ -1926,7 +1934,7 @@ const retryRoute = createRoute({
     409: { description: "Retry blocked", content: { "application/json": { schema: ErrorSchema } } },
   },
 });
-app.openapi(retryRoute, (c) => {
+app.openapi(retryRoute, async (c) => {
   const source = store.getOwned(c.req.valid("param").jobId, c.get("userId"));
   if (!source)
     return c.json(
@@ -1996,7 +2004,7 @@ app.openapi(retryRoute, (c) => {
     updatedAt: now,
   };
   store.create(retry);
-  queue.enqueue(retry.id);
+  await queue.enqueue(retry.id);
   return c.json(retry, 202);
 });
 
@@ -2023,21 +2031,27 @@ app.openapi(eventsRoute, (c) => {
       eventId += 1;
       await stream.writeSSE({
         id: String(eventId),
-        event:
-          job.status === "succeeded" || job.status === "failed" || job.status === "cancelled"
-            ? "job.completed"
-            : "job.updated",
+        event: ["succeeded", "partially_succeeded", "failed", "cancelled"].includes(job.status)
+          ? "job.completed"
+          : "job.updated",
         data: JSON.stringify(job),
       });
     };
-    await send(store.get(id)!);
-    const unsubscribe = queue.subscribe(id, (job) => void send(job));
+    let latest = store.get(id);
+    if (!latest) return;
+    await send(latest);
     while (!stream.aborted) {
       const job = store.get(id);
       if (!job || ["succeeded", "partially_succeeded", "failed", "cancelled"].includes(job.status)) break;
-      await stream.sleep(1000);
+      await stream.sleep(500);
+      const next = store.get(id);
+      if (next && next.updatedAt !== latest.updatedAt) {
+        latest = next;
+        await send(next);
+      }
     }
-    unsubscribe();
+    const terminal = store.get(id);
+    if (terminal && terminal.updatedAt !== latest.updatedAt) await send(terminal);
   });
 });
 

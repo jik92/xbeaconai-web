@@ -1,4 +1,4 @@
-import type { ModuleId } from "../src/entities/types";
+import type { ModuleId } from "../web/entities/types";
 import type { SeedanceModelId } from "./models/video-models";
 
 export type JobStatus = "queued" | "processing" | "succeeded" | "partially_succeeded" | "failed" | "cancelled";

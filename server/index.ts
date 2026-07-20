@@ -1,9 +1,7 @@
 import { resolve, sep } from "node:path";
-import { APP_CONFIG } from "../src/app/config";
-import { app, queue } from "./app";
+import { APP_CONFIG } from "../web/app/config";
+import { app } from "./app";
 import { env } from "./env";
-
-queue.start();
 
 console.log(`${APP_CONFIG.projectName} API ready at http://${env.host}:${env.port}`);
 console.log(`OpenAPI: http://${env.host}:${env.port}/openapi.json`);
