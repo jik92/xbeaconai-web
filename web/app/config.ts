@@ -25,7 +25,7 @@ export const APP_CONFIG = {
     creationWorkflow: {
       "video-remix": true,
       "video-create": false,
-      "ad-script": false,
+      "ad-script": true,
     },
     aiToolbox: {
       "ai-generate": false,
