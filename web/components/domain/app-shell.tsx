@@ -2,13 +2,21 @@ import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import {
   AudioLines,
   Bell,
+  Check,
+  ChevronDown,
+  ChevronUp,
   CircleHelp,
   Coins,
+  Eye,
+  EyeOff,
   Files,
+  GripVertical,
   Images,
+  type LucideIcon,
   Package,
   PanelLeftClose,
   PanelLeftOpen,
+  RotateCcw,
   Search,
   Settings2,
 } from "lucide-react";
@@ -20,6 +28,60 @@ import { useAuth } from "@/features/account/auth-context";
 import { AuthScreen } from "@/features/account/auth-screen";
 import { type WorkspacePanel, WorkspacePanelDrawer } from "@/features/account/workspace-panels";
 import { BrandLogo } from "./brand-logo";
+import {
+  createDefaultSidebarMenuPreferences,
+  moveSidebarMenuItem,
+  normalizeSidebarMenuPreferences,
+  reorderSidebarMenuItem,
+  toggleSidebarMenuItem,
+} from "./sidebar-menu-preferences";
+
+const SIDEBAR_MENU_STORAGE_KEY = "yaozuo:sidebar-menu:v1";
+const SIDEBAR_GROUPS = ["创作工作流", "AI 工具箱", "资产"] as const;
+type SidebarGroup = (typeof SIDEBAR_GROUPS)[number];
+
+interface SidebarMenuItem {
+  id: string;
+  label: string;
+  path: string;
+  icon: LucideIcon;
+  badge?: string;
+  available: boolean;
+}
+
+const ASSET_MENU_ITEMS = [
+  { id: "materials", path: "/assets/materials", label: "素材库", icon: Files, badge: undefined },
+  { id: "portraits", path: "/assets/portraits", label: "人像库", icon: Images, badge: "1125" },
+  { id: "products", path: "/assets/products", label: "商品库", icon: Package, badge: undefined },
+  { id: "voices", path: "/assets/voices", label: "音色库", icon: AudioLines, badge: undefined },
+] as const;
+
+const sidebarMenuItems: Record<SidebarGroup, SidebarMenuItem[]> = {
+  创作工作流: modules
+    .filter((item) => item.group === "创作工作流")
+    .map((item) => ({ ...item, id: `module:${item.id}`, available: isModuleOpen(item.id) })),
+  "AI 工具箱": modules
+    .filter((item) => item.group === "AI 工具箱")
+    .map((item) => ({ ...item, id: `module:${item.id}`, available: isModuleOpen(item.id) })),
+  资产: ASSET_MENU_ITEMS.map((item) => ({
+    ...item,
+    id: `asset:${item.id}`,
+    available: isAssetOpen(item.id),
+  })),
+};
+
+const defaultSidebarMenuOrder = Object.fromEntries(
+  SIDEBAR_GROUPS.map((group) => [group, sidebarMenuItems[group].map((item) => item.id)]),
+) as Record<SidebarGroup, string[]>;
+
+function loadSidebarMenuPreferences() {
+  try {
+    const saved = window.localStorage.getItem(SIDEBAR_MENU_STORAGE_KEY);
+    return normalizeSidebarMenuPreferences(saved ? JSON.parse(saved) : undefined, defaultSidebarMenuOrder);
+  } catch {
+    return createDefaultSidebarMenuPreferences(defaultSidebarMenuOrder);
+  }
+}
 
 export function AppShell() {
   const path = useRouterState({ select: (s) => s.location.pathname });
@@ -28,7 +90,10 @@ export function AppShell() {
     [unread, setUnread] = useState(0),
     [sidebarCollapsed, setSidebarCollapsed] = useState(
       () => window.localStorage.getItem("sidebar-collapsed") === "true",
-    );
+    ),
+    [menuEditing, setMenuEditing] = useState(false),
+    [menuPreferences, setMenuPreferences] = useState(loadSidebarMenuPreferences);
+
   useEffect(() => {
     if (status !== "authenticated") setPanel(undefined);
   }, [status]);
@@ -44,7 +109,16 @@ export function AppShell() {
   }, [status]);
   useEffect(() => {
     window.localStorage.setItem("sidebar-collapsed", String(sidebarCollapsed));
+    if (sidebarCollapsed) setMenuEditing(false);
   }, [sidebarCollapsed]);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(SIDEBAR_MENU_STORAGE_KEY, JSON.stringify(menuPreferences));
+    } catch {
+      // The navigation remains usable if private browsing blocks local storage writes.
+    }
+  }, [menuPreferences]);
+
   if (status === "loading")
     return (
       <main className="auth-page">
@@ -55,6 +129,7 @@ export function AppShell() {
       </main>
     );
   if (status === "anonymous" || !user) return <AuthScreen />;
+
   return (
     <div className={`app-frame${sidebarCollapsed ? " sidebar-collapsed" : ""}`}>
       <header className="topbar">
@@ -70,99 +145,181 @@ export function AppShell() {
           <kbd>⌘ K</kbd>
         </div>
         <div className="top-actions">
-          <button className="credits" onClick={() => setPanel("recharge")}>
+          <button type="button" className="credits" onClick={() => setPanel("recharge")}>
             <Coins size={16} />
             <span>{user.credits.toLocaleString()}</span>
             <b>充值</b>
           </button>
-          <button aria-label="帮助" onClick={() => setPanel("help")}>
+          <button type="button" aria-label="帮助" onClick={() => setPanel("help")}>
             <CircleHelp />
           </button>
-          <button aria-label="通知" className={unread ? "has-dot" : ""} onClick={() => setPanel("notifications")}>
+          <button
+            type="button"
+            aria-label="通知"
+            className={unread ? "has-dot" : ""}
+            onClick={() => setPanel("notifications")}
+          >
             <Bell />
           </button>
-          <button className="avatar" aria-label="个人账号" onClick={() => setPanel("account")}>
+          <button type="button" className="avatar" aria-label="个人账号" onClick={() => setPanel("account")}>
             {user.avatarText}
           </button>
         </div>
       </header>
-      <aside className="sidebar">
-        <button
-          type="button"
-          className="collapse"
-          aria-label={sidebarCollapsed ? "展开导航" : "收起导航"}
-          aria-expanded={!sidebarCollapsed}
-          title={sidebarCollapsed ? "展开导航" : "收起导航"}
-          onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
-        >
-          {sidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-          <span>{sidebarCollapsed ? "展开导航" : "收起导航"}</span>
-        </button>
-        {(["创作工作流", "AI 工具箱"] as const).map((group) => (
-          <nav key={group}>
-            <h3>{group}</h3>
-            {modules
-              .filter((m) => m.group === group)
-              .map((m) =>
-                isModuleOpen(m.id) ? (
-                  <Link
-                    key={m.id}
-                    to={m.path}
-                    aria-label={m.label}
-                    title={sidebarCollapsed ? m.label : undefined}
-                    className={path === m.path ? "active" : ""}
-                  >
-                    <m.icon />
-                    <span>{m.label}</span>
-                    {m.id === "video-remix" && <i>HOT</i>}
-                  </Link>
-                ) : (
-                  <div
-                    key={m.id}
-                    className="sidebar-coming-soon"
-                    aria-label={`${m.label} Coming Soon`}
-                    aria-disabled="true"
-                    title={sidebarCollapsed ? `${m.label}（即将上线）` : "等待产品验收"}
-                  >
-                    <m.icon />
-                    <span>{m.label}</span>
-                    <i>Coming Soon</i>
-                  </div>
-                ),
-              )}
-          </nav>
-        ))}
-        <nav>
-          <h3>资产</h3>
-          {(
-            [
-              { id: "materials", path: "/assets/materials", label: "素材库", icon: Files, badge: undefined },
-              { id: "portraits", path: "/assets/portraits", label: "人像库", icon: Images, badge: "1125" },
-              { id: "products", path: "/assets/products", label: "商品库", icon: Package, badge: undefined },
-              { id: "voices", path: "/assets/voices", label: "音色库", icon: AudioLines, badge: undefined },
-            ] as const
-          ).map((asset) =>
-            isAssetOpen(asset.id) ? (
-              <Link
-                key={asset.id}
-                to={asset.path}
-                aria-label={asset.label}
-                title={sidebarCollapsed ? asset.label : undefined}
-                className={path === asset.path ? "active" : ""}
+      <aside
+        className="sidebar navigation-drawer"
+        aria-label="主导航抽屉"
+        data-display-mode={sidebarCollapsed ? "icon-tooltip" : "icon-title"}
+      >
+        <div className="sidebar-navigation">
+          {SIDEBAR_GROUPS.map((group) => {
+            const groupItems = menuPreferences.order[group]
+              .map((itemId) => sidebarMenuItems[group].find((item) => item.id === itemId))
+              .filter((item): item is SidebarMenuItem => Boolean(item));
+            return (
+              <nav key={group} aria-label={group}>
+                <h3>{group}</h3>
+                {groupItems.map((item, index) => {
+                  const hidden = menuPreferences.hidden.includes(item.id);
+                  if (hidden && !menuEditing) return null;
+                  if (menuEditing)
+                    return (
+                      <fieldset
+                        key={item.id}
+                        aria-label={`编辑${item.label}`}
+                        className={`sidebar-edit-item${hidden ? " hidden-item" : ""}`}
+                        draggable
+                        onDragStart={(event) => {
+                          event.dataTransfer.effectAllowed = "move";
+                          event.dataTransfer.setData("text/plain", item.id);
+                        }}
+                        onDragOver={(event) => {
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = "move";
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          const draggedId = event.dataTransfer.getData("text/plain");
+                          setMenuPreferences((current) => reorderSidebarMenuItem(current, group, draggedId, item.id));
+                        }}
+                      >
+                        <GripVertical className="menu-drag-handle" aria-hidden="true" />
+                        <item.icon />
+                        <span>{item.label}</span>
+                        <div className="menu-item-actions">
+                          <button
+                            type="button"
+                            aria-label={`上移${item.label}`}
+                            title="上移"
+                            disabled={index === 0}
+                            onClick={() =>
+                              setMenuPreferences((current) => moveSidebarMenuItem(current, group, item.id, -1))
+                            }
+                          >
+                            <ChevronUp />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`下移${item.label}`}
+                            title="下移"
+                            disabled={index === groupItems.length - 1}
+                            onClick={() =>
+                              setMenuPreferences((current) => moveSidebarMenuItem(current, group, item.id, 1))
+                            }
+                          >
+                            <ChevronDown />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`${hidden ? "显示" : "隐藏"}${item.label}`}
+                            title={hidden ? "显示菜单" : "隐藏菜单"}
+                            onClick={() => setMenuPreferences((current) => toggleSidebarMenuItem(current, item.id))}
+                          >
+                            {hidden ? <EyeOff /> : <Eye />}
+                          </button>
+                        </div>
+                      </fieldset>
+                    );
+                  return item.available ? (
+                    <Link
+                      key={item.id}
+                      to={item.path}
+                      aria-label={item.label}
+                      title={sidebarCollapsed ? item.label : undefined}
+                      className={path === item.path ? "active" : ""}
+                    >
+                      <item.icon />
+                      <span>{item.label}</span>
+                      {item.id === "module:video-remix" && <i>HOT</i>}
+                      {item.badge && <i>{item.badge}</i>}
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      key={item.id}
+                      className="sidebar-coming-soon"
+                      aria-label={`${item.label} Coming Soon`}
+                      aria-disabled="true"
+                      title={sidebarCollapsed ? `${item.label}（即将上线）` : "等待产品验收"}
+                    >
+                      <item.icon />
+                      <span>{item.label}</span>
+                      <i>Coming Soon</i>
+                    </button>
+                  );
+                })}
+              </nav>
+            );
+          })}
+        </div>
+        <footer className="sidebar-footer">
+          {menuEditing && (
+            <div className="menu-edit-hint">
+              <span>拖拽或使用箭头调整分组内顺序</span>
+              <button
+                type="button"
+                onClick={() => setMenuPreferences(createDefaultSidebarMenuPreferences(defaultSidebarMenuOrder))}
               >
-                <asset.icon />
-                <span>{asset.label}</span>
-                {asset.badge && <i>{asset.badge}</i>}
-              </Link>
-            ) : (
-              <div key={asset.id} className="sidebar-coming-soon" aria-disabled="true" title="等待产品验收">
-                <asset.icon />
-                <span>{asset.label}</span>
-                <i>Coming Soon</i>
-              </div>
-            ),
+                <RotateCcw size={13} />
+                恢复默认
+              </button>
+            </div>
           )}
-        </nav>
+          <div className="sidebar-footer-actions">
+            <button
+              type="button"
+              className={`menu-edit-toggle${menuEditing ? " active" : ""}`}
+              aria-label={menuEditing ? "完成菜单编辑" : "编辑菜单"}
+              aria-pressed={menuEditing}
+              title={sidebarCollapsed ? "编辑菜单" : undefined}
+              onClick={() => {
+                if (sidebarCollapsed) {
+                  setSidebarCollapsed(false);
+                  setMenuEditing(true);
+                  return;
+                }
+                setMenuEditing((editing) => !editing);
+              }}
+            >
+              {menuEditing ? <Check size={16} /> : <Settings2 size={16} />}
+              <span>{menuEditing ? "完成" : "编辑菜单"}</span>
+            </button>
+            <button
+              type="button"
+              className="collapse"
+              aria-label={sidebarCollapsed ? "展开导航，显示图标和标题" : "收起导航，仅显示图标"}
+              aria-expanded={!sidebarCollapsed}
+              title={sidebarCollapsed ? "展开导航" : undefined}
+              onClick={() => {
+                if (!sidebarCollapsed) setMenuEditing(false);
+                setSidebarCollapsed((collapsed) => !collapsed);
+              }}
+            >
+              {sidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+              <span>{sidebarCollapsed ? "展开导航" : "收起导航"}</span>
+            </button>
+          </div>
+        </footer>
       </aside>
       <main className="content">
         <Outlet />

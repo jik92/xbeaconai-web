@@ -221,24 +221,97 @@ select:focus-visible {
   position: sticky;
   top: 56px;
   height: calc(100vh - 56px);
-  overflow: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
 }
 .collapse {
-  height: 30px;
+  width: 100%;
+  height: 34px;
+  min-width: 34px;
+  flex: none;
+  padding: 0 10px;
   border: 0;
   background: #f7f9fb;
   color: #7a8496;
   border-radius: 6px;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 7px;
   font-size: 12px;
 }
 .collapse svg {
   flex: none;
+}
+.menu-edit-toggle {
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  background: white;
+  color: #667085;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.menu-edit-toggle:hover,
+.menu-edit-toggle.active {
+  color: var(--primary);
+  border-color: #bfd0fa;
+  background: var(--primary-soft);
+}
+.menu-edit-hint {
+  margin: 0 0 8px;
+  padding: 8px;
+  border: 1px solid #dce5f5;
+  border-radius: 7px;
+  background: #f7f9fd;
+  color: #7a8496;
+  font-size: 10px;
+  line-height: 1.45;
+}
+.menu-edit-hint span {
+  display: block;
+}
+.menu-edit-hint button {
+  margin-top: 5px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #53637d;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+}
+.sidebar-navigation {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  scrollbar-width: thin;
+}
+.sidebar-footer {
+  flex: none;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  background: white;
+}
+.sidebar-footer-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 .sidebar nav h3 {
   font-size: 11px;
@@ -285,6 +358,75 @@ select:focus-visible {
   border-radius: 3px;
   margin-left: auto;
 }
+.sidebar-edit-item {
+  min-inline-size: 0;
+  height: 36px;
+  margin: 2px 0;
+  padding: 0 4px;
+  color: #5d6779;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  cursor: grab;
+}
+.sidebar-edit-item:hover {
+  border-color: var(--border);
+  background: #f8fafc;
+}
+.sidebar-edit-item:active {
+  cursor: grabbing;
+}
+.sidebar-edit-item.hidden-item {
+  color: #a4acb9;
+  background: #fafbfc;
+}
+.sidebar-edit-item > svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+.sidebar-edit-item .menu-drag-handle {
+  width: 12px;
+  color: #a7afbc;
+}
+.sidebar-edit-item > span {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.menu-item-actions {
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+.menu-item-actions button {
+  width: 19px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #7a8496;
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+}
+.menu-item-actions button:hover:not(:disabled) {
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+.menu-item-actions button:disabled {
+  color: #d4d9e1;
+  cursor: not-allowed;
+}
+.menu-item-actions svg {
+  width: 13px;
+  height: 13px;
+}
 .sidebar-foot {
   margin-top: auto;
   padding-top: 12px;
@@ -314,8 +456,10 @@ select:focus-visible {
 }
 .sidebar-collapsed .collapse {
   width: 100%;
+  flex: none;
 }
 .sidebar-collapsed .collapse span,
+.sidebar-collapsed .sidebar-footer span,
 .sidebar-collapsed .sidebar nav h3,
 .sidebar-collapsed .sidebar nav a span,
 .sidebar-collapsed .sidebar nav a i,
@@ -326,6 +470,7 @@ select:focus-visible {
 }
 .sidebar-collapsed .sidebar nav a,
 .sidebar-collapsed .sidebar-coming-soon,
+.sidebar-collapsed .sidebar-footer button,
 .sidebar-collapsed .sidebar-foot button {
   justify-content: center;
   padding-inline: 0;
@@ -1511,9 +1656,11 @@ td small {
   color: #5e697c;
 }
 .sidebar-coming-soon {
+  width: 100%;
   height: 36px;
   margin: 2px 0;
   padding: 0 10px;
+  border: 0;
   color: #a1a8b3;
   border-radius: 7px;
   display: flex;
