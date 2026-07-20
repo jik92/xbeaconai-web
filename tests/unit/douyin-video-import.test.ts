@@ -7,6 +7,7 @@ import {
   DouyinImportError,
   parseDouyinShareUrl,
   persistImportVideo,
+  validateFullResponse,
 } from "../../server/imports/douyin-video";
 
 const TEST_DATA_DIR = resolve(import.meta.dirname ?? ".", ".tmp-douyin-test");
@@ -92,6 +93,76 @@ describe("Douyin share text parsing", () => {
     const text = "请看 https://example.com/other 和 https://v.douyin.com/main456/?x=1 对比";
     const url = parseDouyinShareUrl(text);
     expect(url.href).toBe("https://v.douyin.com/main456/?x=1");
+  });
+});
+
+describe("Full response validation", () => {
+  const mp4Headers = { "content-type": "video/mp4", "content-length": "1024" };
+
+  test("accepts a complete 200 MP4 response with matching length", () => {
+    expect(() => validateFullResponse({ status: 200, headers: mp4Headers, byteLength: 1024 })).not.toThrow();
+  });
+
+  test("rejects a 206 partial content response", () => {
+    expect(() => validateFullResponse({ status: 206, headers: mp4Headers, byteLength: 1024 })).toThrow(
+      "平台返回了部分视频内容（206）",
+    );
+  });
+
+  test("rejects a response with Content-Range header", () => {
+    expect(() =>
+      validateFullResponse({
+        status: 200,
+        headers: { ...mp4Headers, "content-range": "bytes 0-511/1024" },
+        byteLength: 512,
+      }),
+    ).toThrow("平台返回了分段视频内容（Content-Range）");
+  });
+
+  test("rejects a response without content-length", () => {
+    expect(() =>
+      validateFullResponse({
+        status: 200,
+        headers: { "content-type": "video/mp4" },
+        byteLength: 1024,
+      }),
+    ).toThrow("无法确认视频大小");
+  });
+
+  test("rejects non-MP4 content type", () => {
+    expect(() =>
+      validateFullResponse({
+        status: 200,
+        headers: { "content-type": "application/octet-stream", "content-length": "1024" },
+        byteLength: 1024,
+      }),
+    ).toThrow("仅支持导入 MP4 视频");
+  });
+
+  test("rejects content-length exceeding 500MB", () => {
+    expect(() =>
+      validateFullResponse({
+        status: 200,
+        headers: { "content-type": "video/mp4", "content-length": "524288001" },
+        byteLength: 8,
+      }),
+    ).toThrow("视频超过 500MB");
+  });
+
+  test("rejects zero-length body", () => {
+    expect(() => validateFullResponse({ status: 200, headers: mp4Headers, byteLength: 0 })).toThrow(
+      "未获取到有效视频内容",
+    );
+  });
+
+  test("rejects byte length exceeding 500MB regardless of declared length", () => {
+    expect(() =>
+      validateFullResponse({
+        status: 200,
+        headers: { "content-type": "video/mp4", "content-length": "1024" },
+        byteLength: 500 * 1024 * 1024 + 1,
+      }),
+    ).toThrow("视频超过 500MB");
   });
 });
 

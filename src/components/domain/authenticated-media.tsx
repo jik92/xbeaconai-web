@@ -13,19 +13,43 @@ export function AuthenticatedMedia({
   autoPlay?: boolean;
 }) {
   const [source, setSource] = useState<string>();
+  const [error, setError] = useState(false);
+
   useEffect(() => {
-    let active = true,
-      current: string | undefined;
-    void authenticatedBlobUrl(url).then((value) => {
-      current = value;
-      if (active) setSource(value);
-      else URL.revokeObjectURL(value);
-    });
+    let active = true;
+    let current: string | undefined;
+    setError(false);
+    setSource(undefined);
+    void authenticatedBlobUrl(url)
+      .then((value) => {
+        current = value;
+        if (active) setSource(value);
+        else URL.revokeObjectURL(value);
+      })
+      .catch(() => {
+        if (active) setError(true);
+      });
     return () => {
       active = false;
       if (current) URL.revokeObjectURL(current);
     };
   }, [url]);
+
+  if (error)
+    return (
+      <span className="authenticated-media-error">
+        无法载入预览。
+        <button
+          type="button"
+          onClick={() => {
+            setError(false);
+            setSource(undefined);
+          }}
+        >
+          重试
+        </button>
+      </span>
+    );
   if (!source) return <span>正在载入结果预览…</span>;
   if (mimeType.startsWith("video/")) return <video controls autoPlay={autoPlay} src={source} />;
   if (mimeType.startsWith("audio/")) return <audio controls autoPlay={autoPlay} src={source} />;

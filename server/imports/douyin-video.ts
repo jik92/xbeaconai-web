@@ -130,6 +130,26 @@ function isCandidateVideo(url: string, contentType: string) {
   }
 }
 
+export function validateFullResponse(details: {
+  status: number;
+  headers: Record<string, string>;
+  byteLength: number;
+}): void {
+  if (details.status === 206)
+    throw new DouyinImportError("VIDEO_PARTIAL", "平台返回了部分视频内容（206），无法完整导入", 422);
+  if (details.headers["content-range"])
+    throw new DouyinImportError("VIDEO_PARTIAL", "平台返回了分段视频内容（Content-Range），无法完整导入", 422);
+  if (!details.headers["content-type"]?.toLowerCase().startsWith("video/mp4"))
+    throw new DouyinImportError("UNSUPPORTED_MEDIA_TYPE", "仅支持导入 MP4 视频", 415);
+  const declaredLength = Number(details.headers["content-length"] ?? "");
+  if (!Number.isSafeInteger(declaredLength) || declaredLength < 1)
+    throw new DouyinImportError("VIDEO_SIZE_UNAVAILABLE", "无法确认视频大小，无法安全导入", 422);
+  if (declaredLength > MAX_VIDEO_BYTES) throw new DouyinImportError("VIDEO_TOO_LARGE", "视频超过 500MB，无法导入", 413);
+  if (!details.byteLength) throw new DouyinImportError("EMPTY_VIDEO", "未获取到有效视频内容", 422);
+  if (details.byteLength > MAX_VIDEO_BYTES)
+    throw new DouyinImportError("VIDEO_TOO_LARGE", "视频超过 500MB，无法导入", 413);
+}
+
 export async function resolveDouyinVideo(shareUrl: string): Promise<ResolvedDouyinVideo> {
   const source = parseDouyinShareUrl(shareUrl);
   let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
@@ -139,7 +159,19 @@ export async function resolveDouyinVideo(shareUrl: string): Promise<ResolvedDouy
     await context.route("**/*", (route) => {
       try {
         const url = new URL(route.request().url());
-        if (url.protocol === "https:" && isAllowedNetworkHost(url.hostname)) return route.continue();
+        if (url.protocol === "https:" && isAllowedNetworkHost(url.hostname)) {
+          if (isVideoCdnHost(url.hostname))
+            return route.continue({
+              headers: (() => {
+                const h: Record<string, string> = {};
+                for (const [k, v] of Object.entries(route.request().headers())) {
+                  if (k.toLowerCase() !== "range") h[k] = v;
+                }
+                return h;
+              })(),
+            });
+          return route.continue();
+        }
       } catch {
         /* Abort malformed URLs below. */
       }
@@ -147,7 +179,8 @@ export async function resolveDouyinVideo(shareUrl: string): Promise<ResolvedDouy
     });
     const page = await context.newPage();
     const videoResponse = page.waitForResponse(
-      (response) => isCandidateVideo(response.url(), response.headers()["content-type"] ?? ""),
+      (response) =>
+        response.status() === 200 && isCandidateVideo(response.url(), response.headers()["content-type"] ?? ""),
       { timeout: 20_000 },
     );
     await page.goto(source.href, { waitUntil: "domcontentloaded", timeout: 20_000 });
@@ -162,15 +195,12 @@ export async function resolveDouyinVideo(shareUrl: string): Promise<ResolvedDouy
           .catch(() => undefined),
     );
     const response = await videoResponse;
-    const declaredLength = Number(response.headers()["content-length"] ?? "");
-    if (!Number.isSafeInteger(declaredLength) || declaredLength < 1)
-      throw new DouyinImportError("VIDEO_SIZE_UNAVAILABLE", "无法确认视频大小，无法安全导入", 422);
-    if (declaredLength > MAX_VIDEO_BYTES)
-      throw new DouyinImportError("VIDEO_TOO_LARGE", "视频超过 500MB，无法导入", 413);
     const bytes = await response.body();
-    if (!bytes.byteLength) throw new DouyinImportError("EMPTY_VIDEO", "未获取到有效视频内容", 422);
-    if (bytes.byteLength > MAX_VIDEO_BYTES)
-      throw new DouyinImportError("VIDEO_TOO_LARGE", "视频超过 500MB，无法导入", 413);
+    validateFullResponse({
+      status: response.status(),
+      headers: response.headers(),
+      byteLength: bytes.byteLength,
+    });
     return { bytes, mimeType: "video/mp4", sourceUrl: response.url() };
   } catch (error) {
     if (error instanceof DouyinImportError) throw error;
