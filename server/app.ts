@@ -930,9 +930,10 @@ app.openapi(directUploadInitRoute, async (c) => {
       },
       415,
     );
+  const userId = c.get("userId");
   const folder = body.folderId
-    ? accounts.getAssetFolder(c.get("userId"), body.folderId)
-    : accounts.ensureDefaultAssetFolder(c.get("userId"));
+    ? accounts.getAssetFolder(userId, body.folderId)
+    : accounts.getAssetFolder(userId, accounts.getDefaultAssetFolderId(userId));
   if (!folder)
     return c.json(
       {
@@ -1207,11 +1208,12 @@ app.openapi(uploadRoute, async (c) => {
     extname(file.name)
       .replace(/[^.a-zA-Z0-9]/g, "")
       .slice(0, 10);
+  const userId = c.get("userId");
   const folder =
     kind.data === "media"
       ? typeof rawFolderId === "string" && rawFolderId
-        ? accounts.getAssetFolder(c.get("userId"), rawFolderId)
-        : accounts.ensureDefaultAssetFolder(c.get("userId"))
+        ? accounts.getAssetFolder(userId, rawFolderId)
+        : accounts.getAssetFolder(userId, accounts.getDefaultAssetFolderId(userId))
       : undefined;
   if (kind.data === "media" && !folder)
     return c.json(
@@ -1374,18 +1376,38 @@ app.openapi(assetListRoute, (c) => {
   return c.json({ assets }, 200);
 });
 
-const folderResponse = (folder: ReturnType<AccountStore["ensureDefaultAssetFolder"]>) => ({
+const folderResponse = (folder: ReturnType<AccountStore["ensureDefaultAssetFolder"]>, defaultFolderId?: string) => ({
   id: folder.id,
   parentId: folder.parentId,
   name: folder.name,
   storagePrefix: folder.storagePrefix,
   createdAt: folder.createdAt,
   updatedAt: folder.updatedAt,
+  isDefault: folder.id === defaultFolderId,
 });
 
-app.get("/api/asset-folders", (c) =>
-  c.json({ folders: accounts.listAssetFolders(c.get("userId")).map(folderResponse) }, 200),
-);
+app.get("/api/asset-folders", (c) => {
+  const userId = c.get("userId");
+  const defaultFolderId = accounts.getDefaultAssetFolderId(userId);
+  return c.json(
+    { folders: accounts.listAssetFolders(userId).map((folder) => folderResponse(folder, defaultFolderId)) },
+    200,
+  );
+});
+
+app.put("/api/asset-folders/:folderId/default", (c) => {
+  try {
+    const folder = accounts.setDefaultAssetFolder(c.get("userId"), c.req.param("folderId"));
+    return c.json({ folder: folderResponse(folder, folder.id) }, 200);
+  } catch (error) {
+    if (error instanceof AccountError)
+      return c.json(
+        { error: { code: error.code, message: error.message, retryable: false, requestId: crypto.randomUUID() } },
+        error.status,
+      );
+    throw error;
+  }
+});
 
 app.post("/api/asset-folders", async (c) => {
   try {
@@ -1733,6 +1755,24 @@ app.openapi(createJobRoute, async (c) => {
     );
   const body = c.req.valid("json");
   const ownerUserId = c.get("userId");
+  const jobValues = { ...body.values };
+  if (moduleId === "video-cut") {
+    const outputFolderId = jobValues.outputFolderId || accounts.getDefaultAssetFolderId(ownerUserId);
+    if (!accounts.getAssetFolder(ownerUserId, outputFolderId))
+      return c.json(
+        {
+          error: {
+            code: "OUTPUT_FOLDER_NOT_FOUND",
+            message: "保存文件夹不存在或不属于当前账号",
+            retryable: false,
+            requestId: crypto.randomUUID(),
+          },
+        },
+        422,
+      );
+    jobValues.outputFolderId = outputFolderId;
+    jobValues.saveLocation = outputFolderId;
+  }
   const needsVideoModel = moduleId === "video-remix" || (moduleId === "ai-generate" && body.values.type === "视频");
   let creationQuote = 0;
   if (moduleId === "ai-generate" && body.values.creationKind) {
@@ -1813,7 +1853,7 @@ app.openapi(createJobRoute, async (c) => {
       },
       422,
     );
-  const unavailableAsset = referencedAssetIds(body.values).find((id) => !accounts.ownsAsset(ownerUserId, id));
+  const unavailableAsset = referencedAssetIds(jobValues).find((id) => !accounts.ownsAsset(ownerUserId, id));
   if (unavailableAsset)
     return c.json(
       {
@@ -1842,7 +1882,7 @@ app.openapi(createJobRoute, async (c) => {
     progress: 0,
     stage: "排队中",
     overallExecutionMode: "mock",
-    values: body.values,
+    values: jobValues,
     videoModel: body.videoModel,
     executionPlan: [],
     provenance: [],

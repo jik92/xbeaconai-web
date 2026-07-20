@@ -92,6 +92,7 @@ export interface AssetFolder {
   storagePrefix: string;
   createdAt: string;
   updatedAt: string;
+  isDefault?: boolean;
 }
 export interface LibraryProduct {
   id: string;

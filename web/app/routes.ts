@@ -253,8 +253,6 @@ export const modules: ModuleConfig[] = [
         label: "保存位置",
         kind: "select",
         required: true,
-        options: ["默认", "视频素材", "我的项目"],
-        defaultValue: "默认",
       },
       { id: "source", label: "选择视频", kind: "video", required: true },
     ],

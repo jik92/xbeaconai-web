@@ -24,10 +24,14 @@ describe("asset folder mapping", () => {
     const [defaultFolder] = store.listAssetFolders(user.id);
     expect(defaultFolder.name).toBe("默认");
     expect(defaultFolder.storagePrefix).toBe(`${user.id}/materials/${defaultFolder.id}/`);
+    expect(store.getDefaultAssetFolderId(user.id)).toBe(defaultFolder.id);
 
     const child = store.createAssetFolder(user.id, "广告素材", defaultFolder.id);
     expect(child.parentId).toBe(defaultFolder.id);
     expect(child.storagePrefix).toBe(`${defaultFolder.storagePrefix}${child.id}/`);
+    expect(store.setDefaultAssetFolder(user.id, child.id).id).toBe(child.id);
+    expect(store.getDefaultAssetFolderId(user.id)).toBe(child.id);
+    expect(() => store.deleteAssetFolder(user.id, child.id)).toThrowError(/其他文件夹设为默认/);
 
     store.createAsset({
       id: crypto.randomUUID(),
@@ -47,6 +51,7 @@ describe("asset folder mapping", () => {
     expect(store.listAssets(user.id, "media", child.id)).toMatchObject([
       { width: 1080, height: 1920, durationSec: 15 },
     ]);
+    store.setDefaultAssetFolder(user.id, defaultFolder.id);
     expect(() => store.deleteAssetFolder(user.id, child.id)).toThrow(AccountError);
     store.db.close();
   });

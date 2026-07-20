@@ -278,6 +278,18 @@ export async function createAssetFolder(name: string, parentId?: string) {
   if (!response.ok || !data?.folder) throw new Error(data?.error?.message || "文件夹创建失败");
   return data.folder;
 }
+export async function setDefaultAssetFolder(folderId: string) {
+  const response = await fetch(apiUrl(`/api/asset-folders/${folderId}/default`), {
+    method: "PUT",
+    headers: authHeaders(),
+  });
+  const data = (await response.json().catch(() => null)) as {
+    folder?: AssetFolder;
+    error?: { message?: string };
+  } | null;
+  if (!response.ok || !data?.folder) throw new Error(data?.error?.message || "默认文件夹设置失败");
+  return data.folder;
+}
 export async function renameAssetFolder(folderId: string, name: string) {
   const response = await fetch(apiUrl(`/api/asset-folders/${folderId}`), {
     method: "PATCH",

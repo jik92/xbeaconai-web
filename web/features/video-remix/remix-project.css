@@ -685,7 +685,7 @@
   gap: 9px;
 }
 .stage-actions button,
-.result-actions button,
+.remix-project .result-actions button,
 .compose-preview footer button {
   height: 36px;
   padding: 0 16px;
@@ -823,14 +823,14 @@
   object-fit: cover;
   background: radial-gradient(circle, #9c7651 0 30%, #51351f 31% 60%, #a47a4c 61%);
 }
-.result-meta {
+.remix-project .result-meta {
   position: absolute;
   right: 0;
   top: 116px;
   display: flex;
   gap: 5px;
 }
-.result-meta i {
+.remix-project .result-meta i {
   font-style: normal;
   color: #3b94e9;
   background: #eaf6ff;
@@ -853,7 +853,7 @@
     13px / 1.6 "PingFang SC",
     sans-serif;
 }
-.result-actions {
+.remix-project .result-actions {
   height: 50px;
   display: flex;
   align-items: flex-end;

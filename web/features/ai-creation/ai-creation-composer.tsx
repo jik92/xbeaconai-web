@@ -844,7 +844,7 @@ export function AiCreationComposer() {
               <b>{selectedTask.title}</b>
               <p>{selectedTask.result?.summary ?? "结果已生成，可继续追问或创建变体。"}</p>
             </div>
-            <div className="result-actions">
+            <div className="tool-result-actions">
               {["继续追问", "创建变体", "收藏作品", "下载"].map((action, index) => (
                 <button key={action} className={index === 0 ? "primary" : ""} onClick={() => void resultAction(action)}>
                   {action}

@@ -25,17 +25,19 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   downloadAuthenticated,
+  fetchAssetFolders,
   fetchJob,
   fetchJobs,
   fetchModels,
   requestCancel,
   requestRetry,
+  setDefaultAssetFolder,
   submitJob,
   watchJob,
 } from "@/api/api-client";
 import type { Job, ModuleId, SeedanceModelId } from "@/api/generated/types.gen";
 import type { FieldSpec, ModuleConfig } from "@/app/routes";
-import type { ApiJobResult } from "@/entities/types";
+import type { ApiJobResult, AssetFolder } from "@/entities/types";
 import { db } from "@/lib/db";
 import { AttachmentPicker } from "./attachment-picker";
 import { AuthenticatedMedia } from "./authenticated-media";
@@ -325,6 +327,9 @@ function ToolboxCreatorForm({
   submitted,
   running,
   hydrated,
+  assetFolders,
+  foldersLoading,
+  onSetDefaultFolder,
   onCancel,
   onSubmit,
 }: {
@@ -334,6 +339,9 @@ function ToolboxCreatorForm({
   submitted: boolean;
   running: boolean;
   hydrated: boolean;
+  assetFolders: AssetFolder[];
+  foldersLoading: boolean;
+  onSetDefaultFolder: (folderId: string) => Promise<void>;
   onCancel: () => void;
   onSubmit: () => void;
 }) {
@@ -382,6 +390,18 @@ function ToolboxCreatorForm({
     />
   );
   const invalid = (id: string) => submitted && field(id).required && !values[id];
+  const orderedFolders = useMemo(() => {
+    const result: Array<{ folder: AssetFolder; depth: number }> = [];
+    const append = (parentId: string | undefined, depth: number) => {
+      for (const folder of assetFolders.filter((item) => item.parentId === parentId)) {
+        result.push({ folder, depth });
+        append(folder.id, depth + 1);
+      }
+    };
+    append(undefined, 0);
+    return result;
+  }, [assetFolders]);
+  const selectedFolder = assetFolders.find((folder) => folder.id === values.saveLocation);
   let content: React.ReactNode;
 
   if (config.id === "video-cut") {
@@ -399,9 +419,22 @@ function ToolboxCreatorForm({
         </div>
         <div className={`tool-form-row save-location ${invalid("saveLocation") ? "invalid" : ""}`}>
           {requiredLabel("保存位置", true)}
-          {select("saveLocation")}
-          <button type="button" onClick={() => setValue("saveLocation", values.saveLocation || "默认")}>
-            设为默认
+          <select value={values.saveLocation ?? ""} onChange={(event) => setValue("saveLocation", event.target.value)}>
+            <option value="" disabled>
+              {foldersLoading ? "正在加载我的文件夹…" : "请选择我的文件夹"}
+            </option>
+            {orderedFolders.map(({ folder, depth }) => (
+              <option key={folder.id} value={folder.id}>
+                {`${"　".repeat(depth)}${folder.name}${folder.isDefault ? "（默认）" : ""}`}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            disabled={!selectedFolder || selectedFolder.isDefault}
+            onClick={() => selectedFolder && void onSetDefaultFolder(selectedFolder.id)}
+          >
+            {selectedFolder?.isDefault ? "当前默认" : "设为默认"}
           </button>
         </div>
         <div className={`tool-form-row upload-row ${invalid("source") ? "invalid" : ""}`}>
@@ -773,10 +806,38 @@ function TaskTable({
   );
 }
 
+export function resultMediaArtifacts(result: ApiJobResult | undefined) {
+  return result?.artifacts.filter((artifact) => /^(video|audio|image)\//.test(artifact.mimeType)) ?? [];
+}
+
 function ResultPreview({ task, config }: { task: Job; config: ModuleConfig }) {
   const result = task.result as ApiJobResult | undefined;
-  const media = result?.artifacts.find((artifact) => /^(video|audio|image)\//.test(artifact.mimeType));
+  const mediaArtifacts = resultMediaArtifacts(result);
+  const media = mediaArtifacts[0];
   const text = result?.artifacts.find((artifact) => artifact.text)?.text;
+  if (config.result.kind === "clips" && mediaArtifacts.length)
+    return (
+      <div className="result-preview result-clips">
+        <div className="result-clip-grid">
+          {mediaArtifacts.map((artifact, index) => (
+            <article className="result-clip-card" key={artifact.id}>
+              <div className="result-clip-media">
+                {artifact.url ? (
+                  <AuthenticatedMedia url={artifact.url} mimeType={artifact.mimeType} alt={artifact.name} />
+                ) : (
+                  <config.icon size={32} />
+                )}
+              </div>
+              <small title={artifact.name}>
+                <b>{String(index + 1).padStart(2, "0")}</b>
+                {artifact.name}
+              </small>
+            </article>
+          ))}
+        </div>
+        <p>{result?.summary ?? `共生成 ${mediaArtifacts.length} 个镜头片段`}</p>
+      </div>
+    );
   return (
     <div className={`result-preview result-${config.result.kind}`}>
       {media?.url ? (
@@ -861,7 +922,24 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
     refetchInterval: 5000,
   });
   const { data: modelCatalog = [] } = useQuery({ queryKey: ["api-models"], queryFn: fetchModels, staleTime: 60_000 });
+  const {
+    data: assetFolders = [],
+    isLoading: foldersLoading,
+    refetch: refetchAssetFolders,
+  } = useQuery({
+    queryKey: ["asset-folders"],
+    queryFn: fetchAssetFolders,
+    enabled: config.id === "video-cut",
+  });
   useEffect(() => setTasks(restored), [restored]);
+  useEffect(() => {
+    if (config.id !== "video-cut" || !hydrated || !assetFolders.length) return;
+    setValues((current) => {
+      if (assetFolders.some((folder) => folder.id === current.saveLocation)) return current;
+      const preferred = assetFolders.find((folder) => folder.isDefault) ?? assetFolders[0];
+      return { ...current, saveLocation: preferred.id };
+    });
+  }, [assetFolders, config.id, hydrated]);
   useEffect(() => {
     const cleanups = tasks
       .filter((task) => task.status === "queued" || task.status === "processing")
@@ -944,11 +1022,12 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
     setRunning(true);
     setApiError("");
     try {
+      const submittedValues = config.id === "video-cut" ? { ...values, outputFolderId: values.saveLocation } : values;
       const job = await submitJob(
         config.id as ModuleId,
         values.taskName ||
           `${config.label} · ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
-        { ...values, __scenario: scenario },
+        { ...submittedValues, __scenario: scenario },
         usesSeedance ? videoModel : undefined,
       );
       setTasks((old) => [job, ...old.filter((x) => x.id !== job.id)]);
@@ -959,6 +1038,16 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
       setApiError(error instanceof Error ? error.message : "任务提交失败");
     } finally {
       setRunning(false);
+    }
+  };
+  const setDefaultOutputFolder = async (folderId: string) => {
+    setApiError("");
+    try {
+      await setDefaultAssetFolder(folderId);
+      await refetchAssetFolders();
+      setActionNotice("默认保存文件夹已更新");
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : "默认文件夹设置失败");
     }
   };
   const retry = (task: Job) => {
@@ -1046,6 +1135,9 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
                 submitted={submitted}
                 running={running}
                 hydrated={hydrated}
+                assetFolders={assetFolders}
+                foldersLoading={foldersLoading}
+                onSetDefaultFolder={setDefaultOutputFolder}
                 onCancel={() => setCreatorOpen(false)}
                 onSubmit={() => void submit()}
               />
@@ -1392,7 +1484,7 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
               </button>
             </header>
             <ResultPreview task={selectedTask} config={config} />
-            <div className="result-actions">
+            <div className="tool-result-actions">
               {config.result.actions.map((action, index) => (
                 <button
                   key={action}
@@ -1410,7 +1502,7 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
                 </button>
               ))}
             </div>
-            <div className="result-meta">
+            <div className="tool-result-meta">
               <span>
                 执行来源
                 <b>

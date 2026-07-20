@@ -224,6 +224,9 @@ export class AccountStore {
       this.db.exec("ALTER TABLE media_assets ADD COLUMN height INTEGER");
     if (!assetColumns.some((column) => column.name === "duration_sec"))
       this.db.exec("ALTER TABLE media_assets ADD COLUMN duration_sec REAL");
+    const preferenceColumns = this.db.query("PRAGMA table_info(user_preferences)").all() as Array<{ name: string }>;
+    if (!preferenceColumns.some((column) => column.name === "default_asset_folder_id"))
+      this.db.exec("ALTER TABLE user_preferences ADD COLUMN default_asset_folder_id TEXT");
     this.db.exec("UPDATE media_assets SET display_name=original_name WHERE display_name='' OR display_name IS NULL");
     this.db.exec(
       "CREATE INDEX IF NOT EXISTS media_assets_owner_kind_idx ON media_assets(owner_user_id,asset_kind,created_at DESC)",
@@ -258,6 +261,9 @@ export class AccountStore {
           "INSERT INTO asset_folders(id,owner_user_id,parent_id,name,storage_prefix,created_at,updated_at) VALUES(?,?,NULL,?,?,?,?)",
         )
         .run(defaultFolderId, id, "默认", `${id}/materials/${defaultFolderId}/`, created, created);
+      this.db
+        .query("UPDATE user_preferences SET default_asset_folder_id=?,updated_at=? WHERE user_id=?")
+        .run(defaultFolderId, created, id);
       this.db
         .query("INSERT INTO notifications(id,user_id,type,title,body,created_at) VALUES(?,?,?,?,?,?)")
         .run(
@@ -680,7 +686,14 @@ export class AccountStore {
       created_at: string;
       updated_at: string;
     } | null;
-    if (existing) return this.assetFolder(existing);
+    if (existing) {
+      this.db
+        .query(
+          "UPDATE user_preferences SET default_asset_folder_id=COALESCE(default_asset_folder_id,?) WHERE user_id=?",
+        )
+        .run(existing.id, userId);
+      return this.assetFolder(existing);
+    }
     const id = crypto.randomUUID();
     const created = now();
     this.db
@@ -688,7 +701,27 @@ export class AccountStore {
         "INSERT INTO asset_folders(id,owner_user_id,parent_id,name,storage_prefix,created_at,updated_at) VALUES(?,?,NULL,?,?,?,?)",
       )
       .run(id, userId, "默认", `${userId}/materials/${id}/`, created, created);
+    this.db
+      .query(
+        "UPDATE user_preferences SET default_asset_folder_id=COALESCE(default_asset_folder_id,?),updated_at=? WHERE user_id=?",
+      )
+      .run(id, created, userId);
     return this.getAssetFolder(userId, id)!;
+  }
+  getDefaultAssetFolderId(userId: string) {
+    const row = this.db.query("SELECT default_asset_folder_id FROM user_preferences WHERE user_id=?").get(userId) as {
+      default_asset_folder_id: string | null;
+    } | null;
+    const folderId = row?.default_asset_folder_id ?? undefined;
+    return folderId && this.getAssetFolder(userId, folderId) ? folderId : this.ensureDefaultAssetFolder(userId).id;
+  }
+  setDefaultAssetFolder(userId: string, folderId: string) {
+    const folder = this.getAssetFolder(userId, folderId);
+    if (!folder) throw new AccountError("FOLDER_NOT_FOUND", "文件夹不存在", 404);
+    this.db
+      .query("UPDATE user_preferences SET default_asset_folder_id=?,updated_at=? WHERE user_id=?")
+      .run(folderId, now(), userId);
+    return folder;
   }
   listAssetFolders(userId: string): AssetFolder[] {
     this.ensureDefaultAssetFolder(userId);
@@ -751,6 +784,8 @@ export class AccountStore {
   deleteAssetFolder(userId: string, id: string) {
     const folder = this.getAssetFolder(userId, id);
     if (!folder) throw new AccountError("FOLDER_NOT_FOUND", "文件夹不存在", 404);
+    if (this.getDefaultAssetFolderId(userId) === id)
+      throw new AccountError("DEFAULT_FOLDER_IN_USE", "请先将其他文件夹设为默认", 409);
     const hasChildren = this.db.query("SELECT 1 FROM asset_folders WHERE parent_id=? LIMIT 1").get(id);
     const hasAssets = this.db.query("SELECT 1 FROM media_assets WHERE folder_id=? LIMIT 1").get(id);
     if (hasChildren || hasAssets) throw new AccountError("FOLDER_NOT_EMPTY", "请先移出或删除文件夹内的素材", 409);

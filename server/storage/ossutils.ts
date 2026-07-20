@@ -102,6 +102,16 @@ export class OssUtils {
     }
   }
 
+  async downloadLibraryFile(key: string, filePath: string) {
+    await this.ready().downloadFile({
+      bucket: env.tos.bucket,
+      key: key.replace(/^\/+/, ""),
+      filePath,
+      partSize: 8 * 1024 * 1024,
+      taskNum: 2,
+    });
+  }
+
   createSignedUploadUrl(key: string, expiresSeconds = 15 * 60) {
     return this.ready().getPreSignedUrl({
       bucket: env.tos.bucket,
