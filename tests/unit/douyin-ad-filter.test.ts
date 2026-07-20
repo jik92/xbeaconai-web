@@ -20,11 +20,11 @@ function detailUrl(awemeId: string) {
   return `https://www.douyin.com/aweme/v1/web/aweme/detail/?device_platform=webapp&aid=6383&aweme_id=${awemeId}`;
 }
 
-function detailBody(awemeId: string, urls: string[]) {
+function detailBody(_awemeId: string, urls: string[]) {
   return JSON.stringify({ aweme_detail: { video: { play_addr: { url_list: urls }, duration: 30000 } } });
 }
 
-function html(awemeId: string, opts: { adDetail?: boolean; targetDetail?: boolean; targetCdn?: boolean }) {
+function html(_awemeId: string, opts: { adDetail?: boolean; targetDetail?: boolean; targetCdn?: boolean }) {
   const s: string[] = [];
   if (opts.adDetail) s.push(`fetch("${detailUrl(AD_AWEME_ID)}");`);
   if (opts.targetDetail) s.push(`fetch("${detailUrl(TARGET_AWEME_ID)}");`);
