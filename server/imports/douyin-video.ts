@@ -156,6 +156,49 @@ export function validateFullResponse(details: {
     );
 }
 
+export async function extractTargetVideoUrl(page: {
+  evaluate: (fn: (...args: never[]) => unknown) => Promise<unknown>;
+}): Promise<string> {
+  const url = await page.evaluate(() => {
+    const w = globalThis as Record<string, unknown>;
+
+    const state =
+      w.__INITIAL_STATE__ || w._ROUTER_DATA || w.SSR_DATA || (w as { SSRScriptData?: unknown }).SSRScriptData;
+    if (state && typeof state === "object") {
+      const s = state as Record<string, unknown>;
+      const videoData =
+        (s.video as Record<string, unknown> | undefined) ??
+        ((s.aweme as Record<string, unknown> | undefined)?.detail as Record<string, unknown> | undefined)?.video;
+      if (videoData && typeof videoData === "object") {
+        const addr = (videoData as Record<string, unknown>).playAddr || (videoData as Record<string, unknown>).playApi;
+        if (typeof addr === "string" && addr.length > 0) return addr;
+      }
+    }
+
+    const videos = document.querySelectorAll("video");
+    for (const v of videos) {
+      const src = (v as HTMLVideoElement).src;
+      if (src && (src.includes("douyinvod.com") || src.includes("douyinstatic.com"))) {
+        if (v.closest('[data-e2e="feed-active-video"]') || v.closest(".xgplayer-video")) return src;
+      }
+    }
+    for (const v of videos) {
+      const src = (v as HTMLVideoElement).src;
+      if (src && (src.includes("douyinvod.com") || src.includes("douyinstatic.com"))) return src;
+    }
+
+    return null;
+  });
+
+  if (!url || typeof url !== "string")
+    throw new DouyinImportError(
+      "TARGET_VIDEO_NOT_FOUND",
+      "无法识别目标作品视频，请确认链接为有效的抖音作品分享链接",
+      422,
+    );
+  return url;
+}
+
 export async function resolveDouyinVideo(shareUrl: string): Promise<ResolvedDouyinVideo> {
   const source = parseDouyinShareUrl(shareUrl);
   let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
@@ -184,15 +227,21 @@ export async function resolveDouyinVideo(shareUrl: string): Promise<ResolvedDouy
       return route.abort();
     });
     const page = await context.newPage();
-    const videoResponse = page.waitForResponse(
-      (response) =>
-        response.status() === 200 && isCandidateVideo(response.url(), response.headers()["content-type"] ?? ""),
-      { timeout: 20_000 },
-    );
     await page.goto(source.href, { waitUntil: "domcontentloaded", timeout: 20_000 });
     const finalUrl = new URL(page.url());
     if (!isShareHost(finalUrl.hostname))
       throw new DouyinImportError("UNSUPPORTED_DOUYIN_REDIRECT", "分享链接跳转到了不受支持的地址", 400);
+
+    const targetUrl = await extractTargetVideoUrl(
+      page as unknown as { evaluate: (fn: (...args: never[]) => unknown) => Promise<unknown> },
+    );
+    const videoResponse = page.waitForResponse(
+      (response) =>
+        response.status() === 200 &&
+        response.url() === targetUrl &&
+        isCandidateVideo(response.url(), response.headers()["content-type"] ?? ""),
+      { timeout: 20_000 },
+    );
     await page.evaluate(
       () =>
         void document

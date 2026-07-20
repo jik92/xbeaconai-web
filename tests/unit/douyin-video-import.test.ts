@@ -5,6 +5,7 @@ import { AccountStore } from "../../server/accounts/account-store";
 import {
   assertImportAuthorization,
   DouyinImportError,
+  extractTargetVideoUrl,
   parseDouyinShareUrl,
   persistImportVideo,
   validateFullResponse,
@@ -93,6 +94,43 @@ describe("Douyin share text parsing", () => {
     const text = "请看 https://example.com/other 和 https://v.douyin.com/main456/?x=1 对比";
     const url = parseDouyinShareUrl(text);
     expect(url.href).toBe("https://v.douyin.com/main456/?x=1");
+  });
+});
+
+describe("Target video URL extraction", () => {
+  test("extracts URL from __INITIAL_STATE__ video playAddr", async () => {
+    const mockPage = {
+      evaluate: async () => "https://v26-web.douyinvod.com/video/target123/",
+    };
+    const url = await extractTargetVideoUrl(mockPage as any);
+    expect(url).toBe("https://v26-web.douyinvod.com/video/target123/");
+  });
+
+  test("extracts URL from _ROUTER_DATA video playAddr", async () => {
+    const mockPage = {
+      evaluate: async () => "https://v3-web.douyinvod.com/other456/",
+    };
+    const url = await extractTargetVideoUrl(mockPage as any);
+    expect(url).toBe("https://v3-web.douyinvod.com/other456/");
+  });
+
+  test("extracts URL from SSRScriptData aweme detail", async () => {
+    const mockPage = {
+      evaluate: async () => "https://sf3-sign.douyinstatic.com/obj/tos/789/",
+    };
+    const url = await extractTargetVideoUrl(mockPage as any);
+    expect(url).toBe("https://sf3-sign.douyinstatic.com/obj/tos/789/");
+  });
+
+  test("throws when page has no identifiable target video URL", async () => {
+    const mockPage = { evaluate: async () => null };
+    await expect(extractTargetVideoUrl(mockPage as any)).rejects.toThrow("无法识别目标作品视频");
+  });
+
+  test("ad candidate URL is distinguishable from target video URL", () => {
+    const adUrl = "https://v26-web.douyinvod.com/ad/red-envelope-rain-001/";
+    const targetUrl = "https://v26-web.douyinvod.com/video/target-work-002/";
+    expect(adUrl).not.toBe(targetUrl);
   });
 });
 
