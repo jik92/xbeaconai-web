@@ -810,17 +810,39 @@ export function resultMediaArtifacts(result: ApiJobResult | undefined) {
   return result?.artifacts.filter((artifact) => /^(video|audio|image)\//.test(artifact.mimeType)) ?? [];
 }
 
-function ResultPreview({ task, config }: { task: Job; config: ModuleConfig }) {
+function ResultPreview({
+  task,
+  config,
+  selectedArtifactIds,
+  onToggleArtifact,
+}: {
+  task: Job;
+  config: ModuleConfig;
+  selectedArtifactIds: string[];
+  onToggleArtifact: (artifactId: string) => void;
+}) {
   const result = task.result as ApiJobResult | undefined;
   const mediaArtifacts = resultMediaArtifacts(result);
   const media = mediaArtifacts[0];
   const text = result?.artifacts.find((artifact) => artifact.text)?.text;
-  if (config.result.kind === "clips" && mediaArtifacts.length)
+  if (result?.kind === "video-cut" && mediaArtifacts.length)
     return (
       <div className="result-preview result-clips">
         <div className="result-clip-grid">
           {mediaArtifacts.map((artifact, index) => (
-            <article className="result-clip-card" key={artifact.id}>
+            <article
+              className={`result-clip-card ${selectedArtifactIds.includes(artifact.id) ? "selected" : ""}`}
+              key={artifact.id}
+            >
+              <button
+                type="button"
+                className="result-clip-selector"
+                aria-label={`${selectedArtifactIds.includes(artifact.id) ? "取消选择" : "选择"}${artifact.name}`}
+                aria-pressed={selectedArtifactIds.includes(artifact.id)}
+                onClick={() => onToggleArtifact(artifact.id)}
+              >
+                {selectedArtifactIds.includes(artifact.id) && <Check />}
+              </button>
               <div className="result-clip-media">
                 {artifact.url ? (
                   <AuthenticatedMedia url={artifact.url} mimeType={artifact.mimeType} alt={artifact.name} />
@@ -835,7 +857,10 @@ function ResultPreview({ task, config }: { task: Job; config: ModuleConfig }) {
             </article>
           ))}
         </div>
-        <p>{result?.summary ?? `共生成 ${mediaArtifacts.length} 个镜头片段`}</p>
+        <p>
+          已选择 {selectedArtifactIds.length}/{mediaArtifacts.length} ·{" "}
+          {result?.summary ?? `共生成 ${mediaArtifacts.length} 个镜头片段`}
+        </p>
       </div>
     );
   return (
@@ -906,6 +931,8 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [submitted, setSubmitted] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Job | null>(null);
+  const [selectedArtifactIds, setSelectedArtifactIds] = useState<string[]>([]);
+  const [resultActionRunning, setResultActionRunning] = useState(false);
   const [apiError, setApiError] = useState("");
   const [actionNotice, setActionNotice] = useState("");
   const [videoModel, setVideoModel] = useState<SeedanceModelId>("doubao-seedance-2-0-fast-260128");
@@ -932,6 +959,12 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
     enabled: config.id === "video-cut",
   });
   useEffect(() => setTasks(restored), [restored]);
+  useEffect(() => {
+    const result = selectedTask?.result as ApiJobResult | undefined;
+    setSelectedArtifactIds(
+      config.id === "video-cut" ? resultMediaArtifacts(result).map((artifact) => artifact.id) : [],
+    );
+  }, [config.id, selectedTask?.id]);
   useEffect(() => {
     if (config.id !== "video-cut" || !hydrated || !assetFolders.length) return;
     setValues((current) => {
@@ -1064,6 +1097,67 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
     if (!selectedTask) return;
     const result = selectedTask.result as ApiJobResult | undefined;
     const artifact = result?.artifacts?.[0];
+    const mediaArtifacts = resultMediaArtifacts(result);
+    const selectedArtifacts = mediaArtifacts.filter((item) => selectedArtifactIds.includes(item.id));
+    if (action === "批量选择") {
+      setSelectedArtifactIds(
+        selectedArtifacts.length === mediaArtifacts.length ? [] : mediaArtifacts.map((item) => item.id),
+      );
+      setActionNotice(selectedArtifacts.length === mediaArtifacts.length ? "已取消全部选择" : "已选择全部切片");
+      return;
+    }
+    if (["下载选中", "加入素材库", "合并片段"].includes(action) && !selectedArtifacts.length) {
+      setApiError("请先选择至少一个切片");
+      return;
+    }
+    if (action === "下载选中") {
+      setResultActionRunning(true);
+      setApiError("");
+      try {
+        for (const selected of selectedArtifacts)
+          if (selected.url) await downloadAuthenticated(selected.url, selected.name);
+        setActionNotice(`已开始下载 ${selectedArtifacts.length} 个切片`);
+      } catch (error) {
+        setApiError(error instanceof Error ? error.message : "切片下载失败");
+      } finally {
+        setResultActionRunning(false);
+      }
+      return;
+    }
+    if (action === "加入素材库") {
+      const folderId = selectedTask.values.outputFolderId;
+      const params = new URLSearchParams();
+      if (folderId) params.set("folderId", folderId);
+      params.set("assetIds", selectedArtifacts.map((item) => item.id).join(","));
+      window.location.assign(`/assets/materials?${params}`);
+      return;
+    }
+    if (action === "合并片段") {
+      if (selectedArtifacts.length < 2) {
+        setApiError("至少选择两个切片才能合并");
+        return;
+      }
+      setResultActionRunning(true);
+      setApiError("");
+      try {
+        const mergeJob = await submitJob("video-cut", `${selectedTask.title} · 合并`, {
+          assets: `assets:${JSON.stringify(
+            selectedArtifacts.map((item) => ({ id: item.id, name: item.name, mimeType: item.mimeType })),
+          )}`,
+          mergeMode: "video-cut-clips",
+          sourceVideoCutJobId: selectedTask.id,
+          outputFolderId: selectedTask.values.outputFolderId ?? "",
+        });
+        setTasks((current) => [mergeJob, ...current.filter((item) => item.id !== mergeJob.id)]);
+        setSelectedTask(null);
+        setActionNotice("合并任务已提交，可在当前任务列表查看进度");
+        setResultActionRunning(false);
+      } catch (error) {
+        setApiError(error instanceof Error ? error.message : "合并任务创建失败");
+        setResultActionRunning(false);
+      }
+      return;
+    }
     if (action.includes("复制")) {
       await navigator.clipboard.writeText(result?.summary ?? artifact?.text ?? "");
       setActionNotice("内容已复制到剪贴板");
@@ -1086,11 +1180,11 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
       window.location.href = "/aigc/video-create";
       return;
     }
-    if (action.includes("用于混剪") || action.includes("合并片段")) {
+    if (action.includes("用于混剪")) {
       window.location.href = "/tools/video-mashup";
       return;
     }
-    if (action.includes("加入素材库") || action.includes("收藏") || action.includes("设为常用")) {
+    if (action.includes("收藏") || action.includes("设为常用")) {
       setActionNotice(`${action}成功`);
       return;
     }
@@ -1477,18 +1571,40 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
                         ? "本地处理"
                         : "真实生成"}
                 </span>
-                <h2>{config.result.label}</h2>
+                <h2>
+                  {(selectedTask.result as ApiJobResult | undefined)?.kind === "video-merge"
+                    ? "合并视频"
+                    : config.result.label}
+                </h2>
               </div>
               <button onClick={() => setSelectedTask(null)} aria-label="关闭">
                 <X />
               </button>
             </header>
-            <ResultPreview task={selectedTask} config={config} />
+            <ResultPreview
+              task={selectedTask}
+              config={config}
+              selectedArtifactIds={selectedArtifactIds}
+              onToggleArtifact={(artifactId) =>
+                setSelectedArtifactIds((current) =>
+                  current.includes(artifactId)
+                    ? current.filter((selectedId) => selectedId !== artifactId)
+                    : [...current, artifactId],
+                )
+              }
+            />
+            {(apiError || actionNotice) && (
+              <div className={`tool-result-feedback ${apiError ? "error" : ""}`}>{apiError || actionNotice}</div>
+            )}
             <div className="tool-result-actions">
-              {config.result.actions.map((action, index) => (
+              {((selectedTask.result as ApiJobResult | undefined)?.kind === "video-merge"
+                ? ["下载选中", "加入素材库"]
+                : config.result.actions
+              ).map((action, index) => (
                 <button
                   key={action}
                   className={index === 0 ? "primary" : ""}
+                  disabled={resultActionRunning}
                   onClick={() => void handleResultAction(action)}
                 >
                   {action.includes("复制") ? (

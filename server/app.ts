@@ -1756,7 +1756,7 @@ app.openapi(createJobRoute, async (c) => {
   const body = c.req.valid("json");
   const ownerUserId = c.get("userId");
   const jobValues = { ...body.values };
-  if (moduleId === "video-cut") {
+  if (moduleId === "video-cut" || (moduleId === "video-mashup" && jobValues.mergeMode === "video-cut-clips")) {
     const outputFolderId = jobValues.outputFolderId || accounts.getDefaultAssetFolderId(ownerUserId);
     if (!accounts.getAssetFolder(ownerUserId, outputFolderId))
       return c.json(
@@ -1853,13 +1853,42 @@ app.openapi(createJobRoute, async (c) => {
       },
       422,
     );
-  const unavailableAsset = referencedAssetIds(jobValues).find((id) => !accounts.ownsAsset(ownerUserId, id));
+  const referencedIds = referencedAssetIds(jobValues);
+  const isClipMerge = moduleId === "video-cut" && jobValues.mergeMode === "video-cut-clips";
+  if (isClipMerge && referencedIds.length < 2)
+    return c.json(
+      {
+        error: {
+          code: "INSUFFICIENT_MERGE_CLIPS",
+          message: "至少选择两个视频片段才能合并",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      422,
+    );
+  const unavailableAsset = referencedIds.find((id) => !accounts.ownsAsset(ownerUserId, id));
   if (unavailableAsset)
     return c.json(
       {
         error: {
           code: "ASSET_NOT_AVAILABLE",
           message: "引用的素材不存在或不属于当前账号",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      422,
+    );
+  const invalidMergeAsset = isClipMerge
+    ? referencedIds.find((id) => !accounts.getOwnedAsset(ownerUserId, id)?.mimeType.startsWith("video/"))
+    : undefined;
+  if (invalidMergeAsset)
+    return c.json(
+      {
+        error: {
+          code: "INVALID_MERGE_ASSET",
+          message: "合并任务仅支持视频片段",
           retryable: false,
           requestId: crypto.randomUUID(),
         },

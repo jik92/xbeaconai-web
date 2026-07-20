@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, unlink } from "node:fs/promises";
 import { dirname } from "node:path";
 
 async function run(binary: "ffmpeg" | "ffprobe", args: string[]) {
@@ -121,6 +121,33 @@ export async function splitFixed(input: string, pattern: string) {
     pattern,
   ]);
   return pattern;
+}
+
+export async function concatVideos(inputs: string[], output: string) {
+  if (inputs.length < 2) throw new Error("至少需要两个视频片段才能合并");
+  await outputDir(output);
+  const manifest = `${output}.concat.txt`;
+  const escapePath = (path: string) => path.replaceAll("'", "'\\''");
+  await Bun.write(manifest, inputs.map((path) => `file '${escapePath(path)}'`).join("\n"));
+  try {
+    await run("ffmpeg", [
+      "-y",
+      "-f",
+      "concat",
+      "-safe",
+      "0",
+      "-i",
+      manifest,
+      "-c",
+      "copy",
+      "-movflags",
+      "+faststart",
+      output,
+    ]);
+  } finally {
+    await unlink(manifest).catch(() => undefined);
+  }
+  return output;
 }
 
 export async function composeMedia(video: string, audio: string, output: string) {

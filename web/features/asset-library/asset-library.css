@@ -225,6 +225,21 @@
   color: #344056;
   font-size: 13px;
 }
+.asset-import-notice {
+  margin: 10px 0;
+  padding: 9px 12px;
+  border: 1px solid #ccebd8;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #276044;
+  background: #edf9f2;
+  font-size: 12px;
+}
+.asset-import-notice svg {
+  width: 15px;
+}
 .media-table-preview {
   width: 128px;
   height: 72px;

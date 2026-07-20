@@ -379,6 +379,11 @@ function MediaAssetTable({
 }
 
 function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
+  const locationParams = new URLSearchParams(window.location.search);
+  const requestedFolderId = kind === "media" ? (locationParams.get("folderId") ?? "") : "";
+  const requestedAssetIds = new Set(
+    kind === "media" ? (locationParams.get("assetIds") ?? "").split(",").filter(Boolean) : [],
+  );
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -387,7 +392,7 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [selectedFolderId, setSelectedFolderId] = useState("");
+  const [selectedFolderId, setSelectedFolderId] = useState(requestedFolderId);
   const [loadedMetadata, setLoadedMetadata] = useState<Record<string, MediaMetadata>>({});
   const metadataSaving = useRef(new Set<string>());
   const { data: folders = [], isLoading: foldersLoading } = useQuery({
@@ -487,6 +492,11 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
           uploadLabel={kind === "voice" ? "上传音色" : "上传素材"}
           onUpload={() => setUploadOpen(true)}
         />
+        {!!requestedAssetIds.size && (
+          <div className="asset-import-notice">
+            <Check /> 已在当前文件夹中定位 {data.filter((asset) => requestedAssetIds.has(asset.id)).length} 个切片
+          </div>
+        )}
         {kind === "media" ? (
           <MediaAssetTable
             assets={filtered}
