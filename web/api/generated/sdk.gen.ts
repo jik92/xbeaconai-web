@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type ServerSentEventsResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { CancelJobData, CancelJobErrors, CancelJobResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, CompleteDirectUploadData, CompleteDirectUploadErrors, CompleteDirectUploadResponses, CreateDirectUploadData, CreateDirectUploadErrors, CreateDirectUploadResponses, CreateJobData, CreateJobErrors, CreateJobResponses, CreateRechargeOrderData, CreateRechargeOrderErrors, CreateRechargeOrderResponses, DeleteAssetData, DeleteAssetErrors, DeleteAssetResponses, DeleteProductData, DeleteProductErrors, DeleteProductResponses, DownloadArtifactData, DownloadArtifactErrors, DownloadArtifactResponses, GetAssetContentData, GetAssetContentErrors, GetAssetContentResponses, GetCapabilitiesData, GetCapabilitiesResponses, GetCreationCapabilitiesData, GetCreationCapabilitiesResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetHealthData, GetHealthResponses, GetJobData, GetJobErrors, GetJobResponses, GetModelsData, GetModelsResponses, GetPreferencesData, GetPreferencesResponses, ListAssetsData, ListAssetsResponses, ListJobsData, ListJobsResponses, ListNotificationsData, ListNotificationsResponses, ListRechargeOrdersData, ListRechargeOrdersResponses, ListRechargePackagesData, ListRechargePackagesResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, MarkAllNotificationsReadData, MarkAllNotificationsReadResponses, MarkNotificationReadData, MarkNotificationReadErrors, MarkNotificationReadResponses, RegisterData, RegisterErrors, RegisterResponses, RetryJobData, RetryJobErrors, RetryJobResponses, SaveAssetMetadataData, SaveAssetMetadataErrors, SaveAssetMetadataResponses, SavePreferencesData, SavePreferencesResponses, UpdateProfileData, UpdateProfileErrors, UpdateProfileResponses, UploadMediaData, UploadMediaErrors, UploadMediaResponses, WatchJobEventsData, WatchJobEventsErrors, WatchJobEventsResponse, WatchJobEventsResponses } from './types.gen';
+import type { CancelJobData, CancelJobErrors, CancelJobResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, CompleteDirectUploadData, CompleteDirectUploadErrors, CompleteDirectUploadResponses, CreateAdScriptActionData, CreateAdScriptActionErrors, CreateAdScriptActionResponses, CreateAdScriptProjectData, CreateAdScriptProjectErrors, CreateAdScriptProjectResponses, CreateDirectUploadData, CreateDirectUploadErrors, CreateDirectUploadResponses, CreateJobData, CreateJobErrors, CreateJobResponses, CreateRechargeOrderData, CreateRechargeOrderErrors, CreateRechargeOrderResponses, DeleteAssetData, DeleteAssetErrors, DeleteAssetResponses, DeleteProductData, DeleteProductErrors, DeleteProductResponses, DownloadArtifactData, DownloadArtifactErrors, DownloadArtifactResponses, ExportAdScriptVersionData, ExportAdScriptVersionErrors, ExportAdScriptVersionResponses, GetAdScriptProjectData, GetAdScriptProjectErrors, GetAdScriptProjectResponses, GetAssetContentData, GetAssetContentErrors, GetAssetContentResponses, GetCapabilitiesData, GetCapabilitiesResponses, GetCreationCapabilitiesData, GetCreationCapabilitiesResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetHealthData, GetHealthResponses, GetJobData, GetJobErrors, GetJobResponses, GetModelsData, GetModelsResponses, GetPreferencesData, GetPreferencesResponses, ListAdScriptProjectsData, ListAdScriptProjectsResponses, ListAssetsData, ListAssetsResponses, ListJobsData, ListJobsResponses, ListNotificationsData, ListNotificationsResponses, ListRechargeOrdersData, ListRechargeOrdersResponses, ListRechargePackagesData, ListRechargePackagesResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, MarkAllNotificationsReadData, MarkAllNotificationsReadResponses, MarkNotificationReadData, MarkNotificationReadErrors, MarkNotificationReadResponses, ParseAdScriptSourceData, ParseAdScriptSourceErrors, ParseAdScriptSourceResponses, RegisterData, RegisterErrors, RegisterResponses, RetryJobData, RetryJobErrors, RetryJobResponses, SaveAdScriptVersionData, SaveAdScriptVersionErrors, SaveAdScriptVersionResponses, SaveAssetMetadataData, SaveAssetMetadataErrors, SaveAssetMetadataResponses, SavePreferencesData, SavePreferencesResponses, UpdateProfileData, UpdateProfileErrors, UpdateProfileResponses, UploadMediaData, UploadMediaErrors, UploadMediaResponses, WatchJobEventsData, WatchJobEventsErrors, WatchJobEventsResponse, WatchJobEventsResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -142,6 +142,48 @@ export const saveAssetMetadata = <ThrowOnError extends boolean = false>(options:
 export const getAssetContent = <ThrowOnError extends boolean = false>(options: Options<GetAssetContentData, ThrowOnError>): RequestResult<GetAssetContentResponses, GetAssetContentErrors, ThrowOnError> => (options.client ?? client).get<GetAssetContentResponses, GetAssetContentErrors, ThrowOnError>({ url: '/api/assets/{assetId}/content', ...options });
 
 export const listJobs = <ThrowOnError extends boolean = false>(options?: Options<ListJobsData, ThrowOnError>): RequestResult<ListJobsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListJobsResponses, unknown, ThrowOnError>({ url: '/api/jobs', ...options });
+
+export const parseAdScriptSource = <ThrowOnError extends boolean = false>(options: Options<ParseAdScriptSourceData, ThrowOnError>): RequestResult<ParseAdScriptSourceResponses, ParseAdScriptSourceErrors, ThrowOnError> => (options.client ?? client).post<ParseAdScriptSourceResponses, ParseAdScriptSourceErrors, ThrowOnError>({
+    url: '/api/ad-script/parse',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const listAdScriptProjects = <ThrowOnError extends boolean = false>(options?: Options<ListAdScriptProjectsData, ThrowOnError>): RequestResult<ListAdScriptProjectsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListAdScriptProjectsResponses, unknown, ThrowOnError>({ url: '/api/ad-script/projects', ...options });
+
+export const createAdScriptProject = <ThrowOnError extends boolean = false>(options: Options<CreateAdScriptProjectData, ThrowOnError>): RequestResult<CreateAdScriptProjectResponses, CreateAdScriptProjectErrors, ThrowOnError> => (options.client ?? client).post<CreateAdScriptProjectResponses, CreateAdScriptProjectErrors, ThrowOnError>({
+    url: '/api/ad-script/projects',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const getAdScriptProject = <ThrowOnError extends boolean = false>(options: Options<GetAdScriptProjectData, ThrowOnError>): RequestResult<GetAdScriptProjectResponses, GetAdScriptProjectErrors, ThrowOnError> => (options.client ?? client).get<GetAdScriptProjectResponses, GetAdScriptProjectErrors, ThrowOnError>({ url: '/api/ad-script/projects/{projectId}', ...options });
+
+export const saveAdScriptVersion = <ThrowOnError extends boolean = false>(options: Options<SaveAdScriptVersionData, ThrowOnError>): RequestResult<SaveAdScriptVersionResponses, SaveAdScriptVersionErrors, ThrowOnError> => (options.client ?? client).post<SaveAdScriptVersionResponses, SaveAdScriptVersionErrors, ThrowOnError>({
+    url: '/api/ad-script/projects/{projectId}/variants/{variantId}/versions',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const createAdScriptAction = <ThrowOnError extends boolean = false>(options: Options<CreateAdScriptActionData, ThrowOnError>): RequestResult<CreateAdScriptActionResponses, CreateAdScriptActionErrors, ThrowOnError> => (options.client ?? client).post<CreateAdScriptActionResponses, CreateAdScriptActionErrors, ThrowOnError>({
+    url: '/api/ad-script/projects/{projectId}/variants/{variantId}/actions/{action}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const exportAdScriptVersion = <ThrowOnError extends boolean = false>(options: Options<ExportAdScriptVersionData, ThrowOnError>): RequestResult<ExportAdScriptVersionResponses, ExportAdScriptVersionErrors, ThrowOnError> => (options.client ?? client).get<ExportAdScriptVersionResponses, ExportAdScriptVersionErrors, ThrowOnError>({ url: '/api/ad-script/projects/{projectId}/variants/{variantId}/export', ...options });
 
 export const createJob = <ThrowOnError extends boolean = false>(options: Options<CreateJobData, ThrowOnError>): RequestResult<CreateJobResponses, CreateJobErrors, ThrowOnError> => (options.client ?? client).post<CreateJobResponses, CreateJobErrors, ThrowOnError>({
     url: '/api/{moduleId}/jobs',

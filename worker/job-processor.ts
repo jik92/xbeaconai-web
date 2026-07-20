@@ -1,4 +1,5 @@
 import type { AccountStore } from "../server/accounts/account-store";
+import type { AdScriptStore } from "../server/ad-script/ad-script-store";
 import type { SqliteJobStore } from "../server/jobs/sqlite-job-store";
 import { ossutils } from "../server/storage/ossutils";
 import type { JobRecord } from "../server/types";
@@ -14,10 +15,12 @@ export class JobProcessor {
   constructor(
     readonly store: SqliteJobStore,
     readonly accounts?: AccountStore,
+    readonly adScripts?: AdScriptStore,
   ) {
     this.context = {
       store,
       accounts,
+      adScripts,
       change: (id, patch) => this.change(id, patch),
     };
   }

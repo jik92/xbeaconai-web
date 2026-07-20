@@ -147,6 +147,103 @@ export type ModuleId = 'video-remix' | 'video-create' | 'ad-script' | 'ai-genera
 
 export type SeedanceModelId = 'doubao-seedance-2-0-260128' | 'doubao-seedance-2-0-mini-260615' | 'doubao-seedance-2-0-fast-260128';
 
+export type AdScriptProject = {
+    project: {
+        id: string;
+        ownerUserId: string;
+        jobId: string;
+        status: 'draft' | 'queued' | 'processing' | 'succeeded' | 'partially_succeeded' | 'failed' | 'cancelled';
+        input: AdScriptInput;
+        idempotencyKey: string;
+        createdAt: string;
+        updatedAt: string;
+    };
+    variants: Array<AdScriptVariant>;
+};
+
+export type AdScriptInput = {
+    sceneCategory: 'marketing' | 'placement';
+    sceneId: string;
+    batchCount: number;
+    productName: string;
+    sellingPoints: Array<string>;
+    targetLength: '60-80' | '80-120' | '100-150' | '150-200' | '200-250' | '250-350';
+    marketingGoal: string;
+    targetAudience: string;
+    painPoints?: string;
+    benefits?: string;
+    speakerRole: string;
+    customRole?: string;
+    scriptStyle: string;
+    openingStyle: string;
+    sourceScript?: string;
+    useSourceAsReference?: boolean;
+};
+
+export type AdScriptVariant = {
+    id: string;
+    projectId: string;
+    ordinal: number;
+    status: 'queued' | 'processing' | 'succeeded' | 'failed' | 'cancelled';
+    currentVersionId: string;
+    finalScore: number;
+    compliancePassed: boolean;
+    iterationCount: number;
+    error: {
+        code: string;
+        message: string;
+        retryable: boolean;
+        requestId: string;
+    };
+    createdAt: string;
+    updatedAt: string;
+    versions: Array<AdScriptVersion>;
+};
+
+export type AdScriptVersion = {
+    id: string;
+    variantId: string;
+    sequence: number;
+    source: 'initial' | 'optimized' | 'human';
+    parentVersionId: string;
+    round: number;
+    script: string;
+    score: AdScriptScoreDetail;
+    compliance: AdScriptCompliance;
+    changeSummary: string;
+    model: string;
+    createdAt: string;
+};
+
+export type AdScriptScoreDetail = {
+    scores: AdScriptScores;
+    total: number;
+    suggestions: Array<string>;
+};
+
+export type AdScriptScores = {
+    openingAttraction: number;
+    painResonance: number;
+    benefitClarity: number;
+    callToAction: number;
+};
+
+export type AdScriptCompliance = {
+    passed: boolean;
+    findings: Array<AdScriptComplianceFinding>;
+};
+
+export type AdScriptComplianceFinding = {
+    ruleId: string;
+    severity: 'warning' | 'blocking';
+    source: 'local' | 'ai';
+    excerpt: string;
+    start?: number;
+    end?: number;
+    message: string;
+    suggestion: string;
+};
+
 export type GetHealthData = {
     body?: never;
     path?: never;
@@ -998,6 +1095,204 @@ export type ListJobsResponses = {
 };
 
 export type ListJobsResponse = ListJobsResponses[keyof ListJobsResponses];
+
+export type ParseAdScriptSourceData = {
+    body: {
+        sourceScript: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/ad-script/parse';
+};
+
+export type ParseAdScriptSourceErrors = {
+    /**
+     * Invalid script
+     */
+    422: ApiErrorResponse;
+};
+
+export type ParseAdScriptSourceError = ParseAdScriptSourceErrors[keyof ParseAdScriptSourceErrors];
+
+export type ParseAdScriptSourceResponses = {
+    /**
+     * Parse accepted
+     */
+    202: Job;
+};
+
+export type ParseAdScriptSourceResponse = ParseAdScriptSourceResponses[keyof ParseAdScriptSourceResponses];
+
+export type ListAdScriptProjectsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/ad-script/projects';
+};
+
+export type ListAdScriptProjectsResponses = {
+    /**
+     * Ad script projects
+     */
+    200: {
+        projects: Array<AdScriptProject>;
+    };
+};
+
+export type ListAdScriptProjectsResponse = ListAdScriptProjectsResponses[keyof ListAdScriptProjectsResponses];
+
+export type CreateAdScriptProjectData = {
+    body: AdScriptInput;
+    path?: never;
+    query?: never;
+    url: '/api/ad-script/projects';
+};
+
+export type CreateAdScriptProjectErrors = {
+    /**
+     * Idempotency conflict
+     */
+    409: ApiErrorResponse;
+    /**
+     * Insufficient credits
+     */
+    422: ApiErrorResponse;
+};
+
+export type CreateAdScriptProjectError = CreateAdScriptProjectErrors[keyof CreateAdScriptProjectErrors];
+
+export type CreateAdScriptProjectResponses = {
+    /**
+     * Generation accepted
+     */
+    202: AdScriptProject;
+};
+
+export type CreateAdScriptProjectResponse = CreateAdScriptProjectResponses[keyof CreateAdScriptProjectResponses];
+
+export type GetAdScriptProjectData = {
+    body?: never;
+    path: {
+        projectId: string;
+    };
+    query?: never;
+    url: '/api/ad-script/projects/{projectId}';
+};
+
+export type GetAdScriptProjectErrors = {
+    /**
+     * Not found
+     */
+    404: ApiErrorResponse;
+};
+
+export type GetAdScriptProjectError = GetAdScriptProjectErrors[keyof GetAdScriptProjectErrors];
+
+export type GetAdScriptProjectResponses = {
+    /**
+     * Ad script project
+     */
+    200: AdScriptProject;
+};
+
+export type GetAdScriptProjectResponse = GetAdScriptProjectResponses[keyof GetAdScriptProjectResponses];
+
+export type SaveAdScriptVersionData = {
+    body: {
+        expectedVersionId: string;
+        script: string;
+    };
+    path: {
+        projectId: string;
+        variantId: string;
+    };
+    query?: never;
+    url: '/api/ad-script/projects/{projectId}/variants/{variantId}/versions';
+};
+
+export type SaveAdScriptVersionErrors = {
+    /**
+     * Not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Version conflict
+     */
+    409: ApiErrorResponse;
+};
+
+export type SaveAdScriptVersionError = SaveAdScriptVersionErrors[keyof SaveAdScriptVersionErrors];
+
+export type SaveAdScriptVersionResponses = {
+    /**
+     * Version saved
+     */
+    201: AdScriptProject;
+};
+
+export type SaveAdScriptVersionResponse = SaveAdScriptVersionResponses[keyof SaveAdScriptVersionResponses];
+
+export type CreateAdScriptActionData = {
+    body: {
+        versionId: string;
+    };
+    path: {
+        projectId: string;
+        variantId: string;
+        action: 'rescore' | 'continue';
+    };
+    query?: never;
+    url: '/api/ad-script/projects/{projectId}/variants/{variantId}/actions/{action}';
+};
+
+export type CreateAdScriptActionErrors = {
+    /**
+     * Not found
+     */
+    404: ApiErrorResponse;
+};
+
+export type CreateAdScriptActionError = CreateAdScriptActionErrors[keyof CreateAdScriptActionErrors];
+
+export type CreateAdScriptActionResponses = {
+    /**
+     * Action accepted
+     */
+    202: Job;
+};
+
+export type CreateAdScriptActionResponse = CreateAdScriptActionResponses[keyof CreateAdScriptActionResponses];
+
+export type ExportAdScriptVersionData = {
+    body?: never;
+    path: {
+        projectId: string;
+        variantId: string;
+    };
+    query: {
+        format: 'txt' | 'md';
+        versionId?: string;
+    };
+    url: '/api/ad-script/projects/{projectId}/variants/{variantId}/export';
+};
+
+export type ExportAdScriptVersionErrors = {
+    /**
+     * Not found
+     */
+    404: ApiErrorResponse;
+};
+
+export type ExportAdScriptVersionError = ExportAdScriptVersionErrors[keyof ExportAdScriptVersionErrors];
+
+export type ExportAdScriptVersionResponses = {
+    /**
+     * Exported script
+     */
+    200: string;
+};
+
+export type ExportAdScriptVersionResponse = ExportAdScriptVersionResponses[keyof ExportAdScriptVersionResponses];
 
 export type CreateJobData = {
     body: {

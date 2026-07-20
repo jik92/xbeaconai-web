@@ -2,6 +2,7 @@ import { createRootRoute, createRoute, createRouter, Navigate } from "@tanstack/
 import { AppShell } from "@/components/domain/app-shell";
 import { ComingSoonPage, ProjectComingSoonPage } from "@/components/domain/coming-soon-page";
 import { ModulePage } from "@/components/domain/module-page";
+import { AdScriptPage } from "@/features/ad-script/ad-script-page";
 import { AiGeneratePage } from "@/features/ai-generate/ai-generate-page";
 import { AssetLibrary } from "@/features/asset-library/asset-library";
 import { MediaUnderstandPage } from "@/features/media-understand/media-understand-page";
@@ -26,6 +27,8 @@ const moduleRoutes = modules.map((config) =>
         <ComingSoonPage config={config} />
       ) : config.id === "video-remix" ? (
         <RemixProject />
+      ) : config.id === "ad-script" ? (
+        <AdScriptPage />
       ) : config.id === "ai-generate" ? (
         <AiGeneratePage />
       ) : config.id === "media-understand" ? (

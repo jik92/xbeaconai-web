@@ -85,11 +85,21 @@ export class AihubmixClient {
     return body.data ?? [];
   }
 
-  async generateText(prompt: string, model = "gpt-4.1-nano-free") {
+  async generateText(
+    prompt: string,
+    model = "gpt-4.1-nano-free",
+    options: { maxTokens?: number; temperature?: number; json?: boolean } = {},
+  ) {
     const body = (await this.request("/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model, messages: [{ role: "user", content: prompt }], max_tokens: 160, temperature: 0.4 }),
+      body: JSON.stringify({
+        model,
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: options.maxTokens ?? 160,
+        temperature: options.temperature ?? 0.4,
+        ...(options.json ? { response_format: { type: "json_object" } } : {}),
+      }),
     }).then((response) => response.json())) as {
       choices?: Array<{ message?: { content?: string } }>;
       model?: string;

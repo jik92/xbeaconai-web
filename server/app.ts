@@ -14,6 +14,18 @@ import {
   rechargePackages,
 } from "./accounts/account-store";
 import { authenticate, issueToken } from "./accounts/auth";
+import { AdScriptStore, AdScriptVersionConflictError } from "./ad-script/ad-script-store";
+import { checkAdScriptCompliance } from "./ad-script/compliance";
+import {
+  AD_SCRIPT_CREDITS_PER_VARIANT,
+  AD_SCRIPT_MODEL,
+  AdScriptComplianceSchema,
+  AdScriptInputSchema,
+  AdScriptProjectStatusSchema,
+  AdScriptScoreDetailSchema,
+  AdScriptVariantStatusSchema,
+  AdScriptVersionSourceSchema,
+} from "./ad-script/types";
 import { creationCapabilities, quoteCreation, validateCreationValues } from "./creation/capabilities";
 import { env } from "./env";
 import { BullJobQueue } from "./jobs/bull-job-queue";
@@ -109,6 +121,53 @@ const JobSchema = z
     updatedAt: z.string(),
   })
   .openapi("Job");
+const AdScriptVersionSchema = z
+  .object({
+    id: z.string().uuid(),
+    variantId: z.string().uuid(),
+    sequence: z.number().int().min(1),
+    source: AdScriptVersionSourceSchema,
+    parentVersionId: z.string().uuid().nullable(),
+    round: z.number().int().nonnegative(),
+    script: z.string(),
+    score: AdScriptScoreDetailSchema,
+    compliance: AdScriptComplianceSchema,
+    changeSummary: z.string(),
+    model: z.string(),
+    createdAt: z.string(),
+  })
+  .openapi("AdScriptVersion");
+const AdScriptVariantSchema = z
+  .object({
+    id: z.string().uuid(),
+    projectId: z.string().uuid(),
+    ordinal: z.number().int().min(1).max(3),
+    status: AdScriptVariantStatusSchema,
+    currentVersionId: z.string().uuid().nullable(),
+    finalScore: z.number().int().min(0).max(100).nullable(),
+    compliancePassed: z.boolean().nullable(),
+    iterationCount: z.number().int().nonnegative(),
+    error: ApiErrorSchema.nullable(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    versions: z.array(AdScriptVersionSchema),
+  })
+  .openapi("AdScriptVariant");
+const AdScriptProjectSchema = z
+  .object({
+    project: z.object({
+      id: z.string().uuid(),
+      ownerUserId: z.string().uuid(),
+      jobId: z.string().uuid().nullable(),
+      status: AdScriptProjectStatusSchema,
+      input: AdScriptInputSchema,
+      idempotencyKey: z.string().nullable(),
+      createdAt: z.string(),
+      updatedAt: z.string(),
+    }),
+    variants: z.array(AdScriptVariantSchema),
+  })
+  .openapi("AdScriptProject");
 const ErrorSchema = z.object({ error: ApiErrorSchema }).openapi("ApiErrorResponse");
 const AssetKindSchema = z.enum(["media", "product", "portrait", "voice"]).openapi("AssetKind");
 const LibraryAssetSchema = z.object({
@@ -147,6 +206,7 @@ const DirectUploadInitSchema = z.object({
 
 export const store = new SqliteJobStore();
 export const accounts = new AccountStore();
+export const adScripts = new AdScriptStore();
 export const queue = new BullJobQueue();
 type AppEnv = { Variables: { userId: string; sessionId: string } };
 const app = new OpenAPIHono<AppEnv>();
@@ -1779,6 +1839,294 @@ app.post("/api/video-remix/project/generate", async (c) => {
   return c.json(job, 202);
 });
 
+function adScriptJobRecord(input: {
+  ownerUserId: string;
+  title: string;
+  values: Record<string, string>;
+  idempotencyKey?: string;
+  parentJobId?: string;
+}): JobRecord {
+  const timestamp = new Date().toISOString();
+  return {
+    id: crypto.randomUUID(),
+    ownerUserId: input.ownerUserId,
+    moduleId: "ad-script",
+    title: input.title,
+    status: "queued",
+    progress: 0,
+    stage: "排队中",
+    overallExecutionMode: "real",
+    values: input.values,
+    executionPlan: [],
+    provenance: [],
+    idempotencyKey: input.idempotencyKey,
+    parentJobId: input.parentJobId,
+    cancelRequested: false,
+    providerCancelState: "none",
+    stagingKeys: [],
+    jobSchemaVersion: 2,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+}
+
+const parseAdScriptRoute = createRoute({
+  method: "post",
+  path: "/api/ad-script/parse",
+  operationId: "parseAdScriptSource",
+  request: {
+    body: {
+      required: true,
+      content: { "application/json": { schema: z.object({ sourceScript: z.string().trim().min(20).max(10_000) }) } },
+    },
+  },
+  responses: {
+    202: { description: "Parse accepted", content: { "application/json": { schema: JobSchema } } },
+    422: { description: "Invalid script", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(parseAdScriptRoute, async (c) => {
+  const ownerUserId = c.get("userId");
+  const idempotencyKey = c.req.header("Idempotency-Key")?.trim().slice(0, 128);
+  if (idempotencyKey) {
+    const existing = store.getByIdempotencyKey(ownerUserId, idempotencyKey);
+    if (existing) return c.json(existing, 202);
+  }
+  const job = adScriptJobRecord({
+    ownerUserId,
+    title: "解析已有口播脚本",
+    values: { operation: "parse-source", sourceScript: c.req.valid("json").sourceScript },
+    idempotencyKey,
+  });
+  store.create(job);
+  await queue.enqueue(job.id);
+  return c.json(job, 202);
+});
+
+const createAdScriptProjectRoute = createRoute({
+  method: "post",
+  path: "/api/ad-script/projects",
+  operationId: "createAdScriptProject",
+  request: {
+    body: { required: true, content: { "application/json": { schema: AdScriptInputSchema } } },
+  },
+  responses: {
+    202: { description: "Generation accepted", content: { "application/json": { schema: AdScriptProjectSchema } } },
+    409: { description: "Idempotency conflict", content: { "application/json": { schema: ErrorSchema } } },
+    422: { description: "Insufficient credits", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(createAdScriptProjectRoute, async (c) => {
+  const ownerUserId = c.get("userId");
+  const idempotencyKey = c.req.header("Idempotency-Key")?.trim().slice(0, 128) ?? crypto.randomUUID();
+  const prior = adScripts.getByIdempotencyKey(ownerUserId, idempotencyKey);
+  if (prior) return c.json(prior, 202);
+  const input = c.req.valid("json");
+  const projectId = crypto.randomUUID();
+  const job = adScriptJobRecord({
+    ownerUserId,
+    title: `${input.productName} · ${input.batchCount} 条口播脚本`,
+    values: { operation: "generate", projectId, model: AD_SCRIPT_MODEL },
+    idempotencyKey,
+  });
+  try {
+    const aggregate = adScripts.createCharged({ projectId, ownerUserId, projectInput: input, idempotencyKey, job });
+    await queue.enqueue(job.id);
+    return c.json(aggregate, 202);
+  } catch (error) {
+    if (error instanceof InsufficientCreditsError)
+      return c.json(
+        {
+          error: {
+            code: "INSUFFICIENT_CREDITS",
+            message: `创建 ${input.batchCount} 条脚本需要 ${input.batchCount * AD_SCRIPT_CREDITS_PER_VARIANT} 创作点`,
+            retryable: false,
+            requestId: crypto.randomUUID(),
+          },
+        },
+        422,
+      );
+    throw error;
+  }
+});
+
+const listAdScriptProjectsRoute = createRoute({
+  method: "get",
+  path: "/api/ad-script/projects",
+  operationId: "listAdScriptProjects",
+  responses: {
+    200: {
+      description: "Ad script projects",
+      content: { "application/json": { schema: z.object({ projects: z.array(AdScriptProjectSchema) }) } },
+    },
+  },
+});
+app.openapi(listAdScriptProjectsRoute, (c) => c.json({ projects: adScripts.listOwned(c.get("userId")) }, 200));
+
+const getAdScriptProjectRoute = createRoute({
+  method: "get",
+  path: "/api/ad-script/projects/{projectId}",
+  operationId: "getAdScriptProject",
+  request: { params: z.object({ projectId: z.string().uuid() }) },
+  responses: {
+    200: { description: "Ad script project", content: { "application/json": { schema: AdScriptProjectSchema } } },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(getAdScriptProjectRoute, (c) => {
+  const aggregate = adScripts.getOwned(c.req.valid("param").projectId, c.get("userId"));
+  return aggregate
+    ? c.json(aggregate, 200)
+    : c.json(
+        {
+          error: { code: "NOT_FOUND", message: "口播脚本项目不存在", retryable: false, requestId: crypto.randomUUID() },
+        },
+        404,
+      );
+});
+
+const saveAdScriptVersionRoute = createRoute({
+  method: "post",
+  path: "/api/ad-script/projects/{projectId}/variants/{variantId}/versions",
+  operationId: "saveAdScriptVersion",
+  request: {
+    params: z.object({ projectId: z.string().uuid(), variantId: z.string().uuid() }),
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: z.object({ expectedVersionId: z.string().uuid(), script: z.string().trim().min(20).max(4_000) }),
+        },
+      },
+    },
+  },
+  responses: {
+    201: { description: "Version saved", content: { "application/json": { schema: AdScriptProjectSchema } } },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },
+    409: { description: "Version conflict", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(saveAdScriptVersionRoute, (c) => {
+  const { projectId, variantId } = c.req.valid("param");
+  const body = c.req.valid("json");
+  const aggregate = adScripts.getOwned(projectId, c.get("userId"));
+  const variant = aggregate?.variants.find((item) => item.id === variantId);
+  const current = variant?.versions.find((version) => version.id === variant.currentVersionId);
+  if (!aggregate || !variant || !current)
+    return c.json(
+      { error: { code: "NOT_FOUND", message: "脚本版本不存在", retryable: false, requestId: crypto.randomUUID() } },
+      404,
+    );
+  try {
+    adScripts.saveHumanVersion({
+      projectId,
+      variantId,
+      ownerUserId: c.get("userId"),
+      expectedVersionId: body.expectedVersionId,
+      script: body.script,
+      score: current.score,
+      compliance: checkAdScriptCompliance(body.script, aggregate.project.input),
+    });
+    const updated = adScripts.getOwned(projectId, c.get("userId"));
+    if (!updated) throw new Error("AD_SCRIPT_PROJECT_NOT_FOUND");
+    return c.json(updated, 201);
+  } catch (error) {
+    if (error instanceof AdScriptVersionConflictError)
+      return c.json(
+        {
+          error: {
+            code: "VERSION_CONFLICT",
+            message: error.message,
+            retryable: false,
+            requestId: crypto.randomUUID(),
+          },
+        },
+        409,
+      );
+    throw error;
+  }
+});
+
+const createAdScriptActionRoute = createRoute({
+  method: "post",
+  path: "/api/ad-script/projects/{projectId}/variants/{variantId}/actions/{action}",
+  operationId: "createAdScriptAction",
+  request: {
+    params: z.object({
+      projectId: z.string().uuid(),
+      variantId: z.string().uuid(),
+      action: z.enum(["rescore", "continue"]),
+    }),
+    body: {
+      required: true,
+      content: { "application/json": { schema: z.object({ versionId: z.string().uuid() }) } },
+    },
+  },
+  responses: {
+    202: { description: "Action accepted", content: { "application/json": { schema: JobSchema } } },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(createAdScriptActionRoute, async (c) => {
+  const { projectId, variantId, action } = c.req.valid("param");
+  const versionId = c.req.valid("json").versionId;
+  const aggregate = adScripts.getOwned(projectId, c.get("userId"));
+  const variant = aggregate?.variants.find((item) => item.id === variantId);
+  const version = variant?.versions.find((item) => item.id === versionId);
+  if (!aggregate || !variant || !version)
+    return c.json(
+      { error: { code: "NOT_FOUND", message: "脚本版本不存在", retryable: false, requestId: crypto.randomUUID() } },
+      404,
+    );
+  const idempotencyKey = c.req.header("Idempotency-Key")?.trim().slice(0, 128);
+  if (idempotencyKey) {
+    const existing = store.getByIdempotencyKey(c.get("userId"), idempotencyKey);
+    if (existing) return c.json(existing, 202);
+  }
+  const job = adScriptJobRecord({
+    ownerUserId: c.get("userId"),
+    title: `${aggregate.project.input.productName} · ${action === "rescore" ? "重新评分" : "继续调优"}`,
+    values: { operation: action, projectId, variantId, versionId, model: AD_SCRIPT_MODEL },
+    idempotencyKey,
+    parentJobId: aggregate.project.jobId ?? undefined,
+  });
+  store.create(job);
+  await queue.enqueue(job.id);
+  return c.json(job, 202);
+});
+
+const exportAdScriptRoute = createRoute({
+  method: "get",
+  path: "/api/ad-script/projects/{projectId}/variants/{variantId}/export",
+  operationId: "exportAdScriptVersion",
+  request: {
+    params: z.object({ projectId: z.string().uuid(), variantId: z.string().uuid() }),
+    query: z.object({ format: z.enum(["txt", "md"]), versionId: z.string().uuid().optional() }),
+  },
+  responses: {
+    200: { description: "Exported script", content: { "text/plain": { schema: z.string() } } },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(exportAdScriptRoute, (c) => {
+  const { projectId, variantId } = c.req.valid("param");
+  const query = c.req.valid("query");
+  const aggregate = adScripts.getOwned(projectId, c.get("userId"));
+  const variant = aggregate?.variants.find((item) => item.id === variantId);
+  const version = variant?.versions.find((item) => item.id === (query.versionId ?? variant.currentVersionId));
+  if (!aggregate || !variant || !version)
+    return c.json(
+      { error: { code: "NOT_FOUND", message: "脚本版本不存在", retryable: false, requestId: crypto.randomUUID() } },
+      404,
+    );
+  c.header("Content-Disposition", `attachment; filename="ad-script-${variant.ordinal}.${query.format}"`);
+  const content =
+    query.format === "md"
+      ? `# ${aggregate.project.input.productName}口播脚本 ${variant.ordinal}\n\n${version.script}\n\n---\n\n评分：${version.score.total}/100\n`
+      : version.script;
+  return c.text(content, 200);
+});
+
 const createJobRoute = createRoute({
   method: "post",
   path: "/api/{moduleId}/jobs",
@@ -1808,6 +2156,18 @@ const createJobRoute = createRoute({
 });
 app.openapi(createJobRoute, async (c) => {
   const moduleId = c.req.valid("param").moduleId as ModuleId;
+  if (moduleId === "ad-script")
+    return c.json(
+      {
+        error: {
+          code: "DEDICATED_WORKFLOW_REQUIRED",
+          message: "口播脚本必须通过专用创作流程提交",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      422,
+    );
   if (!isModuleOpen(moduleId))
     return c.json(
       {
@@ -2093,6 +2453,14 @@ app.openapi(cancelRoute, async (c) => {
     );
   if (job.status === "queued") {
     const cancelled = store.update(id, { status: "cancelled", cancelRequested: true, stage: "已取消" }) ?? job;
+    if (job.moduleId === "ad-script") {
+      const aggregate = adScripts.getByJobId(job.id);
+      if (aggregate) {
+        adScripts.updateProject(aggregate.project.id, { status: "cancelled" });
+        for (const variant of aggregate.variants)
+          if (variant.status === "queued") adScripts.updateVariant(variant.id, { status: "cancelled" });
+      }
+    }
     await queue.remove(id).catch(() => undefined);
     return c.json(cancelled, 200);
   }
@@ -2117,6 +2485,18 @@ app.openapi(retryRoute, async (c) => {
     return c.json(
       { error: { code: "NOT_FOUND", message: "任务不存在", retryable: false, requestId: crypto.randomUUID() } },
       404,
+    );
+  if (source.moduleId === "ad-script")
+    return c.json(
+      {
+        error: {
+          code: "DEDICATED_WORKFLOW_REQUIRED",
+          message: "请在口播脚本结果页重新生成或继续调优",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      409,
     );
   if (!isModuleOpen(source.moduleId))
     return c.json(

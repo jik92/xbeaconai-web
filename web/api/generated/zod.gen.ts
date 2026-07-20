@@ -204,6 +204,128 @@ export const zJob = z.object({
     updatedAt: z.string()
 });
 
+export const zAdScriptInput = z.object({
+    sceneCategory: z.enum(['marketing', 'placement']),
+    sceneId: z.string().min(1).max(40),
+    batchCount: z.int().gte(1).lte(3),
+    productName: z.string().min(1).max(30),
+    sellingPoints: z.array(z.string().min(1).max(80)).min(1).max(6),
+    targetLength: z.enum([
+        '60-80',
+        '80-120',
+        '100-150',
+        '150-200',
+        '200-250',
+        '250-350'
+    ]),
+    marketingGoal: z.string().min(1).max(40),
+    targetAudience: z.string().min(1).max(80),
+    painPoints: z.string().max(150).optional().default(''),
+    benefits: z.string().max(100).optional().default(''),
+    speakerRole: z.string().min(1).max(40),
+    customRole: z.string().max(100).optional().default(''),
+    scriptStyle: z.string().min(1).max(40),
+    openingStyle: z.string().min(1).max(40),
+    sourceScript: z.string().max(10000).optional().default(''),
+    useSourceAsReference: z.boolean().optional().default(false)
+});
+
+export const zAdScriptScores = z.object({
+    openingAttraction: z.int().gte(0).lte(25),
+    painResonance: z.int().gte(0).lte(25),
+    benefitClarity: z.int().gte(0).lte(25),
+    callToAction: z.int().gte(0).lte(25)
+});
+
+export const zAdScriptScoreDetail = z.object({
+    scores: zAdScriptScores,
+    total: z.int().gte(0).lte(100),
+    suggestions: z.array(z.string().max(500)).max(12)
+});
+
+export const zAdScriptComplianceFinding = z.object({
+    ruleId: z.string(),
+    severity: z.enum(['warning', 'blocking']),
+    source: z.enum(['local', 'ai']),
+    excerpt: z.string(),
+    start: z.int().gte(0).optional(),
+    end: z.int().gte(0).optional(),
+    message: z.string(),
+    suggestion: z.string()
+});
+
+export const zAdScriptCompliance = z.object({
+    passed: z.boolean(),
+    findings: z.array(zAdScriptComplianceFinding)
+});
+
+export const zAdScriptVersion = z.object({
+    id: z.uuid(),
+    variantId: z.uuid(),
+    sequence: z.int().gte(1),
+    source: z.enum([
+        'initial',
+        'optimized',
+        'human'
+    ]),
+    parentVersionId: z.uuid(),
+    round: z.int().gte(0),
+    script: z.string(),
+    score: zAdScriptScoreDetail,
+    compliance: zAdScriptCompliance,
+    changeSummary: z.string(),
+    model: z.string(),
+    createdAt: z.string()
+});
+
+export const zAdScriptVariant = z.object({
+    id: z.uuid(),
+    projectId: z.uuid(),
+    ordinal: z.int().gte(1).lte(3),
+    status: z.enum([
+        'queued',
+        'processing',
+        'succeeded',
+        'failed',
+        'cancelled'
+    ]),
+    currentVersionId: z.uuid(),
+    finalScore: z.int().gte(0).lte(100),
+    compliancePassed: z.boolean(),
+    iterationCount: z.int().gte(0),
+    error: z.object({
+        code: z.string(),
+        message: z.string(),
+        retryable: z.boolean(),
+        requestId: z.string()
+    }),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    versions: z.array(zAdScriptVersion)
+});
+
+export const zAdScriptProject = z.object({
+    project: z.object({
+        id: z.uuid(),
+        ownerUserId: z.uuid(),
+        jobId: z.uuid(),
+        status: z.enum([
+            'draft',
+            'queued',
+            'processing',
+            'succeeded',
+            'partially_succeeded',
+            'failed',
+            'cancelled'
+        ]),
+        input: zAdScriptInput,
+        idempotencyKey: z.string(),
+        createdAt: z.string(),
+        updatedAt: z.string()
+    }),
+    variants: z.array(zAdScriptVariant)
+});
+
 /**
  * Service health
  */
@@ -607,6 +729,83 @@ export const zListJobsQuery = z.object({
 export const zListJobsResponse = z.object({
     jobs: z.array(zJob)
 });
+
+export const zParseAdScriptSourceBody = z.object({
+    sourceScript: z.string().min(20).max(10000)
+});
+
+/**
+ * Parse accepted
+ */
+export const zParseAdScriptSourceResponse = zJob;
+
+/**
+ * Ad script projects
+ */
+export const zListAdScriptProjectsResponse = z.object({
+    projects: z.array(zAdScriptProject)
+});
+
+export const zCreateAdScriptProjectBody = zAdScriptInput;
+
+/**
+ * Generation accepted
+ */
+export const zCreateAdScriptProjectResponse = zAdScriptProject;
+
+export const zGetAdScriptProjectPath = z.object({
+    projectId: z.uuid()
+});
+
+/**
+ * Ad script project
+ */
+export const zGetAdScriptProjectResponse = zAdScriptProject;
+
+export const zSaveAdScriptVersionBody = z.object({
+    expectedVersionId: z.uuid(),
+    script: z.string().min(20).max(4000)
+});
+
+export const zSaveAdScriptVersionPath = z.object({
+    projectId: z.uuid(),
+    variantId: z.uuid()
+});
+
+/**
+ * Version saved
+ */
+export const zSaveAdScriptVersionResponse = zAdScriptProject;
+
+export const zCreateAdScriptActionBody = z.object({
+    versionId: z.uuid()
+});
+
+export const zCreateAdScriptActionPath = z.object({
+    projectId: z.uuid(),
+    variantId: z.uuid(),
+    action: z.enum(['rescore', 'continue'])
+});
+
+/**
+ * Action accepted
+ */
+export const zCreateAdScriptActionResponse = zJob;
+
+export const zExportAdScriptVersionPath = z.object({
+    projectId: z.uuid(),
+    variantId: z.uuid()
+});
+
+export const zExportAdScriptVersionQuery = z.object({
+    format: z.enum(['txt', 'md']),
+    versionId: z.uuid().optional()
+});
+
+/**
+ * Exported script
+ */
+export const zExportAdScriptVersionResponse = z.string();
 
 export const zCreateJobBody = z.object({
     title: z.string().min(1).max(200),

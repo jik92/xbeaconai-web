@@ -5,16 +5,22 @@ import { apiBaseUrl, apiUrl } from "./base-url";
 import { client } from "./generated/client.gen";
 import {
   cancelJob,
+  createAdScriptAction,
+  createAdScriptProject,
   createJob,
   deleteAsset as deleteAssetRequest,
   deleteProduct as deleteProductRequest,
+  exportAdScriptVersion,
+  getAdScriptProject,
   getJob,
   getModels,
   listJobs,
+  parseAdScriptSource,
   retryJob,
+  saveAdScriptVersion,
   uploadMedia,
 } from "./generated/sdk.gen";
-import type { Job, ModuleId, SeedanceModelId } from "./generated/types.gen";
+import type { AdScriptInput, AdScriptProject, Job, ModuleId, SeedanceModelId } from "./generated/types.gen";
 
 const configure = () =>
   client.setConfig({
@@ -36,6 +42,85 @@ export async function fetchModels() {
   configure();
   const { data } = await getModels({ throwOnError: true });
   return data?.models ?? [];
+}
+export async function parseExistingAdScript(sourceScript: string, idempotencyKey = randomUuid()) {
+  configure();
+  const { data } = await parseAdScriptSource({
+    body: { sourceScript },
+    headers: { ...authHeaders(), "Idempotency-Key": idempotencyKey },
+    throwOnError: true,
+  });
+  if (!data) throw new Error("脚本解析任务创建失败");
+  return data;
+}
+export async function createAdScript(input: AdScriptInput, idempotencyKey = randomUuid()) {
+  configure();
+  const { data } = await createAdScriptProject({
+    body: input,
+    headers: { ...authHeaders(), "Idempotency-Key": idempotencyKey },
+    throwOnError: true,
+  });
+  if (!data) throw new Error("口播脚本任务创建失败");
+  return data;
+}
+export async function fetchAdScriptProject(projectId: string): Promise<AdScriptProject> {
+  configure();
+  const { data } = await getAdScriptProject({ path: { projectId }, headers: authHeaders(), throwOnError: true });
+  if (!data) throw new Error("口播脚本项目加载失败");
+  return data;
+}
+export async function saveAdScriptHumanVersion(input: {
+  projectId: string;
+  variantId: string;
+  expectedVersionId: string;
+  script: string;
+}) {
+  configure();
+  const { data } = await saveAdScriptVersion({
+    path: { projectId: input.projectId, variantId: input.variantId },
+    body: { expectedVersionId: input.expectedVersionId, script: input.script },
+    headers: authHeaders(),
+    throwOnError: true,
+  });
+  if (!data) throw new Error("脚本版本保存失败");
+  return data;
+}
+export async function runAdScriptAction(input: {
+  projectId: string;
+  variantId: string;
+  versionId: string;
+  action: "rescore" | "continue";
+}) {
+  configure();
+  const { data } = await createAdScriptAction({
+    path: { projectId: input.projectId, variantId: input.variantId, action: input.action },
+    body: { versionId: input.versionId },
+    headers: { ...authHeaders(), "Idempotency-Key": randomUuid() },
+    throwOnError: true,
+  });
+  if (!data) throw new Error("脚本操作创建失败");
+  return data;
+}
+export async function downloadAdScriptVersion(input: {
+  projectId: string;
+  variantId: string;
+  versionId: string;
+  format: "txt" | "md";
+}) {
+  configure();
+  const { data } = await exportAdScriptVersion({
+    path: { projectId: input.projectId, variantId: input.variantId },
+    query: { versionId: input.versionId, format: input.format },
+    headers: authHeaders(),
+    throwOnError: true,
+  });
+  if (typeof data !== "string") throw new Error("脚本导出失败");
+  const url = URL.createObjectURL(new Blob([data], { type: input.format === "md" ? "text/markdown" : "text/plain" }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `口播脚本.${input.format}`;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }
 export async function submitJob(
   moduleId: ModuleId,

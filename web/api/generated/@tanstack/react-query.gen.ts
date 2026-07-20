@@ -3,8 +3,8 @@
 import { type DefaultError, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { cancelJob, changePassword, completeDirectUpload, createDirectUpload, createJob, createRechargeOrder, deleteAsset, deleteProduct, downloadArtifact, getAssetContent, getCapabilities, getCreationCapabilities, getCurrentUser, getHealth, getJob, getModels, getPreferences, listAssets, listJobs, listNotifications, listRechargeOrders, listRechargePackages, login, logout, markAllNotificationsRead, markNotificationRead, type Options, register, retryJob, saveAssetMetadata, savePreferences, updateProfile, uploadMedia } from '../sdk.gen';
-import type { CancelJobData, CancelJobError, CancelJobResponse, ChangePasswordData, ChangePasswordError, ChangePasswordResponse, CompleteDirectUploadData, CompleteDirectUploadError, CompleteDirectUploadResponse, CreateDirectUploadData, CreateDirectUploadError, CreateDirectUploadResponse, CreateJobData, CreateJobError, CreateJobResponse, CreateRechargeOrderData, CreateRechargeOrderError, CreateRechargeOrderResponse, DeleteAssetData, DeleteAssetError, DeleteAssetResponse, DeleteProductData, DeleteProductError, DeleteProductResponse, DownloadArtifactData, DownloadArtifactError, DownloadArtifactResponse, GetAssetContentData, GetAssetContentError, GetAssetContentResponse, GetCapabilitiesData, GetCapabilitiesResponse, GetCreationCapabilitiesData, GetCreationCapabilitiesResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetHealthData, GetHealthResponse, GetJobData, GetJobError, GetJobResponse, GetModelsData, GetModelsResponse, GetPreferencesData, GetPreferencesResponse, ListAssetsData, ListAssetsResponse, ListJobsData, ListJobsResponse, ListNotificationsData, ListNotificationsResponse, ListRechargeOrdersData, ListRechargeOrdersResponse, ListRechargePackagesData, ListRechargePackagesResponse, LoginData, LoginError, LoginResponse, LogoutData, LogoutError, LogoutResponse, MarkAllNotificationsReadData, MarkAllNotificationsReadResponse, MarkNotificationReadData, MarkNotificationReadError, MarkNotificationReadResponse, RegisterData, RegisterError, RegisterResponse, RetryJobData, RetryJobError, RetryJobResponse, SaveAssetMetadataData, SaveAssetMetadataError, SaveAssetMetadataResponse, SavePreferencesData, SavePreferencesResponse, UpdateProfileData, UpdateProfileError, UpdateProfileResponse, UploadMediaData, UploadMediaError, UploadMediaResponse } from '../types.gen';
+import { cancelJob, changePassword, completeDirectUpload, createAdScriptAction, createAdScriptProject, createDirectUpload, createJob, createRechargeOrder, deleteAsset, deleteProduct, downloadArtifact, exportAdScriptVersion, getAdScriptProject, getAssetContent, getCapabilities, getCreationCapabilities, getCurrentUser, getHealth, getJob, getModels, getPreferences, listAdScriptProjects, listAssets, listJobs, listNotifications, listRechargeOrders, listRechargePackages, login, logout, markAllNotificationsRead, markNotificationRead, type Options, parseAdScriptSource, register, retryJob, saveAdScriptVersion, saveAssetMetadata, savePreferences, updateProfile, uploadMedia } from '../sdk.gen';
+import type { CancelJobData, CancelJobError, CancelJobResponse, ChangePasswordData, ChangePasswordError, ChangePasswordResponse, CompleteDirectUploadData, CompleteDirectUploadError, CompleteDirectUploadResponse, CreateAdScriptActionData, CreateAdScriptActionError, CreateAdScriptActionResponse, CreateAdScriptProjectData, CreateAdScriptProjectError, CreateAdScriptProjectResponse, CreateDirectUploadData, CreateDirectUploadError, CreateDirectUploadResponse, CreateJobData, CreateJobError, CreateJobResponse, CreateRechargeOrderData, CreateRechargeOrderError, CreateRechargeOrderResponse, DeleteAssetData, DeleteAssetError, DeleteAssetResponse, DeleteProductData, DeleteProductError, DeleteProductResponse, DownloadArtifactData, DownloadArtifactError, DownloadArtifactResponse, ExportAdScriptVersionData, ExportAdScriptVersionError, ExportAdScriptVersionResponse, GetAdScriptProjectData, GetAdScriptProjectError, GetAdScriptProjectResponse, GetAssetContentData, GetAssetContentError, GetAssetContentResponse, GetCapabilitiesData, GetCapabilitiesResponse, GetCreationCapabilitiesData, GetCreationCapabilitiesResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetHealthData, GetHealthResponse, GetJobData, GetJobError, GetJobResponse, GetModelsData, GetModelsResponse, GetPreferencesData, GetPreferencesResponse, ListAdScriptProjectsData, ListAdScriptProjectsResponse, ListAssetsData, ListAssetsResponse, ListJobsData, ListJobsResponse, ListNotificationsData, ListNotificationsResponse, ListRechargeOrdersData, ListRechargeOrdersResponse, ListRechargePackagesData, ListRechargePackagesResponse, LoginData, LoginError, LoginResponse, LogoutData, LogoutError, LogoutResponse, MarkAllNotificationsReadData, MarkAllNotificationsReadResponse, MarkNotificationReadData, MarkNotificationReadError, MarkNotificationReadResponse, ParseAdScriptSourceData, ParseAdScriptSourceError, ParseAdScriptSourceResponse, RegisterData, RegisterError, RegisterResponse, RetryJobData, RetryJobError, RetryJobResponse, SaveAdScriptVersionData, SaveAdScriptVersionError, SaveAdScriptVersionResponse, SaveAssetMetadataData, SaveAssetMetadataError, SaveAssetMetadataResponse, SavePreferencesData, SavePreferencesResponse, UpdateProfileData, UpdateProfileError, UpdateProfileResponse, UploadMediaData, UploadMediaError, UploadMediaResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -427,6 +427,107 @@ export const listJobsOptions = (options?: Options<ListJobsData>) => queryOptions
         return data;
     },
     queryKey: listJobsQueryKey(options)
+});
+
+export const parseAdScriptSourceMutation = (options?: Partial<Options<ParseAdScriptSourceData>>): UseMutationOptions<ParseAdScriptSourceResponse, ParseAdScriptSourceError, Options<ParseAdScriptSourceData>> => {
+    const mutationOptions: UseMutationOptions<ParseAdScriptSourceResponse, ParseAdScriptSourceError, Options<ParseAdScriptSourceData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await parseAdScriptSource({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const listAdScriptProjectsQueryKey = (options?: Options<ListAdScriptProjectsData>) => createQueryKey('listAdScriptProjects', options);
+
+export const listAdScriptProjectsOptions = (options?: Options<ListAdScriptProjectsData>) => queryOptions<ListAdScriptProjectsResponse, DefaultError, ListAdScriptProjectsResponse, ReturnType<typeof listAdScriptProjectsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listAdScriptProjects({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listAdScriptProjectsQueryKey(options)
+});
+
+export const createAdScriptProjectMutation = (options?: Partial<Options<CreateAdScriptProjectData>>): UseMutationOptions<CreateAdScriptProjectResponse, CreateAdScriptProjectError, Options<CreateAdScriptProjectData>> => {
+    const mutationOptions: UseMutationOptions<CreateAdScriptProjectResponse, CreateAdScriptProjectError, Options<CreateAdScriptProjectData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await createAdScriptProject({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getAdScriptProjectQueryKey = (options: Options<GetAdScriptProjectData>) => createQueryKey('getAdScriptProject', options);
+
+export const getAdScriptProjectOptions = (options: Options<GetAdScriptProjectData>) => queryOptions<GetAdScriptProjectResponse, GetAdScriptProjectError, GetAdScriptProjectResponse, ReturnType<typeof getAdScriptProjectQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getAdScriptProject({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getAdScriptProjectQueryKey(options)
+});
+
+export const saveAdScriptVersionMutation = (options?: Partial<Options<SaveAdScriptVersionData>>): UseMutationOptions<SaveAdScriptVersionResponse, SaveAdScriptVersionError, Options<SaveAdScriptVersionData>> => {
+    const mutationOptions: UseMutationOptions<SaveAdScriptVersionResponse, SaveAdScriptVersionError, Options<SaveAdScriptVersionData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await saveAdScriptVersion({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const createAdScriptActionMutation = (options?: Partial<Options<CreateAdScriptActionData>>): UseMutationOptions<CreateAdScriptActionResponse, CreateAdScriptActionError, Options<CreateAdScriptActionData>> => {
+    const mutationOptions: UseMutationOptions<CreateAdScriptActionResponse, CreateAdScriptActionError, Options<CreateAdScriptActionData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await createAdScriptAction({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const exportAdScriptVersionQueryKey = (options: Options<ExportAdScriptVersionData>) => createQueryKey('exportAdScriptVersion', options);
+
+export const exportAdScriptVersionOptions = (options: Options<ExportAdScriptVersionData>) => queryOptions<ExportAdScriptVersionResponse, ExportAdScriptVersionError, ExportAdScriptVersionResponse, ReturnType<typeof exportAdScriptVersionQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await exportAdScriptVersion({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: exportAdScriptVersionQueryKey(options)
 });
 
 export const createJobMutation = (options?: Partial<Options<CreateJobData>>): UseMutationOptions<CreateJobResponse, CreateJobError, Options<CreateJobData>> => {

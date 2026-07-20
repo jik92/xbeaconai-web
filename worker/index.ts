@@ -1,6 +1,7 @@
 import { Queue, Worker } from "bullmq";
 import IORedis from "ioredis";
 import { AccountStore } from "../server/accounts/account-store";
+import { AdScriptStore } from "../server/ad-script/ad-script-store";
 import { env } from "../server/env";
 import { SqliteJobStore } from "../server/jobs/sqlite-job-store";
 import { type ExecuteJobPayload, executeJobName, executeJobOptions } from "../shared/jobs/queue-contract";
@@ -9,7 +10,8 @@ import { createWorkerRedisConnection } from "./redis";
 
 const store = new SqliteJobStore();
 const accounts = new AccountStore();
-const processor = new JobProcessor(store, accounts);
+const adScripts = new AdScriptStore();
+const processor = new JobProcessor(store, accounts, adScripts);
 const recoveryRedis = new IORedis(env.redisUrl, { lazyConnect: true, maxRetriesPerRequest: 1 });
 const recoveryQueue = new Queue<ExecuteJobPayload>(env.redisQueueName, {
   connection: recoveryRedis,
@@ -76,6 +78,7 @@ const shutdown = async () => {
   await recoveryRedis.quit();
   store.close();
   accounts.close();
+  adScripts.close();
   process.exit(0);
 };
 process.on("SIGINT", () => void shutdown());

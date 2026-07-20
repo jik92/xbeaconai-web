@@ -218,6 +218,102 @@ export const creditCharges = sqliteTable(
   (table) => [uniqueIndex("credit_charges_job_idx").on(table.jobId)],
 );
 
+export const creditRefunds = sqliteTable(
+  "credit_refunds",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    jobId: text("job_id").notNull(),
+    amount: integer("amount").notNull(),
+    balanceAfter: integer("balance_after").notNull(),
+    reason: text("reason").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [uniqueIndex("credit_refunds_job_idx").on(table.jobId)],
+);
+
+export const adScriptProjects = sqliteTable(
+  "ad_script_projects",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id),
+    jobId: text("job_id").references(() => jobs.id),
+    status: text("status", {
+      enum: ["draft", "queued", "processing", "succeeded", "partially_succeeded", "failed", "cancelled"],
+    })
+      .notNull()
+      .default("draft"),
+    input: text("input_json", { mode: "json" }).$type<import("../ad-script/types").AdScriptInput>().notNull(),
+    idempotencyKey: text("idempotency_key"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    index("ad_script_projects_owner_updated_idx").on(table.ownerUserId, table.updatedAt),
+    uniqueIndex("ad_script_projects_owner_idempotency_idx").on(table.ownerUserId, table.idempotencyKey),
+  ],
+);
+
+export const adScriptVariants = sqliteTable(
+  "ad_script_variants",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => adScriptProjects.id),
+    ordinal: integer("ordinal").notNull(),
+    status: text("status", { enum: ["queued", "processing", "succeeded", "failed", "cancelled"] })
+      .notNull()
+      .default("queued"),
+    currentVersionId: text("current_version_id"),
+    finalScore: integer("final_score"),
+    compliancePassed: integer("compliance_passed", { mode: "boolean" }),
+    iterationCount: integer("iteration_count").notNull().default(0),
+    error: text("error_json", { mode: "json" }).$type<{
+      code: string;
+      message: string;
+      retryable: boolean;
+      requestId: string;
+    }>(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("ad_script_variants_project_ordinal_idx").on(table.projectId, table.ordinal),
+    index("ad_script_variants_project_idx").on(table.projectId),
+  ],
+);
+
+export const adScriptVersions = sqliteTable(
+  "ad_script_versions",
+  {
+    id: text("id").primaryKey(),
+    variantId: text("variant_id")
+      .notNull()
+      .references(() => adScriptVariants.id),
+    sequence: integer("sequence").notNull(),
+    source: text("source", { enum: ["initial", "optimized", "human"] }).notNull(),
+    parentVersionId: text("parent_version_id"),
+    round: integer("round").notNull(),
+    script: text("script").notNull(),
+    score: text("score_json", { mode: "json" }).$type<import("../ad-script/types").AdScriptScoreDetail>().notNull(),
+    compliance: text("compliance_json", { mode: "json" })
+      .$type<import("../ad-script/types").AdScriptCompliance>()
+      .notNull(),
+    changeSummary: text("change_summary").notNull(),
+    model: text("model").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("ad_script_versions_variant_sequence_idx").on(table.variantId, table.sequence),
+    index("ad_script_versions_variant_created_idx").on(table.variantId, table.createdAt),
+  ],
+);
+
 export const objectCleanup = sqliteTable("object_cleanup", {
   objectKey: text("object_key").primaryKey(),
   jobId: text("job_id").notNull(),

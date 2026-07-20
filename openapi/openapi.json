@@ -614,6 +614,469 @@
           "doubao-seedance-2-0-mini-260615",
           "doubao-seedance-2-0-fast-260128"
         ]
+      },
+      "AdScriptProject": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "ownerUserId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "jobId": {
+                "type": "string",
+                "nullable": true,
+                "format": "uuid"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "draft",
+                  "queued",
+                  "processing",
+                  "succeeded",
+                  "partially_succeeded",
+                  "failed",
+                  "cancelled"
+                ]
+              },
+              "input": {
+                "$ref": "#/components/schemas/AdScriptInput"
+              },
+              "idempotencyKey": {
+                "type": "string",
+                "nullable": true
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "ownerUserId",
+              "jobId",
+              "status",
+              "input",
+              "idempotencyKey",
+              "createdAt",
+              "updatedAt"
+            ]
+          },
+          "variants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdScriptVariant"
+            }
+          }
+        },
+        "required": [
+          "project",
+          "variants"
+        ]
+      },
+      "AdScriptInput": {
+        "type": "object",
+        "properties": {
+          "sceneCategory": {
+            "type": "string",
+            "enum": [
+              "marketing",
+              "placement"
+            ]
+          },
+          "sceneId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "batchCount": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3
+          },
+          "productName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 30
+          },
+          "sellingPoints": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "minItems": 1,
+            "maxItems": 6
+          },
+          "targetLength": {
+            "type": "string",
+            "enum": [
+              "60-80",
+              "80-120",
+              "100-150",
+              "150-200",
+              "200-250",
+              "250-350"
+            ]
+          },
+          "marketingGoal": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "targetAudience": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "painPoints": {
+            "type": "string",
+            "maxLength": 150,
+            "default": ""
+          },
+          "benefits": {
+            "type": "string",
+            "maxLength": 100,
+            "default": ""
+          },
+          "speakerRole": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "customRole": {
+            "type": "string",
+            "maxLength": 100,
+            "default": ""
+          },
+          "scriptStyle": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "openingStyle": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "sourceScript": {
+            "type": "string",
+            "maxLength": 10000,
+            "default": ""
+          },
+          "useSourceAsReference": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "sceneCategory",
+          "sceneId",
+          "batchCount",
+          "productName",
+          "sellingPoints",
+          "targetLength",
+          "marketingGoal",
+          "targetAudience",
+          "speakerRole",
+          "scriptStyle",
+          "openingStyle"
+        ]
+      },
+      "AdScriptVariant": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "projectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ordinal": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "processing",
+              "succeeded",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "currentVersionId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "finalScore": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "maximum": 100
+          },
+          "compliancePassed": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "iterationCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "error": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "retryable": {
+                "type": "boolean"
+              },
+              "requestId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message",
+              "retryable",
+              "requestId"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdScriptVersion"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "ordinal",
+          "status",
+          "currentVersionId",
+          "finalScore",
+          "compliancePassed",
+          "iterationCount",
+          "error",
+          "createdAt",
+          "updatedAt",
+          "versions"
+        ]
+      },
+      "AdScriptVersion": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "variantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "initial",
+              "optimized",
+              "human"
+            ]
+          },
+          "parentVersionId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "round": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "script": {
+            "type": "string"
+          },
+          "score": {
+            "$ref": "#/components/schemas/AdScriptScoreDetail"
+          },
+          "compliance": {
+            "$ref": "#/components/schemas/AdScriptCompliance"
+          },
+          "changeSummary": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "variantId",
+          "sequence",
+          "source",
+          "parentVersionId",
+          "round",
+          "script",
+          "score",
+          "compliance",
+          "changeSummary",
+          "model",
+          "createdAt"
+        ]
+      },
+      "AdScriptScoreDetail": {
+        "type": "object",
+        "properties": {
+          "scores": {
+            "$ref": "#/components/schemas/AdScriptScores"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "suggestions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 12
+          }
+        },
+        "required": [
+          "scores",
+          "total",
+          "suggestions"
+        ]
+      },
+      "AdScriptScores": {
+        "type": "object",
+        "properties": {
+          "openingAttraction": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 25
+          },
+          "painResonance": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 25
+          },
+          "benefitClarity": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 25
+          },
+          "callToAction": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 25
+          }
+        },
+        "required": [
+          "openingAttraction",
+          "painResonance",
+          "benefitClarity",
+          "callToAction"
+        ]
+      },
+      "AdScriptCompliance": {
+        "type": "object",
+        "properties": {
+          "passed": {
+            "type": "boolean"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdScriptComplianceFinding"
+            }
+          }
+        },
+        "required": [
+          "passed",
+          "findings"
+        ]
+      },
+      "AdScriptComplianceFinding": {
+        "type": "object",
+        "properties": {
+          "ruleId": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "warning",
+              "blocking"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "local",
+              "ai"
+            ]
+          },
+          "excerpt": {
+            "type": "string"
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "end": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "message": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ruleId",
+          "severity",
+          "source",
+          "excerpt",
+          "message",
+          "suggestion"
+        ]
       }
     },
     "parameters": {}
@@ -2460,6 +2923,392 @@
                   "required": [
                     "jobs"
                   ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ad-script/parse": {
+      "post": {
+        "operationId": "parseAdScriptSource",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sourceScript": {
+                    "type": "string",
+                    "minLength": 20,
+                    "maxLength": 10000
+                  }
+                },
+                "required": [
+                  "sourceScript"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Parse accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid script",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ad-script/projects": {
+      "post": {
+        "operationId": "createAdScriptProject",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdScriptInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Generation accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdScriptProject"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Insufficient credits",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listAdScriptProjects",
+        "responses": {
+          "200": {
+            "description": "Ad script projects",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "projects": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AdScriptProject"
+                      }
+                    }
+                  },
+                  "required": [
+                    "projects"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ad-script/projects/{projectId}": {
+      "get": {
+        "operationId": "getAdScriptProject",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ad script project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdScriptProject"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ad-script/projects/{projectId}/variants/{variantId}/versions": {
+      "post": {
+        "operationId": "saveAdScriptVersion",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "variantId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expectedVersionId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "script": {
+                    "type": "string",
+                    "minLength": 20,
+                    "maxLength": 4000
+                  }
+                },
+                "required": [
+                  "expectedVersionId",
+                  "script"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Version saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdScriptProject"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ad-script/projects/{projectId}/variants/{variantId}/actions/{action}": {
+      "post": {
+        "operationId": "createAdScriptAction",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "variantId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "rescore",
+                "continue"
+              ]
+            },
+            "required": true,
+            "name": "action",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "versionId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "versionId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Action accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ad-script/projects/{projectId}/variants/{variantId}/export": {
+      "get": {
+        "operationId": "exportAdScriptVersion",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "variantId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "txt",
+                "md"
+              ]
+            },
+            "required": true,
+            "name": "format",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "versionId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exported script",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
             }

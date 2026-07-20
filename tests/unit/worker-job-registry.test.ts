@@ -46,6 +46,7 @@ describe("worker job registry", () => {
     expect(findJobHandler(job("video-cut", { mergeMode: "video-cut-clips" })).name).toBe("video-clip-merge");
     expect(findJobHandler(job("video-cut")).name).toBe("video-cut");
     expect(findJobHandler(job("voice-clone")).name).toBe("voice-clone");
+    expect(findJobHandler(job("ad-script")).name).toBe("ad-script");
     expect(findJobHandler(job("ai-generate")).name).toBe("generic-creation");
   });
 
@@ -76,7 +77,7 @@ describe("worker job registry", () => {
     const path = join(tmpdir(), `worker-job-registry-${crypto.randomUUID()}.sqlite`);
     databases.push(path);
     const store = new SqliteJobStore(path);
-    const record = job("ad-script", { __scenario: "insufficient-credits" });
+    const record = job("ai-generate", { __scenario: "insufficient-credits" });
     store.create(record);
 
     await new JobProcessor(store).process(record.id);

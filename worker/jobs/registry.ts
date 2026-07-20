@@ -1,4 +1,5 @@
 import type { JobRecord } from "../../server/types";
+import { adScriptJob } from "./job-ad-script";
 import { genericCreationJob } from "./job-generic-creation";
 import { videoClipMergeJob } from "./job-video-clip-merge";
 import { videoCutJob } from "./job-video-cut";
@@ -7,6 +8,7 @@ import { voiceCloneJob } from "./job-voice-clone";
 import type { WorkerJobHandler } from "./types";
 
 export const jobHandlers: readonly WorkerJobHandler[] = [
+  adScriptJob,
   videoRemixAnalysisJob,
   videoClipMergeJob,
   videoCutJob,
