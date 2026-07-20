@@ -306,17 +306,16 @@ export function AppShell() {
             </button>
             <button
               type="button"
-              className="collapse"
+              className="drawer-toggle"
               aria-label={sidebarCollapsed ? "展开导航，显示图标和标题" : "收起导航，仅显示图标"}
               aria-expanded={!sidebarCollapsed}
-              title={sidebarCollapsed ? "展开导航" : undefined}
+              title={sidebarCollapsed ? "展开导航" : "收起导航"}
               onClick={() => {
                 if (!sidebarCollapsed) setMenuEditing(false);
                 setSidebarCollapsed((collapsed) => !collapsed);
               }}
             >
               {sidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-              <span>{sidebarCollapsed ? "展开导航" : "收起导航"}</span>
             </button>
           </div>
         </footer>
