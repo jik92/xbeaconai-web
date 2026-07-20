@@ -848,7 +848,7 @@ function ResultPreview({
               >
                 {selectedArtifactIds.includes(artifact.id) && <Check />}
               </button>
-              <div className="result-clip-media">
+              <div className={`result-clip-media${artifact.mimeType.startsWith("video/") ? " result-clip-video" : ""}`}>
                 {artifact.url ? (
                   <AuthenticatedMedia url={artifact.url} mimeType={artifact.mimeType} alt={artifact.name} />
                 ) : (
@@ -1492,34 +1492,36 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
           </header>
         )}
         <TaskSearchFilters compact={isVideoCutPage} onSearch={setAppliedFilters} />
-        <div className={`task-toolbar${isVideoCutPage ? " compact" : ""}`}>
-          {!isVideoCutPage && (
+        {!isVideoCutPage && (
+          <div className="task-toolbar">
             <button type="button" className="new-task-button" onClick={() => setCreatorOpen(true)}>
               <Plus />
               {toolboxDisplayName(config)}
             </button>
-          )}
-          <small>
+          </div>
+        )}
+        <div className={`task-table-container${isVideoCutPage ? " video-cut-task-table-container" : ""}`}>
+          <TaskTable
+            tasks={filteredTasks}
+            retry={retry}
+            preview={setSelectedTask}
+            cancel={cancel}
+            className={isVideoCutPage ? "video-cut-task-table" : "job-task-table"}
+            height={isVideoCutPage ? "100%" : undefined}
+            emptyMessage={tasks.length ? "没有符合条件的任务" : "暂无任务"}
+            emptyAction={
+              !tasks.length ? (
+                <button type="button" onClick={() => setCreatorOpen(true)}>
+                  新建第一个任务
+                </button>
+              ) : undefined
+            }
+          />
+          <small className="task-table-count">
             共 {filteredTasks.length} 个任务
             {filteredTasks.length !== tasks.length && ` / 全部 ${tasks.length} 个`}
           </small>
         </div>
-        <TaskTable
-          tasks={filteredTasks}
-          retry={retry}
-          preview={setSelectedTask}
-          cancel={cancel}
-          className={isVideoCutPage ? "video-cut-task-table" : "job-task-table"}
-          height={isVideoCutPage ? "calc(100vh - 318px)" : undefined}
-          emptyMessage={tasks.length ? "没有符合条件的任务" : "暂无任务"}
-          emptyAction={
-            !tasks.length ? (
-              <button type="button" onClick={() => setCreatorOpen(true)}>
-                新建第一个任务
-              </button>
-            ) : undefined
-          }
-        />
       </section>
       {selectedTask && (
         <div className="result-backdrop" onMouseDown={() => setSelectedTask(null)}>

@@ -916,17 +916,32 @@ select:focus-visible {
   justify-content: space-between;
   margin: 20px 0 16px;
 }
-.task-toolbar.compact {
-  flex: none;
-  justify-content: flex-end;
-  min-height: 26px;
-  margin: 7px 2px;
-}
-.task-toolbar small {
-  color: #939cab;
-}
 .task-toolbar .new-task-button {
   height: 36px;
+}
+.task-table-container {
+  position: relative;
+  min-height: 0;
+}
+.video-cut-task-table-container {
+  flex: 1;
+  margin-top: 12px;
+}
+.task-table-count {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 3;
+  padding: 5px 9px;
+  border: 1px solid #e1e6ee;
+  border-radius: 6px;
+  background: #fffffff0;
+  box-shadow: 0 3px 10px #0f172a12;
+  color: #7d8797;
+  font-size: 11px;
+  line-height: 1;
+  pointer-events: none;
+  backdrop-filter: blur(6px);
 }
 .job-task-table {
   min-height: 310px;
@@ -4104,6 +4119,16 @@ td small {
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+.result-clip-media.result-clip-video {
+  min-height: 80px;
+  aspect-ratio: auto;
+}
+.result-clip-video video {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: none;
 }
 .result-clip-media > span {
   margin: 0;
