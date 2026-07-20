@@ -203,6 +203,9 @@ log "配置 Redis、Bun API 和 BullMQ Worker..."
 ensure_runtime_environment
 require_video_cut_environment
 ensure_redis
+systemctl stop "$API_SERVICE_NAME" "$WORKER_SERVICE_NAME" 2>/dev/null || true
+log "检查并备份旧版 SQLite 数据库..."
+bun run db:legacy-upgrade
 install -m 0644 "$PROJECT_DIR/deploy/xbeaconai-web-api.service" "$API_SERVICE_FILE"
 install -m 0644 "$PROJECT_DIR/deploy/xbeaconai-web-worker.service" "$WORKER_SERVICE_FILE"
 systemctl daemon-reload

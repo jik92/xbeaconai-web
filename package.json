@@ -16,6 +16,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:check": "drizzle-kit check",
+    "db:legacy-upgrade": "bun scripts/migrate-legacy-production.ts",
     "db:studio": "drizzle-kit studio",
     "test:models": "bun scripts/test-model-sdks.ts",
     "test:seedance:multimodal": "bun scripts/test-seedance-multimodal.ts",
