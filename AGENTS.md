@@ -57,7 +57,7 @@ rg -n '^#{2,3} ' DESIGN.md
 - `web/api/generated/`：根据 OpenAPI 自动生成的客户端代码，禁止手工编辑。
 - `server/`：HTTP API、账号、任务存储、模型 Provider、TOS 和 FFmpeg 集成。
 - `server/db/`：Drizzle 数据库连接和 Schema。
-- `worker/`：独立 Worker 入口和任务处理器。Worker 代码不要放回 `server/`。
+- `worker/`：独立 Worker 入口和任务调度器。具体业务 Job 位于 `worker/jobs/`，不要放回 `server/`。
 - `shared/`：跨进程的最小共享契约，目前包括 BullMQ 消息协议。
 - `drizzle/`：Drizzle Kit 生成并由版本控制管理的数据库迁移。
 - `DESIGN.md`：视觉语言、设计 Token、组件规范和响应式策略；仅按“渐进披露与文档路由”读取。
@@ -189,7 +189,11 @@ bun run typecheck
 ## 异步任务约束
 
 - API Server 只通过 `server/jobs/bull-job-queue.ts` 发布或管理 BullMQ Job。
-- Worker 执行逻辑放在 `worker/job-processor.ts`，启动和恢复逻辑放在 `worker/index.ts`。
+- `worker/job-processor.ts` 只负责调度、Handler 选择和维护任务；真实业务 Job 统一使用 `worker/jobs/job-*.ts` 命名。
+- 每种独立 Job 流程实现 `worker/jobs/types.ts` 中的 `WorkerJobHandler`，并注册到 `worker/jobs/registry.ts`；专用 Handler 必须排在通用 fallback 前面。
+- 每个公开模块的阶段、结果摘要和输出类型分别维护在 `worker/jobs/definitions/<module>.ts`，新增模块时必须同步注册到 `worker/jobs/definitions/index.ts`。
+- Seedance 的上游提交、轮询、取消核对和暂存清理集中在 `worker/jobs/job-seedance-video.ts`，不要复制到各 Job Handler。
+- Worker 启动和进程恢复逻辑放在 `worker/index.ts`。
 - 队列消息必须使用 `shared/jobs/queue-contract.ts` 中的类型和 Job 名称；消息体保持最小化，持久状态以 SQLite 为准。
 - 新任务必须考虑幂等提交、重试、取消、进程恢复、重复投递和 Worker 崩溃后的状态一致性。
 - Worker 更新进度和结果时必须回写 SQLite，确保前端轮询或 SSE 能显示真实状态。
