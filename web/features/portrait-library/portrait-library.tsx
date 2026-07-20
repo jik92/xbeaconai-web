@@ -104,17 +104,6 @@ export function PortraitLibrary() {
   };
   return (
     <div className="portrait-page">
-      <header className="portrait-head">
-        <div>
-          <span>ASSET / PORTRAIT</span>
-          <h1>人像库</h1>
-          <p>覆盖真实职业、年龄与生活场景的通用虚拟人像资产，可直接用于数字人口播与视频创作。</p>
-        </div>
-        <div className="portrait-stat">
-          <b>{data.length.toLocaleString()}</b>
-          <span>馆藏人像</span>
-        </div>
-      </header>
       <section className="portrait-toolbar">
         <div className="portrait-search">
           <Search />

@@ -146,37 +146,11 @@
 .material-library-page .asset-library-toolbar {
   margin-top: 0;
 }
-.asset-library-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-}
-.asset-library-head > div:first-child > span,
 .asset-upload-modal header span {
   color: #246bfd;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.15em;
-}
-.asset-library-head h1 {
-  margin: 5px 0;
-  font-size: 26px;
-}
-.asset-library-head p {
-  margin: 0;
-  color: #778194;
-  font-size: 12px;
-}
-.asset-library-stat {
-  text-align: right;
-}
-.asset-library-stat b {
-  display: block;
-  font-size: 28px;
-}
-.asset-library-stat span {
-  color: #929baa;
-  font-size: 10px;
 }
 .asset-library-toolbar {
   display: flex;
@@ -666,9 +640,6 @@
   }
   .asset-library-page {
     padding: 18px 12px;
-  }
-  .asset-library-head p {
-    max-width: 75vw;
   }
   .asset-library-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

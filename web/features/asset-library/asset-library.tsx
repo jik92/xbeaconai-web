@@ -79,12 +79,6 @@ function ProductLibrary() {
 
   return (
     <div className="asset-library-page">
-      <LibraryHeader
-        eyebrow="ASSET / PRODUCT"
-        title="商品库"
-        description="一个商品可绑定多张主图、包装图与细节图；创作时会整组加载给 AI。"
-        count={data.length}
-      />
       <LibraryToolbar
         query={query}
         setQuery={setQuery}
@@ -477,14 +471,6 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
         />
       )}
       <div className="material-library-content">
-        {kind === "voice" && (
-          <LibraryHeader
-            eyebrow="ASSET / VOICE"
-            title="音色库"
-            description="管理配音样本和克隆音色参考，支持 MP3、WAV、M4A、OGG。"
-            count={data.length}
-          />
-        )}
         <LibraryToolbar
           query={query}
           setQuery={setQuery}
@@ -649,32 +635,6 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
         </div>
       )}
     </div>
-  );
-}
-
-function LibraryHeader({
-  eyebrow,
-  title,
-  description,
-  count,
-}: {
-  eyebrow: string;
-  title: string;
-  description: string;
-  count: number;
-}) {
-  return (
-    <header className="asset-library-head">
-      <div>
-        <span>{eyebrow}</span>
-        <h1>{title}</h1>
-        <p>{description}</p>
-      </div>
-      <div className="asset-library-stat">
-        <b>{count}</b>
-        <span>我的资产</span>
-      </div>
-    </header>
   );
 }
 
