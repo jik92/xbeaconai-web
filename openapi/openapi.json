@@ -1643,6 +1643,18 @@
                     "minimum": 1,
                     "maximum": 524288000
                   },
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "durationSec": {
+                    "type": "number",
+                    "minimum": 0
+                  },
                   "displayName": {
                     "type": "string",
                     "minLength": 1,
@@ -1792,6 +1804,15 @@
                         "size": {
                           "type": "integer"
                         },
+                        "width": {
+                          "type": "integer"
+                        },
+                        "height": {
+                          "type": "integer"
+                        },
+                        "durationSec": {
+                          "type": "number"
+                        },
                         "kind": {
                           "$ref": "#/components/schemas/AssetKind"
                         },
@@ -1853,6 +1874,15 @@
                         },
                         "size": {
                           "type": "integer"
+                        },
+                        "width": {
+                          "type": "integer"
+                        },
+                        "height": {
+                          "type": "integer"
+                        },
+                        "durationSec": {
+                          "type": "number"
                         },
                         "kind": {
                           "$ref": "#/components/schemas/AssetKind"
@@ -2116,6 +2146,15 @@
                           "size": {
                             "type": "integer"
                           },
+                          "width": {
+                            "type": "integer"
+                          },
+                          "height": {
+                            "type": "integer"
+                          },
+                          "durationSec": {
+                            "type": "number"
+                          },
                           "kind": {
                             "$ref": "#/components/schemas/AssetKind"
                           },
@@ -2149,6 +2188,129 @@
                   "required": [
                     "assets"
                   ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assets/{assetId}/metadata": {
+      "patch": {
+        "operationId": "saveAssetMetadata",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "assetId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "durationSec": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Asset metadata saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "asset": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "originalName": {
+                          "type": "string"
+                        },
+                        "mimeType": {
+                          "type": "string"
+                        },
+                        "size": {
+                          "type": "integer"
+                        },
+                        "width": {
+                          "type": "integer"
+                        },
+                        "height": {
+                          "type": "integer"
+                        },
+                        "durationSec": {
+                          "type": "number"
+                        },
+                        "kind": {
+                          "$ref": "#/components/schemas/AssetKind"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "folderId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "url": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "originalName",
+                        "mimeType",
+                        "size",
+                        "kind",
+                        "url",
+                        "createdAt"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "asset"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Asset not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
             }

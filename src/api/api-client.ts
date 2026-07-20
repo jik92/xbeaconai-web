@@ -66,6 +66,18 @@ export async function fetchLibraryAssets(kind: Exclude<AssetKind, "product">, fo
   const data = (await response.json()) as { assets: LibraryAsset[] };
   return data.assets;
 }
+export async function saveAssetMetadata(
+  assetId: string,
+  metadata: { width?: number; height?: number; durationSec?: number },
+) {
+  const response = await fetch(apiUrl(`/api/assets/${assetId}/metadata`), {
+    method: "PATCH",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(metadata),
+  });
+  if (!response.ok) throw new Error("素材元数据保存失败");
+  return ((await response.json()) as { asset: LibraryAsset }).asset;
+}
 export async function fetchProducts() {
   const response = await fetch(apiUrl("/api/products"), { headers: authHeaders() });
   if (!response.ok) throw new Error("商品列表加载失败");
@@ -153,9 +165,10 @@ export async function uploadLibraryAsset(
   description = "",
   folderId?: string,
   onProgress?: (percent: number) => void,
+  metadata?: { width?: number; height?: number; durationSec?: number },
 ) {
   if (kind === "media") {
-    const directAsset = await uploadLibraryAssetDirect(file, displayName, description, folderId, onProgress);
+    const directAsset = await uploadLibraryAssetDirect(file, displayName, description, folderId, onProgress, metadata);
     if (directAsset) return directAsset;
   }
   const body = new FormData();
@@ -212,6 +225,7 @@ async function uploadLibraryAssetDirect(
   description: string,
   folderId?: string,
   onProgress?: (percent: number) => void,
+  metadata?: { width?: number; height?: number; durationSec?: number },
 ): Promise<LibraryAsset | undefined> {
   const extension = file.name.split(".").pop()?.toLowerCase();
   const mimeType =
@@ -228,6 +242,7 @@ async function uploadLibraryAssetDirect(
       displayName,
       description: description.trim() || undefined,
       folderId,
+      ...metadata,
     }),
   });
   if (!initResponse.ok) {

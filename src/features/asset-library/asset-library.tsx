@@ -1,36 +1,33 @@
 // biome-ignore-all lint/a11y/useButtonType: This asset workbench contains no forms.
 // biome-ignore-all lint/a11y/noStaticElementInteractions: Modal backdrops dismiss their dialogs.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { ColumnDef } from "@tanstack/react-table";
 import {
   AudioLines,
   Check,
   FileAudio,
   Files,
-  Folder,
-  FolderPlus,
   Image as ImageIcon,
   Package,
-  Pencil,
   Plus,
   Search,
-  Trash2,
   Upload,
   X,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  createAssetFolder,
-  deleteAssetFolder,
   fetchAssetFolders,
   fetchLibraryAssets,
   fetchProducts,
-  renameAssetFolder,
+  saveAssetMetadata,
   uploadLibraryAsset,
   uploadProduct,
 } from "@/api/api-client";
 import { AuthenticatedMedia } from "@/components/domain/authenticated-media";
+import { DataTable } from "@/components/ui/data-table";
 import type { LibraryAsset, LibraryProduct } from "@/entities/types";
+import { AssetFolderSpace } from "./asset-folder-space";
 import "./asset-library.css";
 
 type LibraryKind = "media" | "product" | "voice";
@@ -235,6 +232,152 @@ function ProductLibrary() {
   );
 }
 
+type MediaMetadata = { width?: number; height?: number; durationSec?: number };
+
+async function inspectMediaFile(file: File): Promise<MediaMetadata> {
+  const url = URL.createObjectURL(file);
+  try {
+    if (file.type.startsWith("image/"))
+      return await new Promise<MediaMetadata>((resolve) => {
+        const image = new Image();
+        image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
+        image.onerror = () => resolve({});
+        image.src = url;
+      });
+    if (file.type.startsWith("video/") || file.name.toLowerCase().endsWith(".mp4"))
+      return await new Promise<MediaMetadata>((resolve) => {
+        const video = document.createElement("video");
+        video.preload = "metadata";
+        video.onloadedmetadata = () =>
+          resolve({
+            width: video.videoWidth || undefined,
+            height: video.videoHeight || undefined,
+            durationSec: Number.isFinite(video.duration) ? video.duration : undefined,
+          });
+        video.onerror = () => resolve({});
+        video.src = url;
+      });
+    if (file.type.startsWith("audio/"))
+      return await new Promise<MediaMetadata>((resolve) => {
+        const audio = document.createElement("audio");
+        audio.preload = "metadata";
+        audio.onloadedmetadata = () =>
+          resolve({ durationSec: Number.isFinite(audio.duration) ? audio.duration : undefined });
+        audio.onerror = () => resolve({});
+        audio.src = url;
+      });
+    return {};
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function formatDuration(durationSec?: number) {
+  if (durationSec === undefined || !Number.isFinite(durationSec)) return "—";
+  const seconds = Math.max(0, Math.round(durationSec));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainder = seconds % 60;
+  return hours
+    ? `${hours}:${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`
+    : `${minutes}:${String(remainder).padStart(2, "0")}`;
+}
+
+function MediaAssetTable({
+  assets,
+  loading,
+  error,
+  loadedMetadata,
+  onMetadata,
+  onUpload,
+}: {
+  assets: LibraryAsset[];
+  loading: boolean;
+  error: unknown;
+  loadedMetadata: Record<string, MediaMetadata>;
+  onMetadata: (assetId: string, metadata: MediaMetadata) => void;
+  onUpload: () => void;
+}) {
+  const columns = useMemo<ColumnDef<LibraryAsset, unknown>[]>(
+    () => [
+      {
+        id: "preview",
+        header: "内容预览",
+        size: 260,
+        cell: ({ row }) => {
+          const asset = row.original;
+          return (
+            <div className={`media-table-preview ${asset.mimeType.startsWith("audio/") ? "audio" : ""}`}>
+              <AuthenticatedMedia
+                url={asset.url}
+                mimeType={asset.mimeType}
+                alt={asset.name}
+                controls={asset.mimeType.startsWith("audio/")}
+                onMetadata={(next) => onMetadata(asset.id, next)}
+              />
+            </div>
+          );
+        },
+      },
+      {
+        id: "name",
+        header: "素材名称",
+        size: 300,
+        cell: ({ row }) => (
+          <>
+            <b className="media-table-name">{row.original.name}</b>
+            <small>{row.original.originalName}</small>
+          </>
+        ),
+      },
+      {
+        id: "dimensions",
+        header: "宽高",
+        size: 130,
+        cell: ({ row }) => {
+          const asset = row.original;
+          const width = asset.width ?? loadedMetadata[asset.id]?.width;
+          const height = asset.height ?? loadedMetadata[asset.id]?.height;
+          return width && height ? `${width} × ${height}` : "—";
+        },
+      },
+      {
+        id: "duration",
+        header: "时长",
+        size: 130,
+        cell: ({ row }) => {
+          const asset = row.original;
+          return formatDuration(asset.durationSec ?? loadedMetadata[asset.id]?.durationSec);
+        },
+      },
+      {
+        accessorKey: "createdAt",
+        header: "创建时间",
+        size: 190,
+        cell: ({ getValue }) => new Date(getValue<string>()).toLocaleString("zh-CN", { hour12: false }),
+      },
+    ],
+    [loadedMetadata, onMetadata],
+  );
+
+  return (
+    <DataTable
+      className="media-asset-table"
+      columns={columns}
+      data={assets}
+      getRowId={(asset) => asset.id}
+      loading={loading}
+      loadingMessage="正在加载素材…"
+      error={error}
+      emptyMessage="还没有素材"
+      emptyIcon={<Files />}
+      emptyAction={<button onClick={onUpload}>上传第一个素材</button>}
+      minWidth={1010}
+      height="calc(100vh - 198px)"
+    />
+  );
+}
+
 function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
@@ -245,14 +388,13 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
   const [description, setDescription] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedFolderId, setSelectedFolderId] = useState("");
-  const { data: folders = [] } = useQuery({
+  const [loadedMetadata, setLoadedMetadata] = useState<Record<string, MediaMetadata>>({});
+  const metadataSaving = useRef(new Set<string>());
+  const { data: folders = [], isLoading: foldersLoading } = useQuery({
     queryKey: ["asset-folders"],
     queryFn: fetchAssetFolders,
     enabled: kind === "media",
   });
-  useEffect(() => {
-    if (kind === "media" && !selectedFolderId && folders[0]) setSelectedFolderId(folders[0].id);
-  }, [folders, kind, selectedFolderId]);
   const {
     data = [],
     isLoading,
@@ -260,18 +402,19 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
   } = useQuery({
     queryKey: ["asset-library", kind, selectedFolderId],
     queryFn: () => fetchLibraryAssets(kind, kind === "media" ? selectedFolderId || undefined : undefined),
-    enabled: kind !== "media" || Boolean(selectedFolderId),
   });
   const upload = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       if (!file) throw new Error("请选择上传文件");
+      const metadata = kind === "media" ? await inspectMediaFile(file) : undefined;
       return uploadLibraryAsset(
         file,
         kind,
         name.trim() || file.name.replace(/\.[^.]+$/, ""),
         description,
-        kind === "media" ? selectedFolderId : undefined,
+        kind === "media" ? selectedFolderId || folders[0]?.id : undefined,
         kind === "media" ? setUploadProgress : undefined,
+        metadata,
       );
     },
     onMutate: () => setUploadProgress(0),
@@ -282,7 +425,7 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
       setName("");
       setDescription("");
       setUploadProgress(0);
-      setSelected(asset);
+      if (kind === "voice") setSelected(asset);
     },
   });
   const filtered = useMemo(() => {
@@ -295,87 +438,48 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
     localStorage.setItem("studio:selectedVoice", JSON.stringify(asset));
     window.location.assign("/aigc/video-remix");
   };
-  const addFolder = async () => {
-    const folderName = window.prompt("请输入新文件夹名称");
-    if (!folderName?.trim()) return;
-    try {
-      const folder = await createAssetFolder(folderName.trim());
-      await queryClient.invalidateQueries({ queryKey: ["asset-folders"] });
-      setSelectedFolderId(folder.id);
-    } catch (error) {
-      window.alert(error instanceof Error ? error.message : "文件夹创建失败");
-    }
-  };
-  const renameFolder = async (folderId: string, currentName: string) => {
-    const folderName = window.prompt("请输入新的文件夹名称", currentName);
-    if (!folderName?.trim() || folderName.trim() === currentName) return;
-    try {
-      await renameAssetFolder(folderId, folderName.trim());
-      await queryClient.invalidateQueries({ queryKey: ["asset-folders"] });
-    } catch (error) {
-      window.alert(error instanceof Error ? error.message : "文件夹重命名失败");
-    }
-  };
-  const removeFolder = async (folderId: string) => {
-    if (!window.confirm("确定删除这个空文件夹吗？")) return;
-    try {
-      await deleteAssetFolder(folderId);
-      setSelectedFolderId("");
-      await queryClient.invalidateQueries({ queryKey: ["asset-folders"] });
-    } catch (error) {
-      window.alert(error instanceof Error ? error.message : "文件夹删除失败");
-    }
+  const recordMetadata = (assetId: string, metadata: MediaMetadata) => {
+    setLoadedMetadata((current) => {
+      const previous = current[assetId];
+      if (
+        previous?.width === metadata.width &&
+        previous?.height === metadata.height &&
+        previous?.durationSec === metadata.durationSec
+      )
+        return current;
+      return { ...current, [assetId]: { ...previous, ...metadata } };
+    });
+    const asset = data.find((item) => item.id === assetId);
+    const hasNewMetadata =
+      (!asset?.width && metadata.width) ||
+      (!asset?.height && metadata.height) ||
+      (asset?.durationSec === undefined && metadata.durationSec !== undefined);
+    if (!asset || !hasNewMetadata || metadataSaving.current.has(assetId)) return;
+    metadataSaving.current.add(assetId);
+    void saveAssetMetadata(assetId, metadata)
+      .then(() => queryClient.invalidateQueries({ queryKey: ["asset-library", kind] }))
+      .finally(() => metadataSaving.current.delete(assetId));
   };
 
   return (
     <div className={`asset-library-page ${kind === "media" ? "material-library-page" : ""}`}>
       {kind === "media" && (
-        <aside className="material-folder-sidebar">
-          <header>
-            <b>全部专辑</b>
-            <button type="button" aria-label="新建文件夹" onClick={() => void addFolder()}>
-              <FolderPlus />
-            </button>
-          </header>
-          <nav>
-            {folders.map((folder) => (
-              <div key={folder.id} className={selectedFolderId === folder.id ? "active" : ""}>
-                <button type="button" onClick={() => setSelectedFolderId(folder.id)}>
-                  <Folder />
-                  <span>{folder.name}</span>
-                </button>
-                <span className="folder-actions">
-                  <button
-                    type="button"
-                    aria-label={`重命名 ${folder.name}`}
-                    onClick={() => void renameFolder(folder.id, folder.name)}
-                  >
-                    <Pencil />
-                  </button>
-                  <button type="button" aria-label={`删除 ${folder.name}`} onClick={() => void removeFolder(folder.id)}>
-                    <Trash2 />
-                  </button>
-                </span>
-              </div>
-            ))}
-          </nav>
-          <footer>
-            <span>用户存储目录</span>
-            <b>{folders.find((folder) => folder.id === selectedFolderId)?.storagePrefix ?? "正在初始化…"}</b>
-          </footer>
-        </aside>
+        <AssetFolderSpace
+          folders={folders}
+          selectedFolderId={selectedFolderId}
+          loading={foldersLoading}
+          onSelect={setSelectedFolderId}
+        />
       )}
       <div className="material-library-content">
-        <LibraryHeader
-          eyebrow={kind === "voice" ? "ASSET / VOICE" : "ASSET / MEDIA"}
-          title={kind === "voice" ? "音色库" : "素材库"}
-          description={
-            kind === "voice"
-              ? "管理配音样本和克隆音色参考，支持 MP3、WAV、M4A、OGG。"
-              : "集中管理任务中上传的图片、视频和音频，可在所有通用附件入口重复使用。"
-          }
-          count={data.length}
-        />
+        {kind === "voice" && (
+          <LibraryHeader
+            eyebrow="ASSET / VOICE"
+            title="音色库"
+            description="管理配音样本和克隆音色参考，支持 MP3、WAV、M4A、OGG。"
+            count={data.length}
+          />
+        )}
         <LibraryToolbar
           query={query}
           setQuery={setQuery}
@@ -383,45 +487,48 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
           uploadLabel={kind === "voice" ? "上传音色" : "上传素材"}
           onUpload={() => setUploadOpen(true)}
         />
-        <div className="asset-library-results">
-          <b>{filtered.length}</b> 个匹配结果
-        </div>
-        <section className="asset-library-grid">
-          {filtered.map((asset) => (
-            <button className="library-asset-card" key={asset.id} onClick={() => setSelected(asset)}>
-              <div className={`library-asset-preview ${kind === "voice" ? "voice" : "media"}`}>
-                {kind === "media" && /^(image|video)\//.test(asset.mimeType) ? (
-                  <AuthenticatedMedia url={asset.url} mimeType={asset.mimeType} alt={asset.name} />
-                ) : kind === "voice" ? (
-                  <>
-                    <FileAudio />
-                    <i>试听音色</i>
-                  </>
-                ) : (
-                  <>
-                    <FileAudio />
-                    <i>音频素材</i>
-                  </>
-                )}
-              </div>
-              <div>
-                <h3>{asset.name}</h3>
-                <p>{asset.description || asset.originalName}</p>
-                <small>
-                  {(asset.size / 1024 / 1024).toFixed(1)} MB · {new Date(asset.createdAt).toLocaleDateString("zh-CN")}
-                </small>
-              </div>
-            </button>
-          ))}
-          <LibraryState
+        {kind === "media" ? (
+          <MediaAssetTable
+            assets={filtered}
             loading={isLoading}
             error={error}
-            empty={!filtered.length}
-            icon={kind === "voice" ? <AudioLines /> : <Files />}
-            emptyText={kind === "voice" ? "还没有音色资产" : "还没有通用素材"}
+            loadedMetadata={loadedMetadata}
+            onMetadata={recordMetadata}
             onUpload={() => setUploadOpen(true)}
           />
-        </section>
+        ) : (
+          <>
+            <div className="asset-library-results">
+              <b>{filtered.length}</b> 个匹配结果
+            </div>
+            <section className="asset-library-grid">
+              {filtered.map((asset) => (
+                <button className="library-asset-card" key={asset.id} onClick={() => setSelected(asset)}>
+                  <div className="library-asset-preview voice">
+                    <FileAudio />
+                    <i>试听音色</i>
+                  </div>
+                  <div>
+                    <h3>{asset.name}</h3>
+                    <p>{asset.description || asset.originalName}</p>
+                    <small>
+                      {(asset.size / 1024 / 1024).toFixed(1)} MB ·{" "}
+                      {new Date(asset.createdAt).toLocaleDateString("zh-CN")}
+                    </small>
+                  </div>
+                </button>
+              ))}
+              <LibraryState
+                loading={isLoading}
+                error={error}
+                empty={!filtered.length}
+                icon={<AudioLines />}
+                emptyText="还没有音色资产"
+                onUpload={() => setUploadOpen(true)}
+              />
+            </section>
+          </>
+        )}
       </div>
       {uploadOpen && (
         <div className="asset-modal-layer" role="presentation" onMouseDown={() => setUploadOpen(false)}>
@@ -495,7 +602,7 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
           </aside>
         </div>
       )}
-      {selected && (
+      {kind === "voice" && selected && (
         <div className="asset-modal-layer" role="presentation" onMouseDown={() => setSelected(null)}>
           <aside
             className="asset-detail-modal"
@@ -509,12 +616,8 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
                 <X />
               </button>
             </header>
-            <div className={`asset-detail-media ${kind === "voice" ? "voice" : "media"}`}>
-              {kind === "media" && /^(image|video)\//.test(selected.mimeType) ? (
-                <AuthenticatedMedia url={selected.url} mimeType={selected.mimeType} alt={selected.name} />
-              ) : (
-                <FileAudio />
-              )}
+            <div className="asset-detail-media voice">
+              <FileAudio />
             </div>
             <div className="asset-detail-copy">
               <span>

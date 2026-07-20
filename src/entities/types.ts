@@ -76,6 +76,9 @@ export interface LibraryAsset {
   originalName: string;
   mimeType: string;
   size: number;
+  width?: number;
+  height?: number;
+  durationSec?: number;
   kind: AssetKind;
   description?: string;
   folderId?: string;

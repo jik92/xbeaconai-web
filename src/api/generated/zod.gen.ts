@@ -427,6 +427,9 @@ export const zCreateDirectUploadBody = z.object({
     fileName: z.string().min(1).max(200),
     mimeType: z.string().min(1),
     size: z.int().gte(1).lte(524288000),
+    width: z.int().gte(1).optional(),
+    height: z.int().gte(1).optional(),
+    durationSec: z.number().gte(0).optional(),
     displayName: z.string().min(1).max(80),
     description: z.string().max(300).optional(),
     folderId: z.uuid().optional()
@@ -455,6 +458,9 @@ export const zCompleteDirectUploadResponse = z.union([
             originalName: z.string(),
             mimeType: z.string(),
             size: z.int(),
+            width: z.int().optional(),
+            height: z.int().optional(),
+            durationSec: z.number().optional(),
             kind: zAssetKind,
             description: z.string().optional(),
             folderId: z.uuid().optional(),
@@ -469,6 +475,9 @@ export const zCompleteDirectUploadResponse = z.union([
             originalName: z.string(),
             mimeType: z.string(),
             size: z.int(),
+            width: z.int().optional(),
+            height: z.int().optional(),
+            durationSec: z.number().optional(),
             kind: zAssetKind,
             description: z.string().optional(),
             folderId: z.uuid().optional(),
@@ -519,12 +528,46 @@ export const zListAssetsResponse = z.object({
         originalName: z.string(),
         mimeType: z.string(),
         size: z.int(),
+        width: z.int().optional(),
+        height: z.int().optional(),
+        durationSec: z.number().optional(),
         kind: zAssetKind,
         description: z.string().optional(),
         folderId: z.uuid().optional(),
         url: z.string(),
         createdAt: z.string()
     }))
+});
+
+export const zSaveAssetMetadataBody = z.object({
+    width: z.int().gte(1).optional(),
+    height: z.int().gte(1).optional(),
+    durationSec: z.number().gte(0).optional()
+});
+
+export const zSaveAssetMetadataPath = z.object({
+    assetId: z.uuid()
+});
+
+/**
+ * Asset metadata saved
+ */
+export const zSaveAssetMetadataResponse = z.object({
+    asset: z.object({
+        id: z.uuid(),
+        name: z.string(),
+        originalName: z.string(),
+        mimeType: z.string(),
+        size: z.int(),
+        width: z.int().optional(),
+        height: z.int().optional(),
+        durationSec: z.number().optional(),
+        kind: zAssetKind,
+        description: z.string().optional(),
+        folderId: z.uuid().optional(),
+        url: z.string(),
+        createdAt: z.string()
+    })
 });
 
 export const zGetAssetContentPath = z.object({

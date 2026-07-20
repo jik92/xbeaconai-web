@@ -115,6 +115,9 @@ const LibraryAssetSchema = z.object({
   originalName: z.string(),
   mimeType: z.string(),
   size: z.number().int(),
+  width: z.number().int().optional(),
+  height: z.number().int().optional(),
+  durationSec: z.number().optional(),
   kind: AssetKindSchema,
   description: z.string().optional(),
   folderId: z.string().uuid().optional(),
@@ -125,6 +128,9 @@ const DirectUploadRequestSchema = z.object({
   fileName: z.string().min(1).max(200),
   mimeType: z.string().min(1),
   size: z.number().int().min(1).max(maxDirectUploadBytes),
+  width: z.number().int().min(1).optional(),
+  height: z.number().int().min(1).optional(),
+  durationSec: z.number().min(0).optional(),
   displayName: z.string().min(1).max(80),
   description: z.string().max(300).optional(),
   folderId: z.string().uuid().optional(),
@@ -862,6 +868,9 @@ const libraryAssetResponse = (asset: MediaAsset) => ({
   originalName: asset.originalName,
   mimeType: asset.mimeType,
   size: asset.byteSize,
+  width: asset.width,
+  height: asset.height,
+  durationSec: asset.durationSec,
   kind: asset.kind,
   description: asset.description,
   folderId: asset.folderId,
@@ -940,6 +949,9 @@ app.openapi(directUploadInitRoute, async (c) => {
       originalName: body.fileName,
       mimeType: body.mimeType,
       byteSize: body.size,
+      width: body.width,
+      height: body.height,
+      durationSec: body.durationSec,
       kind: "media",
       displayName: body.displayName.trim() || body.fileName.replace(/\.[^.]+$/, "").slice(0, 80),
       description: body.description?.trim() || undefined,
@@ -1083,6 +1095,9 @@ app.openapi(directUploadCompleteRoute, async (c) => {
     originalName: ticket.originalName,
     mimeType: ticket.mimeType,
     byteSize: ticket.byteSize,
+    width: ticket.width,
+    height: ticket.height,
+    durationSec: ticket.durationSec,
     kind: ticket.kind,
     displayName: ticket.displayName,
     description: ticket.description,
@@ -1412,6 +1427,51 @@ app.delete("/api/asset-folders/:folderId", async (c) => {
       );
     throw error;
   }
+});
+
+const assetMetadataRoute = createRoute({
+  method: "patch",
+  path: "/api/assets/{assetId}/metadata",
+  operationId: "saveAssetMetadata",
+  request: {
+    params: z.object({ assetId: z.string().uuid() }),
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: z.object({
+            width: z.number().int().min(1).optional(),
+            height: z.number().int().min(1).optional(),
+            durationSec: z.number().min(0).optional(),
+          }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: "Asset metadata saved",
+      content: { "application/json": { schema: z.object({ asset: LibraryAssetSchema }) } },
+    },
+    404: { description: "Asset not found", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+
+app.openapi(assetMetadataRoute, (c) => {
+  const asset = accounts.updateAssetMetadata(c.get("userId"), c.req.valid("param").assetId, c.req.valid("json"));
+  if (!asset)
+    return c.json(
+      {
+        error: {
+          code: "ASSET_NOT_FOUND",
+          message: "素材不存在",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      404,
+    );
+  return c.json({ asset: libraryAssetResponse(asset) }, 200);
 });
 
 const assetContentRoute = createRoute({

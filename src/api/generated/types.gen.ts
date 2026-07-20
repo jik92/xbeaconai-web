@@ -639,6 +639,9 @@ export type CreateDirectUploadData = {
         fileName: string;
         mimeType: string;
         size: number;
+        width?: number;
+        height?: number;
+        durationSec?: number;
         displayName: string;
         description?: string;
         folderId?: string;
@@ -723,6 +726,9 @@ export type CompleteDirectUploadResponses = {
             originalName: string;
             mimeType: string;
             size: number;
+            width?: number;
+            height?: number;
+            durationSec?: number;
             kind: AssetKind;
             description?: string;
             folderId?: string;
@@ -740,6 +746,9 @@ export type CompleteDirectUploadResponses = {
             originalName: string;
             mimeType: string;
             size: number;
+            width?: number;
+            height?: number;
+            durationSec?: number;
             kind: AssetKind;
             description?: string;
             folderId?: string;
@@ -824,6 +833,9 @@ export type ListAssetsResponses = {
             originalName: string;
             mimeType: string;
             size: number;
+            width?: number;
+            height?: number;
+            durationSec?: number;
             kind: AssetKind;
             description?: string;
             folderId?: string;
@@ -834,6 +846,53 @@ export type ListAssetsResponses = {
 };
 
 export type ListAssetsResponse = ListAssetsResponses[keyof ListAssetsResponses];
+
+export type SaveAssetMetadataData = {
+    body: {
+        width?: number;
+        height?: number;
+        durationSec?: number;
+    };
+    path: {
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/assets/{assetId}/metadata';
+};
+
+export type SaveAssetMetadataErrors = {
+    /**
+     * Asset not found
+     */
+    404: ApiErrorResponse;
+};
+
+export type SaveAssetMetadataError = SaveAssetMetadataErrors[keyof SaveAssetMetadataErrors];
+
+export type SaveAssetMetadataResponses = {
+    /**
+     * Asset metadata saved
+     */
+    200: {
+        asset: {
+            id: string;
+            name: string;
+            originalName: string;
+            mimeType: string;
+            size: number;
+            width?: number;
+            height?: number;
+            durationSec?: number;
+            kind: AssetKind;
+            description?: string;
+            folderId?: string;
+            url: string;
+            createdAt: string;
+        };
+    };
+};
+
+export type SaveAssetMetadataResponse = SaveAssetMetadataResponses[keyof SaveAssetMetadataResponses];
 
 export type GetAssetContentData = {
     body?: never;

@@ -36,12 +36,17 @@ describe("asset folder mapping", () => {
       originalName: "demo.mp4",
       mimeType: "video/mp4",
       byteSize: 12,
+      width: 1080,
+      height: 1920,
+      durationSec: 15,
       kind: "media",
       displayName: "demo",
       folderId: child.id,
       createdAt: new Date().toISOString(),
     });
-    expect(store.listAssets(user.id, "media", child.id)).toHaveLength(1);
+    expect(store.listAssets(user.id, "media", child.id)).toMatchObject([
+      { width: 1080, height: 1920, durationSec: 15 },
+    ]);
     expect(() => store.deleteAssetFolder(user.id, child.id)).toThrow(AccountError);
     store.db.close();
   });
