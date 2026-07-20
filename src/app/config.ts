@@ -28,7 +28,7 @@ export const APP_CONFIG = {
       "ad-script": false,
     },
     aiToolbox: {
-      "ai-generate": true,
+      "ai-generate": false,
       "video-cut": true,
       "media-understand": false,
       "video-mashup": false,
