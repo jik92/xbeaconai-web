@@ -253,6 +253,7 @@ function ToolboxUploadTile({
   onChange: (value: string) => void;
   multiple?: boolean;
 }) {
+  const [preview, setPreview] = useState<{ name: string; mimeType: string; url?: string }>();
   const names = value.startsWith("assets:")
     ? (() => {
         try {
@@ -272,8 +273,21 @@ function ToolboxUploadTile({
       multiple={multiple}
       trigger={(open) => (
         <button type="button" className={`tool-upload-tile ${value ? "has-file" : ""}`} onClick={open}>
-          {value ? <Check /> : <Plus />}
-          {names.length > 0 && <small>{names.length > 1 ? `已选择 ${names.length} 个素材` : names[0]}</small>}
+          {preview?.url ? (
+            <span className="tool-upload-preview">
+              <AuthenticatedMedia url={preview.url} mimeType={preview.mimeType} alt={preview.name} controls={false} />
+              <i>
+                <Check />
+              </i>
+            </span>
+          ) : value ? (
+            <Check />
+          ) : (
+            <Plus />
+          )}
+          {names.length > 0 && !preview?.url && (
+            <small>{names.length > 1 ? `已选择 ${names.length} 个素材` : names[0]}</small>
+          )}
         </button>
       )}
       onSelect={(assets) => {
@@ -281,7 +295,10 @@ function ToolboxUploadTile({
           onChange(
             `assets:${JSON.stringify(assets.map((asset) => ({ id: asset.id, name: asset.name, mimeType: asset.mimeType })))}`,
           );
-        else if (assets[0]) onChange(`asset:${assets[0].id}:${assets[0].name}`);
+        else if (assets[0]) {
+          setPreview(assets[0]);
+          onChange(`asset:${assets[0].id}:${assets[0].name}`);
+        }
       }}
     />
   );
@@ -379,6 +396,13 @@ function ToolboxCreatorForm({
         <div className="tool-form-row compact-row">
           {requiredLabel("自动保存")}
           <ToolboxSwitch value={values.autoSave ?? ""} onChange={(value) => setValue("autoSave", value)} />
+        </div>
+        <div className={`tool-form-row save-location ${invalid("saveLocation") ? "invalid" : ""}`}>
+          {requiredLabel("保存位置", true)}
+          {select("saveLocation")}
+          <button type="button" onClick={() => setValue("saveLocation", values.saveLocation || "默认")}>
+            设为默认
+          </button>
         </div>
         <div className={`tool-form-row upload-row ${invalid("source") ? "invalid" : ""}`}>
           {requiredLabel("选择视频", true)}

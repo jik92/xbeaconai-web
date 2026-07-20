@@ -3,8 +3,8 @@
 import { type DefaultError, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { cancelJob, changePassword, createJob, createRechargeOrder, downloadArtifact, getAssetContent, getCapabilities, getCreationCapabilities, getCurrentUser, getHealth, getJob, getModels, getPreferences, listAssets, listJobs, listNotifications, listRechargeOrders, listRechargePackages, login, logout, markAllNotificationsRead, markNotificationRead, type Options, register, retryJob, savePreferences, updateProfile, uploadMedia } from '../sdk.gen';
-import type { CancelJobData, CancelJobError, CancelJobResponse, ChangePasswordData, ChangePasswordError, ChangePasswordResponse, CreateJobData, CreateJobError, CreateJobResponse, CreateRechargeOrderData, CreateRechargeOrderError, CreateRechargeOrderResponse, DownloadArtifactData, DownloadArtifactError, DownloadArtifactResponse, GetAssetContentData, GetAssetContentError, GetAssetContentResponse, GetCapabilitiesData, GetCapabilitiesResponse, GetCreationCapabilitiesData, GetCreationCapabilitiesResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetHealthData, GetHealthResponse, GetJobData, GetJobError, GetJobResponse, GetModelsData, GetModelsResponse, GetPreferencesData, GetPreferencesResponse, ListAssetsData, ListAssetsResponse, ListJobsData, ListJobsResponse, ListNotificationsData, ListNotificationsResponse, ListRechargeOrdersData, ListRechargeOrdersResponse, ListRechargePackagesData, ListRechargePackagesResponse, LoginData, LoginError, LoginResponse, LogoutData, LogoutError, LogoutResponse, MarkAllNotificationsReadData, MarkAllNotificationsReadResponse, MarkNotificationReadData, MarkNotificationReadError, MarkNotificationReadResponse, RegisterData, RegisterError, RegisterResponse, RetryJobData, RetryJobError, RetryJobResponse, SavePreferencesData, SavePreferencesResponse, UpdateProfileData, UpdateProfileError, UpdateProfileResponse, UploadMediaData, UploadMediaError, UploadMediaResponse } from '../types.gen';
+import { cancelJob, changePassword, completeDirectUpload, createDirectUpload, createJob, createRechargeOrder, downloadArtifact, getAssetContent, getCapabilities, getCreationCapabilities, getCurrentUser, getHealth, getJob, getModels, getPreferences, listAssets, listJobs, listNotifications, listRechargeOrders, listRechargePackages, login, logout, markAllNotificationsRead, markNotificationRead, type Options, register, retryJob, savePreferences, updateProfile, uploadMedia } from '../sdk.gen';
+import type { CancelJobData, CancelJobError, CancelJobResponse, ChangePasswordData, ChangePasswordError, ChangePasswordResponse, CompleteDirectUploadData, CompleteDirectUploadError, CompleteDirectUploadResponse, CreateDirectUploadData, CreateDirectUploadError, CreateDirectUploadResponse, CreateJobData, CreateJobError, CreateJobResponse, CreateRechargeOrderData, CreateRechargeOrderError, CreateRechargeOrderResponse, DownloadArtifactData, DownloadArtifactError, DownloadArtifactResponse, GetAssetContentData, GetAssetContentError, GetAssetContentResponse, GetCapabilitiesData, GetCapabilitiesResponse, GetCreationCapabilitiesData, GetCreationCapabilitiesResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetHealthData, GetHealthResponse, GetJobData, GetJobError, GetJobResponse, GetModelsData, GetModelsResponse, GetPreferencesData, GetPreferencesResponse, ListAssetsData, ListAssetsResponse, ListJobsData, ListJobsResponse, ListNotificationsData, ListNotificationsResponse, ListRechargeOrdersData, ListRechargeOrdersResponse, ListRechargePackagesData, ListRechargePackagesResponse, LoginData, LoginError, LoginResponse, LogoutData, LogoutError, LogoutResponse, MarkAllNotificationsReadData, MarkAllNotificationsReadResponse, MarkNotificationReadData, MarkNotificationReadError, MarkNotificationReadResponse, RegisterData, RegisterError, RegisterResponse, RetryJobData, RetryJobError, RetryJobResponse, SavePreferencesData, SavePreferencesResponse, UpdateProfileData, UpdateProfileError, UpdateProfileResponse, UploadMediaData, UploadMediaError, UploadMediaResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -299,6 +299,34 @@ export const getCreationCapabilitiesOptions = (options?: Options<GetCreationCapa
     },
     queryKey: getCreationCapabilitiesQueryKey(options)
 });
+
+export const createDirectUploadMutation = (options?: Partial<Options<CreateDirectUploadData>>): UseMutationOptions<CreateDirectUploadResponse, CreateDirectUploadError, Options<CreateDirectUploadData>> => {
+    const mutationOptions: UseMutationOptions<CreateDirectUploadResponse, CreateDirectUploadError, Options<CreateDirectUploadData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await createDirectUpload({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const completeDirectUploadMutation = (options?: Partial<Options<CompleteDirectUploadData>>): UseMutationOptions<CompleteDirectUploadResponse, CompleteDirectUploadError, Options<CompleteDirectUploadData>> => {
+    const mutationOptions: UseMutationOptions<CompleteDirectUploadResponse, CompleteDirectUploadError, Options<CompleteDirectUploadData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await completeDirectUpload({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
 
 export const uploadMediaMutation = (options?: Partial<Options<UploadMediaData>>): UseMutationOptions<UploadMediaResponse, UploadMediaError, Options<UploadMediaData>> => {
     const mutationOptions: UseMutationOptions<UploadMediaResponse, UploadMediaError, Options<UploadMediaData>> = {

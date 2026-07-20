@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type ServerSentEventsResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { CancelJobData, CancelJobErrors, CancelJobResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, CreateJobData, CreateJobErrors, CreateJobResponses, CreateRechargeOrderData, CreateRechargeOrderErrors, CreateRechargeOrderResponses, DownloadArtifactData, DownloadArtifactErrors, DownloadArtifactResponses, GetAssetContentData, GetAssetContentErrors, GetAssetContentResponses, GetCapabilitiesData, GetCapabilitiesResponses, GetCreationCapabilitiesData, GetCreationCapabilitiesResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetHealthData, GetHealthResponses, GetJobData, GetJobErrors, GetJobResponses, GetModelsData, GetModelsResponses, GetPreferencesData, GetPreferencesResponses, ListAssetsData, ListAssetsResponses, ListJobsData, ListJobsResponses, ListNotificationsData, ListNotificationsResponses, ListRechargeOrdersData, ListRechargeOrdersResponses, ListRechargePackagesData, ListRechargePackagesResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, MarkAllNotificationsReadData, MarkAllNotificationsReadResponses, MarkNotificationReadData, MarkNotificationReadErrors, MarkNotificationReadResponses, RegisterData, RegisterErrors, RegisterResponses, RetryJobData, RetryJobErrors, RetryJobResponses, SavePreferencesData, SavePreferencesResponses, UpdateProfileData, UpdateProfileErrors, UpdateProfileResponses, UploadMediaData, UploadMediaErrors, UploadMediaResponses, WatchJobEventsData, WatchJobEventsErrors, WatchJobEventsResponse, WatchJobEventsResponses } from './types.gen';
+import type { CancelJobData, CancelJobErrors, CancelJobResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, CompleteDirectUploadData, CompleteDirectUploadErrors, CompleteDirectUploadResponses, CreateDirectUploadData, CreateDirectUploadErrors, CreateDirectUploadResponses, CreateJobData, CreateJobErrors, CreateJobResponses, CreateRechargeOrderData, CreateRechargeOrderErrors, CreateRechargeOrderResponses, DownloadArtifactData, DownloadArtifactErrors, DownloadArtifactResponses, GetAssetContentData, GetAssetContentErrors, GetAssetContentResponses, GetCapabilitiesData, GetCapabilitiesResponses, GetCreationCapabilitiesData, GetCreationCapabilitiesResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetHealthData, GetHealthResponses, GetJobData, GetJobErrors, GetJobResponses, GetModelsData, GetModelsResponses, GetPreferencesData, GetPreferencesResponses, ListAssetsData, ListAssetsResponses, ListJobsData, ListJobsResponses, ListNotificationsData, ListNotificationsResponses, ListRechargeOrdersData, ListRechargeOrdersResponses, ListRechargePackagesData, ListRechargePackagesResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, MarkAllNotificationsReadData, MarkAllNotificationsReadResponses, MarkNotificationReadData, MarkNotificationReadErrors, MarkNotificationReadResponses, RegisterData, RegisterErrors, RegisterResponses, RetryJobData, RetryJobErrors, RetryJobResponses, SavePreferencesData, SavePreferencesResponses, UpdateProfileData, UpdateProfileErrors, UpdateProfileResponses, UploadMediaData, UploadMediaErrors, UploadMediaResponses, WatchJobEventsData, WatchJobEventsErrors, WatchJobEventsResponse, WatchJobEventsResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -95,6 +95,24 @@ export const getCapabilities = <ThrowOnError extends boolean = false>(options?: 
 export const getModels = <ThrowOnError extends boolean = false>(options?: Options<GetModelsData, ThrowOnError>): RequestResult<GetModelsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetModelsResponses, unknown, ThrowOnError>({ url: '/api/models', ...options });
 
 export const getCreationCapabilities = <ThrowOnError extends boolean = false>(options?: Options<GetCreationCapabilitiesData, ThrowOnError>): RequestResult<GetCreationCapabilitiesResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetCreationCapabilitiesResponses, unknown, ThrowOnError>({ url: '/api/creation/capabilities', ...options });
+
+export const createDirectUpload = <ThrowOnError extends boolean = false>(options: Options<CreateDirectUploadData, ThrowOnError>): RequestResult<CreateDirectUploadResponses, CreateDirectUploadErrors, ThrowOnError> => (options.client ?? client).post<CreateDirectUploadResponses, CreateDirectUploadErrors, ThrowOnError>({
+    url: '/api/uploads/direct',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const completeDirectUpload = <ThrowOnError extends boolean = false>(options: Options<CompleteDirectUploadData, ThrowOnError>): RequestResult<CompleteDirectUploadResponses, CompleteDirectUploadErrors, ThrowOnError> => (options.client ?? client).post<CompleteDirectUploadResponses, CompleteDirectUploadErrors, ThrowOnError>({
+    url: '/api/uploads/direct/complete',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 export const uploadMedia = <ThrowOnError extends boolean = false>(options: Options<UploadMediaData, ThrowOnError>): RequestResult<UploadMediaResponses, UploadMediaErrors, ThrowOnError> => (options.client ?? client).post<UploadMediaResponses, UploadMediaErrors, ThrowOnError>({
     ...formDataBodySerializer,

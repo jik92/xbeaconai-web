@@ -152,7 +152,12 @@ export async function uploadLibraryAsset(
   displayName: string,
   description = "",
   folderId?: string,
+  onProgress?: (percent: number) => void,
 ) {
+  if (kind === "media") {
+    const directAsset = await uploadLibraryAssetDirect(file, displayName, description, folderId, onProgress);
+    if (directAsset) return directAsset;
+  }
   const body = new FormData();
   body.set("file", file);
   body.set("kind", kind);
@@ -166,6 +171,79 @@ export async function uploadLibraryAsset(
   }
   const data = (await response.json()) as { asset: LibraryAsset & { displayName?: string } };
   return { ...data.asset, name: data.asset.displayName || data.asset.name } as LibraryAsset;
+}
+
+interface DirectUploadAuthorization {
+  uploadUrl: string;
+  uploadToken: string;
+  method: "PUT";
+  headers: Record<string, string>;
+  expiresAt: string;
+}
+
+async function responseError(response: Response, fallback: string) {
+  const data = (await response.json().catch(() => null)) as { error?: { code?: string; message?: string } } | null;
+  return { code: data?.error?.code, message: data?.error?.message || fallback };
+}
+
+function putDirectFile(authorization: DirectUploadAuthorization, file: File, onProgress?: (percent: number) => void) {
+  return new Promise<void>((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open(authorization.method, authorization.uploadUrl);
+    for (const [name, value] of Object.entries(authorization.headers)) request.setRequestHeader(name, value);
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress?.(Math.min(99, Math.round((event.loaded / event.total) * 100)));
+    };
+    request.onerror = () => reject(new Error("TOS 直传失败，请检查网络或存储桶 CORS 配置"));
+    request.onabort = () => reject(new Error("TOS 直传已取消"));
+    request.onload = () => {
+      if (request.status >= 200 && request.status < 300) {
+        onProgress?.(100);
+        resolve();
+      } else reject(new Error(`TOS 直传失败（HTTP ${request.status || "未知"}）`));
+    };
+    request.send(file);
+  });
+}
+
+async function uploadLibraryAssetDirect(
+  file: File,
+  displayName: string,
+  description: string,
+  folderId?: string,
+  onProgress?: (percent: number) => void,
+): Promise<LibraryAsset | undefined> {
+  const extension = file.name.split(".").pop()?.toLowerCase();
+  const mimeType =
+    file.type ||
+    ({ mp4: "video/mp4", mov: "video/quicktime", webm: "video/webm" } as Record<string, string>)[extension ?? ""] ||
+    "application/octet-stream";
+  const initResponse = await fetch(apiUrl("/api/uploads/direct"), {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      fileName: file.name,
+      mimeType,
+      size: file.size,
+      displayName,
+      description: description.trim() || undefined,
+      folderId,
+    }),
+  });
+  if (!initResponse.ok) {
+    const error = await responseError(initResponse, "无法申请 TOS 直传地址");
+    if (initResponse.status === 503 && error.code === "DIRECT_UPLOAD_UNAVAILABLE") return undefined;
+    throw new Error(error.message);
+  }
+  const authorization = (await initResponse.json()) as DirectUploadAuthorization;
+  await putDirectFile(authorization, file, onProgress);
+  const completeResponse = await fetch(apiUrl("/api/uploads/direct/complete"), {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ uploadToken: authorization.uploadToken }),
+  });
+  if (!completeResponse.ok) throw new Error((await responseError(completeResponse, "素材回写失败")).message);
+  return ((await completeResponse.json()) as { asset: LibraryAsset }).asset;
 }
 export async function fetchAssetFolders() {
   const response = await fetch(apiUrl("/api/asset-folders"), { headers: authHeaders() });

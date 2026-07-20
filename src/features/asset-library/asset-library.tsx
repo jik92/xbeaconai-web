@@ -243,6 +243,7 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
   const [file, setFile] = useState<File | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedFolderId, setSelectedFolderId] = useState("");
   const { data: folders = [] } = useQuery({
     queryKey: ["asset-folders"],
@@ -270,14 +271,17 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
         name.trim() || file.name.replace(/\.[^.]+$/, ""),
         description,
         kind === "media" ? selectedFolderId : undefined,
+        kind === "media" ? setUploadProgress : undefined,
       );
     },
+    onMutate: () => setUploadProgress(0),
     onSuccess: (asset) => {
       void queryClient.invalidateQueries({ queryKey: ["asset-library", kind] });
       setUploadOpen(false);
       setFile(null);
       setName("");
       setDescription("");
+      setUploadProgress(0);
       setSelected(asset);
     },
   });
@@ -438,11 +442,12 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
                 accept={
                   kind === "voice"
                     ? "audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/ogg,audio/webm"
-                    : "image/*,video/*,audio/*"
+                    : "image/png,image/jpeg,image/webp,image/gif,video/mp4,video/quicktime,video/webm,audio/mpeg,audio/wav,audio/x-wav,audio/ogg,audio/mp4,audio/webm,.mp4,.mov,.webm"
                 }
                 onChange={(event) => {
                   const next = event.target.files?.[0] || null;
                   setFile(next);
+                  setUploadProgress(0);
                   if (next && !name) setName(next.name.replace(/\.[^.]+$/, ""));
                 }}
               />
@@ -454,6 +459,14 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
                   : "支持常见图片、视频和音频格式，单文件最大 500MB"}
               </span>
             </label>
+            {kind === "media" && upload.isPending && (
+              <div className="asset-upload-progress" role="progressbar" aria-valuenow={uploadProgress}>
+                <span>
+                  <i style={{ width: `${uploadProgress}%` }} />
+                </span>
+                <b>{uploadProgress < 100 ? `正在直传 TOS · ${uploadProgress}%` : "TOS 上传完成，正在写入素材库…"}</b>
+              </div>
+            )}
             <label>
               资产名称
               <input

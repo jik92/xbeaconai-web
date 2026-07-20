@@ -758,7 +758,7 @@ export class AccountStore {
   getOwnedAsset(userId: string, id: string) {
     const row = this.db
       .query(
-        "SELECT id,owner_user_id,storage_key,original_name,mime_type,byte_size,asset_kind,display_name,description,created_at FROM media_assets WHERE id=? AND owner_user_id=?",
+        "SELECT id,owner_user_id,storage_key,original_name,mime_type,byte_size,asset_kind,display_name,description,folder_id,created_at FROM media_assets WHERE id=? AND owner_user_id=?",
       )
       .get(id, userId) as {
       id: string;
@@ -770,6 +770,7 @@ export class AccountStore {
       asset_kind: MediaAsset["kind"];
       display_name: string;
       description: string | null;
+      folder_id: string | null;
       created_at: string;
     } | null;
     return row
@@ -783,6 +784,7 @@ export class AccountStore {
           kind: row.asset_kind,
           displayName: row.display_name || row.original_name,
           description: row.description ?? undefined,
+          folderId: row.folder_id ?? undefined,
           createdAt: row.created_at,
         }
       : undefined;

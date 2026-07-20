@@ -634,12 +634,130 @@ export type GetCreationCapabilitiesResponses = {
 
 export type GetCreationCapabilitiesResponse = GetCreationCapabilitiesResponses[keyof GetCreationCapabilitiesResponses];
 
+export type CreateDirectUploadData = {
+    body: {
+        fileName: string;
+        mimeType: string;
+        size: number;
+        displayName: string;
+        description?: string;
+        folderId?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/uploads/direct';
+};
+
+export type CreateDirectUploadErrors = {
+    /**
+     * Invalid upload
+     */
+    400: ApiErrorResponse;
+    /**
+     * Unsupported media type
+     */
+    415: ApiErrorResponse;
+    /**
+     * Direct upload unavailable
+     */
+    503: ApiErrorResponse;
+};
+
+export type CreateDirectUploadError = CreateDirectUploadErrors[keyof CreateDirectUploadErrors];
+
+export type CreateDirectUploadResponses = {
+    /**
+     * Short-lived direct TOS upload authorization
+     */
+    200: {
+        uploadUrl: string;
+        uploadToken: string;
+        method: 'PUT';
+        headers: {
+            [key: string]: string;
+        };
+        expiresAt: string;
+    };
+};
+
+export type CreateDirectUploadResponse = CreateDirectUploadResponses[keyof CreateDirectUploadResponses];
+
+export type CompleteDirectUploadData = {
+    body: {
+        uploadToken: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/uploads/direct/complete';
+};
+
+export type CompleteDirectUploadErrors = {
+    /**
+     * Invalid upload token
+     */
+    400: ApiErrorResponse;
+    /**
+     * Uploaded object does not match
+     */
+    409: ApiErrorResponse;
+    /**
+     * TOS verification failed
+     */
+    502: ApiErrorResponse;
+    /**
+     * Direct upload unavailable
+     */
+    503: ApiErrorResponse;
+};
+
+export type CompleteDirectUploadError = CompleteDirectUploadErrors[keyof CompleteDirectUploadErrors];
+
+export type CompleteDirectUploadResponses = {
+    /**
+     * Previously completed upload
+     */
+    200: {
+        asset: {
+            id: string;
+            name: string;
+            originalName: string;
+            mimeType: string;
+            size: number;
+            kind: AssetKind;
+            description?: string;
+            folderId?: string;
+            url: string;
+            createdAt: string;
+        };
+    };
+    /**
+     * Direct upload registered
+     */
+    201: {
+        asset: {
+            id: string;
+            name: string;
+            originalName: string;
+            mimeType: string;
+            size: number;
+            kind: AssetKind;
+            description?: string;
+            folderId?: string;
+            url: string;
+            createdAt: string;
+        };
+    };
+};
+
+export type CompleteDirectUploadResponse = CompleteDirectUploadResponses[keyof CompleteDirectUploadResponses];
+
 export type UploadMediaData = {
     body: {
         file: Blob | File;
         kind?: AssetKind;
         displayName?: string;
         description?: string;
+        folderId?: string;
     };
     path?: never;
     query?: never;
@@ -676,6 +794,7 @@ export type UploadMediaResponses = {
             kind: AssetKind;
             displayName: string;
             description?: string;
+            folderId?: string;
             url: string;
             createdAt: string;
         };
@@ -689,6 +808,7 @@ export type ListAssetsData = {
     path?: never;
     query?: {
         kind?: AssetKind;
+        folderId?: string;
     };
     url: '/api/assets';
 };
@@ -706,6 +826,7 @@ export type ListAssetsResponses = {
             size: number;
             kind: AssetKind;
             description?: string;
+            folderId?: string;
             url: string;
             createdAt: string;
         }>;

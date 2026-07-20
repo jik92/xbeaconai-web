@@ -6,11 +6,13 @@ export function AuthenticatedMedia({
   mimeType,
   alt,
   autoPlay = false,
+  controls = true,
 }: {
   url: string;
   mimeType: string;
   alt: string;
   autoPlay?: boolean;
+  controls?: boolean;
 }) {
   const [source, setSource] = useState<string>();
   useEffect(() => {
@@ -27,7 +29,9 @@ export function AuthenticatedMedia({
     };
   }, [url]);
   if (!source) return <span>正在载入结果预览…</span>;
-  if (mimeType.startsWith("video/")) return <video controls autoPlay={autoPlay} src={source} />;
-  if (mimeType.startsWith("audio/")) return <audio controls autoPlay={autoPlay} src={source} />;
+  if (mimeType.startsWith("video/"))
+    return <video controls={controls} autoPlay={autoPlay} muted={!controls} src={source} />;
+  if (mimeType.startsWith("audio/"))
+    return <audio controls={controls} autoPlay={autoPlay} muted={!controls} src={source} />;
   return <img src={source} alt={alt} />;
 }

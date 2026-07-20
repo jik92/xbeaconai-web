@@ -1619,6 +1619,320 @@
         }
       }
     },
+    "/api/uploads/direct": {
+      "post": {
+        "operationId": "createDirectUpload",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "fileName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "mimeType": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "size": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 524288000
+                  },
+                  "displayName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 300
+                  },
+                  "folderId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "fileName",
+                  "mimeType",
+                  "size",
+                  "displayName"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Short-lived direct TOS upload authorization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "uploadUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "uploadToken": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "method": {
+                      "type": "string",
+                      "enum": [
+                        "PUT"
+                      ]
+                    },
+                    "headers": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    },
+                    "expiresAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "uploadUrl",
+                    "uploadToken",
+                    "method",
+                    "headers",
+                    "expiresAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid upload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Direct upload unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/uploads/direct/complete": {
+      "post": {
+        "operationId": "completeDirectUpload",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "uploadToken": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "uploadToken"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Previously completed upload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "asset": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "originalName": {
+                          "type": "string"
+                        },
+                        "mimeType": {
+                          "type": "string"
+                        },
+                        "size": {
+                          "type": "integer"
+                        },
+                        "kind": {
+                          "$ref": "#/components/schemas/AssetKind"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "folderId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "url": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "originalName",
+                        "mimeType",
+                        "size",
+                        "kind",
+                        "url",
+                        "createdAt"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "asset"
+                  ]
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Direct upload registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "asset": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "originalName": {
+                          "type": "string"
+                        },
+                        "mimeType": {
+                          "type": "string"
+                        },
+                        "size": {
+                          "type": "integer"
+                        },
+                        "kind": {
+                          "$ref": "#/components/schemas/AssetKind"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "folderId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "url": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "originalName",
+                        "mimeType",
+                        "size",
+                        "kind",
+                        "url",
+                        "createdAt"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "asset"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid upload token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Uploaded object does not match",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "TOS verification failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Direct upload unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/uploads": {
       "post": {
         "operationId": "uploadMedia",
@@ -1643,6 +1957,10 @@
                   "description": {
                     "type": "string",
                     "maxLength": 300
+                  },
+                  "folderId": {
+                    "type": "string",
+                    "format": "uuid"
                   }
                 },
                 "required": [
@@ -1683,6 +2001,10 @@
                         },
                         "description": {
                           "type": "string"
+                        },
+                        "folderId": {
+                          "type": "string",
+                          "format": "uuid"
                         },
                         "url": {
                           "type": "string"
@@ -1754,6 +2076,15 @@
             "required": false,
             "name": "kind",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "folderId",
+            "in": "query"
           }
         ],
         "responses": {
@@ -1790,6 +2121,10 @@
                           },
                           "description": {
                             "type": "string"
+                          },
+                          "folderId": {
+                            "type": "string",
+                            "format": "uuid"
                           },
                           "url": {
                             "type": "string"

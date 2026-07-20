@@ -423,11 +423,67 @@ export const zGetCreationCapabilitiesResponse = z.object({
     }))
 });
 
+export const zCreateDirectUploadBody = z.object({
+    fileName: z.string().min(1).max(200),
+    mimeType: z.string().min(1),
+    size: z.int().gte(1).lte(524288000),
+    displayName: z.string().min(1).max(80),
+    description: z.string().max(300).optional(),
+    folderId: z.uuid().optional()
+});
+
+/**
+ * Short-lived direct TOS upload authorization
+ */
+export const zCreateDirectUploadResponse = z.object({
+    uploadUrl: z.url(),
+    uploadToken: z.string().min(1),
+    method: z.enum(['PUT']),
+    headers: z.record(z.string(), z.string()),
+    expiresAt: z.string()
+});
+
+export const zCompleteDirectUploadBody = z.object({
+    uploadToken: z.string().min(1)
+});
+
+export const zCompleteDirectUploadResponse = z.union([
+    z.object({
+        asset: z.object({
+            id: z.uuid(),
+            name: z.string(),
+            originalName: z.string(),
+            mimeType: z.string(),
+            size: z.int(),
+            kind: zAssetKind,
+            description: z.string().optional(),
+            folderId: z.uuid().optional(),
+            url: z.string(),
+            createdAt: z.string()
+        })
+    }),
+    z.object({
+        asset: z.object({
+            id: z.uuid(),
+            name: z.string(),
+            originalName: z.string(),
+            mimeType: z.string(),
+            size: z.int(),
+            kind: zAssetKind,
+            description: z.string().optional(),
+            folderId: z.uuid().optional(),
+            url: z.string(),
+            createdAt: z.string()
+        })
+    })
+]);
+
 export const zUploadMediaBody = z.object({
     file: z.string(),
     kind: zAssetKind.optional(),
     displayName: z.string().max(80).optional(),
-    description: z.string().max(300).optional()
+    description: z.string().max(300).optional(),
+    folderId: z.uuid().optional()
 });
 
 /**
@@ -442,13 +498,15 @@ export const zUploadMediaResponse = z.object({
         kind: zAssetKind,
         displayName: z.string(),
         description: z.string().optional(),
+        folderId: z.uuid().optional(),
         url: z.string(),
         createdAt: z.string()
     })
 });
 
 export const zListAssetsQuery = z.object({
-    kind: zAssetKind.optional()
+    kind: zAssetKind.optional(),
+    folderId: z.uuid().optional()
 });
 
 /**
@@ -463,6 +521,7 @@ export const zListAssetsResponse = z.object({
         size: z.int(),
         kind: zAssetKind,
         description: z.string().optional(),
+        folderId: z.uuid().optional(),
         url: z.string(),
         createdAt: z.string()
     }))

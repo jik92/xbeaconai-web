@@ -481,6 +481,29 @@
   color: #d9485c;
   font-size: 11px;
 }
+.asset-upload-progress {
+  margin: 0 20px 12px;
+  display: grid;
+  gap: 7px;
+}
+.asset-upload-progress > span {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e8edf5;
+}
+.asset-upload-progress > span > i {
+  height: 100%;
+  display: block;
+  border-radius: inherit;
+  background: #246bfd;
+  transition: width 160ms ease;
+}
+.asset-upload-progress > b {
+  color: #657086;
+  font-size: 11px;
+  font-weight: 500;
+}
 .asset-detail-media {
   height: 330px;
   background: #eef1f5;

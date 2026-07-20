@@ -5,7 +5,13 @@ import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
 import { APP_CONFIG, isModuleOpen } from "../src/app/config";
 import type { ModuleId } from "../src/entities/types";
-import { AccountError, AccountStore, type Preferences, rechargePackages } from "./accounts/account-store";
+import {
+  AccountError,
+  AccountStore,
+  type MediaAsset,
+  type Preferences,
+  rechargePackages,
+} from "./accounts/account-store";
 import { authenticate, issueToken } from "./accounts/auth";
 import { creationCapabilities, quoteCreation, validateCreationValues } from "./creation/capabilities";
 import { env } from "./env";
@@ -15,6 +21,12 @@ import { seedanceModelIds, videoModels } from "./models/video-models";
 import { auditSdkRegistry } from "./sdk-registry";
 import { ossutils } from "./storage/ossutils";
 import type { JobRecord, StageProvenance } from "./types";
+import {
+  directUploadExtensions,
+  issueDirectUploadTicket,
+  maxDirectUploadBytes,
+  verifyDirectUploadTicket,
+} from "./uploads/direct-upload";
 
 const moduleIds = [
   "video-remix",
@@ -108,6 +120,21 @@ const LibraryAssetSchema = z.object({
   folderId: z.string().uuid().optional(),
   url: z.string(),
   createdAt: z.string(),
+});
+const DirectUploadRequestSchema = z.object({
+  fileName: z.string().min(1).max(200),
+  mimeType: z.string().min(1),
+  size: z.number().int().min(1).max(maxDirectUploadBytes),
+  displayName: z.string().min(1).max(80),
+  description: z.string().max(300).optional(),
+  folderId: z.string().uuid().optional(),
+});
+const DirectUploadInitSchema = z.object({
+  uploadUrl: z.string().url(),
+  uploadToken: z.string().min(1),
+  method: z.literal("PUT"),
+  headers: z.record(z.string(), z.string()),
+  expiresAt: z.string(),
 });
 
 export const store = new SqliteJobStore();
@@ -829,6 +856,243 @@ const creationCapabilitiesRoute = createRoute({
 });
 app.openapi(creationCapabilitiesRoute, (c) => c.json({ models: creationCapabilities(videoModelEnabled) }, 200));
 
+const libraryAssetResponse = (asset: MediaAsset) => ({
+  id: asset.id,
+  name: asset.displayName,
+  originalName: asset.originalName,
+  mimeType: asset.mimeType,
+  size: asset.byteSize,
+  kind: asset.kind,
+  description: asset.description,
+  folderId: asset.folderId,
+  url: `/api/assets/${asset.id}/content`,
+  createdAt: asset.createdAt,
+});
+
+const directUploadInitRoute = createRoute({
+  method: "post",
+  path: "/api/uploads/direct",
+  operationId: "createDirectUpload",
+  request: {
+    body: { required: true, content: { "application/json": { schema: DirectUploadRequestSchema } } },
+  },
+  responses: {
+    200: {
+      description: "Short-lived direct TOS upload authorization",
+      content: { "application/json": { schema: DirectUploadInitSchema } },
+    },
+    400: { description: "Invalid upload", content: { "application/json": { schema: ErrorSchema } } },
+    415: { description: "Unsupported media type", content: { "application/json": { schema: ErrorSchema } } },
+    503: { description: "Direct upload unavailable", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+
+app.openapi(directUploadInitRoute, async (c) => {
+  const requestId = crypto.randomUUID();
+  if (!ossutils.configured)
+    return c.json(
+      {
+        error: {
+          code: "DIRECT_UPLOAD_UNAVAILABLE",
+          message: "TOS 直传尚未配置",
+          retryable: true,
+          requestId,
+        },
+      },
+      503,
+    );
+  const body = c.req.valid("json");
+  const extension = directUploadExtensions[body.mimeType];
+  if (!extension)
+    return c.json(
+      {
+        error: {
+          code: "UNSUPPORTED_MEDIA_TYPE",
+          message: "仅支持常见图片、视频和音频格式",
+          retryable: false,
+          requestId,
+        },
+      },
+      415,
+    );
+  const folder = body.folderId
+    ? accounts.getAssetFolder(c.get("userId"), body.folderId)
+    : accounts.ensureDefaultAssetFolder(c.get("userId"));
+  if (!folder)
+    return c.json(
+      {
+        error: {
+          code: "FOLDER_NOT_FOUND",
+          message: "素材文件夹不存在",
+          retryable: false,
+          requestId,
+        },
+      },
+      400,
+    );
+  const assetId = crypto.randomUUID();
+  const storageKey = `${folder.storagePrefix}${assetId}${extension}`;
+  const ticket = await issueDirectUploadTicket(
+    {
+      sub: c.get("userId"),
+      assetId,
+      storageKey,
+      originalName: body.fileName,
+      mimeType: body.mimeType,
+      byteSize: body.size,
+      kind: "media",
+      displayName: body.displayName.trim() || body.fileName.replace(/\.[^.]+$/, "").slice(0, 80),
+      description: body.description?.trim() || undefined,
+      folderId: folder.id,
+    },
+    env.jwtSecret,
+  );
+  return c.json(
+    {
+      uploadUrl: ossutils.createSignedUploadUrl(storageKey),
+      uploadToken: ticket.token,
+      method: "PUT" as const,
+      headers: { "Content-Type": body.mimeType },
+      expiresAt: ticket.expiresAt,
+    },
+    200,
+  );
+});
+
+const directUploadCompleteRoute = createRoute({
+  method: "post",
+  path: "/api/uploads/direct/complete",
+  operationId: "completeDirectUpload",
+  request: {
+    body: {
+      required: true,
+      content: { "application/json": { schema: z.object({ uploadToken: z.string().min(1) }) } },
+    },
+  },
+  responses: {
+    200: {
+      description: "Previously completed upload",
+      content: { "application/json": { schema: z.object({ asset: LibraryAssetSchema }) } },
+    },
+    201: {
+      description: "Direct upload registered",
+      content: { "application/json": { schema: z.object({ asset: LibraryAssetSchema }) } },
+    },
+    400: { description: "Invalid upload token", content: { "application/json": { schema: ErrorSchema } } },
+    409: { description: "Uploaded object does not match", content: { "application/json": { schema: ErrorSchema } } },
+    502: { description: "TOS verification failed", content: { "application/json": { schema: ErrorSchema } } },
+    503: { description: "Direct upload unavailable", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+
+app.openapi(directUploadCompleteRoute, async (c) => {
+  const requestId = crypto.randomUUID();
+  if (!ossutils.configured)
+    return c.json(
+      {
+        error: {
+          code: "DIRECT_UPLOAD_UNAVAILABLE",
+          message: "TOS 直传尚未配置",
+          retryable: true,
+          requestId,
+        },
+      },
+      503,
+    );
+  let ticket;
+  try {
+    ticket = await verifyDirectUploadTicket(c.req.valid("json").uploadToken, env.jwtSecret);
+  } catch {
+    return c.json(
+      {
+        error: {
+          code: "INVALID_UPLOAD_TOKEN",
+          message: "上传凭证无效或已过期，请重新上传",
+          retryable: false,
+          requestId,
+        },
+      },
+      400,
+    );
+  }
+  if (ticket.sub !== c.get("userId"))
+    return c.json(
+      {
+        error: {
+          code: "INVALID_UPLOAD_TOKEN",
+          message: "上传凭证与当前账号不匹配",
+          retryable: false,
+          requestId,
+        },
+      },
+      400,
+    );
+  const existing = accounts.getOwnedAsset(c.get("userId"), ticket.assetId);
+  if (existing) return c.json({ asset: libraryAssetResponse(existing) }, 200);
+  if (!accounts.getAssetFolder(c.get("userId"), ticket.folderId)) {
+    await ossutils.deleteObject(ticket.storageKey).catch(() => undefined);
+    return c.json(
+      {
+        error: {
+          code: "FOLDER_NOT_FOUND",
+          message: "素材文件夹已不存在，请重新选择",
+          retryable: false,
+          requestId,
+        },
+      },
+      409,
+    );
+  }
+  let metadata;
+  try {
+    metadata = (await ossutils.headObject(ticket.storageKey)).data;
+  } catch (error) {
+    const statusCode = (error as { statusCode?: number }).statusCode;
+    return c.json(
+      {
+        error: {
+          code: statusCode === 404 ? "DIRECT_UPLOAD_MISSING" : "DIRECT_UPLOAD_VERIFY_FAILED",
+          message: statusCode === 404 ? "TOS 尚未收到完整文件，请重新上传" : "TOS 文件校验失败，请稍后重试",
+          retryable: true,
+          requestId,
+        },
+      },
+      statusCode === 404 ? 409 : 502,
+    );
+  }
+  const uploadedBytes = Number(metadata["content-length"] ?? 0);
+  const uploadedMimeType = String(metadata["content-type"] ?? "").split(";", 1)[0];
+  if (uploadedBytes !== ticket.byteSize || uploadedMimeType !== ticket.mimeType) {
+    await ossutils.deleteObject(ticket.storageKey).catch(() => undefined);
+    return c.json(
+      {
+        error: {
+          code: "DIRECT_UPLOAD_MISMATCH",
+          message: "TOS 文件信息与上传申请不一致，请重新上传",
+          retryable: false,
+          requestId,
+        },
+      },
+      409,
+    );
+  }
+  const asset: MediaAsset = {
+    id: ticket.assetId,
+    ownerUserId: ticket.sub,
+    storageKey: ticket.storageKey,
+    originalName: ticket.originalName,
+    mimeType: ticket.mimeType,
+    byteSize: ticket.byteSize,
+    kind: ticket.kind,
+    displayName: ticket.displayName,
+    description: ticket.description,
+    folderId: ticket.folderId,
+    createdAt: new Date().toISOString(),
+  };
+  accounts.createAsset(asset);
+  return c.json({ asset: libraryAssetResponse(asset) }, 201);
+});
+
 const uploadRoute = createRoute({
   method: "post",
   path: "/api/uploads",
@@ -887,27 +1151,12 @@ app.openapi(uploadRoute, async (c) => {
   const requestId = crypto.randomUUID();
   if (!(file instanceof File) || file.size === 0)
     return c.json({ error: { code: "INVALID_MEDIA", message: "请选择有效文件", retryable: false, requestId } }, 400);
-  if (file.size > 500 * 1024 * 1024)
+  if (file.size > maxDirectUploadBytes)
     return c.json(
       { error: { code: "UPLOAD_TOO_LARGE", message: "文件不能超过 500MB", retryable: false, requestId } },
       413,
     );
-  const extensions: Record<string, string> = {
-    "image/png": ".png",
-    "image/jpeg": ".jpg",
-    "image/webp": ".webp",
-    "image/gif": ".gif",
-    "video/mp4": ".mp4",
-    "video/quicktime": ".mov",
-    "video/webm": ".webm",
-    "audio/mpeg": ".mp3",
-    "audio/wav": ".wav",
-    "audio/x-wav": ".wav",
-    "audio/ogg": ".ogg",
-    "audio/mp4": ".m4a",
-    "audio/webm": ".webm",
-  };
-  if (!extensions[file.type])
+  if (!directUploadExtensions[file.type])
     return c.json(
       {
         error: {
@@ -933,7 +1182,7 @@ app.openapi(uploadRoute, async (c) => {
     );
   const id = crypto.randomUUID();
   const safeExtension =
-    extensions[file.type] ??
+    directUploadExtensions[file.type] ??
     extname(file.name)
       .replace(/[^.a-zA-Z0-9]/g, "")
       .slice(0, 10);
@@ -1100,18 +1349,7 @@ app.post("/api/products", async (c) => {
 
 app.openapi(assetListRoute, (c) => {
   const { kind, folderId } = c.req.valid("query");
-  const assets = accounts.listAssets(c.get("userId"), kind, folderId).map((asset) => ({
-    id: asset.id,
-    name: asset.displayName,
-    originalName: asset.originalName,
-    mimeType: asset.mimeType,
-    size: asset.byteSize,
-    kind: asset.kind,
-    description: asset.description,
-    folderId: asset.folderId,
-    url: `/api/assets/${asset.id}/content`,
-    createdAt: asset.createdAt,
-  }));
+  const assets = accounts.listAssets(c.get("userId"), kind, folderId).map(libraryAssetResponse);
   return c.json({ assets }, 200);
 });
 
@@ -1193,7 +1431,15 @@ app.openapi(assetContentRoute, async (c) => {
   const asset = accounts.getOwnedAsset(c.get("userId"), c.req.valid("param").assetId);
   if (!asset) return new Response("Not found", { status: 404 });
   const file = Bun.file(resolve(env.dataDir, "uploads", asset.storageKey));
-  if (!(await file.exists())) return new Response("Not found", { status: 404 });
+  if (!(await file.exists())) {
+    if (!ossutils.configured) return new Response("Not found", { status: 404 });
+    try {
+      await ossutils.headObject(asset.storageKey);
+      return Response.redirect(ossutils.createSignedReadUrl(asset.storageKey), 302);
+    } catch {
+      return new Response("Not found", { status: 404 });
+    }
+  }
   return new Response(file, {
     headers: {
       "Content-Type": asset.mimeType || "application/octet-stream",

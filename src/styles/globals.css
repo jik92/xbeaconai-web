@@ -1011,6 +1011,47 @@ select:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.tool-upload-preview {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: hidden;
+  border-radius: inherit;
+  background: #eef1f5;
+}
+.tool-upload-preview > video,
+.tool-upload-preview > img,
+.tool-upload-preview > span {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+.tool-upload-preview > span {
+  padding: 12px;
+  display: grid;
+  place-items: center;
+  color: #7b8493;
+  font-size: 12px;
+}
+.tool-upload-preview > i {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: white;
+  background: #1677ff;
+  box-shadow: 0 2px 8px #0003;
+}
+.tool-upload-preview > i svg {
+  width: 14px;
+  height: 14px;
+}
 .tool-upload-tile .tool-upload-error {
   color: var(--danger);
 }
@@ -1070,6 +1111,17 @@ select:focus-visible {
 }
 .video-cut-form .tool-form-row {
   grid-template-columns: 170px minmax(0, 1fr);
+}
+.video-cut-form .save-location {
+  grid-template-columns: 170px minmax(0, 1fr) 150px;
+  gap: 12px;
+}
+.video-cut-form .save-location > button {
+  height: 46px;
+  border: 1px solid #d9dce1;
+  border-radius: 8px;
+  color: #252a33;
+  background: white;
 }
 .creator-voice-clone {
   width: min(880px, 100%);
@@ -1300,8 +1352,8 @@ select:focus-visible {
 .short-input input {
   max-width: 110px;
 }
-.save-location {
-  grid-template-columns: 145px minmax(0, 1fr) auto !important;
+.mashup-right .save-location {
+  grid-template-columns: 145px minmax(0, 1fr) auto;
   gap: 10px;
 }
 .save-location > button {

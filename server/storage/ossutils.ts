@@ -102,6 +102,15 @@ export class OssUtils {
     }
   }
 
+  createSignedUploadUrl(key: string, expiresSeconds = 15 * 60) {
+    return this.ready().getPreSignedUrl({
+      bucket: env.tos.bucket,
+      key: key.replace(/^\/+/, ""),
+      method: "PUT",
+      expires: expiresSeconds,
+    });
+  }
+
   async putStagedFile(input: PutStagedFileInput) {
     if (input.signal?.aborted) throw new Error("TOS_UPLOAD_ABORTED");
     const release = await uploadGate.acquire(input.sizeBytes);
