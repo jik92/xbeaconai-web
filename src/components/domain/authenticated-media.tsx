@@ -14,7 +14,9 @@ export function AuthenticatedMedia({
 }) {
   const [source, setSource] = useState<string>();
   const [error, setError] = useState(false);
+  const [retryNonce, setRetryNonce] = useState(0);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: retryNonce triggers re-fetch on retry click
   useEffect(() => {
     let active = true;
     let current: string | undefined;
@@ -33,25 +35,21 @@ export function AuthenticatedMedia({
       active = false;
       if (current) URL.revokeObjectURL(current);
     };
-  }, [url]);
+  }, [url, retryNonce]);
 
   if (error)
     return (
       <span className="authenticated-media-error">
         无法载入预览。
-        <button
-          type="button"
-          onClick={() => {
-            setError(false);
-            setSource(undefined);
-          }}
-        >
+        <button type="button" onClick={() => setRetryNonce((n) => n + 1)}>
           重试
         </button>
       </span>
     );
   if (!source) return <span>正在载入结果预览…</span>;
+  // biome-ignore lint/a11y/useMediaCaption: video content is user-uploaded media preview with no captions available
   if (mimeType.startsWith("video/")) return <video controls autoPlay={autoPlay} src={source} />;
+  // biome-ignore lint/a11y/useMediaCaption: audio content is user-uploaded media preview with no captions available
   if (mimeType.startsWith("audio/")) return <audio controls autoPlay={autoPlay} src={source} />;
   return <img src={source} alt={alt} />;
 }

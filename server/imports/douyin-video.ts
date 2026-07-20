@@ -148,6 +148,12 @@ export function validateFullResponse(details: {
   if (!details.byteLength) throw new DouyinImportError("EMPTY_VIDEO", "未获取到有效视频内容", 422);
   if (details.byteLength > MAX_VIDEO_BYTES)
     throw new DouyinImportError("VIDEO_TOO_LARGE", "视频超过 500MB，无法导入", 413);
+  if (details.byteLength !== declaredLength)
+    throw new DouyinImportError(
+      "VIDEO_SIZE_MISMATCH",
+      `视频实际大小（${details.byteLength} 字节）与声明的大小（${declaredLength} 字节）不一致，文件可能不完整`,
+      422,
+    );
 }
 
 export async function resolveDouyinVideo(shareUrl: string): Promise<ResolvedDouyinVideo> {

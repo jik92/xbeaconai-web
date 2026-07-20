@@ -164,6 +164,16 @@ describe("Full response validation", () => {
       }),
     ).toThrow("视频超过 500MB");
   });
+
+  test("rejects 200 response whose byte length is shorter than Content-Length", () => {
+    expect(() =>
+      validateFullResponse({
+        status: 200,
+        headers: { "content-type": "video/mp4", "content-length": "2048" },
+        byteLength: 1024,
+      }),
+    ).toThrow("视频实际大小");
+  });
 });
 
 describe("Douyin video import persistence", () => {
