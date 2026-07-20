@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { createColumnHelper, flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
+import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   ArrowLeft,
@@ -16,7 +16,6 @@ import {
   Play,
   Plus,
   RotateCcw,
-  Search,
   Sparkles,
   UploadCloud,
   WandSparkles,
@@ -37,10 +36,12 @@ import {
 } from "@/api/api-client";
 import type { Job, ModuleId, SeedanceModelId } from "@/api/generated/types.gen";
 import type { FieldSpec, ModuleConfig } from "@/app/routes";
+import { DataTable } from "@/components/ui/data-table";
 import type { ApiJobResult, AssetFolder } from "@/entities/types";
 import { db } from "@/lib/db";
 import { AttachmentPicker } from "./attachment-picker";
 import { AuthenticatedMedia } from "./authenticated-media";
+import { TaskSearchFilters } from "./task-search-filters";
 
 const statusMap: Record<Job["status"], string> = {
   queued: "排队中",
@@ -674,17 +675,26 @@ function TaskTable({
   retry,
   preview,
   cancel,
+  className,
+  height,
+  emptyMessage,
+  emptyAction,
 }: {
   tasks: Job[];
   retry: (t: Job) => void;
   preview: (t: Job) => void;
   cancel: (t: Job) => void;
+  className?: string;
+  height?: string;
+  emptyMessage?: string;
+  emptyAction?: React.ReactNode;
 }) {
   const column = createColumnHelper<Job>();
   const columns = useMemo(
     () => [
       column.accessor("title", {
         header: "任务名称",
+        size: 260,
         cell: (i) => (
           <div>
             <b>{i.getValue()}</b>
@@ -703,6 +713,7 @@ function TaskTable({
       }),
       column.accessor("status", {
         header: "状态",
+        size: 110,
         cell: (i) => (
           <span className={`status status-${i.getValue()}`}>
             {i.getValue() === "processing" && <LoaderCircle size={13} className="animate-spin" />}
@@ -712,6 +723,7 @@ function TaskTable({
       }),
       column.accessor("progress", {
         header: "进度",
+        size: 170,
         cell: (i) => (
           <div className="progress">
             <span style={{ width: `${i.getValue()}%` }} />
@@ -722,53 +734,58 @@ function TaskTable({
       column.display({
         id: "resultCount",
         header: "结果数",
+        size: 80,
         cell: (i) => i.row.original.result?.artifacts.length ?? "—",
       }),
       column.display({
         id: "creator",
         header: "创建人",
+        size: 100,
         cell: () => "当前用户",
       }),
       column.display({
         id: "createdAt",
         header: "创建时间",
+        size: 170,
         cell: (i) => new Date(i.row.original.createdAt).toLocaleString(),
       }),
       column.display({
         id: "updatedAt",
         header: "更新时间",
+        size: 170,
         cell: (i) => new Date(i.row.original.updatedAt).toLocaleString(),
       }),
       column.display({
         id: "actions",
         header: "操作",
+        size: 210,
         cell: (i) => (
           <div className="row-actions">
             {i.row.original.status === "succeeded" || i.row.original.status === "partially_succeeded" ? (
               <>
-                <button onClick={() => preview(i.row.original)}>
+                <button type="button" onClick={() => preview(i.row.original)}>
                   <Play size={14} />
                   查看结果
                 </button>
                 {i.row.original.status === "partially_succeeded" ? (
-                  <button onClick={() => retry(i.row.original)}>
+                  <button type="button" onClick={() => retry(i.row.original)}>
                     <RotateCcw size={14} />
                     重试未完成
                   </button>
                 ) : (
-                  <button onClick={() => preview(i.row.original)}>
+                  <button type="button" onClick={() => preview(i.row.original)}>
                     <Download size={14} />
                     导出
                   </button>
                 )}
               </>
             ) : i.row.original.status === "failed" || i.row.original.status === "cancelled" ? (
-              <button onClick={() => retry(i.row.original)}>
+              <button type="button" onClick={() => retry(i.row.original)}>
                 <RotateCcw size={14} />
                 重试
               </button>
             ) : (
-              <button onClick={() => cancel(i.row.original)}>
+              <button type="button" onClick={() => cancel(i.row.original)}>
                 <X size={14} />
                 取消
               </button>
@@ -779,30 +796,18 @@ function TaskTable({
     ],
     [column, retry, preview, cancel],
   );
-  const table = useReactTable({ data: tasks, columns, getCoreRowModel: getCoreRowModel() });
   return (
-    <div className="table-wrap">
-      <table>
-        <thead>
-          {table.getHeaderGroups().map((g) => (
-            <tr key={g.id}>
-              {g.headers.map((h) => (
-                <th key={h.id}>{flexRender(h.column.columnDef.header, h.getContext())}</th>
-              ))}
-            </tr>
-          ))}
-        </thead>
-        <tbody>
-          {table.getRowModel().rows.map((r) => (
-            <tr key={r.id}>
-              {r.getVisibleCells().map((c) => (
-                <td key={c.id}>{flexRender(c.column.columnDef.cell, c.getContext())}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <DataTable
+      className={className}
+      columns={columns as ColumnDef<Job, unknown>[]}
+      data={tasks}
+      getRowId={(task) => task.id}
+      emptyMessage={emptyMessage}
+      emptyIcon={<X />}
+      emptyAction={emptyAction}
+      minWidth={1270}
+      height={height}
+    />
   );
 }
 
@@ -937,10 +942,6 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
   const [actionNotice, setActionNotice] = useState("");
   const [videoModel, setVideoModel] = useState<SeedanceModelId>("doubao-seedance-2-0-fast-260128");
   const [creatorOpen, setCreatorOpen] = useState(false);
-  const [taskNameFilter, setTaskNameFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [dateFromFilter, setDateFromFilter] = useState("");
-  const [dateToFilter, setDateToFilter] = useState("");
   const [appliedFilters, setAppliedFilters] = useState({ name: "", status: "", from: "", to: "" });
   const setValue = (id: string, value: string) => setValues((old) => ({ ...old, [id]: value }));
   const { data: restored = emptyJobs } = useQuery({
@@ -1049,6 +1050,11 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
       (!appliedFilters.from || new Date(task.createdAt) >= new Date(`${appliedFilters.from}T00:00:00`)) &&
       (!appliedFilters.to || new Date(task.createdAt) <= new Date(`${appliedFilters.to}T23:59:59.999`)),
   );
+  const isVideoCutPage = config.id === "video-cut";
+  const activeTaskCount = tasks.filter((task) => task.status === "queued" || task.status === "processing").length;
+  const finishedTaskCount = tasks.filter(
+    (task) => task.status === "succeeded" || task.status === "partially_succeeded",
+  ).length;
   const submit = async () => {
     setSubmitted(true);
     if (missing.length) return;
@@ -1455,99 +1461,65 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
           </section>
         </div>
       )}
-      <section className="tasks-section">
-        <div className="task-filters">
-          <label>
-            <span>任务名称</span>
-            <input
-              value={taskNameFilter}
-              onChange={(event) => setTaskNameFilter(event.target.value)}
-              placeholder="请输入"
-            />
-          </label>
-          <label>
-            <span>处理状态</span>
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-              <option value="">不限</option>
-              <option value="queued">排队中</option>
-              <option value="processing">生成中</option>
-              <option value="succeeded">已完成</option>
-              <option value="partially_succeeded">部分完成</option>
-              <option value="failed">失败</option>
-              <option value="cancelled">已取消</option>
-            </select>
-          </label>
-          <label>
-            <span>创建人</span>
-            <select defaultValue="current">
-              <option value="current">当前用户</option>
-            </select>
-          </label>
-          <label className="date-filter">
-            <span>创建时间</span>
-            <input
-              type="date"
-              aria-label="开始日期"
-              value={dateFromFilter}
-              onChange={(event) => setDateFromFilter(event.target.value)}
-            />
-            <i>至</i>
-            <input
-              type="date"
-              aria-label="结束日期"
-              value={dateToFilter}
-              onChange={(event) => setDateToFilter(event.target.value)}
-            />
-          </label>
-          <div className="filter-actions">
-            <button
-              type="button"
-              className="reset-filter"
-              onClick={() => {
-                setTaskNameFilter("");
-                setStatusFilter("");
-                setDateFromFilter("");
-                setDateToFilter("");
-                setAppliedFilters({ name: "", status: "", from: "", to: "" });
-              }}
-            >
-              重置
-            </button>
-            <button
-              type="button"
-              className="query-filter"
-              onClick={() =>
-                setAppliedFilters({
-                  name: taskNameFilter.trim(),
-                  status: statusFilter,
-                  from: dateFromFilter,
-                  to: dateToFilter,
-                })
-              }
-            >
-              <Search />
-              查询
-            </button>
-          </div>
-        </div>
-        <div className="task-toolbar">
-          <button type="button" className="new-task-button" onClick={() => setCreatorOpen(true)}>
-            <Plus />
-            {toolboxDisplayName(config)}
-          </button>
-          <small>共 {filteredTasks.length} 个任务</small>
-        </div>
-        {filteredTasks.length ? (
-          <TaskTable tasks={filteredTasks} retry={retry} preview={setSelectedTask} cancel={cancel} />
-        ) : (
-          <div className="empty">
-            <X size={24} />
-            <b>{tasks.length ? "没有符合条件的任务" : "暂无数据"}</b>
-            <span>
-              {tasks.length ? "请调整筛选条件后重新查询" : `点击“${toolboxDisplayName(config)}”创建第一个任务`}
-            </span>
-          </div>
+      <section className={`tasks-section${isVideoCutPage ? " video-cut-tasks" : ""}`}>
+        {isVideoCutPage && (
+          <header className="video-cut-page-head">
+            <div>
+              <span>VIDEO CUT</span>
+              <h1>AI视频分割</h1>
+              <p>识别镜头边界与文案动作，将长视频拆分为可复用片段。</p>
+            </div>
+            <div className="video-cut-page-actions">
+              <dl>
+                <div>
+                  <dt>全部任务</dt>
+                  <dd>{tasks.length}</dd>
+                </div>
+                <div>
+                  <dt>处理中</dt>
+                  <dd>{activeTaskCount}</dd>
+                </div>
+                <div>
+                  <dt>已完成</dt>
+                  <dd>{finishedTaskCount}</dd>
+                </div>
+              </dl>
+              <button type="button" className="new-task-button" onClick={() => setCreatorOpen(true)}>
+                <Plus />
+                新建分割任务
+              </button>
+            </div>
+          </header>
         )}
+        <TaskSearchFilters compact={isVideoCutPage} onSearch={setAppliedFilters} />
+        <div className={`task-toolbar${isVideoCutPage ? " compact" : ""}`}>
+          {!isVideoCutPage && (
+            <button type="button" className="new-task-button" onClick={() => setCreatorOpen(true)}>
+              <Plus />
+              {toolboxDisplayName(config)}
+            </button>
+          )}
+          <small>
+            共 {filteredTasks.length} 个任务
+            {filteredTasks.length !== tasks.length && ` / 全部 ${tasks.length} 个`}
+          </small>
+        </div>
+        <TaskTable
+          tasks={filteredTasks}
+          retry={retry}
+          preview={setSelectedTask}
+          cancel={cancel}
+          className={isVideoCutPage ? "video-cut-task-table" : "job-task-table"}
+          height={isVideoCutPage ? "calc(100vh - 318px)" : undefined}
+          emptyMessage={tasks.length ? "没有符合条件的任务" : "暂无任务"}
+          emptyAction={
+            !tasks.length ? (
+              <button type="button" onClick={() => setCreatorOpen(true)}>
+                新建第一个任务
+              </button>
+            ) : undefined
+          }
+        />
       </section>
       {selectedTask && (
         <div className="result-backdrop" onMouseDown={() => setSelectedTask(null)}>
