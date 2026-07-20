@@ -207,20 +207,26 @@ export async function resolveDouyinVideo(shareUrl: string): Promise<ResolvedDouy
     });
     const page = await context.newPage();
 
-    const detailResponse = page.waitForResponse(
-      (response) =>
-        response.status() === 200 &&
-        response.url().includes("/aweme/v1/web/aweme/detail/") &&
-        response.url().includes("aweme_id"),
-      { timeout: 20_000 },
-    );
-
     await page.goto(source.href, { waitUntil: "domcontentloaded", timeout: 20_000 });
     const finalUrl = new URL(page.url());
     if (!isShareHost(finalUrl.hostname))
       throw new DouyinImportError("UNSUPPORTED_DOUYIN_REDIRECT", "分享链接跳转到了不受支持的地址", 400);
 
     const awemeId = extractAwemeId(finalUrl);
+    const detailResponse = page.waitForResponse(
+      (response) => {
+        if (response.status() !== 200) return false;
+        if (!response.url().includes("/aweme/v1/web/aweme/detail/")) return false;
+        try {
+          const params = new URL(response.url()).searchParams;
+          return params.get("aweme_id") === awemeId;
+        } catch {
+          return false;
+        }
+      },
+      { timeout: 20_000 },
+    );
+
     const detailResp = await detailResponse;
     const detail = (await detailResp.json()) as { aweme_detail?: { video?: { play_addr?: { url_list?: string[] } } } };
     const urlList: string[] = detail?.aweme_detail?.video?.play_addr?.url_list ?? [];
