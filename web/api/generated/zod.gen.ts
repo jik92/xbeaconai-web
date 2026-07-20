@@ -539,6 +539,24 @@ export const zListAssetsResponse = z.object({
     }))
 });
 
+export const zDeleteAssetPath = z.object({
+    assetId: z.uuid()
+});
+
+/**
+ * Asset deleted
+ */
+export const zDeleteAssetResponse = z.void();
+
+export const zDeleteProductPath = z.object({
+    productId: z.uuid()
+});
+
+/**
+ * Product and its images deleted
+ */
+export const zDeleteProductResponse = z.void();
+
 export const zSaveAssetMetadataBody = z.object({
     width: z.int().gte(1).optional(),
     height: z.int().gte(1).optional(),

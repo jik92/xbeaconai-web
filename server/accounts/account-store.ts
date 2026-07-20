@@ -747,6 +747,45 @@ export class AccountStore {
       .get();
     return row ? mediaAsset(row) : undefined;
   }
+  deleteOwnedAsset(userId: string, id: string) {
+    const asset = this.getOwnedAsset(userId, id);
+    if (!asset) throw new AccountError("ASSET_NOT_FOUND", "素材不存在", 404);
+    if (asset.kind === "product") throw new AccountError("PRODUCT_DELETE_REQUIRED", "商品图片需要按整个商品删除", 409);
+    this.db
+      .delete(mediaAssets)
+      .where(and(eq(mediaAssets.id, id), eq(mediaAssets.ownerUserId, userId)))
+      .run();
+    return asset;
+  }
+  deleteProduct(userId: string, productId: string) {
+    const rows = this.db
+      .select()
+      .from(mediaAssets)
+      .where(
+        and(
+          eq(mediaAssets.ownerUserId, userId),
+          eq(mediaAssets.assetKind, "product"),
+          eq(mediaAssets.productGroupId, productId),
+        ),
+      )
+      .all();
+    if (!rows.length) throw new AccountError("PRODUCT_NOT_FOUND", "商品不存在", 404);
+    this.db.transaction(
+      (tx) => {
+        tx.delete(mediaAssets)
+          .where(
+            and(
+              eq(mediaAssets.ownerUserId, userId),
+              eq(mediaAssets.assetKind, "product"),
+              eq(mediaAssets.productGroupId, productId),
+            ),
+          )
+          .run();
+      },
+      { behavior: "immediate" },
+    );
+    return rows.map(mediaAsset);
+  }
   updateAssetMetadata(userId: string, id: string, metadata: { width?: number; height?: number; durationSec?: number }) {
     const current = this.getOwnedAsset(userId, id);
     if (!current || current.kind !== "media") return current;

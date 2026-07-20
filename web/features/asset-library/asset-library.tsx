@@ -11,12 +11,15 @@ import {
   Package,
   Plus,
   Search,
+  Trash2,
   Upload,
   X,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  deleteLibraryAsset,
+  deleteLibraryProduct,
   fetchAssetFolders,
   fetchLibraryAssets,
   fetchProducts,
@@ -66,6 +69,23 @@ function ProductLibrary() {
       setSelected(product);
     },
   });
+  const remove = useMutation({
+    mutationFn: deleteLibraryProduct,
+    onSuccess: (_, productId) => {
+      void queryClient.invalidateQueries({ queryKey: ["product-library"] });
+      void queryClient.invalidateQueries({ queryKey: ["asset-library", "product"] });
+      const saved = localStorage.getItem("studio:selectedProduct");
+      if (saved) {
+        try {
+          if ((JSON.parse(saved) as { id?: string }).id === productId)
+            localStorage.removeItem("studio:selectedProduct");
+        } catch {
+          localStorage.removeItem("studio:selectedProduct");
+        }
+      }
+      setSelected(null);
+    },
+  });
   const filtered = useMemo(() => {
     const keyword = query.trim().toLowerCase();
     return keyword
@@ -75,6 +95,15 @@ function ProductLibrary() {
   const applyToRemix = (product: LibraryProduct) => {
     localStorage.setItem("studio:selectedProduct", JSON.stringify(product));
     window.location.assign("/aigc/video-remix");
+  };
+  const removeProduct = async (product: LibraryProduct) => {
+    if (!window.confirm(`确定永久删除商品“${product.name}”及其 ${product.images.length} 张图片吗？此操作无法撤销。`))
+      return;
+    try {
+      await remove.mutateAsync(product.id);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "商品删除失败");
+    }
   };
 
   return (
@@ -215,6 +244,9 @@ function ProductLibrary() {
               <small>{scopeLabel(selected.sharingScope)}</small>
             </div>
             <footer>
+              <button className="danger" disabled={remove.isPending} onClick={() => void removeProduct(selected)}>
+                <Trash2 /> {remove.isPending ? "删除中…" : "删除商品"}
+              </button>
               <button className="primary" onClick={() => applyToRemix(selected)}>
                 <Package /> 用于爆款二创
               </button>
@@ -284,6 +316,8 @@ function MediaAssetTable({
   loadedMetadata,
   onMetadata,
   onUpload,
+  onDelete,
+  deleting,
 }: {
   assets: LibraryAsset[];
   loading: boolean;
@@ -291,6 +325,8 @@ function MediaAssetTable({
   loadedMetadata: Record<string, MediaMetadata>;
   onMetadata: (assetId: string, metadata: MediaMetadata) => void;
   onUpload: () => void;
+  onDelete: (asset: LibraryAsset) => void;
+  deleting: boolean;
 }) {
   const columns = useMemo<ColumnDef<LibraryAsset, unknown>[]>(
     () => [
@@ -350,8 +386,24 @@ function MediaAssetTable({
         size: 190,
         cell: ({ getValue }) => new Date(getValue<string>()).toLocaleString("zh-CN", { hour12: false }),
       },
+      {
+        id: "actions",
+        header: "操作",
+        size: 90,
+        cell: ({ row }) => (
+          <button
+            type="button"
+            className="media-asset-delete"
+            disabled={deleting}
+            aria-label={`删除 ${row.original.name}`}
+            onClick={() => onDelete(row.original)}
+          >
+            <Trash2 /> 删除
+          </button>
+        ),
+      },
     ],
-    [loadedMetadata, onMetadata],
+    [deleting, loadedMetadata, onDelete, onMetadata],
   );
 
   return (
@@ -428,6 +480,23 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
       if (kind === "voice") setSelected(asset);
     },
   });
+  const remove = useMutation({
+    mutationFn: deleteLibraryAsset,
+    onSuccess: (_, assetId) => {
+      void queryClient.invalidateQueries({ queryKey: ["asset-library", kind] });
+      const savedVoice = localStorage.getItem("studio:selectedVoice");
+      if (savedVoice) {
+        try {
+          if ((JSON.parse(savedVoice) as { id?: string }).id === assetId)
+            localStorage.removeItem("studio:selectedVoice");
+        } catch {
+          localStorage.removeItem("studio:selectedVoice");
+        }
+      }
+      if (selected?.id === assetId) setSelected(null);
+      if (previewingVoiceId === assetId) setPreviewingVoiceId(null);
+    },
+  });
   const filtered = useMemo(() => {
     const keyword = query.trim().toLowerCase();
     return keyword
@@ -437,6 +506,15 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
   const applyToRemix = (asset: LibraryAsset) => {
     localStorage.setItem("studio:selectedVoice", JSON.stringify(asset));
     window.location.assign("/aigc/video-remix");
+  };
+  const removeAsset = async (asset: LibraryAsset) => {
+    const typeName = kind === "voice" ? "音色" : "素材";
+    if (!window.confirm(`确定永久删除${typeName}“${asset.name}”吗？此操作无法撤销。`)) return;
+    try {
+      await remove.mutateAsync(asset.id);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : `${typeName}删除失败`);
+    }
   };
   const recordMetadata = (assetId: string, metadata: MediaMetadata) => {
     setLoadedMetadata((current) => {
@@ -492,6 +570,8 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
             loadedMetadata={loadedMetadata}
             onMetadata={recordMetadata}
             onUpload={() => setUploadOpen(true)}
+            onDelete={(asset) => void removeAsset(asset)}
+            deleting={remove.isPending}
           />
         ) : (
           <>
@@ -635,6 +715,9 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
             </div>
             {kind === "voice" && (
               <footer>
+                <button className="danger" disabled={remove.isPending} onClick={() => void removeAsset(selected)}>
+                  <Trash2 /> {remove.isPending ? "删除中…" : "删除音色"}
+                </button>
                 <button className="primary" onClick={() => applyToRemix(selected)}>
                   <AudioLines /> 用于爆款二创
                 </button>

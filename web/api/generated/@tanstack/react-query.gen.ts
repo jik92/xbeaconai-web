@@ -3,8 +3,8 @@
 import { type DefaultError, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { cancelJob, changePassword, completeDirectUpload, createDirectUpload, createJob, createRechargeOrder, downloadArtifact, getAssetContent, getCapabilities, getCreationCapabilities, getCurrentUser, getHealth, getJob, getModels, getPreferences, listAssets, listJobs, listNotifications, listRechargeOrders, listRechargePackages, login, logout, markAllNotificationsRead, markNotificationRead, type Options, register, retryJob, saveAssetMetadata, savePreferences, updateProfile, uploadMedia } from '../sdk.gen';
-import type { CancelJobData, CancelJobError, CancelJobResponse, ChangePasswordData, ChangePasswordError, ChangePasswordResponse, CompleteDirectUploadData, CompleteDirectUploadError, CompleteDirectUploadResponse, CreateDirectUploadData, CreateDirectUploadError, CreateDirectUploadResponse, CreateJobData, CreateJobError, CreateJobResponse, CreateRechargeOrderData, CreateRechargeOrderError, CreateRechargeOrderResponse, DownloadArtifactData, DownloadArtifactError, DownloadArtifactResponse, GetAssetContentData, GetAssetContentError, GetAssetContentResponse, GetCapabilitiesData, GetCapabilitiesResponse, GetCreationCapabilitiesData, GetCreationCapabilitiesResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetHealthData, GetHealthResponse, GetJobData, GetJobError, GetJobResponse, GetModelsData, GetModelsResponse, GetPreferencesData, GetPreferencesResponse, ListAssetsData, ListAssetsResponse, ListJobsData, ListJobsResponse, ListNotificationsData, ListNotificationsResponse, ListRechargeOrdersData, ListRechargeOrdersResponse, ListRechargePackagesData, ListRechargePackagesResponse, LoginData, LoginError, LoginResponse, LogoutData, LogoutError, LogoutResponse, MarkAllNotificationsReadData, MarkAllNotificationsReadResponse, MarkNotificationReadData, MarkNotificationReadError, MarkNotificationReadResponse, RegisterData, RegisterError, RegisterResponse, RetryJobData, RetryJobError, RetryJobResponse, SaveAssetMetadataData, SaveAssetMetadataError, SaveAssetMetadataResponse, SavePreferencesData, SavePreferencesResponse, UpdateProfileData, UpdateProfileError, UpdateProfileResponse, UploadMediaData, UploadMediaError, UploadMediaResponse } from '../types.gen';
+import { cancelJob, changePassword, completeDirectUpload, createDirectUpload, createJob, createRechargeOrder, deleteAsset, deleteProduct, downloadArtifact, getAssetContent, getCapabilities, getCreationCapabilities, getCurrentUser, getHealth, getJob, getModels, getPreferences, listAssets, listJobs, listNotifications, listRechargeOrders, listRechargePackages, login, logout, markAllNotificationsRead, markNotificationRead, type Options, register, retryJob, saveAssetMetadata, savePreferences, updateProfile, uploadMedia } from '../sdk.gen';
+import type { CancelJobData, CancelJobError, CancelJobResponse, ChangePasswordData, ChangePasswordError, ChangePasswordResponse, CompleteDirectUploadData, CompleteDirectUploadError, CompleteDirectUploadResponse, CreateDirectUploadData, CreateDirectUploadError, CreateDirectUploadResponse, CreateJobData, CreateJobError, CreateJobResponse, CreateRechargeOrderData, CreateRechargeOrderError, CreateRechargeOrderResponse, DeleteAssetData, DeleteAssetError, DeleteAssetResponse, DeleteProductData, DeleteProductError, DeleteProductResponse, DownloadArtifactData, DownloadArtifactError, DownloadArtifactResponse, GetAssetContentData, GetAssetContentError, GetAssetContentResponse, GetCapabilitiesData, GetCapabilitiesResponse, GetCreationCapabilitiesData, GetCreationCapabilitiesResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetHealthData, GetHealthResponse, GetJobData, GetJobError, GetJobResponse, GetModelsData, GetModelsResponse, GetPreferencesData, GetPreferencesResponse, ListAssetsData, ListAssetsResponse, ListJobsData, ListJobsResponse, ListNotificationsData, ListNotificationsResponse, ListRechargeOrdersData, ListRechargeOrdersResponse, ListRechargePackagesData, ListRechargePackagesResponse, LoginData, LoginError, LoginResponse, LogoutData, LogoutError, LogoutResponse, MarkAllNotificationsReadData, MarkAllNotificationsReadResponse, MarkNotificationReadData, MarkNotificationReadError, MarkNotificationReadResponse, RegisterData, RegisterError, RegisterResponse, RetryJobData, RetryJobError, RetryJobResponse, SaveAssetMetadataData, SaveAssetMetadataError, SaveAssetMetadataResponse, SavePreferencesData, SavePreferencesResponse, UpdateProfileData, UpdateProfileError, UpdateProfileResponse, UploadMediaData, UploadMediaError, UploadMediaResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -356,6 +356,34 @@ export const listAssetsOptions = (options?: Options<ListAssetsData>) => queryOpt
     },
     queryKey: listAssetsQueryKey(options)
 });
+
+export const deleteAssetMutation = (options?: Partial<Options<DeleteAssetData>>): UseMutationOptions<DeleteAssetResponse, DeleteAssetError, Options<DeleteAssetData>> => {
+    const mutationOptions: UseMutationOptions<DeleteAssetResponse, DeleteAssetError, Options<DeleteAssetData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await deleteAsset({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const deleteProductMutation = (options?: Partial<Options<DeleteProductData>>): UseMutationOptions<DeleteProductResponse, DeleteProductError, Options<DeleteProductData>> => {
+    const mutationOptions: UseMutationOptions<DeleteProductResponse, DeleteProductError, Options<DeleteProductData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await deleteProduct({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
 
 export const saveAssetMetadataMutation = (options?: Partial<Options<SaveAssetMetadataData>>): UseMutationOptions<SaveAssetMetadataResponse, SaveAssetMetadataError, Options<SaveAssetMetadataData>> => {
     const mutationOptions: UseMutationOptions<SaveAssetMetadataResponse, SaveAssetMetadataError, Options<SaveAssetMetadataData>> = {

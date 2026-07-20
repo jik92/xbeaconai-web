@@ -17,19 +17,27 @@ export function AuthenticatedMedia({
   onMetadata?: (metadata: { width?: number; height?: number; durationSec?: number }) => void;
 }) {
   const [source, setSource] = useState<string>();
+  const [loadError, setLoadError] = useState(false);
   useEffect(() => {
     let active = true,
       current: string | undefined;
-    void authenticatedBlobUrl(url).then((value) => {
-      current = value;
-      if (active) setSource(value);
-      else URL.revokeObjectURL(value);
-    });
+    setSource(undefined);
+    setLoadError(false);
+    void authenticatedBlobUrl(url)
+      .then((value) => {
+        current = value;
+        if (active) setSource(value);
+        else URL.revokeObjectURL(value);
+      })
+      .catch(() => {
+        if (active) setLoadError(true);
+      });
     return () => {
       active = false;
       if (current) URL.revokeObjectURL(current);
     };
   }, [url]);
+  if (loadError) return <span>预览不可用</span>;
   if (!source) return <span>正在载入结果预览…</span>;
   if (mimeType.startsWith("video/"))
     return (

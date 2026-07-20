@@ -1,0 +1,64 @@
+import { expect, test } from "@playwright/test";
+
+const pngFixture = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+  "base64",
+);
+
+test.beforeEach(async ({ page }, testInfo) => {
+  await page.goto("/assets/materials");
+  if (
+    await page
+      .getByRole("button", { name: "注册", exact: true })
+      .isVisible()
+      .catch(() => false)
+  ) {
+    await page.getByRole("button", { name: "注册", exact: true }).click();
+    await page.getByLabel("显示名称").fill("资产删除测试用户");
+    await page.getByLabel("邮箱").fill(`asset-delete-${testInfo.project.name}-${Date.now()}@example.test`);
+    await page.locator('input[type="password"]').fill("AssetDelete2026");
+    await page.getByRole("button", { name: "创建账号并登录" }).click();
+    await expect(page.locator(".auth-page")).toBeHidden();
+    await page.goto("/assets/materials");
+  }
+});
+
+test("deletes uploaded media and complete products", async ({ page }) => {
+  await page.route("**/api/uploads/direct", (route) =>
+    route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ error: { code: "DIRECT_UPLOAD_UNAVAILABLE", message: "test fallback" } }),
+    }),
+  );
+
+  await page.getByRole("button", { name: "上传素材" }).click();
+  await page.locator('.asset-upload-modal input[type="file"]').setInputFiles({
+    name: "deletion-media.png",
+    mimeType: "image/png",
+    buffer: pngFixture,
+  });
+  await page.getByRole("button", { name: "确认上传" }).click();
+  await expect(page.getByText("deletion-media", { exact: true })).toBeVisible();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "删除 deletion-media" }).click();
+  await expect(page.getByText("deletion-media", { exact: true })).toHaveCount(0);
+
+  await page.goto("/assets/products");
+  await page.getByRole("button", { name: "创建商品" }).click();
+  const productModal = page.locator(".product-upload-modal");
+  await productModal.locator('input[type="file"]').setInputFiles({
+    name: "product.png",
+    mimeType: "image/png",
+    buffer: pngFixture,
+  });
+  await productModal.locator('input[maxlength="200"]').fill("待删除商品");
+  await productModal.getByRole("button", { name: "确认上传" }).click();
+
+  const detail = page.locator(".product-detail-modal");
+  await expect(detail).toBeVisible();
+  page.once("dialog", (dialog) => dialog.accept());
+  await detail.getByRole("button", { name: "删除商品" }).click();
+  await expect(detail).toBeHidden();
+  await expect(page.getByText("待删除商品", { exact: true })).toHaveCount(0);
+});

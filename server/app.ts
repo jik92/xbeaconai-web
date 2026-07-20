@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync } from "node:fs";
-import { dirname, extname, resolve } from "node:path";
+import { rm } from "node:fs/promises";
+import { dirname, extname, isAbsolute, relative, resolve } from "node:path";
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
@@ -885,6 +886,18 @@ const libraryAssetResponse = (asset: MediaAsset) => ({
   createdAt: asset.createdAt,
 });
 
+async function removeAssetFiles(assets: MediaAsset[]) {
+  const uploadRoot = resolve(env.dataDir, "uploads");
+  await Promise.allSettled(
+    assets.map(async (asset) => {
+      const localPath = resolve(uploadRoot, asset.storageKey);
+      const relativePath = relative(uploadRoot, localPath);
+      if (!relativePath.startsWith("..") && !isAbsolute(relativePath)) await rm(localPath, { force: true });
+      if (ossutils.configured) await ossutils.deleteObject(asset.storageKey);
+    }),
+  );
+}
+
 const directUploadInitRoute = createRoute({
   method: "post",
   path: "/api/uploads/direct",
@@ -1375,6 +1388,59 @@ app.openapi(assetListRoute, (c) => {
   const { kind, folderId } = c.req.valid("query");
   const assets = accounts.listAssets(c.get("userId"), kind, folderId).map(libraryAssetResponse);
   return c.json({ assets }, 200);
+});
+
+const deleteAssetRoute = createRoute({
+  method: "delete",
+  path: "/api/assets/{assetId}",
+  operationId: "deleteAsset",
+  request: { params: z.object({ assetId: z.string().uuid() }) },
+  responses: {
+    204: { description: "Asset deleted" },
+    404: { description: "Asset not found", content: { "application/json": { schema: ErrorSchema } } },
+    409: { description: "Delete the complete product", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+
+app.openapi(deleteAssetRoute, async (c) => {
+  try {
+    const asset = accounts.deleteOwnedAsset(c.get("userId"), c.req.valid("param").assetId);
+    await removeAssetFiles([asset]);
+    return c.body(null, 204);
+  } catch (error) {
+    if (error instanceof AccountError)
+      return c.json(
+        { error: { code: error.code, message: error.message, retryable: false, requestId: crypto.randomUUID() } },
+        error.status === 409 ? 409 : 404,
+      );
+    throw error;
+  }
+});
+
+const deleteProductRoute = createRoute({
+  method: "delete",
+  path: "/api/products/{productId}",
+  operationId: "deleteProduct",
+  request: { params: z.object({ productId: z.string().uuid() }) },
+  responses: {
+    204: { description: "Product and its images deleted" },
+    404: { description: "Product not found", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+
+app.openapi(deleteProductRoute, async (c) => {
+  try {
+    const assets = accounts.deleteProduct(c.get("userId"), c.req.valid("param").productId);
+    await removeAssetFiles(assets);
+    return c.body(null, 204);
+  } catch (error) {
+    if (error instanceof AccountError)
+      return c.json(
+        { error: { code: error.code, message: error.message, retryable: false, requestId: crypto.randomUUID() } },
+        404,
+      );
+    throw error;
+  }
 });
 
 const folderResponse = (folder: ReturnType<AccountStore["ensureDefaultAssetFolder"]>, defaultFolderId?: string) => ({

@@ -3,7 +3,17 @@ import { getAuthToken } from "@/features/account/auth-context";
 import { randomUuid } from "@/lib/random-id";
 import { apiBaseUrl, apiUrl } from "./base-url";
 import { client } from "./generated/client.gen";
-import { cancelJob, createJob, getJob, getModels, listJobs, retryJob, uploadMedia } from "./generated/sdk.gen";
+import {
+  cancelJob,
+  createJob,
+  deleteAsset as deleteAssetRequest,
+  deleteProduct as deleteProductRequest,
+  getJob,
+  getModels,
+  listJobs,
+  retryJob,
+  uploadMedia,
+} from "./generated/sdk.gen";
 import type { Job, ModuleId, SeedanceModelId } from "./generated/types.gen";
 
 const configure = () =>
@@ -65,6 +75,14 @@ export async function fetchLibraryAssets(kind: Exclude<AssetKind, "product">, fo
   if (!response.ok) throw new Error("资产列表加载失败");
   const data = (await response.json()) as { assets: LibraryAsset[] };
   return data.assets;
+}
+export async function deleteLibraryAsset(assetId: string) {
+  configure();
+  await deleteAssetRequest({ path: { assetId }, headers: authHeaders(), throwOnError: true });
+}
+export async function deleteLibraryProduct(productId: string) {
+  configure();
+  await deleteProductRequest({ path: { productId }, headers: authHeaders(), throwOnError: true });
 }
 export async function saveAssetMetadata(
   assetId: string,

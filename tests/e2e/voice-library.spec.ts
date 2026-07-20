@@ -53,4 +53,11 @@ test("plays an uploaded voice from the card and detail dialog", async ({ page })
 
   await page.getByRole("button", { name: "试听音色" }).click();
   await expect(page.locator(".voice-asset-card audio[controls]")).toBeVisible();
+
+  await page.locator(".voice-asset-details").click();
+  await expect(detail).toBeVisible();
+  page.once("dialog", (dialog) => dialog.accept());
+  await detail.getByRole("button", { name: "删除音色" }).click();
+  await expect(detail).toBeHidden();
+  await expect(page.locator(".voice-asset-card")).toHaveCount(0);
 });

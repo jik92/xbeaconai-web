@@ -34,9 +34,10 @@ describe("product library", () => {
       createdAt,
     }));
 
+    const productId = crypto.randomUUID();
     store.createProductAssets(
       {
-        id: crypto.randomUUID(),
+        id: productId,
         ownerUserId: registration.user.id,
         name: "草编礼帽",
         description: "卡其色草编平顶礼帽",
@@ -51,6 +52,14 @@ describe("product library", () => {
     expect(products[0]?.name).toBe("草编礼帽");
     expect(products[0]?.sharingScope).toBe("team");
     expect(products[0]?.images.map((image) => image.originalName)).toEqual(["主图.png", "侧面.png", "细节.png"]);
+    const other = await store.register({
+      email: `other-product-${crypto.randomUUID()}@example.com`,
+      password: "Test-password-123",
+      displayName: "其他用户",
+    });
+    expect(() => store.deleteProduct(other.user.id, productId)).toThrow();
+    expect(store.deleteProduct(registration.user.id, productId)).toHaveLength(3);
+    expect(store.listProducts(registration.user.id)).toHaveLength(0);
     store.close();
   });
 });

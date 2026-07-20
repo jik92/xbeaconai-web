@@ -847,6 +847,64 @@ export type ListAssetsResponses = {
 
 export type ListAssetsResponse = ListAssetsResponses[keyof ListAssetsResponses];
 
+export type DeleteAssetData = {
+    body?: never;
+    path: {
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/assets/{assetId}';
+};
+
+export type DeleteAssetErrors = {
+    /**
+     * Asset not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Delete the complete product
+     */
+    409: ApiErrorResponse;
+};
+
+export type DeleteAssetError = DeleteAssetErrors[keyof DeleteAssetErrors];
+
+export type DeleteAssetResponses = {
+    /**
+     * Asset deleted
+     */
+    204: void;
+};
+
+export type DeleteAssetResponse = DeleteAssetResponses[keyof DeleteAssetResponses];
+
+export type DeleteProductData = {
+    body?: never;
+    path: {
+        productId: string;
+    };
+    query?: never;
+    url: '/api/products/{productId}';
+};
+
+export type DeleteProductErrors = {
+    /**
+     * Product not found
+     */
+    404: ApiErrorResponse;
+};
+
+export type DeleteProductError = DeleteProductErrors[keyof DeleteProductErrors];
+
+export type DeleteProductResponses = {
+    /**
+     * Product and its images deleted
+     */
+    204: void;
+};
+
+export type DeleteProductResponse = DeleteProductResponses[keyof DeleteProductResponses];
+
 export type SaveAssetMetadataData = {
     body: {
         width?: number;

@@ -50,8 +50,18 @@ describe("asset folder mapping", () => {
     expect(store.listAssets(user.id, "media", child.id)).toMatchObject([
       { width: 1080, height: 1920, durationSec: 15 },
     ]);
+    const [asset] = store.listAssets(user.id, "media", child.id);
+    const other = await store.register({
+      email: "other-folders@example.com",
+      password: "Password123",
+      displayName: "其他用户",
+    });
+    expect(() => store.deleteOwnedAsset(other.user.id, asset.id)).toThrow(AccountError);
+    expect(store.deleteOwnedAsset(user.id, asset.id).id).toBe(asset.id);
+    expect(store.listAssets(user.id, "media", child.id)).toHaveLength(0);
     store.setDefaultAssetFolder(user.id, defaultFolder.id);
-    expect(() => store.deleteAssetFolder(user.id, child.id)).toThrow(AccountError);
+    store.deleteAssetFolder(user.id, child.id);
+    expect(() => store.deleteOwnedAsset(user.id, asset.id)).toThrow(AccountError);
     store.close();
   });
 });
