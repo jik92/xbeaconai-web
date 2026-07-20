@@ -24,7 +24,7 @@ export const APP_CONFIG = {
   menuFeatures: {
     creationWorkflow: {
       "video-remix": true,
-      "video-create": false,
+      "video-create": true,
       "ad-script": true,
     },
     aiToolbox: {
