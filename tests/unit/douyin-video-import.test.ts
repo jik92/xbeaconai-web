@@ -52,6 +52,49 @@ describe("Douyin video import guards", () => {
   });
 });
 
+describe("Douyin share text parsing", () => {
+  test("extracts the douyin URL from a full pasted share message", () => {
+    const text = "4.17 复制打开抖音，看看【创作者】的作品 春日花海  https://v.douyin.com/dZKNZs4U3DI/ 05/10@抖音";
+    const url = parseDouyinShareUrl(text);
+    expect(url.href).toBe("https://v.douyin.com/dZKNZs4U3DI/");
+    expect(url.hostname).toBe("v.douyin.com");
+  });
+
+  test("accepts raw HTTPS douyin URLs unchanged", () => {
+    expect(parseDouyinShareUrl("https://v.douyin.com/abc").href).toBe("https://v.douyin.com/abc");
+    expect(parseDouyinShareUrl("https://www.douyin.com/video/456").hostname).toBe("www.douyin.com");
+  });
+
+  test("rejects text with zero douyin URLs", () => {
+    expect(() => parseDouyinShareUrl("这是一段没有链接的分享文字")).toThrow(DouyinImportError);
+  });
+
+  test("rejects text containing only non-douyin HTTPS URLs", () => {
+    expect(() => parseDouyinShareUrl("请看 https://example.com/video 这个视频")).toThrow(DouyinImportError);
+  });
+
+  test("rejects text containing an http (non-HTTPS) douyin URL", () => {
+    expect(() => parseDouyinShareUrl("请看 http://v.douyin.com/abc 这个")).toThrow(DouyinImportError);
+  });
+
+  test("rejects text containing multiple allowlisted douyin URLs", () => {
+    const text = "视频1 https://v.douyin.com/aaa111/ 和 视频2 https://v.douyin.com/bbb222/ 请选一个";
+    expect(() => parseDouyinShareUrl(text)).toThrow("分享文本包含多个抖音链接");
+  });
+
+  test("deduplicates identical douyin URLs in text", () => {
+    const text = "同一个链接出现了两次 https://v.douyin.com/dup123/  https://v.douyin.com/dup123/";
+    const url = parseDouyinShareUrl(text);
+    expect(url.href).toBe("https://v.douyin.com/dup123/");
+  });
+
+  test("ignores non-douyin URLs and extracts the single douyin URL", () => {
+    const text = "请看 https://example.com/other 和 https://v.douyin.com/main456/?x=1 对比";
+    const url = parseDouyinShareUrl(text);
+    expect(url.href).toBe("https://v.douyin.com/main456/?x=1");
+  });
+});
+
 describe("Douyin video import persistence", () => {
   let accounts: AccountStore;
 

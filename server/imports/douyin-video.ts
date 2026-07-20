@@ -71,16 +71,50 @@ function isAllowedNetworkHost(hostname: string) {
   return host.endsWith(".douyin.com") || isVideoCdnHost(host);
 }
 
-export function parseDouyinShareUrl(value: string): URL {
-  let url: URL;
-  try {
-    url = new URL(value.trim());
-  } catch {
-    throw new DouyinImportError("INVALID_DOUYIN_URL", "请输入有效的抖音分享链接", 400);
+function findDouyinUrls(text: string): string[] {
+  const urlPattern = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi;
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const match of text.matchAll(urlPattern)) {
+    try {
+      const u = new URL(match[0]);
+      if (u.protocol === "https:" && isShareHost(u.hostname) && !seen.has(u.href)) {
+        seen.add(u.href);
+        result.push(u.href);
+      }
+    } catch {
+      /* skip malformed tokens */
+    }
   }
-  if (url.protocol !== "https:" || !isShareHost(url.hostname))
+  return result;
+}
+
+export function parseDouyinShareUrl(value: string): URL {
+  const trimmed = value.trim();
+
+  // Fast path: input is already a well-formed supported URL
+  try {
+    const direct = new URL(trimmed);
+    if (direct.protocol === "https:" && isShareHost(direct.hostname)) return direct;
+  } catch {
+    /* not a parseable URL — try share-text extraction below */
+  }
+
+  // Extract candidate douyin HTTPS URLs from pasted share text
+  const candidates = findDouyinUrls(trimmed);
+  if (candidates.length === 0) {
+    // Determine the best error message
+    try {
+      new URL(trimmed);
+      // Parsable but wrong protocol or host
+    } catch {
+      throw new DouyinImportError("INVALID_DOUYIN_URL", "请输入有效的抖音分享链接", 400);
+    }
     throw new DouyinImportError("UNSUPPORTED_DOUYIN_URL", "仅支持抖音 HTTPS 分享链接", 400);
-  return url;
+  }
+  if (candidates.length > 1)
+    throw new DouyinImportError("MULTIPLE_DOUYIN_URLS", "分享文本包含多个抖音链接，请只保留一个", 400);
+  return new URL(candidates[0]);
 }
 
 export function assertImportAuthorization(authorized: boolean) {
