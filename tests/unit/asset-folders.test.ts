@@ -14,7 +14,6 @@ describe("asset folder mapping", () => {
     const path = join(tmpdir(), `asset-folders-${crypto.randomUUID()}.sqlite`);
     databases.push(path);
     const store = new AccountStore(path);
-    store.db.exec("CREATE TABLE jobs (id TEXT PRIMARY KEY, owner_user_id TEXT)");
     const { user } = await store.register({
       email: "folders@example.com",
       password: "Password123",
@@ -53,6 +52,6 @@ describe("asset folder mapping", () => {
     ]);
     store.setDefaultAssetFolder(user.id, defaultFolder.id);
     expect(() => store.deleteAssetFolder(user.id, child.id)).toThrow(AccountError);
-    store.db.close();
+    store.close();
   });
 });

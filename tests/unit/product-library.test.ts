@@ -15,7 +15,6 @@ describe("product library", () => {
     const directory = await mkdtemp(resolve(tmpdir(), "yaozuo-product-test-"));
     temporaryDirectories.push(directory);
     const store = new AccountStore(resolve(directory, "test.sqlite"));
-    store.db.exec("CREATE TABLE jobs (id TEXT PRIMARY KEY, owner_user_id TEXT)");
     const registration = await store.register({
       email: `product-${crypto.randomUUID()}@example.com`,
       password: "Test-password-123",
@@ -52,6 +51,6 @@ describe("product library", () => {
     expect(products[0]?.name).toBe("草编礼帽");
     expect(products[0]?.sharingScope).toBe("team");
     expect(products[0]?.images.map((image) => image.originalName)).toEqual(["主图.png", "侧面.png", "细节.png"]);
-    store.db.close();
+    store.close();
   });
 });

@@ -74,8 +74,8 @@ const shutdown = async () => {
   await workerRedis.quit();
   await recoveryQueue.close();
   await recoveryRedis.quit();
-  store.db.close();
-  accounts.db.close();
+  store.close();
+  accounts.close();
   process.exit(0);
 };
 process.on("SIGINT", () => void shutdown());

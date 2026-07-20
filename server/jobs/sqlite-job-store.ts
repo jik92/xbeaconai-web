@@ -1,250 +1,192 @@
-import { Database } from "bun:sqlite";
+import { and, asc, desc, eq, inArray, lte } from "drizzle-orm";
 import type { ModuleId } from "../../web/entities/types";
+import { type AppDatabase, openDatabase } from "../db/database";
+import { creditCharges, jobs, objectCleanup, users } from "../db/schema";
 import { env } from "../env";
-import type { JobRecord, JobResult, JobStatus, StageProvenance } from "../types";
+import type { JobRecord } from "../types";
 
-interface JobRow {
-  id: string;
-  owner_user_id: string | null;
-  module_id: ModuleId;
-  title: string;
-  status: JobStatus;
-  progress: number;
-  stage: string;
-  overall_execution_mode: JobRecord["overallExecutionMode"];
-  values_json: string;
-  video_model: JobRecord["videoModel"] | null;
-  execution_plan_json: string;
-  provenance_json: string;
-  result_json: string | null;
-  error_json: string | null;
-  parent_job_id: string | null;
-  idempotency_key: string | null;
-  cancel_requested: number;
-  provider_model: JobRecord["providerModel"] | null;
-  provider_task_id: string | null;
-  provider_status: string | null;
-  provider_submitted_at: string | null;
-  provider_deadline_at: string | null;
-  provider_cancel_state: JobRecord["providerCancelState"] | null;
-  staging_keys_json: string | null;
-  job_schema_version: 1 | 2 | null;
-  created_at: string;
-  updated_at: string;
-}
-
-const parse = <T>(value: string | null, fallback: T): T => (value ? (JSON.parse(value) as T) : fallback);
+type JobRow = typeof jobs.$inferSelect;
 export class InsufficientCreditsError extends Error {}
 
+const jobValues = (job: JobRecord): typeof jobs.$inferInsert => ({
+  id: job.id,
+  ownerUserId: job.ownerUserId,
+  moduleId: job.moduleId,
+  title: job.title,
+  status: job.status,
+  progress: job.progress,
+  stage: job.stage,
+  overallExecutionMode: job.overallExecutionMode,
+  values: job.values,
+  videoModel: job.videoModel,
+  executionPlan: job.executionPlan,
+  provenance: job.provenance,
+  result: job.result,
+  error: job.error,
+  parentJobId: job.parentJobId,
+  idempotencyKey: job.idempotencyKey,
+  cancelRequested: job.cancelRequested,
+  providerModel: job.providerModel,
+  providerTaskId: job.providerTaskId,
+  providerStatus: job.providerStatus,
+  providerSubmittedAt: job.providerSubmittedAt,
+  providerDeadlineAt: job.providerDeadlineAt,
+  providerCancelState: job.providerCancelState ?? "none",
+  stagingKeys: job.stagingKeys,
+  jobSchemaVersion: job.jobSchemaVersion,
+  createdAt: job.createdAt,
+  updatedAt: job.updatedAt,
+});
+
 export class SqliteJobStore {
-  readonly db: Database;
+  readonly db: AppDatabase;
+  private readonly client: ReturnType<typeof openDatabase>["client"];
 
   constructor(path = env.databasePath) {
-    this.db = new Database(path, { create: true, strict: true });
-    this.db.exec("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON;");
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS jobs (
-        id TEXT PRIMARY KEY,
-        module_id TEXT NOT NULL,
-        title TEXT NOT NULL,
-        status TEXT NOT NULL,
-        progress INTEGER NOT NULL,
-        stage TEXT NOT NULL,
-        overall_execution_mode TEXT NOT NULL,
-        values_json TEXT NOT NULL,
-        execution_plan_json TEXT NOT NULL,
-        provenance_json TEXT NOT NULL,
-        result_json TEXT,
-        error_json TEXT,
-        parent_job_id TEXT,
-        cancel_requested INTEGER NOT NULL DEFAULT 0,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS jobs_module_created_idx ON jobs(module_id, created_at DESC);
-      CREATE INDEX IF NOT EXISTS jobs_status_created_idx ON jobs(status, created_at ASC);
-      CREATE TABLE IF NOT EXISTS object_cleanup (
-        object_key TEXT PRIMARY KEY,
-        job_id TEXT NOT NULL,
-        attempts INTEGER NOT NULL DEFAULT 0,
-        last_error TEXT,
-        next_attempt_at TEXT NOT NULL,
-        created_at TEXT NOT NULL
-      );
-    `);
-    const columns = this.db.query("PRAGMA table_info(jobs)").all() as Array<{ name: string }>;
-    if (!columns.some((column) => column.name === "idempotency_key"))
-      this.db.exec("ALTER TABLE jobs ADD COLUMN idempotency_key TEXT");
-    if (!columns.some((column) => column.name === "owner_user_id"))
-      this.db.exec("ALTER TABLE jobs ADD COLUMN owner_user_id TEXT");
-    const additions = [
-      ["video_model", "TEXT"],
-      ["provider_model", "TEXT"],
-      ["provider_task_id", "TEXT"],
-      ["provider_status", "TEXT"],
-      ["provider_submitted_at", "TEXT"],
-      ["provider_deadline_at", "TEXT"],
-      ["provider_cancel_state", "TEXT"],
-      ["staging_keys_json", "TEXT NOT NULL DEFAULT '[]'"],
-      ["job_schema_version", "INTEGER NOT NULL DEFAULT 1"],
-    ] as const;
-    for (const [name, definition] of additions)
-      if (!columns.some((column) => column.name === name))
-        this.db.exec(`ALTER TABLE jobs ADD COLUMN ${name} ${definition}`);
-    this.db.exec(
-      "DROP INDEX IF EXISTS jobs_idempotency_idx; CREATE UNIQUE INDEX jobs_idempotency_idx ON jobs(owner_user_id,idempotency_key) WHERE idempotency_key IS NOT NULL",
-    );
+    const connection = openDatabase(path);
+    this.client = connection.client;
+    this.db = connection.db;
     this.retireWanJobs();
   }
 
+  close() {
+    this.client.close();
+  }
+
   private retireWanJobs() {
-    const now = new Date().toISOString();
-    const error = JSON.stringify({
+    const timestamp = new Date().toISOString();
+    const error = {
       code: "MODEL_RETIRED",
       message: "Wan 已停止支持，请重新选择 Seedance 模型创建任务",
       retryable: false,
       requestId: crypto.randomUUID(),
-    });
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      this.db
-        .query(`UPDATE jobs SET status='failed',stage='模型已停用',error_json=?,updated_at=?
-        WHERE status IN ('queued','processing') AND (execution_plan_json LIKE '%wan2.6-t2v%' OR provenance_json LIKE '%wan2.6-t2v%')`)
-        .run(error, now);
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
+    };
+    const retired = this.db
+      .select({ id: jobs.id, executionPlan: jobs.executionPlan, provenance: jobs.provenance })
+      .from(jobs)
+      .where(inArray(jobs.status, ["queued", "processing"]))
+      .all()
+      .filter((job) => JSON.stringify([job.executionPlan, job.provenance]).includes("wan2.6-t2v"));
+    if (!retired.length) return;
+    this.db
+      .update(jobs)
+      .set({ status: "failed", stage: "模型已停用", error, updatedAt: timestamp })
+      .where(
+        inArray(
+          jobs.id,
+          retired.map((job) => job.id),
+        ),
+      )
+      .run();
   }
 
   private fromRow(row: JobRow): JobRecord {
     return {
       id: row.id,
-      ownerUserId: row.owner_user_id ?? "legacy",
-      moduleId: row.module_id,
+      ownerUserId: row.ownerUserId ?? "legacy",
+      moduleId: row.moduleId,
       title: row.title,
       status: row.status,
       progress: row.progress,
       stage: row.stage,
-      overallExecutionMode: row.overall_execution_mode,
-      values: parse(row.values_json, {}),
-      videoModel: row.video_model ?? undefined,
-      executionPlan: parse<StageProvenance[]>(row.execution_plan_json, []),
-      provenance: parse<StageProvenance[]>(row.provenance_json, []),
-      result: parse<JobResult | undefined>(row.result_json, undefined),
-      error: parse<JobRecord["error"]>(row.error_json, undefined),
-      parentJobId: row.parent_job_id ?? undefined,
-      idempotencyKey: row.idempotency_key ?? undefined,
-      cancelRequested: Boolean(row.cancel_requested),
-      providerModel: row.provider_model ?? undefined,
-      providerTaskId: row.provider_task_id ?? undefined,
-      providerStatus: row.provider_status ?? undefined,
-      providerSubmittedAt: row.provider_submitted_at ?? undefined,
-      providerDeadlineAt: row.provider_deadline_at ?? undefined,
-      providerCancelState: row.provider_cancel_state ?? undefined,
-      stagingKeys: parse(row.staging_keys_json, []),
-      jobSchemaVersion: row.job_schema_version ?? 1,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
+      overallExecutionMode: row.overallExecutionMode,
+      values: row.values,
+      videoModel: row.videoModel ?? undefined,
+      executionPlan: row.executionPlan,
+      provenance: row.provenance,
+      result: row.result ?? undefined,
+      error: row.error ?? undefined,
+      parentJobId: row.parentJobId ?? undefined,
+      idempotencyKey: row.idempotencyKey ?? undefined,
+      cancelRequested: row.cancelRequested,
+      providerModel: row.providerModel ?? undefined,
+      providerTaskId: row.providerTaskId ?? undefined,
+      providerStatus: row.providerStatus ?? undefined,
+      providerSubmittedAt: row.providerSubmittedAt ?? undefined,
+      providerDeadlineAt: row.providerDeadlineAt ?? undefined,
+      providerCancelState: row.providerCancelState ?? undefined,
+      stagingKeys: row.stagingKeys,
+      jobSchemaVersion: row.jobSchemaVersion,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
     };
   }
 
   create(job: JobRecord): JobRecord {
-    this.db
-      .query(`INSERT INTO jobs (
-      id,module_id,title,status,progress,stage,overall_execution_mode,values_json,
-      execution_plan_json,provenance_json,result_json,error_json,parent_job_id,
-      cancel_requested,created_at,updated_at,idempotency_key,owner_user_id,video_model,
-      provider_model,provider_task_id,provider_status,provider_submitted_at,provider_deadline_at,
-      provider_cancel_state,staging_keys_json,job_schema_version
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-      .run(
-        job.id,
-        job.moduleId,
-        job.title,
-        job.status,
-        job.progress,
-        job.stage,
-        job.overallExecutionMode,
-        JSON.stringify(job.values),
-        JSON.stringify(job.executionPlan),
-        JSON.stringify(job.provenance),
-        job.result ? JSON.stringify(job.result) : null,
-        job.error ? JSON.stringify(job.error) : null,
-        job.parentJobId ?? null,
-        job.cancelRequested ? 1 : 0,
-        job.createdAt,
-        job.updatedAt,
-        job.idempotencyKey ?? null,
-        job.ownerUserId,
-        job.videoModel ?? null,
-        job.providerModel ?? null,
-        job.providerTaskId ?? null,
-        job.providerStatus ?? null,
-        job.providerSubmittedAt ?? null,
-        job.providerDeadlineAt ?? null,
-        job.providerCancelState ?? "none",
-        JSON.stringify(job.stagingKeys),
-        job.jobSchemaVersion,
-      );
+    this.db.insert(jobs).values(jobValues(job)).run();
     return job;
   }
 
   createCharged(job: JobRecord, credits: number): JobRecord {
     if (!Number.isInteger(credits) || credits <= 0) return this.create(job);
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      const user = this.db.query("SELECT credits FROM users WHERE id=?").get(job.ownerUserId) as {
-        credits: number;
-      } | null;
-      if (!user || user.credits < credits) throw new InsufficientCreditsError("创作点不足");
-      const balance = user.credits - credits;
-      this.create(job);
-      this.db.query("UPDATE users SET credits=?,updated_at=? WHERE id=?").run(balance, job.createdAt, job.ownerUserId);
-      this.db
-        .query("INSERT INTO credit_charges(id,user_id,job_id,amount,balance_after,created_at) VALUES(?,?,?,?,?,?)")
-        .run(crypto.randomUUID(), job.ownerUserId, job.id, credits, balance, job.createdAt);
-      this.db.exec("COMMIT");
-      return job;
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
+    return this.db.transaction(
+      (tx) => {
+        const user = tx.select().from(users).where(eq(users.id, job.ownerUserId)).get();
+        if (!user || user.credits < credits) throw new InsufficientCreditsError("创作点不足");
+        const balance = user.credits - credits;
+        tx.insert(jobs).values(jobValues(job)).run();
+        tx.update(users).set({ credits: balance, updatedAt: job.createdAt }).where(eq(users.id, job.ownerUserId)).run();
+        tx.insert(creditCharges)
+          .values({
+            id: crypto.randomUUID(),
+            userId: job.ownerUserId,
+            jobId: job.id,
+            amount: credits,
+            balanceAfter: balance,
+            createdAt: job.createdAt,
+          })
+          .run();
+        return job;
+      },
+      { behavior: "immediate" },
+    );
   }
 
   get(id: string): JobRecord | undefined {
-    const row = this.db.query("SELECT * FROM jobs WHERE id = ?").get(id) as JobRow | null;
+    const row = this.db.select().from(jobs).where(eq(jobs.id, id)).get();
     return row ? this.fromRow(row) : undefined;
   }
 
   getOwned(id: string, ownerUserId: string): JobRecord | undefined {
-    const job = this.get(id);
-    return job?.ownerUserId === ownerUserId ? job : undefined;
+    const row = this.db
+      .select()
+      .from(jobs)
+      .where(and(eq(jobs.id, id), eq(jobs.ownerUserId, ownerUserId)))
+      .get();
+    return row ? this.fromRow(row) : undefined;
   }
 
   getByIdempotencyKey(ownerUserId: string, key: string): JobRecord | undefined {
     const row = this.db
-      .query("SELECT * FROM jobs WHERE owner_user_id=? AND idempotency_key = ?")
-      .get(ownerUserId, key) as JobRow | null;
+      .select()
+      .from(jobs)
+      .where(and(eq(jobs.ownerUserId, ownerUserId), eq(jobs.idempotencyKey, key)))
+      .get();
     return row ? this.fromRow(row) : undefined;
   }
 
   list(ownerUserId: string, moduleId?: ModuleId): JobRecord[] {
-    const rows = moduleId
-      ? this.db
-          .query("SELECT * FROM jobs WHERE owner_user_id=? AND module_id = ? ORDER BY created_at DESC LIMIT 100")
-          .all(ownerUserId, moduleId)
-      : this.db.query("SELECT * FROM jobs WHERE owner_user_id=? ORDER BY created_at DESC LIMIT 100").all(ownerUserId);
-    return (rows as JobRow[]).map((row) => this.fromRow(row));
+    const condition = moduleId
+      ? and(eq(jobs.ownerUserId, ownerUserId), eq(jobs.moduleId, moduleId))
+      : eq(jobs.ownerUserId, ownerUserId);
+    return this.db
+      .select()
+      .from(jobs)
+      .where(condition)
+      .orderBy(desc(jobs.createdAt))
+      .limit(100)
+      .all()
+      .map((row) => this.fromRow(row));
   }
 
   recoverable(): JobRecord[] {
-    return (
-      this.db
-        .query("SELECT * FROM jobs WHERE status IN ('queued','processing') ORDER BY created_at ASC")
-        .all() as JobRow[]
-    ).map((row) => this.fromRow(row));
+    return this.db
+      .select()
+      .from(jobs)
+      .where(inArray(jobs.status, ["queued", "processing"]))
+      .orderBy(asc(jobs.createdAt))
+      .all()
+      .map((row) => this.fromRow(row));
   }
 
   update(id: string, patch: Partial<JobRecord>): JobRecord | undefined {
@@ -252,58 +194,83 @@ export class SqliteJobStore {
     if (!current) return undefined;
     const next = { ...current, ...patch, updatedAt: new Date().toISOString() };
     this.db
-      .query(`UPDATE jobs SET status=?,progress=?,stage=?,overall_execution_mode=?,values_json=?,video_model=?,
-      execution_plan_json=?,provenance_json=?,result_json=?,error_json=?,cancel_requested=?,provider_model=?,
-      provider_task_id=?,provider_status=?,provider_submitted_at=?,provider_deadline_at=?,provider_cancel_state=?,
-      staging_keys_json=?,job_schema_version=?,updated_at=? WHERE id=?`)
-      .run(
-        next.status,
-        next.progress,
-        next.stage,
-        next.overallExecutionMode,
-        JSON.stringify(next.values),
-        next.videoModel ?? null,
-        JSON.stringify(next.executionPlan),
-        JSON.stringify(next.provenance),
-        next.result ? JSON.stringify(next.result) : null,
-        next.error ? JSON.stringify(next.error) : null,
-        next.cancelRequested ? 1 : 0,
-        next.providerModel ?? null,
-        next.providerTaskId ?? null,
-        next.providerStatus ?? null,
-        next.providerSubmittedAt ?? null,
-        next.providerDeadlineAt ?? null,
-        next.providerCancelState ?? "none",
-        JSON.stringify(next.stagingKeys),
-        next.jobSchemaVersion,
-        next.updatedAt,
-        id,
-      );
+      .update(jobs)
+      .set({
+        status: next.status,
+        progress: next.progress,
+        stage: next.stage,
+        overallExecutionMode: next.overallExecutionMode,
+        values: next.values,
+        videoModel: next.videoModel,
+        executionPlan: next.executionPlan,
+        provenance: next.provenance,
+        result: next.result,
+        error: next.error,
+        cancelRequested: next.cancelRequested,
+        providerModel: next.providerModel,
+        providerTaskId: next.providerTaskId,
+        providerStatus: next.providerStatus,
+        providerSubmittedAt: next.providerSubmittedAt,
+        providerDeadlineAt: next.providerDeadlineAt,
+        providerCancelState: next.providerCancelState ?? "none",
+        stagingKeys: next.stagingKeys,
+        jobSchemaVersion: next.jobSchemaVersion,
+        updatedAt: next.updatedAt,
+      })
+      .where(eq(jobs.id, id))
+      .run();
     return next;
   }
 
   scheduleObjectCleanup(jobId: string, key: string, error: unknown) {
-    const time = new Date().toISOString();
-    this.db
-      .query(
-        `INSERT INTO object_cleanup(object_key,job_id,attempts,last_error,next_attempt_at,created_at) VALUES(?,?,1,?,?,?) ON CONFLICT(object_key) DO UPDATE SET attempts=attempts+1,last_error=excluded.last_error,next_attempt_at=excluded.next_attempt_at`,
-      )
-      .run(key, jobId, String(error).slice(0, 500), time, time);
+    const timestamp = new Date().toISOString();
+    this.db.transaction(
+      (tx) => {
+        const existing = tx.select().from(objectCleanup).where(eq(objectCleanup.objectKey, key)).get();
+        if (existing) {
+          tx.update(objectCleanup)
+            .set({ attempts: existing.attempts + 1, lastError: String(error).slice(0, 500), nextAttemptAt: timestamp })
+            .where(eq(objectCleanup.objectKey, key))
+            .run();
+          return;
+        }
+        tx.insert(objectCleanup)
+          .values({
+            objectKey: key,
+            jobId,
+            attempts: 1,
+            lastError: String(error).slice(0, 500),
+            nextAttemptAt: timestamp,
+            createdAt: timestamp,
+          })
+          .run();
+      },
+      { behavior: "immediate" },
+    );
   }
   pendingObjectCleanup() {
     return this.db
-      .query(
-        "SELECT object_key,job_id,attempts FROM object_cleanup WHERE next_attempt_at<=? ORDER BY created_at LIMIT 100",
-      )
-      .all(new Date().toISOString()) as Array<{ object_key: string; job_id: string; attempts: number }>;
+      .select()
+      .from(objectCleanup)
+      .where(lte(objectCleanup.nextAttemptAt, new Date().toISOString()))
+      .orderBy(asc(objectCleanup.createdAt))
+      .limit(100)
+      .all()
+      .map((row) => ({ object_key: row.objectKey, job_id: row.jobId, attempts: row.attempts }));
   }
   completeObjectCleanup(key: string) {
-    this.db.query("DELETE FROM object_cleanup WHERE object_key=?").run(key);
+    this.db.delete(objectCleanup).where(eq(objectCleanup.objectKey, key)).run();
   }
   deferObjectCleanup(key: string, error: unknown, attempts: number) {
     const delay = Math.min(60 * 60_000, 2 ** Math.min(attempts, 8) * 5_000);
     this.db
-      .query("UPDATE object_cleanup SET attempts=attempts+1,last_error=?,next_attempt_at=? WHERE object_key=?")
-      .run(String(error).slice(0, 500), new Date(Date.now() + delay).toISOString(), key);
+      .update(objectCleanup)
+      .set({
+        attempts: attempts + 1,
+        lastError: String(error).slice(0, 500),
+        nextAttemptAt: new Date(Date.now() + delay).toISOString(),
+      })
+      .where(eq(objectCleanup.objectKey, key))
+      .run();
   }
 }
