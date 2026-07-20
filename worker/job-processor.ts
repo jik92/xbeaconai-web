@@ -3,6 +3,7 @@ import type { AdScriptStore } from "../server/ad-script/ad-script-store";
 import type { SqliteJobStore } from "../server/jobs/sqlite-job-store";
 import { ossutils } from "../server/storage/ossutils";
 import type { JobRecord } from "../server/types";
+import type { VideoCreateStore } from "../server/video-create/video-create-store";
 import { findJobHandler } from "./jobs/registry";
 import type { JobHandlerContext } from "./jobs/types";
 
@@ -16,11 +17,13 @@ export class JobProcessor {
     readonly store: SqliteJobStore,
     readonly accounts?: AccountStore,
     readonly adScripts?: AdScriptStore,
+    readonly videoCreates?: VideoCreateStore,
   ) {
     this.context = {
       store,
       accounts,
       adScripts,
+      videoCreates,
       change: (id, patch) => this.change(id, patch),
     };
   }

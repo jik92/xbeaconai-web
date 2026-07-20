@@ -16,6 +16,53 @@ export interface VideoAnalysisResult {
   usage?: GeminiGenerateContentResponse["usageMetadata"];
 }
 
+export async function analyzeImagesWithGemini(input: {
+  images: Array<{ path: string; mimeType: string }>;
+  prompt: string;
+  model?: string;
+}): Promise<VideoAnalysisResult> {
+  if (!env.openaiKey) throw new Error("AIHUBMIX_NOT_CONFIGURED");
+  if (env.blockAiOutbound) throw new Error("AI_OUTBOUND_BLOCKED:image-analysis");
+  if (!input.images.length) throw new Error("IMAGE_ANALYSIS_REQUIRES_IMAGE");
+  const model = input.model ?? env.videoAnalysisModel;
+  const files = await Promise.all(
+    input.images.map(async (image) => {
+      const file = Bun.file(image.path);
+      if (!(await file.exists())) throw new Error("PRODUCT_REFERENCE_FILE_NOT_FOUND");
+      return { file, mimeType: image.mimeType };
+    }),
+  );
+  if (files.reduce((total, item) => total + item.file.size, 0) > 20 * 1024 * 1024)
+    throw new Error("IMAGE_ANALYSIS_INLINE_LIMIT_EXCEEDED");
+  const parts = await Promise.all(
+    files.map(async (item) => ({
+      inlineData: {
+        mimeType: item.mimeType,
+        data: Buffer.from(await item.file.arrayBuffer()).toString("base64"),
+      },
+    })),
+  );
+  const origin = new URL(env.openaiBaseUrl || "https://aihubmix.com").origin;
+  const response = await fetch(`${origin}/gemini/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-goog-api-key": env.openaiKey },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts: [...parts, { text: input.prompt }] }],
+      generationConfig: { temperature: 0.2, maxOutputTokens: 4_096, responseMimeType: "application/json" },
+    }),
+    signal: AbortSignal.timeout(180_000),
+  });
+  const raw = await response.text();
+  if (!response.ok) throw new Error(`GEMINI_IMAGE_ANALYSIS_${response.status}: ${raw.slice(0, 1_000)}`);
+  const body = JSON.parse(raw) as GeminiGenerateContentResponse;
+  const text = body.candidates?.[0]?.content?.parts
+    ?.map((part) => part.text ?? "")
+    .join("")
+    .trim();
+  if (!text) throw new Error(`GEMINI_IMAGE_ANALYSIS_EMPTY:${body.candidates?.[0]?.finishReason ?? "unknown"}`);
+  return { text, model: body.modelVersion ?? model, usage: body.usageMetadata };
+}
+
 export async function transcribeMediaWithAihubmix(input: { mediaPath: string; mimeType?: string; model?: string }) {
   if (!env.openaiKey) throw new Error("AIHUBMIX_NOT_CONFIGURED");
   if (env.blockAiOutbound) throw new Error("AI_OUTBOUND_BLOCKED:transcription");

@@ -7,6 +7,7 @@ import { AiGeneratePage } from "@/features/ai-generate/ai-generate-page";
 import { AssetLibrary } from "@/features/asset-library/asset-library";
 import { MediaUnderstandPage } from "@/features/media-understand/media-understand-page";
 import { PortraitLibrary } from "@/features/portrait-library/portrait-library";
+import { VideoCreatePage } from "@/features/video-create/video-create-page";
 import { RemixProject } from "@/features/video-remix/remix-project";
 import { isAssetOpen, isModuleOpen } from "./config";
 import { homeDestination, modules } from "./routes";
@@ -27,6 +28,8 @@ const moduleRoutes = modules.map((config) =>
         <ComingSoonPage config={config} />
       ) : config.id === "video-remix" ? (
         <RemixProject />
+      ) : config.id === "video-create" ? (
+        <VideoCreatePage />
       ) : config.id === "ad-script" ? (
         <AdScriptPage />
       ) : config.id === "ai-generate" ? (

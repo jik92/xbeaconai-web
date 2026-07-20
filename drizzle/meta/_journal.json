@@ -15,6 +15,13 @@
       "when": 1784579508288,
       "tag": "0001_silky_blue_shield",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784583926878,
+      "tag": "0002_polite_blizzard",
+      "breakpoints": true
     }
   ]
 }

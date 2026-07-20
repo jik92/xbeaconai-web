@@ -326,6 +326,148 @@ export const zAdScriptProject = z.object({
     variants: z.array(zAdScriptVariant)
 });
 
+export const zVideoCreateInput = z.object({
+    productAssetIds: z.array(z.uuid()).min(1).max(6),
+    portraitAssetId: z.uuid().optional(),
+    scene: z.string().min(1).max(40),
+    productName: z.string().max(60).optional().default(''),
+    sellingPoints: z.array(z.string().min(1).max(80)).max(8).optional().default([]),
+    durationSec: z.int().gte(15).lte(180),
+    segmentCount: z.int().gte(1).lte(12),
+    speechRate: z.enum([
+        'slow',
+        'medium',
+        'fast'
+    ]),
+    requirements: z.string().max(1000).optional().default(''),
+    scriptStyle: z.string().max(100).optional().default('自然种草'),
+    videoModel: z.enum([
+        'doubao-seedance-2-0-260128',
+        'doubao-seedance-2-0-mini-260615',
+        'doubao-seedance-2-0-fast-260128'
+    ]).optional().default('doubao-seedance-2-0-fast-260128'),
+    voiceAssetId: z.uuid().optional(),
+    ratio: z.enum([
+        '9:16',
+        '16:9',
+        '1:1'
+    ]).optional().default('9:16'),
+    subtitles: z.boolean().optional().default(true),
+    priority: z.enum(['speech', 'visual']).optional().default('speech')
+});
+
+export const zVideoCreateRecommendation = z.object({
+    productName: z.string().min(1).max(60),
+    sellingPoints: z.array(z.string().min(1).max(80)).min(1).max(8),
+    scene: z.string().min(1).max(40),
+    durationSec: z.int().gte(15).lte(180),
+    segmentCount: z.int().gte(1).lte(12),
+    requirements: z.string().max(1000),
+    scriptStyle: z.string().min(1).max(100)
+});
+
+export const zVideoCreateProject = z.object({
+    project: z.object({
+        id: z.uuid(),
+        ownerUserId: z.uuid(),
+        title: z.string(),
+        status: z.enum([
+            'draft',
+            'analyzing',
+            'script_generating',
+            'script_review',
+            'storyboard_generating',
+            'storyboard_review',
+            'composing',
+            'completed',
+            'failed'
+        ]),
+        input: zVideoCreateInput,
+        recommendation: zVideoCreateRecommendation,
+        currentJobId: z.uuid(),
+        finalArtifactId: z.uuid(),
+        version: z.int().gte(1),
+        idempotencyKey: z.string(),
+        error: z.object({
+            code: z.string(),
+            message: z.string(),
+            retryable: z.boolean(),
+            requestId: z.string()
+        }).optional(),
+        createdAt: z.string(),
+        updatedAt: z.string()
+    }),
+    sections: z.array(z.object({
+        id: z.uuid(),
+        projectId: z.uuid(),
+        ordinal: z.int().gte(1),
+        label: z.string(),
+        currentVersionId: z.uuid(),
+        createdAt: z.string(),
+        updatedAt: z.string(),
+        versions: z.array(z.object({
+            id: z.uuid(),
+            sectionId: z.uuid(),
+            sequence: z.int().gte(1),
+            source: z.enum([
+                'generated',
+                'regenerated',
+                'human'
+            ]),
+            parentVersionId: z.uuid(),
+            text: z.string(),
+            durationSec: z.int().gte(1),
+            model: z.string(),
+            createdAt: z.string()
+        })),
+        currentVersion: z.object({
+            id: z.uuid(),
+            sectionId: z.uuid(),
+            sequence: z.int().gte(1),
+            source: z.enum([
+                'generated',
+                'regenerated',
+                'human'
+            ]),
+            parentVersionId: z.uuid(),
+            text: z.string(),
+            durationSec: z.int().gte(1),
+            model: z.string(),
+            createdAt: z.string()
+        }).optional()
+    })),
+    shots: z.array(z.object({
+        id: z.uuid(),
+        projectId: z.uuid(),
+        scriptSectionId: z.uuid(),
+        ordinal: z.int().gte(1),
+        prompt: z.string(),
+        durationSec: z.int().gte(1),
+        status: z.enum([
+            'pending',
+            'queued',
+            'generating',
+            'succeeded',
+            'failed',
+            'replaced'
+        ]),
+        jobId: z.uuid(),
+        videoAssetId: z.uuid(),
+        audioEnabled: z.boolean(),
+        subtitleEnabled: z.boolean(),
+        attempts: z.int().gte(0),
+        error: z.object({
+            code: z.string(),
+            message: z.string(),
+            retryable: z.boolean(),
+            requestId: z.string()
+        }).optional(),
+        createdAt: z.string(),
+        updatedAt: z.string()
+    })),
+    canCompose: z.boolean()
+});
+
 /**
  * Service health
  */
@@ -806,6 +948,130 @@ export const zExportAdScriptVersionQuery = z.object({
  * Exported script
  */
 export const zExportAdScriptVersionResponse = z.string();
+
+/**
+ * Video create projects
+ */
+export const zListVideoCreateProjectsResponse = z.object({
+    projects: z.array(zVideoCreateProject)
+});
+
+export const zCreateVideoCreateProjectBody = z.object({
+    title: z.string().min(1).max(100),
+    input: zVideoCreateInput
+});
+
+/**
+ * Video create project
+ */
+export const zCreateVideoCreateProjectResponse = zVideoCreateProject;
+
+export const zGetVideoCreateProjectPath = z.object({
+    projectId: z.uuid()
+});
+
+/**
+ * Video create project
+ */
+export const zGetVideoCreateProjectResponse = zVideoCreateProject;
+
+export const zUpdateVideoCreateProjectBody = z.object({
+    expectedVersion: z.int().gte(1),
+    input: zVideoCreateInput
+});
+
+export const zUpdateVideoCreateProjectPath = z.object({
+    projectId: z.uuid()
+});
+
+/**
+ * Updated
+ */
+export const zUpdateVideoCreateProjectResponse = zVideoCreateProject;
+
+export const zSaveVideoCreateSectionBody = z.object({
+    expectedVersionId: z.uuid(),
+    text: z.string().min(1).max(1000),
+    durationSec: z.int().gte(1).lte(180)
+});
+
+export const zSaveVideoCreateSectionPath = z.object({
+    projectId: z.uuid(),
+    sectionId: z.uuid()
+});
+
+/**
+ * Saved
+ */
+export const zSaveVideoCreateSectionResponse = zVideoCreateProject;
+
+export const zRunVideoCreateActionPath = z.object({
+    projectId: z.uuid(),
+    action: z.enum([
+        'analyze',
+        'script',
+        'storyboard',
+        'compose'
+    ])
+});
+
+/**
+ * Accepted
+ */
+export const zRunVideoCreateActionResponse = zJob;
+
+export const zRegenerateVideoCreateSectionBody = z.object({
+    expectedVersionId: z.uuid()
+});
+
+export const zRegenerateVideoCreateSectionPath = z.object({
+    projectId: z.uuid(),
+    sectionId: z.uuid()
+});
+
+/**
+ * Accepted
+ */
+export const zRegenerateVideoCreateSectionResponse = zJob;
+
+export const zGenerateVideoCreateShotPath = z.object({
+    projectId: z.uuid(),
+    shotId: z.uuid()
+});
+
+/**
+ * Accepted
+ */
+export const zGenerateVideoCreateShotResponse = zJob;
+
+export const zReplaceVideoCreateShotBody = z.object({
+    assetId: z.uuid()
+});
+
+export const zReplaceVideoCreateShotPath = z.object({
+    projectId: z.uuid(),
+    shotId: z.uuid()
+});
+
+/**
+ * Replaced
+ */
+export const zReplaceVideoCreateShotResponse = zVideoCreateProject;
+
+export const zUpdateVideoCreateShotSettingsBody = z.object({
+    audioEnabled: z.boolean(),
+    subtitleEnabled: z.boolean()
+});
+
+export const zUpdateVideoCreateShotSettingsPath = z.object({
+    projectId: z.uuid(),
+    shotId: z.uuid()
+});
+
+/**
+ * Updated
+ */
+export const zUpdateVideoCreateShotSettingsResponse = zVideoCreateProject;
 
 export const zCreateJobBody = z.object({
     title: z.string().min(1).max(200),

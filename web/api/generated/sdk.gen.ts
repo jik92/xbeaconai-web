@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type ServerSentEventsResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { CancelJobData, CancelJobErrors, CancelJobResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, CompleteDirectUploadData, CompleteDirectUploadErrors, CompleteDirectUploadResponses, CreateAdScriptActionData, CreateAdScriptActionErrors, CreateAdScriptActionResponses, CreateAdScriptProjectData, CreateAdScriptProjectErrors, CreateAdScriptProjectResponses, CreateDirectUploadData, CreateDirectUploadErrors, CreateDirectUploadResponses, CreateJobData, CreateJobErrors, CreateJobResponses, CreateRechargeOrderData, CreateRechargeOrderErrors, CreateRechargeOrderResponses, DeleteAssetData, DeleteAssetErrors, DeleteAssetResponses, DeleteProductData, DeleteProductErrors, DeleteProductResponses, DownloadArtifactData, DownloadArtifactErrors, DownloadArtifactResponses, ExportAdScriptVersionData, ExportAdScriptVersionErrors, ExportAdScriptVersionResponses, GetAdScriptProjectData, GetAdScriptProjectErrors, GetAdScriptProjectResponses, GetAssetContentData, GetAssetContentErrors, GetAssetContentResponses, GetCapabilitiesData, GetCapabilitiesResponses, GetCreationCapabilitiesData, GetCreationCapabilitiesResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetHealthData, GetHealthResponses, GetJobData, GetJobErrors, GetJobResponses, GetModelsData, GetModelsResponses, GetPreferencesData, GetPreferencesResponses, ListAdScriptProjectsData, ListAdScriptProjectsResponses, ListAssetsData, ListAssetsResponses, ListJobsData, ListJobsResponses, ListNotificationsData, ListNotificationsResponses, ListRechargeOrdersData, ListRechargeOrdersResponses, ListRechargePackagesData, ListRechargePackagesResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, MarkAllNotificationsReadData, MarkAllNotificationsReadResponses, MarkNotificationReadData, MarkNotificationReadErrors, MarkNotificationReadResponses, ParseAdScriptSourceData, ParseAdScriptSourceErrors, ParseAdScriptSourceResponses, RegisterData, RegisterErrors, RegisterResponses, RetryJobData, RetryJobErrors, RetryJobResponses, SaveAdScriptVersionData, SaveAdScriptVersionErrors, SaveAdScriptVersionResponses, SaveAssetMetadataData, SaveAssetMetadataErrors, SaveAssetMetadataResponses, SavePreferencesData, SavePreferencesResponses, UpdateProfileData, UpdateProfileErrors, UpdateProfileResponses, UploadMediaData, UploadMediaErrors, UploadMediaResponses, WatchJobEventsData, WatchJobEventsErrors, WatchJobEventsResponse, WatchJobEventsResponses } from './types.gen';
+import type { CancelJobData, CancelJobErrors, CancelJobResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, CompleteDirectUploadData, CompleteDirectUploadErrors, CompleteDirectUploadResponses, CreateAdScriptActionData, CreateAdScriptActionErrors, CreateAdScriptActionResponses, CreateAdScriptProjectData, CreateAdScriptProjectErrors, CreateAdScriptProjectResponses, CreateDirectUploadData, CreateDirectUploadErrors, CreateDirectUploadResponses, CreateJobData, CreateJobErrors, CreateJobResponses, CreateRechargeOrderData, CreateRechargeOrderErrors, CreateRechargeOrderResponses, CreateVideoCreateProjectData, CreateVideoCreateProjectErrors, CreateVideoCreateProjectResponses, DeleteAssetData, DeleteAssetErrors, DeleteAssetResponses, DeleteProductData, DeleteProductErrors, DeleteProductResponses, DownloadArtifactData, DownloadArtifactErrors, DownloadArtifactResponses, ExportAdScriptVersionData, ExportAdScriptVersionErrors, ExportAdScriptVersionResponses, GenerateVideoCreateShotData, GenerateVideoCreateShotErrors, GenerateVideoCreateShotResponses, GetAdScriptProjectData, GetAdScriptProjectErrors, GetAdScriptProjectResponses, GetAssetContentData, GetAssetContentErrors, GetAssetContentResponses, GetCapabilitiesData, GetCapabilitiesResponses, GetCreationCapabilitiesData, GetCreationCapabilitiesResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetHealthData, GetHealthResponses, GetJobData, GetJobErrors, GetJobResponses, GetModelsData, GetModelsResponses, GetPreferencesData, GetPreferencesResponses, GetVideoCreateProjectData, GetVideoCreateProjectErrors, GetVideoCreateProjectResponses, ListAdScriptProjectsData, ListAdScriptProjectsResponses, ListAssetsData, ListAssetsResponses, ListJobsData, ListJobsResponses, ListNotificationsData, ListNotificationsResponses, ListRechargeOrdersData, ListRechargeOrdersResponses, ListRechargePackagesData, ListRechargePackagesResponses, ListVideoCreateProjectsData, ListVideoCreateProjectsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, MarkAllNotificationsReadData, MarkAllNotificationsReadResponses, MarkNotificationReadData, MarkNotificationReadErrors, MarkNotificationReadResponses, ParseAdScriptSourceData, ParseAdScriptSourceErrors, ParseAdScriptSourceResponses, RegenerateVideoCreateSectionData, RegenerateVideoCreateSectionErrors, RegenerateVideoCreateSectionResponses, RegisterData, RegisterErrors, RegisterResponses, ReplaceVideoCreateShotData, ReplaceVideoCreateShotErrors, ReplaceVideoCreateShotResponses, RetryJobData, RetryJobErrors, RetryJobResponses, RunVideoCreateActionData, RunVideoCreateActionErrors, RunVideoCreateActionResponses, SaveAdScriptVersionData, SaveAdScriptVersionErrors, SaveAdScriptVersionResponses, SaveAssetMetadataData, SaveAssetMetadataErrors, SaveAssetMetadataResponses, SavePreferencesData, SavePreferencesResponses, SaveVideoCreateSectionData, SaveVideoCreateSectionErrors, SaveVideoCreateSectionResponses, UpdateProfileData, UpdateProfileErrors, UpdateProfileResponses, UpdateVideoCreateProjectData, UpdateVideoCreateProjectErrors, UpdateVideoCreateProjectResponses, UpdateVideoCreateShotSettingsData, UpdateVideoCreateShotSettingsErrors, UpdateVideoCreateShotSettingsResponses, UploadMediaData, UploadMediaErrors, UploadMediaResponses, WatchJobEventsData, WatchJobEventsErrors, WatchJobEventsResponse, WatchJobEventsResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -184,6 +184,68 @@ export const createAdScriptAction = <ThrowOnError extends boolean = false>(optio
 });
 
 export const exportAdScriptVersion = <ThrowOnError extends boolean = false>(options: Options<ExportAdScriptVersionData, ThrowOnError>): RequestResult<ExportAdScriptVersionResponses, ExportAdScriptVersionErrors, ThrowOnError> => (options.client ?? client).get<ExportAdScriptVersionResponses, ExportAdScriptVersionErrors, ThrowOnError>({ url: '/api/ad-script/projects/{projectId}/variants/{variantId}/export', ...options });
+
+export const listVideoCreateProjects = <ThrowOnError extends boolean = false>(options?: Options<ListVideoCreateProjectsData, ThrowOnError>): RequestResult<ListVideoCreateProjectsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListVideoCreateProjectsResponses, unknown, ThrowOnError>({ url: '/api/video-create/projects', ...options });
+
+export const createVideoCreateProject = <ThrowOnError extends boolean = false>(options: Options<CreateVideoCreateProjectData, ThrowOnError>): RequestResult<CreateVideoCreateProjectResponses, CreateVideoCreateProjectErrors, ThrowOnError> => (options.client ?? client).post<CreateVideoCreateProjectResponses, CreateVideoCreateProjectErrors, ThrowOnError>({
+    url: '/api/video-create/projects',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const getVideoCreateProject = <ThrowOnError extends boolean = false>(options: Options<GetVideoCreateProjectData, ThrowOnError>): RequestResult<GetVideoCreateProjectResponses, GetVideoCreateProjectErrors, ThrowOnError> => (options.client ?? client).get<GetVideoCreateProjectResponses, GetVideoCreateProjectErrors, ThrowOnError>({ url: '/api/video-create/projects/{projectId}', ...options });
+
+export const updateVideoCreateProject = <ThrowOnError extends boolean = false>(options: Options<UpdateVideoCreateProjectData, ThrowOnError>): RequestResult<UpdateVideoCreateProjectResponses, UpdateVideoCreateProjectErrors, ThrowOnError> => (options.client ?? client).patch<UpdateVideoCreateProjectResponses, UpdateVideoCreateProjectErrors, ThrowOnError>({
+    url: '/api/video-create/projects/{projectId}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const saveVideoCreateSection = <ThrowOnError extends boolean = false>(options: Options<SaveVideoCreateSectionData, ThrowOnError>): RequestResult<SaveVideoCreateSectionResponses, SaveVideoCreateSectionErrors, ThrowOnError> => (options.client ?? client).patch<SaveVideoCreateSectionResponses, SaveVideoCreateSectionErrors, ThrowOnError>({
+    url: '/api/video-create/projects/{projectId}/sections/{sectionId}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const runVideoCreateAction = <ThrowOnError extends boolean = false>(options: Options<RunVideoCreateActionData, ThrowOnError>): RequestResult<RunVideoCreateActionResponses, RunVideoCreateActionErrors, ThrowOnError> => (options.client ?? client).post<RunVideoCreateActionResponses, RunVideoCreateActionErrors, ThrowOnError>({ url: '/api/video-create/projects/{projectId}/actions/{action}', ...options });
+
+export const regenerateVideoCreateSection = <ThrowOnError extends boolean = false>(options: Options<RegenerateVideoCreateSectionData, ThrowOnError>): RequestResult<RegenerateVideoCreateSectionResponses, RegenerateVideoCreateSectionErrors, ThrowOnError> => (options.client ?? client).post<RegenerateVideoCreateSectionResponses, RegenerateVideoCreateSectionErrors, ThrowOnError>({
+    url: '/api/video-create/projects/{projectId}/sections/{sectionId}/regenerate',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const generateVideoCreateShot = <ThrowOnError extends boolean = false>(options: Options<GenerateVideoCreateShotData, ThrowOnError>): RequestResult<GenerateVideoCreateShotResponses, GenerateVideoCreateShotErrors, ThrowOnError> => (options.client ?? client).post<GenerateVideoCreateShotResponses, GenerateVideoCreateShotErrors, ThrowOnError>({ url: '/api/video-create/projects/{projectId}/shots/{shotId}/generate', ...options });
+
+export const replaceVideoCreateShot = <ThrowOnError extends boolean = false>(options: Options<ReplaceVideoCreateShotData, ThrowOnError>): RequestResult<ReplaceVideoCreateShotResponses, ReplaceVideoCreateShotErrors, ThrowOnError> => (options.client ?? client).post<ReplaceVideoCreateShotResponses, ReplaceVideoCreateShotErrors, ThrowOnError>({
+    url: '/api/video-create/projects/{projectId}/shots/{shotId}/replacement',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const updateVideoCreateShotSettings = <ThrowOnError extends boolean = false>(options: Options<UpdateVideoCreateShotSettingsData, ThrowOnError>): RequestResult<UpdateVideoCreateShotSettingsResponses, UpdateVideoCreateShotSettingsErrors, ThrowOnError> => (options.client ?? client).patch<UpdateVideoCreateShotSettingsResponses, UpdateVideoCreateShotSettingsErrors, ThrowOnError>({
+    url: '/api/video-create/projects/{projectId}/shots/{shotId}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 export const createJob = <ThrowOnError extends boolean = false>(options: Options<CreateJobData, ThrowOnError>): RequestResult<CreateJobResponses, CreateJobErrors, ThrowOnError> => (options.client ?? client).post<CreateJobResponses, CreateJobErrors, ThrowOnError>({
     url: '/api/{moduleId}/jobs',

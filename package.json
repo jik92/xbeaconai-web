@@ -26,6 +26,7 @@
     "test:voice-clone": "bun scripts/test-volc-speech.ts",
     "test:ad-script": "bun scripts/test-ad-script-model.ts",
     "test:ad-script:performance": "bun scripts/test-ad-script-performance.ts",
+    "test:video-create:text": "bun scripts/test-video-create-text.ts",
     "build": "tsc -b && vite build",
     "typecheck": "tsc --noEmit",
     "lint": "biome lint .",

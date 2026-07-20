@@ -244,6 +244,111 @@ export type AdScriptComplianceFinding = {
     suggestion: string;
 };
 
+export type VideoCreateProject = {
+    project: {
+        id: string;
+        ownerUserId: string;
+        title: string;
+        status: 'draft' | 'analyzing' | 'script_generating' | 'script_review' | 'storyboard_generating' | 'storyboard_review' | 'composing' | 'completed' | 'failed';
+        input: VideoCreateInput;
+        recommendation: VideoCreateRecommendation;
+        currentJobId: string;
+        finalArtifactId: string;
+        version: number;
+        idempotencyKey: string;
+        error?: {
+            code: string;
+            message: string;
+            retryable: boolean;
+            requestId: string;
+        };
+        createdAt: string;
+        updatedAt: string;
+    };
+    sections: Array<{
+        id: string;
+        projectId: string;
+        ordinal: number;
+        label: string;
+        currentVersionId: string;
+        createdAt: string;
+        updatedAt: string;
+        versions: Array<{
+            id: string;
+            sectionId: string;
+            sequence: number;
+            source: 'generated' | 'regenerated' | 'human';
+            parentVersionId: string;
+            text: string;
+            durationSec: number;
+            model: string;
+            createdAt: string;
+        }>;
+        currentVersion?: {
+            id: string;
+            sectionId: string;
+            sequence: number;
+            source: 'generated' | 'regenerated' | 'human';
+            parentVersionId: string;
+            text: string;
+            durationSec: number;
+            model: string;
+            createdAt: string;
+        };
+    }>;
+    shots: Array<{
+        id: string;
+        projectId: string;
+        scriptSectionId: string;
+        ordinal: number;
+        prompt: string;
+        durationSec: number;
+        status: 'pending' | 'queued' | 'generating' | 'succeeded' | 'failed' | 'replaced';
+        jobId: string;
+        videoAssetId: string;
+        audioEnabled: boolean;
+        subtitleEnabled: boolean;
+        attempts: number;
+        error?: {
+            code: string;
+            message: string;
+            retryable: boolean;
+            requestId: string;
+        };
+        createdAt: string;
+        updatedAt: string;
+    }>;
+    canCompose: boolean;
+};
+
+export type VideoCreateInput = {
+    productAssetIds: Array<string>;
+    portraitAssetId?: string;
+    scene: string;
+    productName?: string;
+    sellingPoints?: Array<string>;
+    durationSec: number;
+    segmentCount: number;
+    speechRate: 'slow' | 'medium' | 'fast';
+    requirements?: string;
+    scriptStyle?: string;
+    videoModel?: 'doubao-seedance-2-0-260128' | 'doubao-seedance-2-0-mini-260615' | 'doubao-seedance-2-0-fast-260128';
+    voiceAssetId?: string;
+    ratio?: '9:16' | '16:9' | '1:1';
+    subtitles?: boolean;
+    priority?: 'speech' | 'visual';
+};
+
+export type VideoCreateRecommendation = {
+    productName: string;
+    sellingPoints: Array<string>;
+    scene: string;
+    durationSec: number;
+    segmentCount: number;
+    requirements: string;
+    scriptStyle: string;
+};
+
 export type GetHealthData = {
     body?: never;
     path?: never;
@@ -1293,6 +1398,316 @@ export type ExportAdScriptVersionResponses = {
 };
 
 export type ExportAdScriptVersionResponse = ExportAdScriptVersionResponses[keyof ExportAdScriptVersionResponses];
+
+export type ListVideoCreateProjectsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/video-create/projects';
+};
+
+export type ListVideoCreateProjectsResponses = {
+    /**
+     * Video create projects
+     */
+    200: {
+        projects: Array<VideoCreateProject>;
+    };
+};
+
+export type ListVideoCreateProjectsResponse = ListVideoCreateProjectsResponses[keyof ListVideoCreateProjectsResponses];
+
+export type CreateVideoCreateProjectData = {
+    body: {
+        title: string;
+        input: VideoCreateInput;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/video-create/projects';
+};
+
+export type CreateVideoCreateProjectErrors = {
+    /**
+     * Invalid assets
+     */
+    422: ApiErrorResponse;
+};
+
+export type CreateVideoCreateProjectError = CreateVideoCreateProjectErrors[keyof CreateVideoCreateProjectErrors];
+
+export type CreateVideoCreateProjectResponses = {
+    /**
+     * Video create project
+     */
+    201: VideoCreateProject;
+};
+
+export type CreateVideoCreateProjectResponse = CreateVideoCreateProjectResponses[keyof CreateVideoCreateProjectResponses];
+
+export type GetVideoCreateProjectData = {
+    body?: never;
+    path: {
+        projectId: string;
+    };
+    query?: never;
+    url: '/api/video-create/projects/{projectId}';
+};
+
+export type GetVideoCreateProjectErrors = {
+    /**
+     * Not found
+     */
+    404: ApiErrorResponse;
+};
+
+export type GetVideoCreateProjectError = GetVideoCreateProjectErrors[keyof GetVideoCreateProjectErrors];
+
+export type GetVideoCreateProjectResponses = {
+    /**
+     * Video create project
+     */
+    200: VideoCreateProject;
+};
+
+export type GetVideoCreateProjectResponse = GetVideoCreateProjectResponses[keyof GetVideoCreateProjectResponses];
+
+export type UpdateVideoCreateProjectData = {
+    body: {
+        expectedVersion: number;
+        input: VideoCreateInput;
+    };
+    path: {
+        projectId: string;
+    };
+    query?: never;
+    url: '/api/video-create/projects/{projectId}';
+};
+
+export type UpdateVideoCreateProjectErrors = {
+    /**
+     * Not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Version conflict
+     */
+    409: ApiErrorResponse;
+    /**
+     * Invalid state or assets
+     */
+    422: ApiErrorResponse;
+};
+
+export type UpdateVideoCreateProjectError = UpdateVideoCreateProjectErrors[keyof UpdateVideoCreateProjectErrors];
+
+export type UpdateVideoCreateProjectResponses = {
+    /**
+     * Updated
+     */
+    200: VideoCreateProject;
+};
+
+export type UpdateVideoCreateProjectResponse = UpdateVideoCreateProjectResponses[keyof UpdateVideoCreateProjectResponses];
+
+export type SaveVideoCreateSectionData = {
+    body: {
+        expectedVersionId: string;
+        text: string;
+        durationSec: number;
+    };
+    path: {
+        projectId: string;
+        sectionId: string;
+    };
+    query?: never;
+    url: '/api/video-create/projects/{projectId}/sections/{sectionId}';
+};
+
+export type SaveVideoCreateSectionErrors = {
+    /**
+     * Not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Version conflict
+     */
+    409: ApiErrorResponse;
+};
+
+export type SaveVideoCreateSectionError = SaveVideoCreateSectionErrors[keyof SaveVideoCreateSectionErrors];
+
+export type SaveVideoCreateSectionResponses = {
+    /**
+     * Saved
+     */
+    200: VideoCreateProject;
+};
+
+export type SaveVideoCreateSectionResponse = SaveVideoCreateSectionResponses[keyof SaveVideoCreateSectionResponses];
+
+export type RunVideoCreateActionData = {
+    body?: never;
+    path: {
+        projectId: string;
+        action: 'analyze' | 'script' | 'storyboard' | 'compose';
+    };
+    query?: never;
+    url: '/api/video-create/projects/{projectId}/actions/{action}';
+};
+
+export type RunVideoCreateActionErrors = {
+    /**
+     * Not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Invalid state
+     */
+    409: ApiErrorResponse;
+};
+
+export type RunVideoCreateActionError = RunVideoCreateActionErrors[keyof RunVideoCreateActionErrors];
+
+export type RunVideoCreateActionResponses = {
+    /**
+     * Accepted
+     */
+    202: Job;
+};
+
+export type RunVideoCreateActionResponse = RunVideoCreateActionResponses[keyof RunVideoCreateActionResponses];
+
+export type RegenerateVideoCreateSectionData = {
+    body: {
+        expectedVersionId: string;
+    };
+    path: {
+        projectId: string;
+        sectionId: string;
+    };
+    query?: never;
+    url: '/api/video-create/projects/{projectId}/sections/{sectionId}/regenerate';
+};
+
+export type RegenerateVideoCreateSectionErrors = {
+    /**
+     * Not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Already generating
+     */
+    409: ApiErrorResponse;
+};
+
+export type RegenerateVideoCreateSectionError = RegenerateVideoCreateSectionErrors[keyof RegenerateVideoCreateSectionErrors];
+
+export type RegenerateVideoCreateSectionResponses = {
+    /**
+     * Accepted
+     */
+    202: Job;
+};
+
+export type RegenerateVideoCreateSectionResponse = RegenerateVideoCreateSectionResponses[keyof RegenerateVideoCreateSectionResponses];
+
+export type GenerateVideoCreateShotData = {
+    body?: never;
+    path: {
+        projectId: string;
+        shotId: string;
+    };
+    query?: never;
+    url: '/api/video-create/projects/{projectId}/shots/{shotId}/generate';
+};
+
+export type GenerateVideoCreateShotErrors = {
+    /**
+     * Not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Already generating
+     */
+    409: ApiErrorResponse;
+};
+
+export type GenerateVideoCreateShotError = GenerateVideoCreateShotErrors[keyof GenerateVideoCreateShotErrors];
+
+export type GenerateVideoCreateShotResponses = {
+    /**
+     * Accepted
+     */
+    202: Job;
+};
+
+export type GenerateVideoCreateShotResponse = GenerateVideoCreateShotResponses[keyof GenerateVideoCreateShotResponses];
+
+export type ReplaceVideoCreateShotData = {
+    body: {
+        assetId: string;
+    };
+    path: {
+        projectId: string;
+        shotId: string;
+    };
+    query?: never;
+    url: '/api/video-create/projects/{projectId}/shots/{shotId}/replacement';
+};
+
+export type ReplaceVideoCreateShotErrors = {
+    /**
+     * Not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Invalid video
+     */
+    422: ApiErrorResponse;
+};
+
+export type ReplaceVideoCreateShotError = ReplaceVideoCreateShotErrors[keyof ReplaceVideoCreateShotErrors];
+
+export type ReplaceVideoCreateShotResponses = {
+    /**
+     * Replaced
+     */
+    200: VideoCreateProject;
+};
+
+export type ReplaceVideoCreateShotResponse = ReplaceVideoCreateShotResponses[keyof ReplaceVideoCreateShotResponses];
+
+export type UpdateVideoCreateShotSettingsData = {
+    body: {
+        audioEnabled: boolean;
+        subtitleEnabled: boolean;
+    };
+    path: {
+        projectId: string;
+        shotId: string;
+    };
+    query?: never;
+    url: '/api/video-create/projects/{projectId}/shots/{shotId}';
+};
+
+export type UpdateVideoCreateShotSettingsErrors = {
+    /**
+     * Not found
+     */
+    404: ApiErrorResponse;
+};
+
+export type UpdateVideoCreateShotSettingsError = UpdateVideoCreateShotSettingsErrors[keyof UpdateVideoCreateShotSettingsErrors];
+
+export type UpdateVideoCreateShotSettingsResponses = {
+    /**
+     * Updated
+     */
+    200: VideoCreateProject;
+};
+
+export type UpdateVideoCreateShotSettingsResponse = UpdateVideoCreateShotSettingsResponses[keyof UpdateVideoCreateShotSettingsResponses];
 
 export type CreateJobData = {
     body: {

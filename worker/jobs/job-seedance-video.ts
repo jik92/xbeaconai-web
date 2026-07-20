@@ -141,6 +141,20 @@ export class SeedanceVideoJob {
       }
       this.context.change(job.id, { providerStatus: "submitting" });
       try {
+        const requestedDuration = Number(job.values.durationSec ?? job.values.duration ?? 5);
+        const duration = Math.min(15, Math.max(4, Math.round(requestedDuration))) as
+          | 4
+          | 5
+          | 6
+          | 7
+          | 8
+          | 9
+          | 10
+          | 11
+          | 12
+          | 13
+          | 14
+          | 15;
         const created = await aihubmix.createSeedanceVideo({
           model,
           prompt:
@@ -150,8 +164,8 @@ export class SeedanceVideoJob {
             "A polished product video in a clean bright studio, stable camera",
           resolution: "720p",
           ratio: job.values.ratio?.startsWith("9:16") ? "9:16" : job.values.ratio?.startsWith("1:1") ? "1:1" : "16:9",
-          duration: 5,
-          generateAudio: true,
+          duration,
+          generateAudio: job.values.generateAudio !== "false",
           watermark: false,
           references,
         });

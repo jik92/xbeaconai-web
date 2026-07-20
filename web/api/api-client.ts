@@ -8,19 +8,37 @@ import {
   createAdScriptAction,
   createAdScriptProject,
   createJob,
+  createVideoCreateProject,
   deleteAsset as deleteAssetRequest,
   deleteProduct as deleteProductRequest,
   exportAdScriptVersion,
+  generateVideoCreateShot,
   getAdScriptProject,
   getJob,
   getModels,
+  getVideoCreateProject,
   listJobs,
+  listVideoCreateProjects,
   parseAdScriptSource,
+  regenerateVideoCreateSection,
+  replaceVideoCreateShot,
   retryJob,
+  runVideoCreateAction,
   saveAdScriptVersion,
+  saveVideoCreateSection,
+  updateVideoCreateProject,
+  updateVideoCreateShotSettings,
   uploadMedia,
 } from "./generated/sdk.gen";
-import type { AdScriptInput, AdScriptProject, Job, ModuleId, SeedanceModelId } from "./generated/types.gen";
+import type {
+  AdScriptInput,
+  AdScriptProject,
+  Job,
+  ModuleId,
+  SeedanceModelId,
+  VideoCreateInput,
+  VideoCreateProject,
+} from "./generated/types.gen";
 
 const configure = () =>
   client.setConfig({
@@ -42,6 +60,129 @@ export async function fetchModels() {
   configure();
   const { data } = await getModels({ throwOnError: true });
   return data?.models ?? [];
+}
+
+export async function fetchVideoCreateProjects() {
+  configure();
+  const { data } = await listVideoCreateProjects({ headers: authHeaders(), throwOnError: true });
+  return data?.projects ?? [];
+}
+
+export async function fetchVideoCreateProject(projectId: string): Promise<VideoCreateProject> {
+  configure();
+  const { data } = await getVideoCreateProject({ path: { projectId }, headers: authHeaders(), throwOnError: true });
+  if (!data) throw new Error("一键成片项目加载失败");
+  return data;
+}
+
+export async function createVideoCreate(input: VideoCreateInput, title: string, idempotencyKey = randomUuid()) {
+  configure();
+  const { data } = await createVideoCreateProject({
+    body: { input, title },
+    headers: { ...authHeaders(), "Idempotency-Key": idempotencyKey },
+    throwOnError: true,
+  });
+  if (!data) throw new Error("一键成片项目创建失败");
+  return data;
+}
+
+export async function updateVideoCreate(input: VideoCreateProject, values: VideoCreateInput) {
+  configure();
+  const { data } = await updateVideoCreateProject({
+    path: { projectId: input.project.id },
+    body: { expectedVersion: input.project.version, input: values },
+    headers: authHeaders(),
+    throwOnError: true,
+  });
+  if (!data) throw new Error("一键成片参数保存失败");
+  return data;
+}
+
+export async function runVideoCreateProjectAction(
+  projectId: string,
+  action: "analyze" | "script" | "storyboard" | "compose",
+) {
+  configure();
+  const { data } = await runVideoCreateAction({
+    path: { projectId, action },
+    headers: { ...authHeaders(), "Idempotency-Key": randomUuid() },
+    throwOnError: true,
+  });
+  if (!data) throw new Error("一键成片任务提交失败");
+  return data;
+}
+
+export async function saveVideoCreateScriptSection(input: {
+  projectId: string;
+  sectionId: string;
+  expectedVersionId: string;
+  text: string;
+  durationSec: number;
+}) {
+  configure();
+  const { data } = await saveVideoCreateSection({
+    path: { projectId: input.projectId, sectionId: input.sectionId },
+    body: { expectedVersionId: input.expectedVersionId, text: input.text, durationSec: input.durationSec },
+    headers: authHeaders(),
+    throwOnError: true,
+  });
+  if (!data) throw new Error("脚本保存失败");
+  return data;
+}
+
+export async function regenerateVideoCreateScriptSection(input: {
+  projectId: string;
+  sectionId: string;
+  expectedVersionId: string;
+}) {
+  configure();
+  const { data } = await regenerateVideoCreateSection({
+    path: { projectId: input.projectId, sectionId: input.sectionId },
+    body: { expectedVersionId: input.expectedVersionId },
+    headers: { ...authHeaders(), "Idempotency-Key": randomUuid() },
+    throwOnError: true,
+  });
+  if (!data) throw new Error("脚本换版任务提交失败");
+  return data;
+}
+
+export async function generateVideoCreateShotVideo(projectId: string, shotId: string) {
+  configure();
+  const { data } = await generateVideoCreateShot({
+    path: { projectId, shotId },
+    headers: { ...authHeaders(), "Idempotency-Key": randomUuid() },
+    throwOnError: true,
+  });
+  if (!data) throw new Error("分镜视频任务提交失败");
+  return data;
+}
+
+export async function replaceVideoCreateShotVideo(projectId: string, shotId: string, assetId: string) {
+  configure();
+  const { data } = await replaceVideoCreateShot({
+    path: { projectId, shotId },
+    body: { assetId },
+    headers: authHeaders(),
+    throwOnError: true,
+  });
+  if (!data) throw new Error("替代视频保存失败");
+  return data;
+}
+
+export async function updateVideoCreateShotOptions(
+  projectId: string,
+  shotId: string,
+  options: { audioEnabled: boolean; subtitleEnabled: boolean },
+) {
+  configure();
+  const { data } = await updateVideoCreateShotSettings({
+    path: { projectId, shotId },
+    body: options,
+    headers: authHeaders(),
+    throwOnError: true,
+  });
+  if (!data) throw new Error("分镜设置保存失败");
+  return data;
 }
 export async function parseExistingAdScript(sourceScript: string, idempotencyKey = randomUuid()) {
   configure();

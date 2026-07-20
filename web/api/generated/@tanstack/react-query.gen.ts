@@ -3,8 +3,8 @@
 import { type DefaultError, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { cancelJob, changePassword, completeDirectUpload, createAdScriptAction, createAdScriptProject, createDirectUpload, createJob, createRechargeOrder, deleteAsset, deleteProduct, downloadArtifact, exportAdScriptVersion, getAdScriptProject, getAssetContent, getCapabilities, getCreationCapabilities, getCurrentUser, getHealth, getJob, getModels, getPreferences, listAdScriptProjects, listAssets, listJobs, listNotifications, listRechargeOrders, listRechargePackages, login, logout, markAllNotificationsRead, markNotificationRead, type Options, parseAdScriptSource, register, retryJob, saveAdScriptVersion, saveAssetMetadata, savePreferences, updateProfile, uploadMedia } from '../sdk.gen';
-import type { CancelJobData, CancelJobError, CancelJobResponse, ChangePasswordData, ChangePasswordError, ChangePasswordResponse, CompleteDirectUploadData, CompleteDirectUploadError, CompleteDirectUploadResponse, CreateAdScriptActionData, CreateAdScriptActionError, CreateAdScriptActionResponse, CreateAdScriptProjectData, CreateAdScriptProjectError, CreateAdScriptProjectResponse, CreateDirectUploadData, CreateDirectUploadError, CreateDirectUploadResponse, CreateJobData, CreateJobError, CreateJobResponse, CreateRechargeOrderData, CreateRechargeOrderError, CreateRechargeOrderResponse, DeleteAssetData, DeleteAssetError, DeleteAssetResponse, DeleteProductData, DeleteProductError, DeleteProductResponse, DownloadArtifactData, DownloadArtifactError, DownloadArtifactResponse, ExportAdScriptVersionData, ExportAdScriptVersionError, ExportAdScriptVersionResponse, GetAdScriptProjectData, GetAdScriptProjectError, GetAdScriptProjectResponse, GetAssetContentData, GetAssetContentError, GetAssetContentResponse, GetCapabilitiesData, GetCapabilitiesResponse, GetCreationCapabilitiesData, GetCreationCapabilitiesResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetHealthData, GetHealthResponse, GetJobData, GetJobError, GetJobResponse, GetModelsData, GetModelsResponse, GetPreferencesData, GetPreferencesResponse, ListAdScriptProjectsData, ListAdScriptProjectsResponse, ListAssetsData, ListAssetsResponse, ListJobsData, ListJobsResponse, ListNotificationsData, ListNotificationsResponse, ListRechargeOrdersData, ListRechargeOrdersResponse, ListRechargePackagesData, ListRechargePackagesResponse, LoginData, LoginError, LoginResponse, LogoutData, LogoutError, LogoutResponse, MarkAllNotificationsReadData, MarkAllNotificationsReadResponse, MarkNotificationReadData, MarkNotificationReadError, MarkNotificationReadResponse, ParseAdScriptSourceData, ParseAdScriptSourceError, ParseAdScriptSourceResponse, RegisterData, RegisterError, RegisterResponse, RetryJobData, RetryJobError, RetryJobResponse, SaveAdScriptVersionData, SaveAdScriptVersionError, SaveAdScriptVersionResponse, SaveAssetMetadataData, SaveAssetMetadataError, SaveAssetMetadataResponse, SavePreferencesData, SavePreferencesResponse, UpdateProfileData, UpdateProfileError, UpdateProfileResponse, UploadMediaData, UploadMediaError, UploadMediaResponse } from '../types.gen';
+import { cancelJob, changePassword, completeDirectUpload, createAdScriptAction, createAdScriptProject, createDirectUpload, createJob, createRechargeOrder, createVideoCreateProject, deleteAsset, deleteProduct, downloadArtifact, exportAdScriptVersion, generateVideoCreateShot, getAdScriptProject, getAssetContent, getCapabilities, getCreationCapabilities, getCurrentUser, getHealth, getJob, getModels, getPreferences, getVideoCreateProject, listAdScriptProjects, listAssets, listJobs, listNotifications, listRechargeOrders, listRechargePackages, listVideoCreateProjects, login, logout, markAllNotificationsRead, markNotificationRead, type Options, parseAdScriptSource, regenerateVideoCreateSection, register, replaceVideoCreateShot, retryJob, runVideoCreateAction, saveAdScriptVersion, saveAssetMetadata, savePreferences, saveVideoCreateSection, updateProfile, updateVideoCreateProject, updateVideoCreateShotSettings, uploadMedia } from '../sdk.gen';
+import type { CancelJobData, CancelJobError, CancelJobResponse, ChangePasswordData, ChangePasswordError, ChangePasswordResponse, CompleteDirectUploadData, CompleteDirectUploadError, CompleteDirectUploadResponse, CreateAdScriptActionData, CreateAdScriptActionError, CreateAdScriptActionResponse, CreateAdScriptProjectData, CreateAdScriptProjectError, CreateAdScriptProjectResponse, CreateDirectUploadData, CreateDirectUploadError, CreateDirectUploadResponse, CreateJobData, CreateJobError, CreateJobResponse, CreateRechargeOrderData, CreateRechargeOrderError, CreateRechargeOrderResponse, CreateVideoCreateProjectData, CreateVideoCreateProjectError, CreateVideoCreateProjectResponse, DeleteAssetData, DeleteAssetError, DeleteAssetResponse, DeleteProductData, DeleteProductError, DeleteProductResponse, DownloadArtifactData, DownloadArtifactError, DownloadArtifactResponse, ExportAdScriptVersionData, ExportAdScriptVersionError, ExportAdScriptVersionResponse, GenerateVideoCreateShotData, GenerateVideoCreateShotError, GenerateVideoCreateShotResponse, GetAdScriptProjectData, GetAdScriptProjectError, GetAdScriptProjectResponse, GetAssetContentData, GetAssetContentError, GetAssetContentResponse, GetCapabilitiesData, GetCapabilitiesResponse, GetCreationCapabilitiesData, GetCreationCapabilitiesResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetHealthData, GetHealthResponse, GetJobData, GetJobError, GetJobResponse, GetModelsData, GetModelsResponse, GetPreferencesData, GetPreferencesResponse, GetVideoCreateProjectData, GetVideoCreateProjectError, GetVideoCreateProjectResponse, ListAdScriptProjectsData, ListAdScriptProjectsResponse, ListAssetsData, ListAssetsResponse, ListJobsData, ListJobsResponse, ListNotificationsData, ListNotificationsResponse, ListRechargeOrdersData, ListRechargeOrdersResponse, ListRechargePackagesData, ListRechargePackagesResponse, ListVideoCreateProjectsData, ListVideoCreateProjectsResponse, LoginData, LoginError, LoginResponse, LogoutData, LogoutError, LogoutResponse, MarkAllNotificationsReadData, MarkAllNotificationsReadResponse, MarkNotificationReadData, MarkNotificationReadError, MarkNotificationReadResponse, ParseAdScriptSourceData, ParseAdScriptSourceError, ParseAdScriptSourceResponse, RegenerateVideoCreateSectionData, RegenerateVideoCreateSectionError, RegenerateVideoCreateSectionResponse, RegisterData, RegisterError, RegisterResponse, ReplaceVideoCreateShotData, ReplaceVideoCreateShotError, ReplaceVideoCreateShotResponse, RetryJobData, RetryJobError, RetryJobResponse, RunVideoCreateActionData, RunVideoCreateActionError, RunVideoCreateActionResponse, SaveAdScriptVersionData, SaveAdScriptVersionError, SaveAdScriptVersionResponse, SaveAssetMetadataData, SaveAssetMetadataError, SaveAssetMetadataResponse, SavePreferencesData, SavePreferencesResponse, SaveVideoCreateSectionData, SaveVideoCreateSectionError, SaveVideoCreateSectionResponse, UpdateProfileData, UpdateProfileError, UpdateProfileResponse, UpdateVideoCreateProjectData, UpdateVideoCreateProjectError, UpdateVideoCreateProjectResponse, UpdateVideoCreateShotSettingsData, UpdateVideoCreateShotSettingsError, UpdateVideoCreateShotSettingsResponse, UploadMediaData, UploadMediaError, UploadMediaResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -529,6 +529,148 @@ export const exportAdScriptVersionOptions = (options: Options<ExportAdScriptVers
     },
     queryKey: exportAdScriptVersionQueryKey(options)
 });
+
+export const listVideoCreateProjectsQueryKey = (options?: Options<ListVideoCreateProjectsData>) => createQueryKey('listVideoCreateProjects', options);
+
+export const listVideoCreateProjectsOptions = (options?: Options<ListVideoCreateProjectsData>) => queryOptions<ListVideoCreateProjectsResponse, DefaultError, ListVideoCreateProjectsResponse, ReturnType<typeof listVideoCreateProjectsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listVideoCreateProjects({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listVideoCreateProjectsQueryKey(options)
+});
+
+export const createVideoCreateProjectMutation = (options?: Partial<Options<CreateVideoCreateProjectData>>): UseMutationOptions<CreateVideoCreateProjectResponse, CreateVideoCreateProjectError, Options<CreateVideoCreateProjectData>> => {
+    const mutationOptions: UseMutationOptions<CreateVideoCreateProjectResponse, CreateVideoCreateProjectError, Options<CreateVideoCreateProjectData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await createVideoCreateProject({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getVideoCreateProjectQueryKey = (options: Options<GetVideoCreateProjectData>) => createQueryKey('getVideoCreateProject', options);
+
+export const getVideoCreateProjectOptions = (options: Options<GetVideoCreateProjectData>) => queryOptions<GetVideoCreateProjectResponse, GetVideoCreateProjectError, GetVideoCreateProjectResponse, ReturnType<typeof getVideoCreateProjectQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getVideoCreateProject({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getVideoCreateProjectQueryKey(options)
+});
+
+export const updateVideoCreateProjectMutation = (options?: Partial<Options<UpdateVideoCreateProjectData>>): UseMutationOptions<UpdateVideoCreateProjectResponse, UpdateVideoCreateProjectError, Options<UpdateVideoCreateProjectData>> => {
+    const mutationOptions: UseMutationOptions<UpdateVideoCreateProjectResponse, UpdateVideoCreateProjectError, Options<UpdateVideoCreateProjectData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await updateVideoCreateProject({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const saveVideoCreateSectionMutation = (options?: Partial<Options<SaveVideoCreateSectionData>>): UseMutationOptions<SaveVideoCreateSectionResponse, SaveVideoCreateSectionError, Options<SaveVideoCreateSectionData>> => {
+    const mutationOptions: UseMutationOptions<SaveVideoCreateSectionResponse, SaveVideoCreateSectionError, Options<SaveVideoCreateSectionData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await saveVideoCreateSection({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const runVideoCreateActionMutation = (options?: Partial<Options<RunVideoCreateActionData>>): UseMutationOptions<RunVideoCreateActionResponse, RunVideoCreateActionError, Options<RunVideoCreateActionData>> => {
+    const mutationOptions: UseMutationOptions<RunVideoCreateActionResponse, RunVideoCreateActionError, Options<RunVideoCreateActionData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await runVideoCreateAction({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const regenerateVideoCreateSectionMutation = (options?: Partial<Options<RegenerateVideoCreateSectionData>>): UseMutationOptions<RegenerateVideoCreateSectionResponse, RegenerateVideoCreateSectionError, Options<RegenerateVideoCreateSectionData>> => {
+    const mutationOptions: UseMutationOptions<RegenerateVideoCreateSectionResponse, RegenerateVideoCreateSectionError, Options<RegenerateVideoCreateSectionData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await regenerateVideoCreateSection({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const generateVideoCreateShotMutation = (options?: Partial<Options<GenerateVideoCreateShotData>>): UseMutationOptions<GenerateVideoCreateShotResponse, GenerateVideoCreateShotError, Options<GenerateVideoCreateShotData>> => {
+    const mutationOptions: UseMutationOptions<GenerateVideoCreateShotResponse, GenerateVideoCreateShotError, Options<GenerateVideoCreateShotData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await generateVideoCreateShot({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const replaceVideoCreateShotMutation = (options?: Partial<Options<ReplaceVideoCreateShotData>>): UseMutationOptions<ReplaceVideoCreateShotResponse, ReplaceVideoCreateShotError, Options<ReplaceVideoCreateShotData>> => {
+    const mutationOptions: UseMutationOptions<ReplaceVideoCreateShotResponse, ReplaceVideoCreateShotError, Options<ReplaceVideoCreateShotData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await replaceVideoCreateShot({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const updateVideoCreateShotSettingsMutation = (options?: Partial<Options<UpdateVideoCreateShotSettingsData>>): UseMutationOptions<UpdateVideoCreateShotSettingsResponse, UpdateVideoCreateShotSettingsError, Options<UpdateVideoCreateShotSettingsData>> => {
+    const mutationOptions: UseMutationOptions<UpdateVideoCreateShotSettingsResponse, UpdateVideoCreateShotSettingsError, Options<UpdateVideoCreateShotSettingsData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await updateVideoCreateShotSettings({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
 
 export const createJobMutation = (options?: Partial<Options<CreateJobData>>): UseMutationOptions<CreateJobResponse, CreateJobError, Options<CreateJobData>> => {
     const mutationOptions: UseMutationOptions<CreateJobResponse, CreateJobError, Options<CreateJobData>> = {

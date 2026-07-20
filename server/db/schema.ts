@@ -314,6 +314,102 @@ export const adScriptVersions = sqliteTable(
   ],
 );
 
+export const videoCreateProjects = sqliteTable(
+  "video_create_projects",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id),
+    title: text("title").notNull(),
+    status: text("status").$type<import("../video-create/types").VideoCreateProjectStatus>().notNull().default("draft"),
+    input: text("input_json", { mode: "json" }).$type<import("../video-create/types").VideoCreateInput>().notNull(),
+    recommendation: text("recommendation_json", { mode: "json" }).$type<
+      import("../video-create/types").VideoCreateRecommendation
+    >(),
+    currentJobId: text("current_job_id").references(() => jobs.id),
+    finalArtifactId: text("final_artifact_id"),
+    version: integer("version").notNull().default(1),
+    idempotencyKey: text("idempotency_key"),
+    error: text("error_json", { mode: "json" }).$type<JobRecord["error"]>(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    index("video_create_projects_owner_updated_idx").on(table.ownerUserId, table.updatedAt),
+    uniqueIndex("video_create_projects_owner_idempotency_idx").on(table.ownerUserId, table.idempotencyKey),
+  ],
+);
+
+export const videoCreateScriptSections = sqliteTable(
+  "video_create_script_sections",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => videoCreateProjects.id),
+    ordinal: integer("ordinal").notNull(),
+    label: text("label").notNull(),
+    currentVersionId: text("current_version_id"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("video_create_sections_project_ordinal_idx").on(table.projectId, table.ordinal),
+    index("video_create_sections_project_idx").on(table.projectId),
+  ],
+);
+
+export const videoCreateScriptVersions = sqliteTable(
+  "video_create_script_versions",
+  {
+    id: text("id").primaryKey(),
+    sectionId: text("section_id")
+      .notNull()
+      .references(() => videoCreateScriptSections.id),
+    sequence: integer("sequence").notNull(),
+    source: text("source", { enum: ["generated", "regenerated", "human"] }).notNull(),
+    parentVersionId: text("parent_version_id"),
+    text: text("text").notNull(),
+    durationSec: integer("duration_sec").notNull(),
+    model: text("model").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("video_create_versions_section_sequence_idx").on(table.sectionId, table.sequence),
+    index("video_create_versions_section_idx").on(table.sectionId),
+  ],
+);
+
+export const videoCreateShots = sqliteTable(
+  "video_create_shots",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => videoCreateProjects.id),
+    scriptSectionId: text("script_section_id")
+      .notNull()
+      .references(() => videoCreateScriptSections.id),
+    ordinal: integer("ordinal").notNull(),
+    prompt: text("prompt").notNull(),
+    durationSec: integer("duration_sec").notNull(),
+    status: text("status").$type<import("../video-create/types").VideoCreateShotStatus>().notNull().default("pending"),
+    jobId: text("job_id").references(() => jobs.id),
+    videoAssetId: text("video_asset_id"),
+    audioEnabled: integer("audio_enabled", { mode: "boolean" }).notNull().default(true),
+    subtitleEnabled: integer("subtitle_enabled", { mode: "boolean" }).notNull().default(true),
+    attempts: integer("attempts").notNull().default(0),
+    error: text("error_json", { mode: "json" }).$type<JobRecord["error"]>(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("video_create_shots_project_ordinal_idx").on(table.projectId, table.ordinal),
+    index("video_create_shots_project_idx").on(table.projectId),
+  ],
+);
+
 export const objectCleanup = sqliteTable("object_cleanup", {
   objectKey: text("object_key").primaryKey(),
   jobId: text("job_id").notNull(),

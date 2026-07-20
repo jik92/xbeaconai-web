@@ -4,6 +4,7 @@ import { AccountStore } from "../server/accounts/account-store";
 import { AdScriptStore } from "../server/ad-script/ad-script-store";
 import { env } from "../server/env";
 import { SqliteJobStore } from "../server/jobs/sqlite-job-store";
+import { VideoCreateStore } from "../server/video-create/video-create-store";
 import { type ExecuteJobPayload, executeJobName, executeJobOptions } from "../shared/jobs/queue-contract";
 import { JobProcessor } from "./job-processor";
 import { createWorkerRedisConnection } from "./redis";
@@ -11,7 +12,8 @@ import { createWorkerRedisConnection } from "./redis";
 const store = new SqliteJobStore();
 const accounts = new AccountStore();
 const adScripts = new AdScriptStore();
-const processor = new JobProcessor(store, accounts, adScripts);
+const videoCreates = new VideoCreateStore();
+const processor = new JobProcessor(store, accounts, adScripts, videoCreates);
 const recoveryRedis = new IORedis(env.redisUrl, { lazyConnect: true, maxRetriesPerRequest: 1 });
 const recoveryQueue = new Queue<ExecuteJobPayload>(env.redisQueueName, {
   connection: recoveryRedis,
@@ -79,6 +81,7 @@ const shutdown = async () => {
   store.close();
   accounts.close();
   adScripts.close();
+  videoCreates.close();
   process.exit(0);
 };
 process.on("SIGINT", () => void shutdown());

@@ -2,11 +2,13 @@ import type { AccountStore } from "../../server/accounts/account-store";
 import type { AdScriptStore } from "../../server/ad-script/ad-script-store";
 import type { SqliteJobStore } from "../../server/jobs/sqlite-job-store";
 import type { JobRecord } from "../../server/types";
+import type { VideoCreateStore } from "../../server/video-create/video-create-store";
 
 export interface JobHandlerContext {
   readonly store: SqliteJobStore;
   readonly accounts?: AccountStore;
   readonly adScripts?: AdScriptStore;
+  readonly videoCreates?: VideoCreateStore;
   change(id: string, patch: Partial<JobRecord>): JobRecord | undefined;
 }
 

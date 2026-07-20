@@ -2,6 +2,7 @@ import type { JobRecord } from "../../server/types";
 import { adScriptJob } from "./job-ad-script";
 import { genericCreationJob } from "./job-generic-creation";
 import { videoClipMergeJob } from "./job-video-clip-merge";
+import { videoCreateJob } from "./job-video-create";
 import { videoCutJob } from "./job-video-cut";
 import { videoRemixAnalysisJob } from "./job-video-remix-analysis";
 import { voiceCloneJob } from "./job-voice-clone";
@@ -9,6 +10,7 @@ import type { WorkerJobHandler } from "./types";
 
 export const jobHandlers: readonly WorkerJobHandler[] = [
   adScriptJob,
+  videoCreateJob,
   videoRemixAnalysisJob,
   videoClipMergeJob,
   videoCutJob,

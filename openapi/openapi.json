@@ -1077,6 +1077,542 @@
           "message",
           "suggestion"
         ]
+      },
+      "VideoCreateProject": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "ownerUserId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "title": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "draft",
+                  "analyzing",
+                  "script_generating",
+                  "script_review",
+                  "storyboard_generating",
+                  "storyboard_review",
+                  "composing",
+                  "completed",
+                  "failed"
+                ]
+              },
+              "input": {
+                "$ref": "#/components/schemas/VideoCreateInput"
+              },
+              "recommendation": {
+                "$ref": "#/components/schemas/VideoCreateRecommendation"
+              },
+              "currentJobId": {
+                "type": "string",
+                "nullable": true,
+                "format": "uuid"
+              },
+              "finalArtifactId": {
+                "type": "string",
+                "nullable": true,
+                "format": "uuid"
+              },
+              "version": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "idempotencyKey": {
+                "type": "string",
+                "nullable": true
+              },
+              "error": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "requestId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable",
+                  "requestId"
+                ]
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "ownerUserId",
+              "title",
+              "status",
+              "input",
+              "recommendation",
+              "currentJobId",
+              "finalArtifactId",
+              "version",
+              "idempotencyKey",
+              "createdAt",
+              "updatedAt"
+            ]
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "projectId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "ordinal": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "label": {
+                  "type": "string"
+                },
+                "currentVersionId": {
+                  "type": "string",
+                  "nullable": true,
+                  "format": "uuid"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                },
+                "versions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "sectionId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "sequence": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "generated",
+                          "regenerated",
+                          "human"
+                        ]
+                      },
+                      "parentVersionId": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uuid"
+                      },
+                      "text": {
+                        "type": "string"
+                      },
+                      "durationSec": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "sectionId",
+                      "sequence",
+                      "source",
+                      "parentVersionId",
+                      "text",
+                      "durationSec",
+                      "model",
+                      "createdAt"
+                    ]
+                  }
+                },
+                "currentVersion": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "sectionId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "sequence": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "generated",
+                        "regenerated",
+                        "human"
+                      ]
+                    },
+                    "parentVersionId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "durationSec": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "sectionId",
+                    "sequence",
+                    "source",
+                    "parentVersionId",
+                    "text",
+                    "durationSec",
+                    "model",
+                    "createdAt"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "projectId",
+                "ordinal",
+                "label",
+                "currentVersionId",
+                "createdAt",
+                "updatedAt",
+                "versions"
+              ]
+            }
+          },
+          "shots": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "projectId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "scriptSectionId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "ordinal": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "prompt": {
+                  "type": "string"
+                },
+                "durationSec": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "queued",
+                    "generating",
+                    "succeeded",
+                    "failed",
+                    "replaced"
+                  ]
+                },
+                "jobId": {
+                  "type": "string",
+                  "nullable": true,
+                  "format": "uuid"
+                },
+                "videoAssetId": {
+                  "type": "string",
+                  "nullable": true,
+                  "format": "uuid"
+                },
+                "audioEnabled": {
+                  "type": "boolean"
+                },
+                "subtitleEnabled": {
+                  "type": "boolean"
+                },
+                "attempts": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "error": {
+                  "type": "object",
+                  "nullable": true,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "retryable",
+                    "requestId"
+                  ]
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "projectId",
+                "scriptSectionId",
+                "ordinal",
+                "prompt",
+                "durationSec",
+                "status",
+                "jobId",
+                "videoAssetId",
+                "audioEnabled",
+                "subtitleEnabled",
+                "attempts",
+                "createdAt",
+                "updatedAt"
+              ]
+            }
+          },
+          "canCompose": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "project",
+          "sections",
+          "shots",
+          "canCompose"
+        ]
+      },
+      "VideoCreateInput": {
+        "type": "object",
+        "properties": {
+          "productAssetIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "minItems": 1,
+            "maxItems": 6
+          },
+          "portraitAssetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "scene": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "productName": {
+            "type": "string",
+            "maxLength": 60,
+            "default": ""
+          },
+          "sellingPoints": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "maxItems": 8,
+            "default": []
+          },
+          "durationSec": {
+            "type": "integer",
+            "minimum": 15,
+            "maximum": 180
+          },
+          "segmentCount": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12
+          },
+          "speechRate": {
+            "type": "string",
+            "enum": [
+              "slow",
+              "medium",
+              "fast"
+            ]
+          },
+          "requirements": {
+            "type": "string",
+            "maxLength": 1000,
+            "default": ""
+          },
+          "scriptStyle": {
+            "type": "string",
+            "maxLength": 100,
+            "default": "自然种草"
+          },
+          "videoModel": {
+            "type": "string",
+            "enum": [
+              "doubao-seedance-2-0-260128",
+              "doubao-seedance-2-0-mini-260615",
+              "doubao-seedance-2-0-fast-260128"
+            ],
+            "default": "doubao-seedance-2-0-fast-260128"
+          },
+          "voiceAssetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ratio": {
+            "type": "string",
+            "enum": [
+              "9:16",
+              "16:9",
+              "1:1"
+            ],
+            "default": "9:16"
+          },
+          "subtitles": {
+            "type": "boolean",
+            "default": true
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "speech",
+              "visual"
+            ],
+            "default": "speech"
+          }
+        },
+        "required": [
+          "productAssetIds",
+          "scene",
+          "durationSec",
+          "segmentCount",
+          "speechRate"
+        ]
+      },
+      "VideoCreateRecommendation": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "productName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "sellingPoints": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "minItems": 1,
+            "maxItems": 8
+          },
+          "scene": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "durationSec": {
+            "type": "integer",
+            "minimum": 15,
+            "maximum": 180
+          },
+          "segmentCount": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12
+          },
+          "requirements": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "scriptStyle": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "productName",
+          "sellingPoints",
+          "scene",
+          "durationSec",
+          "segmentCount",
+          "requirements",
+          "scriptStyle"
+        ]
       }
     },
     "parameters": {}
@@ -3299,6 +3835,628 @@
               "text/plain": {
                 "schema": {
                   "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/video-create/projects": {
+      "post": {
+        "operationId": "createVideoCreateProject",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "input": {
+                    "$ref": "#/components/schemas/VideoCreateInput"
+                  }
+                },
+                "required": [
+                  "title",
+                  "input"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Video create project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoCreateProject"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid assets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listVideoCreateProjects",
+        "responses": {
+          "200": {
+            "description": "Video create projects",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "projects": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/VideoCreateProject"
+                      }
+                    }
+                  },
+                  "required": [
+                    "projects"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/video-create/projects/{projectId}": {
+      "get": {
+        "operationId": "getVideoCreateProject",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Video create project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoCreateProject"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateVideoCreateProject",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expectedVersion": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "input": {
+                    "$ref": "#/components/schemas/VideoCreateInput"
+                  }
+                },
+                "required": [
+                  "expectedVersion",
+                  "input"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoCreateProject"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid state or assets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/video-create/projects/{projectId}/sections/{sectionId}": {
+      "patch": {
+        "operationId": "saveVideoCreateSection",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "sectionId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expectedVersionId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "durationSec": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 180
+                  }
+                },
+                "required": [
+                  "expectedVersionId",
+                  "text",
+                  "durationSec"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoCreateProject"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/video-create/projects/{projectId}/actions/{action}": {
+      "post": {
+        "operationId": "runVideoCreateAction",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "analyze",
+                "script",
+                "storyboard",
+                "compose"
+              ]
+            },
+            "required": true,
+            "name": "action",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Invalid state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/video-create/projects/{projectId}/sections/{sectionId}/regenerate": {
+      "post": {
+        "operationId": "regenerateVideoCreateSection",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "sectionId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expectedVersionId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "expectedVersionId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already generating",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/video-create/projects/{projectId}/shots/{shotId}/generate": {
+      "post": {
+        "operationId": "generateVideoCreateShot",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "shotId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already generating",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/video-create/projects/{projectId}/shots/{shotId}/replacement": {
+      "post": {
+        "operationId": "replaceVideoCreateShot",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "shotId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "assetId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "assetId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replaced",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoCreateProject"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid video",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/video-create/projects/{projectId}/shots/{shotId}": {
+      "patch": {
+        "operationId": "updateVideoCreateShotSettings",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "shotId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "audioEnabled": {
+                    "type": "boolean"
+                  },
+                  "subtitleEnabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "audioEnabled",
+                  "subtitleEnabled"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoCreateProject"
                 }
               }
             }
