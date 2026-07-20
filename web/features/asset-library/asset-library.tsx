@@ -382,6 +382,7 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
   const [query, setQuery] = useState("");
   const [uploadOpen, setUploadOpen] = useState(false);
   const [selected, setSelected] = useState<LibraryAsset | null>(null);
+  const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -499,20 +500,28 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
             </div>
             <section className="asset-library-grid">
               {filtered.map((asset) => (
-                <button className="library-asset-card" key={asset.id} onClick={() => setSelected(asset)}>
+                <article className="library-asset-card voice-asset-card" key={asset.id}>
                   <div className="library-asset-preview voice">
-                    <FileAudio />
-                    <i>试听音色</i>
+                    {previewingVoiceId === asset.id ? (
+                      <AuthenticatedMedia url={asset.url} mimeType={asset.mimeType} alt={asset.name} autoPlay />
+                    ) : (
+                      <>
+                        <FileAudio />
+                        <button type="button" onClick={() => setPreviewingVoiceId(asset.id)}>
+                          试听音色
+                        </button>
+                      </>
+                    )}
                   </div>
-                  <div>
+                  <button type="button" className="voice-asset-details" onClick={() => setSelected(asset)}>
                     <h3>{asset.name}</h3>
                     <p>{asset.description || asset.originalName}</p>
                     <small>
                       {(asset.size / 1024 / 1024).toFixed(1)} MB ·{" "}
                       {new Date(asset.createdAt).toLocaleDateString("zh-CN")}
                     </small>
-                  </div>
-                </button>
+                  </button>
+                </article>
               ))}
               <LibraryState
                 loading={isLoading}
@@ -613,7 +622,7 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
               </button>
             </header>
             <div className="asset-detail-media voice">
-              <FileAudio />
+              <AuthenticatedMedia url={selected.url} mimeType={selected.mimeType} alt={selected.name} />
             </div>
             <div className="asset-detail-copy">
               <span>

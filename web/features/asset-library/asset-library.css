@@ -332,9 +332,24 @@
   width: 48px;
   height: 48px;
 }
-.library-asset-preview.voice i {
+.library-asset-preview.voice > button {
+  padding: 7px 14px;
+  border: 1px solid #5073b5;
+  border-radius: 999px;
+  color: #395d9f;
+  background: #ffffffb8;
   font-size: 11px;
-  font-style: normal;
+}
+.library-asset-preview.voice audio {
+  width: calc(100% - 28px);
+}
+.voice-asset-details {
+  width: 100%;
+  padding: 12px;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
 }
 .library-asset-card > div:last-child {
   padding: 12px;
