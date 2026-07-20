@@ -1,9 +1,13 @@
-import { Search } from "lucide-react";
+import { CalendarDays, Search } from "lucide-react";
 import { useState } from "react";
+import type { DateRange } from "react-day-picker";
+import { zhCN } from "react-day-picker/locale";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 export interface TaskSearchFilterValue {
   name: string;
@@ -19,8 +23,30 @@ interface TaskSearchFiltersProps {
 
 const emptyFilters: TaskSearchFilterValue = { name: "", status: "", from: "", to: "" };
 
+function parseDate(value: string) {
+  if (!value) return undefined;
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function serializeDate(value: Date | undefined) {
+  if (!value) return "";
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function displayDate(value: Date | undefined) {
+  return value?.toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" });
+}
+
 export function TaskSearchFilters({ compact = false, onSearch }: TaskSearchFiltersProps) {
   const [filters, setFilters] = useState(emptyFilters);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const selectedRange: DateRange | undefined = filters.from
+    ? { from: parseDate(filters.from), to: parseDate(filters.to) }
+    : undefined;
 
   const updateFilter = (key: keyof TaskSearchFilterValue, value: string) => {
     setFilters((current) => ({ ...current, [key]: value }));
@@ -75,24 +101,38 @@ export function TaskSearchFilters({ compact = false, onSearch }: TaskSearchFilte
           </NativeSelect>
         </div>
       )}
-      <div className="flex w-[390px] shrink-0 items-center gap-2">
-        <Label className="shrink-0" htmlFor="task-date-from-filter">
+      <div className="flex w-[340px] shrink-0 items-center gap-2">
+        <Label className="shrink-0" htmlFor="task-date-filter">
           创建时间
         </Label>
-        <Input
-          id="task-date-from-filter"
-          type="date"
-          aria-label="开始日期"
-          value={filters.from}
-          onChange={(event) => updateFilter("from", event.target.value)}
-        />
-        <span className="shrink-0 text-sm text-muted">至</span>
-        <Input
-          type="date"
-          aria-label="结束日期"
-          value={filters.to}
-          onChange={(event) => updateFilter("to", event.target.value)}
-        />
+        <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+          <PopoverTrigger asChild>
+            <Button id="task-date-filter" className="min-w-0 flex-1 justify-start px-3 font-normal" variant="outline">
+              <CalendarDays />
+              <span className="truncate">
+                {selectedRange?.from
+                  ? `${displayDate(selectedRange.from)}${selectedRange.to ? ` - ${displayDate(selectedRange.to)}` : ""}`
+                  : "选择日期范围"}
+              </span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end">
+            <Calendar
+              mode="range"
+              locale={zhCN}
+              selected={selectedRange}
+              resetOnSelect
+              onSelect={(range) => {
+                setFilters((current) => ({
+                  ...current,
+                  from: serializeDate(range?.from),
+                  to: serializeDate(range?.to),
+                }));
+                if (range?.from && range.to) setCalendarOpen(false);
+              }}
+            />
+          </PopoverContent>
+        </Popover>
       </div>
       <div className="flex shrink-0 gap-2">
         <Button variant="outline" onClick={resetFilters}>
