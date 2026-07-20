@@ -2,41 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Check, ChevronDown, Download, Filter, Images, Search, Shuffle, UserRound, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-
-interface PortraitRecord {
-  index: number;
-  category: string;
-  page: number;
-  name: string;
-  description: string;
-  source_url: string;
-  file: string;
-}
-interface Portrait extends PortraitRecord {
-  age: number;
-  gender: string;
-  profession: string;
-}
-
-const parse = (record: PortraitRecord): Portrait => {
-  const normalized = record.name.replace(/女性/g, "女").replace(/男性/g, "男");
-  const match = normalized.match(/^\S+\s+(\d+)岁\s+([男女])\s+(.+)$/);
-  return {
-    ...record,
-    age: Number(match?.[1] || 0),
-    gender: match?.[2] || "未知",
-    profession: match?.[3] || normalized,
-  };
-};
+import { fetchPortraits, type Portrait } from "./portrait-data";
 
 export function PortraitLibrary() {
   const { data = [], isLoading } = useQuery({
     queryKey: ["portrait-library"],
-    queryFn: async () => {
-      const response = await fetch("/portraits.json");
-      if (!response.ok) throw new Error("人像清单加载失败");
-      return ((await response.json()) as PortraitRecord[]).map(parse);
-    },
+    queryFn: fetchPortraits,
     staleTime: Infinity,
   });
   const getColumns = () =>

@@ -35,6 +35,7 @@ import type { Job } from "@/api/generated/types.gen";
 import { AttachmentPicker, type AttachmentSelection } from "@/components/domain/attachment-picker";
 import { AuthenticatedMedia } from "@/components/domain/authenticated-media";
 import type { ApiJobResult, LibraryAsset, LibraryProduct } from "@/entities/types";
+import { fetchPortraits, type Portrait } from "@/features/portrait-library/portrait-data";
 import "./remix-project.css";
 
 const stages = ["上传配置", "AI 解析", "提示词校对", "分镜校对", "合并成片"];
@@ -347,6 +348,129 @@ function ProductPickerModal({
   );
 }
 
+function PortraitPickerModal({
+  selected,
+  onClose,
+  onSelect,
+}: {
+  selected: SelectedPortrait | null;
+  onClose: () => void;
+  onSelect: (portrait: Portrait) => void;
+}) {
+  const {
+    data = [],
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["portrait-library"],
+    queryFn: fetchPortraits,
+    staleTime: Infinity,
+  });
+  const [query, setQuery] = useState("");
+  const [gender, setGender] = useState("全部");
+  const [visibleCount, setVisibleCount] = useState(48);
+  const filtered = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return data.filter((portrait) => {
+      const matchesQuery =
+        !normalizedQuery ||
+        `${portrait.name} ${portrait.profession} ${portrait.description}`.toLowerCase().includes(normalizedQuery);
+      return matchesQuery && (gender === "全部" || portrait.gender === gender);
+    });
+  }, [data, gender, query]);
+
+  useEffect(() => setVisibleCount(48), [gender, query]);
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [onClose]);
+
+  return (
+    <div className="remix-picker-layer" role="presentation" onMouseDown={onClose}>
+      <aside
+        className="remix-picker portrait-picker-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="选择人像"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <header>
+          <div>
+            <small>PORTRAIT LIBRARY</small>
+            <h2>选择人像</h2>
+          </div>
+          <button aria-label="关闭" onClick={onClose}>
+            <X />
+          </button>
+        </header>
+        <div className="portrait-picker-controls">
+          <label>
+            <Search />
+            <input
+              autoFocus
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="搜索职业、年龄或人物描述…"
+            />
+          </label>
+          <div aria-label="按性别筛选">
+            {["全部", "女", "男"].map((item) => (
+              <button key={item} className={gender === item ? "active" : ""} onClick={() => setGender(item)}>
+                {item}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="remix-picker-grid portrait-picker-grid">
+          {filtered.slice(0, visibleCount).map((portrait) => {
+            const isCurrent = selected?.index === portrait.index;
+            return (
+              <button
+                key={portrait.index}
+                className={isCurrent ? "current" : ""}
+                aria-label={`${isCurrent ? "当前人像，" : ""}选择${portrait.name}`}
+                onClick={() => onSelect(portrait)}
+              >
+                <span className="portrait">
+                  <img src={portrait.source_url} alt={portrait.name} loading="lazy" />
+                  {isCurrent && (
+                    <i>
+                      <CircleCheck /> 当前使用
+                    </i>
+                  )}
+                </span>
+                <b>{portrait.profession}</b>
+                <small>
+                  {portrait.age ? `${portrait.age} 岁 · ` : ""}
+                  {portrait.gender}性 · NO. {String(portrait.index).padStart(4, "0")}
+                </small>
+              </button>
+            );
+          })}
+          {isLoading && <p>正在加载人像库…</p>}
+          {error && <p>{error instanceof Error ? error.message : "人像清单加载失败"}</p>}
+          {!isLoading && !error && !filtered.length && <p>没有找到匹配的人像，请调整搜索条件。</p>}
+        </div>
+        <footer className="portrait-picker-footer">
+          <span>
+            共 {filtered.length.toLocaleString()} 个人像
+            {filtered.length > visibleCount && `，已显示 ${visibleCount} 个`}
+          </span>
+          <div>
+            {filtered.length > visibleCount && (
+              <button onClick={() => setVisibleCount((count) => count + 48)}>加载更多</button>
+            )}
+            <button onClick={onClose}>取消</button>
+          </div>
+        </footer>
+      </aside>
+    </div>
+  );
+}
+
 function ProjectHistoryDrawer({ open, job, onClose }: { open: boolean; job: Job | null; onClose: () => void }) {
   const rows = useMemo(
     () => [
@@ -463,8 +587,8 @@ export function RemixProject() {
   const [notice, setNotice] = useState("");
   const [job, setJob] = useState<Job | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [picker, setPicker] = useState<"product" | "voice" | null>(null);
-  const [selectedPortrait] = useState<SelectedPortrait | null>(() => {
+  const [picker, setPicker] = useState<"product" | "portrait" | "voice" | null>(null);
+  const [selectedPortrait, setSelectedPortrait] = useState<SelectedPortrait | null>(() => {
     try {
       return JSON.parse(localStorage.getItem("studio:selectedPortrait") || "null");
     } catch {
@@ -659,10 +783,7 @@ export function RemixProject() {
           selectedVoice={selectedVoice}
           source={source}
           onSelectAttachment={(asset) => setSource(`asset:${asset.id}:${asset.name}`)}
-          onPick={(kind) => {
-            if (kind === "portrait") window.location.assign("/assets/portraits");
-            else setPicker(kind);
-          }}
+          onPick={setPicker}
         />
         <section className="remix-workspace">
           {notice && (
@@ -929,6 +1050,26 @@ export function RemixProject() {
           onSelect={(asset) => {
             setSelectedVoice(asset);
             localStorage.setItem("studio:selectedVoice", JSON.stringify(asset));
+            setPicker(null);
+          }}
+        />
+      )}
+      {picker === "portrait" && (
+        <PortraitPickerModal
+          selected={selectedPortrait}
+          onClose={() => setPicker(null)}
+          onSelect={(portrait) => {
+            const selected = {
+              name: portrait.name,
+              profession: portrait.profession,
+              source_url: portrait.source_url,
+              index: portrait.index,
+              description: portrait.description,
+              gender: portrait.gender,
+              age: portrait.age,
+            };
+            setSelectedPortrait(selected);
+            localStorage.setItem("studio:selectedPortrait", JSON.stringify(selected));
             setPicker(null);
           }}
         />
