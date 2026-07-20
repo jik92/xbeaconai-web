@@ -1,5 +1,5 @@
 [Unit]
-Description=xBeacon AI web API
+Description=xBeacon AI BullMQ worker
 After=network-online.target redis-server.service
 Wants=network-online.target
 Requires=redis-server.service
@@ -10,11 +10,13 @@ User=root
 WorkingDirectory=/root/build/xbeaconai-web
 Environment=NODE_ENV=production
 EnvironmentFile=/etc/xbeaconai-web.env
-ExecStart=/usr/local/bin/bun run start
+ExecStart=/usr/local/bin/bun run worker
 Restart=on-failure
 RestartSec=3
-TimeoutStopSec=20
+TimeoutStopSec=45
+KillSignal=SIGTERM
 UMask=0077
 
 [Install]
 WantedBy=multi-user.target
+

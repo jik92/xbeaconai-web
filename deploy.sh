@@ -6,8 +6,10 @@ readonly PROJECT_DIR="/root/build/xbeaconai-web"
 readonly WEB_ROOT="/var/www/xbeaconai-web"
 readonly DATA_DIR="/var/lib/xbeaconai-web"
 readonly ENV_FILE="/etc/xbeaconai-web.env"
-readonly SERVICE_NAME="xbeaconai-web-api.service"
-readonly SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}"
+readonly API_SERVICE_NAME="xbeaconai-web-api.service"
+readonly API_SERVICE_FILE="/etc/systemd/system/${API_SERVICE_NAME}"
+readonly WORKER_SERVICE_NAME="xbeaconai-web-worker.service"
+readonly WORKER_SERVICE_FILE="/etc/systemd/system/${WORKER_SERVICE_NAME}"
 readonly NGINX_SITE="/etc/nginx/sites-available/xbeaconai-web"
 readonly CERTBOT_WEB_ROOT="/var/www/certbot"
 readonly CERTIFICATE_PATH="/etc/letsencrypt/live/app.xbeaconai.com/fullchain.pem"
@@ -17,6 +19,7 @@ readonly API_HEALTH_URL="http://127.0.0.1:8787/api/health"
 readonly APP_ORIGIN="${APP_ORIGIN:-https://app.xbeaconai.com}"
 readonly API_ORIGIN="${API_ORIGIN:-https://api.xbeaconai.com}"
 readonly DIRECT_ORIGIN="${DIRECT_ORIGIN:-http://118.196.101.57:9000}"
+readonly ENABLE_TLS="${ENABLE_TLS:-auto}"
 
 log() {
     printf '[%s] %s\n' "$(date '+%F %T')" "$*"
@@ -56,6 +59,55 @@ ensure_runtime_environment() {
     upsert_env "YAOZUO_DATA_DIR" "$DATA_DIR"
     upsert_env "ALLOWED_ORIGINS" "${APP_ORIGIN},${API_ORIGIN},${DIRECT_ORIGIN}"
     upsert_env "ALLOW_MOCK_FALLBACK" "true"
+    upsert_env "REDIS_URL" "redis://127.0.0.1:6379"
+    upsert_env "REDIS_QUEUE_NAME" "yaozuo-jobs"
+    upsert_env "WORKER_CONCURRENCY" "${WORKER_CONCURRENCY:-1}"
+}
+
+require_video_cut_environment() {
+    local keys=(TOS_ACCESS_KEY_ID TOS_SECRET_ACCESS_KEY TOS_REGION TOS_ENDPOINT TOS_BUCKET)
+    local missing=()
+    local key
+    for key in "${keys[@]}"; do
+        if ! grep -q "^${key}=." "$ENV_FILE"; then
+            missing+=("$key")
+        fi
+    done
+    if (( ${#missing[@]} )); then
+        log "视频分割缺少环境变量：${missing[*]}"
+        return 1
+    fi
+}
+
+ensure_system_packages() {
+    local packages=(ca-certificates curl ffmpeg git nginx openssl redis-server rsync unzip)
+    local missing=()
+    local package
+    for package in "${packages[@]}"; do
+        if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q 'install ok installed'; then
+            missing+=("$package")
+        fi
+    done
+    if (( ${#missing[@]} )); then
+        log "安装系统依赖：${missing[*]}"
+        apt-get update
+        DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${missing[@]}"
+    fi
+    if ! command -v bun >/dev/null 2>&1; then
+        log "安装 Bun..."
+        curl --fail --silent --show-error --location https://bun.sh/install | bash
+        install -m 0755 /root/.bun/bin/bun /usr/local/bin/bun
+    fi
+}
+
+ensure_redis() {
+    systemctl enable redis-server >/dev/null
+    systemctl restart redis-server
+    if [[ "$(redis-cli -h 127.0.0.1 ping)" != "PONG" ]]; then
+        log "Redis 本地健康检查失败。"
+        return 1
+    fi
+    redis-cli -h 127.0.0.1 CONFIG SET maxmemory-policy noeviction >/dev/null
 }
 
 wait_for_api() {
@@ -67,7 +119,21 @@ wait_for_api() {
         sleep 1
     done
     log "API 健康检查失败，最近日志如下："
-    journalctl -u "$SERVICE_NAME" --no-pager -n 80 >&2
+    journalctl -u "$API_SERVICE_NAME" --no-pager -n 80 >&2
+    return 1
+}
+
+wait_for_worker() {
+    local attempt
+    for attempt in $(seq 1 30); do
+        if systemctl is-active --quiet "$WORKER_SERVICE_NAME" && \
+            journalctl -u "$WORKER_SERVICE_NAME" --no-pager -n 30 | grep -q 'BullMQ worker ready'; then
+            return 0
+        fi
+        sleep 1
+    done
+    log "Worker 健康检查失败，最近日志如下："
+    journalctl -u "$WORKER_SERVICE_NAME" --no-pager -n 80 >&2
     return 1
 }
 
@@ -95,6 +161,10 @@ ensure_tls_certificate() {
         /etc/letsencrypt/renewal-hooks/deploy/reload-nginx
 }
 
+tls_enabled() {
+    [[ "$ENABLE_TLS" == "true" || ( "$ENABLE_TLS" == "auto" && -f "$CERTIFICATE_PATH" ) ]]
+}
+
 if [[ "${DEPLOY_REEXECUTED:-0}" != "1" ]]; then
     exec 9>"$LOCK_FILE"
     if ! flock -n 9; then
@@ -104,6 +174,8 @@ if [[ "${DEPLOY_REEXECUTED:-0}" != "1" ]]; then
 fi
 
 cd "$PROJECT_DIR"
+
+ensure_system_packages
 
 current_branch="$(git branch --show-current)"
 if [[ -z "$current_branch" ]]; then
@@ -127,13 +199,22 @@ bun install --frozen-lockfile --registry="$NPM_REGISTRY"
 log "构建生产版本..."
 VITE_API_BASE_URL="$API_ORIGIN" bun run build
 
-log "配置并重启 Bun API..."
+log "配置 Redis、Bun API 和 BullMQ Worker..."
 ensure_runtime_environment
-install -m 0644 "$PROJECT_DIR/deploy/xbeaconai-web-api.service" "$SERVICE_FILE"
+require_video_cut_environment
+ensure_redis
+install -m 0644 "$PROJECT_DIR/deploy/xbeaconai-web-api.service" "$API_SERVICE_FILE"
+install -m 0644 "$PROJECT_DIR/deploy/xbeaconai-web-worker.service" "$WORKER_SERVICE_FILE"
 systemctl daemon-reload
-systemctl enable "$SERVICE_NAME" >/dev/null
-systemctl restart "$SERVICE_NAME"
+systemctl enable "$API_SERVICE_NAME" "$WORKER_SERVICE_NAME" >/dev/null
+systemctl restart "$API_SERVICE_NAME"
 wait_for_api
+systemctl restart "$WORKER_SERVICE_NAME"
+wait_for_worker
+
+log "验证 FFmpeg/FFprobe..."
+ffmpeg -version >/dev/null
+ffprobe -version >/dev/null
 
 log "同步静态文件到 ${WEB_ROOT}..."
 install -d -m 0755 "$WEB_ROOT"
@@ -141,22 +222,33 @@ rsync -a --delete "$PROJECT_DIR/dist/" "$WEB_ROOT/"
 find "$WEB_ROOT" -type d -exec chmod 0755 {} +
 find "$WEB_ROOT" -type f -exec chmod 0644 {} +
 
-ensure_tls_certificate
-
-log "配置 HTTPS 双域名和 /api 反向代理..."
-install -m 0644 "$PROJECT_DIR/deploy/nginx-xbeaconai-web.conf" "$NGINX_SITE"
+if tls_enabled; then
+    ensure_tls_certificate
+    log "配置 HTTPS 双域名和 /api 反向代理..."
+    install -m 0644 "$PROJECT_DIR/deploy/nginx-xbeaconai-web.conf" "$NGINX_SITE"
+else
+    log "配置 ${DIRECT_ORIGIN} 和 /api 反向代理..."
+    install -m 0644 "$PROJECT_DIR/deploy/nginx-xbeaconai-web-direct.conf" "$NGINX_SITE"
+fi
 ln -sfn "$NGINX_SITE" /etc/nginx/sites-enabled/xbeaconai-web
 nginx -t
-systemctl reload nginx
+systemctl enable nginx >/dev/null
+systemctl restart nginx
 systemctl is-active --quiet nginx
 
 log "验证公网入口..."
 curl --fail --silent --show-error -H "Host: 118.196.101.57:9000" http://127.0.0.1:9000/ >/dev/null
 curl --fail --silent --show-error -H "Host: 118.196.101.57:9000" -H "Origin: $DIRECT_ORIGIN" \
     http://127.0.0.1:9000/api/health >/dev/null
-curl --fail --silent --show-error --resolve app.xbeaconai.com:443:127.0.0.1 \
-    https://app.xbeaconai.com/ >/dev/null
-curl --fail --silent --show-error --resolve api.xbeaconai.com:443:127.0.0.1 -H "Origin: $APP_ORIGIN" \
-    https://api.xbeaconai.com/api/health >/dev/null
+curl --fail --silent --show-error -H "Host: 118.196.101.57:9000" \
+    http://127.0.0.1:9000/tools/video-cut >/dev/null
+if tls_enabled; then
+    curl --fail --silent --show-error --resolve app.xbeaconai.com:443:127.0.0.1 \
+        https://app.xbeaconai.com/ >/dev/null
+    curl --fail --silent --show-error --resolve api.xbeaconai.com:443:127.0.0.1 -H "Origin: $APP_ORIGIN" \
+        https://api.xbeaconai.com/api/health >/dev/null
+fi
+
+systemctl is-active --quiet redis-server "$API_SERVICE_NAME" "$WORKER_SERVICE_NAME" nginx
 
 log "部署完成：$(git rev-parse --short HEAD)"
