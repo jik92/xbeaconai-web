@@ -1456,13 +1456,6 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
         </div>
       )}
       <section className="tasks-section">
-        <div className="task-page-title">
-          <div>
-            <span>AI 工具箱</span>
-            <h1>{toolboxDisplayName(config)}任务</h1>
-            <p>查看任务状态、处理进度和生成结果。</p>
-          </div>
-        </div>
         <div className="task-filters">
           <label>
             <span>任务名称</span>
