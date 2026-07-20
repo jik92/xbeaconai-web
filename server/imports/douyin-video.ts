@@ -1,6 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { chromium } from "playwright";
+import { chromium, type Browser } from "playwright";
 
 const MAX_VIDEO_BYTES = 500 * 1024 * 1024;
 const SHARE_HOSTS = new Set(["v.douyin.com", "www.douyin.com", "www.iesdouyin.com"]);
@@ -61,7 +61,7 @@ function isShareHost(hostname: string) {
   return SHARE_HOSTS.has(hostname.toLowerCase());
 }
 
-function isVideoCdnHost(hostname: string) {
+export function isVideoCdnHost(hostname: string) {
   const host = hostname.toLowerCase();
   return host.endsWith(".douyinvod.com") || host.endsWith(".douyinstatic.com");
 }
@@ -71,7 +71,7 @@ function isAllowedNetworkHost(hostname: string) {
   return host.endsWith(".douyin.com") || isVideoCdnHost(host);
 }
 
-function findDouyinUrls(text: string): string[] {
+export function findDouyinUrls(text: string): string[] {
   const urlPattern = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi;
   const seen = new Set<string>();
   const result: string[] = [];
@@ -179,58 +179,96 @@ export function pickCdnUrl(urlList: string[]): string {
 }
 
 export async function resolveDouyinVideo(shareUrl: string): Promise<ResolvedDouyinVideo> {
-  const source = parseDouyinShareUrl(shareUrl);
-  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+  const browser = await chromium.launch({ headless: true });
   try {
-    browser = await chromium.launch({ headless: true });
-    const context = await browser.newContext();
-    await context.route("**/*", (route) => {
-      try {
-        const url = new URL(route.request().url());
-        if (url.protocol === "https:" && isAllowedNetworkHost(url.hostname)) {
-          if (isVideoCdnHost(url.hostname))
-            return route.continue({
-              headers: (() => {
-                const h: Record<string, string> = {};
-                for (const [k, v] of Object.entries(route.request().headers())) {
-                  if (k.toLowerCase() !== "range") h[k] = v;
-                }
-                return h;
-              })(),
-            });
-          return route.continue();
+    return await resolveDouyinVideoWithBrowser(browser, shareUrl);
+  } finally {
+    await browser.close();
+  }
+}
+
+export async function resolveDouyinVideoWithBrowser(
+  browser: Browser,
+  shareUrl: string,
+  opts?: { context?: Awaited<ReturnType<Browser["newContext"]>> },
+): Promise<ResolvedDouyinVideo> {
+  const source = parseDouyinShareUrl(shareUrl);
+  const context = opts?.context ?? (await browser.newContext());
+  const shouldClose = !opts?.context;
+  try {
+    if (!opts?.context) {
+      await context.route("**/*", (route) => {
+        try {
+          const url = new URL(route.request().url());
+          if (url.protocol === "https:" && isAllowedNetworkHost(url.hostname)) {
+            if (isVideoCdnHost(url.hostname))
+              return route.continue({
+                headers: (() => {
+                  const h: Record<string, string> = {};
+                  for (const [k, v] of Object.entries(route.request().headers())) {
+                    if (k.toLowerCase() !== "range") h[k] = v;
+                  }
+                  return h;
+                })(),
+              });
+            return route.continue();
+          }
+        } catch {
+          /* Abort malformed URLs below. */
         }
-      } catch {
-        /* Abort malformed URLs below. */
-      }
-      return route.abort();
-    });
+        return route.abort();
+      });
+    }
+
     const page = await context.newPage();
 
+    // Collect all detail responses using page.on  before navigation
+    const detailEntries: { url: string; body: string }[] = [];
+    const pending: Promise<void>[] = [];
+    page.on("response", (response) => {
+      const url = response.url();
+      if (response.status() === 200 && url.includes("/aweme/v1/web/aweme/detail/") && url.includes("aweme_id=")) {
+        pending.push(
+          response.text().then(
+            (text) => {
+              detailEntries.push({ url, body: text });
+            },
+            () => {
+              /* ignore read errors */
+            },
+          ),
+        );
+      }
+    });
+
     await page.goto(source.href, { waitUntil: "domcontentloaded", timeout: 20_000 });
+    // Wait for JS-triggered detail fetches
+    await page.waitForTimeout(300);
+    await Promise.all(pending);
+
     const finalUrl = new URL(page.url());
     if (!isShareHost(finalUrl.hostname))
       throw new DouyinImportError("UNSUPPORTED_DOUYIN_REDIRECT", "分享链接跳转到了不受支持的地址", 400);
 
     const awemeId = extractAwemeId(finalUrl);
-    const detailResponse = page.waitForResponse(
-      (response) => {
-        if (response.status() !== 200) return false;
-        if (!response.url().includes("/aweme/v1/web/aweme/detail/")) return false;
-        try {
-          const params = new URL(response.url()).searchParams;
-          return params.get("aweme_id") === awemeId;
-        } catch {
-          return false;
-        }
-      },
-      { timeout: 20_000 },
-    );
 
-    const detailResp = await detailResponse;
-    const detail = (await detailResp.json()) as { aweme_detail?: { video?: { play_addr?: { url_list?: string[] } } } };
-    const urlList: string[] = detail?.aweme_detail?.video?.play_addr?.url_list ?? [];
-    if (!Array.isArray(urlList) || urlList.length === 0)
+    let urlList: string[] = [];
+    for (const entry of detailEntries) {
+      try {
+        const params = new URL(entry.url).searchParams;
+        if (params.get("aweme_id") === awemeId) {
+          const detail = JSON.parse(entry.body) as {
+            aweme_detail?: { video?: { play_addr?: { url_list?: string[] } } };
+          };
+          urlList = detail?.aweme_detail?.video?.play_addr?.url_list ?? [];
+          if (urlList.length > 0) break;
+        }
+      } catch {
+        /* skip malformed */
+      }
+    }
+
+    if (urlList.length === 0)
       throw new DouyinImportError("TARGET_VIDEO_NOT_FOUND", "无法从作品详情获取目标视频地址", 422);
 
     const targetUrl = pickCdnUrl(urlList);
@@ -269,7 +307,7 @@ export async function resolveDouyinVideo(shareUrl: string): Promise<ResolvedDouy
       throw new DouyinImportError("DOUYIN_VIDEO_TIMEOUT", "未能在限定时间内获取视频，请检查链接或稍后重试", 502);
     throw new DouyinImportError("DOUYIN_VIDEO_IMPORT_FAILED", "抖音视频导入失败，请检查链接是否可公开访问", 502);
   } finally {
-    await browser?.close();
+    if (shouldClose) await context.close();
   }
 }
 
