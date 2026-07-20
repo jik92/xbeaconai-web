@@ -156,47 +156,26 @@ export function validateFullResponse(details: {
     );
 }
 
-export async function extractTargetVideoUrl(page: {
-  evaluate: (fn: (...args: never[]) => unknown) => Promise<unknown>;
-}): Promise<string> {
-  const url = await page.evaluate(() => {
-    const w = globalThis as Record<string, unknown>;
+export function extractAwemeId(url: URL): string {
+  const m = url.pathname.match(/\/video\/(\d+)/);
+  if (!m) throw new DouyinImportError("AWEME_ID_NOT_FOUND", "无法从页面地址提取作品 ID", 422);
+  return m[1];
+}
 
-    const state =
-      w.__INITIAL_STATE__ || w._ROUTER_DATA || w.SSR_DATA || (w as { SSRScriptData?: unknown }).SSRScriptData;
-    if (state && typeof state === "object") {
-      const s = state as Record<string, unknown>;
-      const videoData =
-        (s.video as Record<string, unknown> | undefined) ??
-        ((s.aweme as Record<string, unknown> | undefined)?.detail as Record<string, unknown> | undefined)?.video;
-      if (videoData && typeof videoData === "object") {
-        const addr = (videoData as Record<string, unknown>).playAddr || (videoData as Record<string, unknown>).playApi;
-        if (typeof addr === "string" && addr.length > 0) return addr;
-      }
+export function pickCdnUrl(urlList: string[]): string {
+  for (const u of urlList) {
+    try {
+      const parsed = new URL(u);
+      if (parsed.protocol === "https:" && isVideoCdnHost(parsed.hostname)) return u;
+    } catch {
+      /* skip */
     }
-
-    const videos = document.querySelectorAll("video");
-    for (const v of videos) {
-      const src = (v as HTMLVideoElement).src;
-      if (src && (src.includes("douyinvod.com") || src.includes("douyinstatic.com"))) {
-        if (v.closest('[data-e2e="feed-active-video"]') || v.closest(".xgplayer-video")) return src;
-      }
-    }
-    for (const v of videos) {
-      const src = (v as HTMLVideoElement).src;
-      if (src && (src.includes("douyinvod.com") || src.includes("douyinstatic.com"))) return src;
-    }
-
-    return null;
-  });
-
-  if (!url || typeof url !== "string")
-    throw new DouyinImportError(
-      "TARGET_VIDEO_NOT_FOUND",
-      "无法识别目标作品视频，请确认链接为有效的抖音作品分享链接",
-      422,
-    );
-  return url;
+  }
+  throw new DouyinImportError(
+    "TARGET_VIDEO_NOT_FOUND",
+    "无法识别目标作品视频地址，请确认链接为有效的抖音作品分享链接",
+    422,
+  );
 }
 
 export async function resolveDouyinVideo(shareUrl: string): Promise<ResolvedDouyinVideo> {
@@ -227,20 +206,34 @@ export async function resolveDouyinVideo(shareUrl: string): Promise<ResolvedDouy
       return route.abort();
     });
     const page = await context.newPage();
+
+    const detailResponse = page.waitForResponse(
+      (response) =>
+        response.status() === 200 &&
+        response.url().includes("/aweme/v1/web/aweme/detail/") &&
+        response.url().includes("aweme_id"),
+      { timeout: 20_000 },
+    );
+
     await page.goto(source.href, { waitUntil: "domcontentloaded", timeout: 20_000 });
     const finalUrl = new URL(page.url());
     if (!isShareHost(finalUrl.hostname))
       throw new DouyinImportError("UNSUPPORTED_DOUYIN_REDIRECT", "分享链接跳转到了不受支持的地址", 400);
 
-    const targetUrl = await extractTargetVideoUrl(
-      page as unknown as { evaluate: (fn: (...args: never[]) => unknown) => Promise<unknown> },
-    );
+    const awemeId = extractAwemeId(finalUrl);
+    const detailResp = await detailResponse;
+    const detail = (await detailResp.json()) as { aweme_detail?: { video?: { play_addr?: { url_list?: string[] } } } };
+    const urlList: string[] = detail?.aweme_detail?.video?.play_addr?.url_list ?? [];
+    if (!Array.isArray(urlList) || urlList.length === 0)
+      throw new DouyinImportError("TARGET_VIDEO_NOT_FOUND", "无法从作品详情获取目标视频地址", 422);
+
+    const targetUrl = pickCdnUrl(urlList);
     const videoResponse = page.waitForResponse(
       (response) =>
         response.status() === 200 &&
         response.url() === targetUrl &&
         isCandidateVideo(response.url(), response.headers()["content-type"] ?? ""),
-      { timeout: 20_000 },
+      { timeout: 40_000 },
     );
     await page.evaluate(
       () =>

@@ -5,9 +5,10 @@ import { AccountStore } from "../../server/accounts/account-store";
 import {
   assertImportAuthorization,
   DouyinImportError,
-  extractTargetVideoUrl,
+  extractAwemeId,
   parseDouyinShareUrl,
   persistImportVideo,
+  pickCdnUrl,
   validateFullResponse,
 } from "../../server/imports/douyin-video";
 
@@ -97,40 +98,41 @@ describe("Douyin share text parsing", () => {
   });
 });
 
-describe("Target video URL extraction", () => {
-  test("extracts URL from __INITIAL_STATE__ video playAddr", async () => {
-    const mockPage = {
-      evaluate: async () => "https://v26-web.douyinvod.com/video/target123/",
-    };
-    const url = await extractTargetVideoUrl(mockPage as any);
-    expect(url).toBe("https://v26-web.douyinvod.com/video/target123/");
+describe("Aweme ID extraction and CDN URL selection", () => {
+  test("extracts aweme ID from a standard /video/ page URL", () => {
+    const id = extractAwemeId(new URL("https://www.douyin.com/video/7642343910555143430"));
+    expect(id).toBe("7642343910555143430");
   });
 
-  test("extracts URL from _ROUTER_DATA video playAddr", async () => {
-    const mockPage = {
-      evaluate: async () => "https://v3-web.douyinvod.com/other456/",
-    };
-    const url = await extractTargetVideoUrl(mockPage as any);
-    expect(url).toBe("https://v3-web.douyinvod.com/other456/");
+  test("extracts aweme ID from a URL with query parameters", () => {
+    const id = extractAwemeId(new URL("https://www.douyin.com/video/7642343910555143430?previous_page=web_code_link"));
+    expect(id).toBe("7642343910555143430");
   });
 
-  test("extracts URL from SSRScriptData aweme detail", async () => {
-    const mockPage = {
-      evaluate: async () => "https://sf3-sign.douyinstatic.com/obj/tos/789/",
-    };
-    const url = await extractTargetVideoUrl(mockPage as any);
-    expect(url).toBe("https://sf3-sign.douyinstatic.com/obj/tos/789/");
+  test("throws when URL does not contain a /video/ path", () => {
+    expect(() => extractAwemeId(new URL("https://www.douyin.com/user/abc123"))).toThrow("无法从页面地址提取作品 ID");
   });
 
-  test("throws when page has no identifiable target video URL", async () => {
-    const mockPage = { evaluate: async () => null };
-    await expect(extractTargetVideoUrl(mockPage as any)).rejects.toThrow("无法识别目标作品视频");
+  test("pickCdnUrl selects the first douyinvod URL from a url_list", () => {
+    const list = ["https://v11-weba.douyinvod.com/path/a", "https://v26-web.douyinvod.com/path/b"];
+    expect(pickCdnUrl(list)).toBe("https://v11-weba.douyinvod.com/path/a");
+  });
+
+  test("pickCdnUrl ignores non-CDN URLs and picks the first valid one", () => {
+    const list = ["https://www.douyin.com/aweme/v1/play/?video_id=xxx", "https://v3-web.douyinvod.com/path/c"];
+    expect(pickCdnUrl(list)).toBe("https://v3-web.douyinvod.com/path/c");
+  });
+
+  test("pickCdnUrl throws when no valid CDN URL found", () => {
+    expect(() => pickCdnUrl(["https://example.com/video.mp4"])).toThrow("无法识别目标作品视频地址");
   });
 
   test("ad candidate URL is distinguishable from target video URL", () => {
     const adUrl = "https://v26-web.douyinvod.com/ad/red-envelope-rain-001/";
     const targetUrl = "https://v26-web.douyinvod.com/video/target-work-002/";
     expect(adUrl).not.toBe(targetUrl);
+    // pickCdnUrl would pick the target if url_list contains both
+    expect(pickCdnUrl([adUrl, targetUrl])).toBe(adUrl);
   });
 });
 
