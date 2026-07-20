@@ -37,6 +37,7 @@ import {
 import type { Job, ModuleId, SeedanceModelId } from "@/api/generated/types.gen";
 import type { FieldSpec, ModuleConfig } from "@/app/routes";
 import { DataTable } from "@/components/ui/data-table";
+import { Slider } from "@/components/ui/slider";
 import type { ApiJobResult, AssetFolder } from "@/entities/types";
 import { db } from "@/lib/db";
 import { AttachmentPicker } from "./attachment-picker";
@@ -390,7 +391,9 @@ function ToolboxCreatorForm({
       multiple={multiple}
     />
   );
-  const invalid = (id: string) => submitted && field(id).required && !values[id];
+  const voiceFieldRequired = (id: string) => id === "synthesisText";
+  const invalid = (id: string) =>
+    submitted && (config.id === "voice-clone" ? voiceFieldRequired(id) : field(id).required) && !values[id];
   const orderedFolders = useMemo(() => {
     const result: Array<{ folder: AssetFolder; depth: number }> = [];
     const append = (parentId: string | undefined, depth: number) => {
@@ -518,52 +521,48 @@ function ToolboxCreatorForm({
   } else if (config.id === "voice-clone") {
     content = (
       <div className="tool-simple-form voice-clone-form">
-        <div className="tool-form-row compact-row">
-          {requiredLabel("自动保存")}
-          <ToolboxSwitch value={values.autoSave ?? ""} onChange={(value) => setValue("autoSave", value)} />
+        <div className="tool-form-row combo-summary">
+          {requiredLabel("配音音色")}
+          <span>
+            <b>系统预设音色</b>
+            <small>无需配置音色参数</small>
+          </span>
         </div>
-        <div className={`tool-form-row upload-row ${invalid("sample") ? "invalid" : ""}`}>
-          {requiredLabel("原始音频", true)}
-          {upload("sample")}
-        </div>
-        <div className={`tool-form-row textarea-row ${invalid("transcript") ? "invalid" : ""}`}>
-          {requiredLabel("音频转换文本", true)}
+        <div className={`tool-form-row textarea-row ${invalid("synthesisText") ? "invalid" : ""}`}>
+          {requiredLabel("合成文本", true)}
           <div>
             <textarea
               maxLength={1000}
-              value={values.transcript ?? ""}
-              placeholder="请输入音频转换文本"
-              onChange={(event) => setValue("transcript", event.target.value)}
+              value={values.synthesisText ?? ""}
+              placeholder="输入要生成语音的文本"
+              onChange={(event) => setValue("synthesisText", event.target.value)}
             />
-            <small>{(values.transcript ?? "").length} / 1000</small>
+            <small>{(values.synthesisText ?? "").length} / 1000</small>
           </div>
         </div>
-        <div className="tool-form-row speed-row">
-          {requiredLabel("音色速度", true)}
-          <input
-            type="range"
-            min="0.5"
-            max="2"
-            step="0.1"
-            value={values.speed ?? "1.0"}
-            onChange={(event) => setValue("speed", event.target.value)}
-          />
-          <input
-            type="number"
-            min="0.5"
-            max="2"
-            step="0.1"
-            value={values.speed ?? "1.0"}
-            onChange={(event) => setValue("speed", event.target.value)}
-          />
+        <div className="tool-form-row">
+          {requiredLabel("语言")}
+          {select("synthesisLanguage")}
         </div>
         <div className="tool-form-row">
-          {requiredLabel("语言选择", true)}
-          {select("language")}
+          {requiredLabel("配音风格")}
+          {select("synthesisStyle")}
         </div>
         <div className="tool-form-row">
-          {requiredLabel("配音风格", true)}
-          {select("style")}
+          {requiredLabel("语速")}
+          <div className="flex min-w-0 items-center gap-4">
+            <Slider
+              aria-label="语速"
+              min={-50}
+              max={100}
+              step={1}
+              value={[Number(values.speechRate ?? 0)]}
+              onValueChange={([value]) => setValue("speechRate", String(value ?? 0))}
+            />
+            <output className="w-20 shrink-0 text-right text-sm text-muted">
+              {Number(values.speechRate ?? 0) === 0 ? "正常" : `${values.speechRate}%`}
+            </output>
+          </div>
         </div>
       </div>
     );
@@ -1018,8 +1017,12 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
   const splitAt = Math.ceil(config.fields.length / 2);
   const stepFields = [config.fields.slice(0, splitAt), config.fields.slice(splitAt)];
   const visibleFields = stepFields[currentStep] ?? [];
-  const missing = config.fields.filter((field) => field.required && !values[field.id]);
-  const missingVisible = visibleFields.filter((field) => field.required && !values[field.id]);
+  const fieldRequired = (field: FieldSpec) => {
+    if (config.id !== "voice-clone") return Boolean(field.required);
+    return field.id === "synthesisText";
+  };
+  const missing = config.fields.filter((field) => fieldRequired(field) && !values[field.id]);
+  const missingVisible = visibleFields.filter((field) => fieldRequired(field) && !values[field.id]);
   const next = () => {
     setSubmitted(true);
     if (missingVisible.length) return;
@@ -1062,10 +1065,10 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
     setApiError("");
     try {
       const submittedValues = config.id === "video-cut" ? { ...values, outputFolderId: values.saveLocation } : values;
+      const generatedTitle = `${config.label} · ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
       const job = await submitJob(
         config.id as ModuleId,
-        values.taskName ||
-          `${config.label} · ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
+        config.id === "voice-clone" ? generatedTitle : values.taskName || generatedTitle,
         { ...submittedValues, __scenario: scenario },
         usesSeedance ? videoModel : undefined,
       );
@@ -1105,6 +1108,20 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
     const artifact = result?.artifacts?.[0];
     const mediaArtifacts = resultMediaArtifacts(result);
     const selectedArtifacts = mediaArtifacts.filter((item) => selectedArtifactIds.includes(item.id));
+    if (action === "再次生成") {
+      setValues({
+        ...initialValues(),
+        ...selectedTask.values,
+        operation: "synthesize",
+        voiceSource: "preset",
+        presetVoiceId: "zh_female_vv_uranus_bigtts",
+        parentJobId: "",
+      });
+      setSelectedTask(null);
+      setSubmitted(false);
+      setCreatorOpen(true);
+      return;
+    }
     if (action === "批量选择") {
       setSelectedArtifactIds(
         selectedArtifacts.length === mediaArtifacts.length ? [] : mediaArtifacts.map((item) => item.id),
@@ -1566,7 +1583,9 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
             <div className="tool-result-actions">
               {((selectedTask.result as ApiJobResult | undefined)?.kind === "video-merge"
                 ? ["下载选中", "加入素材库"]
-                : config.result.actions
+                : (selectedTask.result as ApiJobResult | undefined)?.kind === "voice-synthesis"
+                  ? ["下载音频", "再次生成"]
+                  : config.result.actions
               ).map((action, index) => (
                 <button
                   key={action}
@@ -1596,7 +1615,7 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
                 任务状态<b>已完成</b>
               </span>
               <span>
-                消耗<b>{config.cost} 创作点</b>
+                消耗<b>{config.id === "voice-clone" ? "供应商按量计费" : `${config.cost} 创作点`}</b>
               </span>
             </div>
           </section>

@@ -3,12 +3,14 @@ import { genericCreationJob } from "./job-generic-creation";
 import { videoClipMergeJob } from "./job-video-clip-merge";
 import { videoCutJob } from "./job-video-cut";
 import { videoRemixAnalysisJob } from "./job-video-remix-analysis";
+import { voiceCloneJob } from "./job-voice-clone";
 import type { WorkerJobHandler } from "./types";
 
 export const jobHandlers: readonly WorkerJobHandler[] = [
   videoRemixAnalysisJob,
   videoClipMergeJob,
   videoCutJob,
+  voiceCloneJob,
   genericCreationJob,
 ];
 

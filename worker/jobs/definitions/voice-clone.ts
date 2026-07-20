@@ -7,6 +7,6 @@ export const voiceCloneDefinition: JobDefinition = {
     ["voice-clone", "音色训练"],
     ["speech-synthesize", "试听生成"],
   ],
-  summary: "模拟音色已创建，可输入文本生成试听。",
+  summary: "音色已创建，并生成真实试听音频。",
   outputKind: () => "audio",
 };

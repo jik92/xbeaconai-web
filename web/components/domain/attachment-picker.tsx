@@ -16,6 +16,7 @@ import {
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { fetchAssetFolders, fetchLibraryAssets, uploadMediaFile } from "@/api/api-client";
 import type { AssetFolder, LibraryAsset } from "@/entities/types";
+import { AuthenticatedMedia } from "./authenticated-media";
 
 export interface AttachmentSelection {
   id: string;
@@ -41,6 +42,19 @@ function AssetIcon({ mimeType }: { mimeType: string }) {
   return <FileVideo2 />;
 }
 
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+}
+
+function formatDuration(seconds: number | undefined) {
+  if (seconds === undefined) return undefined;
+  const minutes = Math.floor(seconds / 60);
+  const remaining = Math.round(seconds % 60);
+  return `${minutes}:${String(remaining).padStart(2, "0")}`;
+}
+
 export function AttachmentPicker({
   accept = "image/*,video/*,audio/*",
   multiple = false,
@@ -58,6 +72,7 @@ export function AttachmentPicker({
   const [source, setSource] = useState<"library" | "upload">("library");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
+  const [previewId, setPreviewId] = useState("");
   const [folderId, setFolderId] = useState("");
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
@@ -108,9 +123,12 @@ export function AttachmentPicker({
         (!keyword || `${asset.name} ${asset.originalName} ${asset.description ?? ""}`.toLowerCase().includes(keyword)),
     );
   }, [accept, data, query]);
+  const previewAsset =
+    data.find((asset) => asset.id === previewId) ?? data.find((asset) => asset.id === selected.at(-1));
   const close = () => {
     setOpen(false);
     setSelected([]);
+    setPreviewId("");
     setError("");
   };
   const chooseLibrary = () => {
@@ -205,6 +223,7 @@ export function AttachmentPicker({
                           onClick={() => {
                             setFolderId(folder.id);
                             setSelected([]);
+                            setPreviewId("");
                           }}
                         >
                           {folder.id === folderId ? <FolderOpen /> : <Folder />}
@@ -232,60 +251,102 @@ export function AttachmentPicker({
                         </span>
                       ))}
                     </div>
-                    <div className="attachment-grid">
-                      {!query.trim() &&
-                        childFolders.map((folder) => (
-                          <button
-                            type="button"
-                            key={folder.id}
-                            className="attachment-folder-card"
-                            onClick={() => {
-                              setFolderId(folder.id);
-                              setSelected([]);
-                            }}
-                          >
-                            <i>
-                              <Folder />
-                            </i>
-                            <span>
-                              <b>{folder.name}</b>
-                              <small>文件夹</small>
-                            </span>
-                            <ChevronRight />
-                          </button>
-                        ))}
-                      {filtered.map((asset) => {
-                        const active = selected.includes(asset.id);
-                        return (
-                          <button
-                            type="button"
-                            key={asset.id}
-                            className={active ? "active" : ""}
-                            onClick={() =>
-                              setSelected((current) =>
-                                active
-                                  ? current.filter((id) => id !== asset.id)
-                                  : multiple
-                                    ? [...current, asset.id]
-                                    : [asset.id],
-                              )
-                            }
-                          >
-                            <i>
-                              <AssetIcon mimeType={asset.mimeType} />
-                            </i>
-                            <span>
-                              <b>{asset.name}</b>
-                              <small>{asset.mimeType}</small>
-                            </span>
-                            {active && <Check className="attachment-check" />}
-                          </button>
-                        );
-                      })}
-                      {(isLoading || foldersLoading) && <p>正在加载素材库…</p>}
-                      {!isLoading && !foldersLoading && !filtered.length && !childFolders.length && (
-                        <p>当前文件夹暂无符合格式的文件，可切换到本地上传。</p>
-                      )}
+                    <div className="attachment-content-layout">
+                      <div className="attachment-grid">
+                        {!query.trim() &&
+                          childFolders.map((folder) => (
+                            <button
+                              type="button"
+                              key={folder.id}
+                              className="attachment-folder-card"
+                              onClick={() => {
+                                setFolderId(folder.id);
+                                setSelected([]);
+                                setPreviewId("");
+                              }}
+                            >
+                              <i>
+                                <Folder />
+                              </i>
+                              <span>
+                                <b>{folder.name}</b>
+                                <small>文件夹</small>
+                              </span>
+                              <ChevronRight />
+                            </button>
+                          ))}
+                        {filtered.map((asset) => {
+                          const active = selected.includes(asset.id);
+                          return (
+                            <button
+                              type="button"
+                              key={asset.id}
+                              className={active ? "active" : ""}
+                              onMouseEnter={() => setPreviewId(asset.id)}
+                              onFocus={() => setPreviewId(asset.id)}
+                              onClick={() => {
+                                setPreviewId(asset.id);
+                                setSelected((current) =>
+                                  active
+                                    ? current.filter((id) => id !== asset.id)
+                                    : multiple
+                                      ? [...current, asset.id]
+                                      : [asset.id],
+                                );
+                              }}
+                            >
+                              <i>
+                                <AssetIcon mimeType={asset.mimeType} />
+                              </i>
+                              <span>
+                                <b>{asset.name}</b>
+                                <small>{asset.mimeType}</small>
+                              </span>
+                              {active && <Check className="attachment-check" />}
+                            </button>
+                          );
+                        })}
+                        {(isLoading || foldersLoading) && <p>正在加载素材库…</p>}
+                        {!isLoading && !foldersLoading && !filtered.length && !childFolders.length && (
+                          <p>当前文件夹暂无符合格式的文件，可切换到本地上传。</p>
+                        )}
+                      </div>
+                      <aside className="attachment-preview-panel" aria-live="polite">
+                        <header>
+                          <b>内容预览</b>
+                          <small>{previewAsset ? previewAsset.mimeType : "选择或悬停素材"}</small>
+                        </header>
+                        {previewAsset ? (
+                          <>
+                            <div className={`attachment-media-preview preview-${previewAsset.mimeType.split("/")[0]}`}>
+                              <AuthenticatedMedia
+                                key={previewAsset.id}
+                                url={previewAsset.url}
+                                mimeType={previewAsset.mimeType}
+                                alt={previewAsset.name}
+                              />
+                            </div>
+                            <div className="attachment-preview-meta">
+                              <b title={previewAsset.name}>{previewAsset.name}</b>
+                              <span>
+                                {previewAsset.width && previewAsset.height
+                                  ? `${previewAsset.width} × ${previewAsset.height} · `
+                                  : ""}
+                                {formatDuration(previewAsset.durationSec)
+                                  ? `${formatDuration(previewAsset.durationSec)} · `
+                                  : ""}
+                                {formatBytes(previewAsset.size)}
+                              </span>
+                              {previewAsset.description && <p>{previewAsset.description}</p>}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="attachment-preview-empty">
+                            <FileImage />
+                            <span>在左侧悬停或选择素材后，可在这里查看真实内容。</span>
+                          </div>
+                        )}
+                      </aside>
                     </div>
                   </section>
                 </div>

@@ -27,6 +27,7 @@ import {
   maxDirectUploadBytes,
   verifyDirectUploadTicket,
 } from "./uploads/direct-upload";
+import { validateVoiceTaskValues } from "./voice/validate-voice-task";
 
 const moduleIds = [
   "video-remix",
@@ -1756,6 +1757,32 @@ app.openapi(createJobRoute, async (c) => {
   const body = c.req.valid("json");
   const ownerUserId = c.get("userId");
   const jobValues = { ...body.values };
+  if (moduleId === "voice-clone") {
+    jobValues.operation = "synthesize";
+    jobValues.voiceSource = "preset";
+    jobValues.presetVoiceId = "zh_female_vv_uranus_bigtts";
+    jobValues.synthesisSpeakerId = "";
+    jobValues.parentJobId = "";
+    jobValues.styleInstruction = "";
+    jobValues.toneFidelity = "";
+    jobValues.authorized = "";
+    jobValues.consentReference = "";
+    jobValues.consentScope = "";
+    jobValues.consentExpiresAt = "";
+    const invalidMessage = validateVoiceTaskValues(jobValues);
+    if (invalidMessage)
+      return c.json(
+        {
+          error: {
+            code: "INVALID_VOICE_CLONE_CONFIG",
+            message: invalidMessage,
+            retryable: false,
+            requestId: crypto.randomUUID(),
+          },
+        },
+        422,
+      );
+  }
   if (moduleId === "video-cut" || (moduleId === "video-mashup" && jobValues.mergeMode === "video-cut-clips")) {
     const outputFolderId = jobValues.outputFolderId || accounts.getDefaultAssetFolderId(ownerUserId);
     if (!accounts.getAssetFolder(ownerUserId, outputFolderId))
@@ -1902,6 +1929,20 @@ app.openapi(createJobRoute, async (c) => {
   }
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
+  const requestedParentJobId = jobValues.parentJobId?.trim();
+  const parentJob = requestedParentJobId ? store.getOwned(requestedParentJobId, ownerUserId) : undefined;
+  if (requestedParentJobId && (!parentJob || parentJob.moduleId !== moduleId || parentJob.status !== "succeeded"))
+    return c.json(
+      {
+        error: {
+          code: "INVALID_PARENT_JOB",
+          message: "关联的上游任务不存在、未完成或不属于当前账号",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      422,
+    );
   const job: JobRecord = {
     id,
     ownerUserId,
@@ -1916,6 +1957,7 @@ app.openapi(createJobRoute, async (c) => {
     executionPlan: [],
     provenance: [],
     idempotencyKey,
+    parentJobId: parentJob?.id,
     cancelRequested: false,
     providerCancelState: "none",
     stagingKeys: [],

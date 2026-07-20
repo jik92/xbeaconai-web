@@ -45,6 +45,7 @@ describe("worker job registry", () => {
     expect(findJobHandler(job("video-remix", { workflowPhase: "analysis" })).name).toBe("video-remix-analysis");
     expect(findJobHandler(job("video-cut", { mergeMode: "video-cut-clips" })).name).toBe("video-clip-merge");
     expect(findJobHandler(job("video-cut")).name).toBe("video-cut");
+    expect(findJobHandler(job("voice-clone")).name).toBe("voice-clone");
     expect(findJobHandler(job("ai-generate")).name).toBe("generic-creation");
   });
 

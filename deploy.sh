@@ -64,6 +64,24 @@ ensure_runtime_environment() {
     upsert_env "WORKER_CONCURRENCY" "${WORKER_CONCURRENCY:-1}"
 }
 
+sync_project_secrets() {
+    local project_env="$PROJECT_DIR/.env"
+    local keys=(
+        OPENAI_BASE_URL OPENAI_KEY
+        TOS_ACCESS_KEY_ID TOS_SECRET_ACCESS_KEY TOS_REGION TOS_ENDPOINT TOS_BUCKET
+        VOLC_SPEECH_API_KEY_ID VOLC_SPEECH_API_KEY VOLC_SPEECH_BASE_URL
+        VOLC_SPEECH_CLONE_RESOURCE_ID VOLC_SPEECH_TTS_RESOURCE_ID VOLC_SPEECH_PRESET_TTS_RESOURCE_ID
+    )
+    local key value
+    [[ -f "$project_env" ]] || return 0
+    for key in "${keys[@]}"; do
+        value="$(awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$project_env")"
+        if [[ -n "$value" ]]; then
+            upsert_env "$key" "$value"
+        fi
+    done
+}
+
 require_video_cut_environment() {
     local keys=(TOS_ACCESS_KEY_ID TOS_SECRET_ACCESS_KEY TOS_REGION TOS_ENDPOINT TOS_BUCKET)
     local missing=()
@@ -75,6 +93,13 @@ require_video_cut_environment() {
     done
     if (( ${#missing[@]} )); then
         log "视频分割缺少环境变量：${missing[*]}"
+        return 1
+    fi
+}
+
+require_voice_clone_environment() {
+    if ! grep -q '^VOLC_SPEECH_API_KEY=.' "$ENV_FILE"; then
+        log "音色克隆缺少环境变量：VOLC_SPEECH_API_KEY"
         return 1
     fi
 }
@@ -201,7 +226,9 @@ VITE_API_BASE_URL="$API_ORIGIN" bun run build
 
 log "配置 Redis、Bun API 和 BullMQ Worker..."
 ensure_runtime_environment
+sync_project_secrets
 require_video_cut_environment
+require_voice_clone_environment
 ensure_redis
 systemctl stop "$API_SERVICE_NAME" "$WORKER_SERVICE_NAME" 2>/dev/null || true
 log "检查并备份旧版 SQLite 数据库..."
@@ -245,6 +272,8 @@ curl --fail --silent --show-error -H "Host: 118.196.101.57:9000" -H "Origin: $DI
     http://127.0.0.1:9000/api/health >/dev/null
 curl --fail --silent --show-error -H "Host: 118.196.101.57:9000" \
     http://127.0.0.1:9000/tools/video-cut >/dev/null
+curl --fail --silent --show-error -H "Host: 118.196.101.57:9000" \
+    http://127.0.0.1:9000/tools/voice-clone >/dev/null
 if tls_enabled; then
     curl --fail --silent --show-error --resolve app.xbeaconai.com:443:127.0.0.1 \
         https://app.xbeaconai.com/ >/dev/null

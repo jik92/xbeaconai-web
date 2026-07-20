@@ -28,6 +28,16 @@ export const env = {
   openaiBaseUrl: process.env.OPENAI_BASE_URL ?? "",
   openaiKey: process.env.OPENAI_KEY ?? "",
   videoAnalysisModel: process.env.VIDEO_ANALYSIS_MODEL ?? "gemini-3.5-flash",
+  volcSpeech: {
+    apiKeyId: process.env.VOLC_SPEECH_API_KEY_ID ?? "",
+    apiKey: process.env.VOLC_SPEECH_API_KEY ?? "",
+    baseUrl: process.env.VOLC_SPEECH_BASE_URL ?? "https://openspeech.bytedance.com",
+    cloneResourceId: process.env.VOLC_SPEECH_CLONE_RESOURCE_ID ?? "seed-icl-2.0",
+    ttsResourceId: process.env.VOLC_SPEECH_TTS_RESOURCE_ID ?? "seed-icl-2.0",
+    presetTtsResourceId: process.env.VOLC_SPEECH_PRESET_TTS_RESOURCE_ID ?? "seed-tts-2.0",
+    pollIntervalMs: Math.max(500, Number(process.env.VOLC_SPEECH_POLL_INTERVAL_MS ?? 2_000)),
+    pollTimeoutMs: Math.max(10_000, Number(process.env.VOLC_SPEECH_POLL_TIMEOUT_MS ?? 180_000)),
+  },
   tos: {
     accessKeyId: process.env.TOS_ACCESS_KEY_ID ?? "",
     accessKeySecret: process.env.TOS_SECRET_ACCESS_KEY ?? "",

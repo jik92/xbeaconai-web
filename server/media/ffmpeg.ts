@@ -45,7 +45,15 @@ export async function generateSampleVideo(output: string) {
 export async function probeMedia(input: string) {
   const { stdout } = await run("ffprobe", ["-v", "error", "-show_streams", "-show_format", "-of", "json", input]);
   return JSON.parse(stdout) as {
-    streams: Array<{ codec_type: string; codec_name: string; width?: number; height?: number; duration?: string }>;
+    streams: Array<{
+      codec_type: string;
+      codec_name: string;
+      width?: number;
+      height?: number;
+      duration?: string;
+      sample_rate?: string;
+      channels?: number;
+    }>;
     format: { duration?: string; size?: string; format_name?: string };
   };
 }

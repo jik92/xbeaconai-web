@@ -32,7 +32,7 @@ export const APP_CONFIG = {
       "video-cut": true,
       "media-understand": false,
       "video-mashup": false,
-      "voice-clone": false,
+      "voice-clone": true,
       "video-renewal": false,
       "subtitle-erase": false,
       "video-enhancement": false,

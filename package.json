@@ -23,6 +23,7 @@
     "test:video-analysis": "bun scripts/test-video-analysis.ts",
     "test:tos": "bun scripts/test-tos-sdk.ts",
     "test:ffmpeg": "bun scripts/test-ffmpeg-sdk.ts",
+    "test:voice-clone": "bun scripts/test-volc-speech.ts",
     "build": "tsc -b && vite build",
     "typecheck": "tsc --noEmit",
     "lint": "biome lint .",
@@ -36,6 +37,7 @@
   "dependencies": {
     "@hono/zod-openapi": "^1.5.1",
     "@radix-ui/react-popover": "1.1.20",
+    "@radix-ui/react-slider": "1.3.6",
     "@tanstack/react-query": "^5.101.2",
     "@tanstack/react-router": "^1.170.18",
     "@tanstack/react-table": "^8.21.3",
