@@ -33,13 +33,14 @@ function makeDetailFetcher(onlyForAwemeId: string | null): DetailFetcher {
   };
 }
 
-function makeVideoFetcher(expectedUrl: string | null): VideoFetcher {
+function makeVideoFetcher(expectedUrl: string | null, httpStatus = 200): VideoFetcher {
   return async (_ctx: BrowserContext, cdnUrl: string, _referer: string) => {
     if (expectedUrl !== null && cdnUrl !== expectedUrl) {
       throw new DouyinImportError("VIDEO_DOWNLOAD_FAILED", "下载视频失败", 502);
     }
     return {
       bytes: MP4,
+      status: httpStatus,
       headers: { "content-type": "video/mp4", "content-length": String(MP4.length) },
       sourceUrl: cdnUrl,
     };
@@ -74,11 +75,7 @@ describe("Resolver active fetch with injectable fetchers", () => {
     };
     const videoFetcher: VideoFetcher = async (_ctx, cdnUrl, _ref) => {
       expect(cdnUrl).toBe(TARGET_CDN);
-      return {
-        bytes: MP4,
-        headers: { "content-type": "video/mp4", "content-length": String(MP4.length) },
-        sourceUrl: cdnUrl,
-      };
+      return { bytes: MP4, status: 200, headers: { "content-type": "video/mp4", "content-length": String(MP4.length) }, sourceUrl: cdnUrl };
     };
 
     const result = await resolveDouyinVideoWithBrowser(browser, "https://v.douyin.com/1/", {
@@ -160,6 +157,55 @@ describe("Resolver active fetch with injectable fetchers", () => {
         fetchVideo: makeVideoFetcher(TARGET_CDN),
       }),
     ).rejects.toThrow(DouyinImportError);
+    await context.close();
+  });
+
+  test("detail response without aweme_detail.aweme_id is rejected", async () => {
+    const context = await browser.newContext();
+    await context.route("**/*", (route) => {
+      const u = route.request().url();
+      if (u === "https://v.douyin.com/5/")
+        return route.fulfill({ status: 302, headers: { location: `https://www.douyin.com/video/${TARGET_AWEME_ID}` } });
+      if (u === `https://www.douyin.com/video/${TARGET_AWEME_ID}`)
+        return route.fulfill({ status: 200, contentType: "text/html", body: "<html><body></body></html>" });
+      return route.continue().catch(() => route.abort());
+    });
+
+    const detailFetcher: DetailFetcher = async (_ctx, awemeId) => {
+      const body = JSON.stringify({
+        aweme_detail: { video: { play_addr: { url_list: [TARGET_CDN] } } },
+      });
+      return { url: `u/${awemeId}`, body };
+    };
+
+    await expect(
+      resolveDouyinVideoWithBrowser(browser, "https://v.douyin.com/5/", {
+        context,
+        fetchDetail: detailFetcher,
+        fetchVideo: makeVideoFetcher(TARGET_CDN),
+      }),
+    ).rejects.toThrow("作品详情中的作品 ID 与目标不匹配");
+    await context.close();
+  });
+
+  test("video fetcher 206 status is rejected by validateFullResponse", async () => {
+    const context = await browser.newContext();
+    await context.route("**/*", (route) => {
+      const u = route.request().url();
+      if (u === "https://v.douyin.com/6/")
+        return route.fulfill({ status: 302, headers: { location: `https://www.douyin.com/video/${TARGET_AWEME_ID}` } });
+      if (u === `https://www.douyin.com/video/${TARGET_AWEME_ID}`)
+        return route.fulfill({ status: 200, contentType: "text/html", body: "<html><body></body></html>" });
+      return route.continue().catch(() => route.abort());
+    });
+
+    await expect(
+      resolveDouyinVideoWithBrowser(browser, "https://v.douyin.com/6/", {
+        context,
+        fetchDetail: makeDetailFetcher(TARGET_AWEME_ID),
+        fetchVideo: makeVideoFetcher(TARGET_CDN, 206),
+      }),
+    ).rejects.toThrow("平台返回了部分视频内容（206）");
     await context.close();
   });
 });

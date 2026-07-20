@@ -74,6 +74,7 @@ export interface VideoFetcher {
     referer: string,
   ): Promise<{
     bytes: Uint8Array;
+    status: number;
     headers: Record<string, string>;
     sourceUrl: string;
   }>;
@@ -209,7 +210,7 @@ async function defaultFetchVideo(
   context: BrowserContext,
   cdnUrl: string,
   referer: string,
-): Promise<{ bytes: Uint8Array; headers: Record<string, string>; sourceUrl: string }> {
+): Promise<{ bytes: Uint8Array; status: number; headers: Record<string, string>; sourceUrl: string }> {
   const cookies = await context.cookies();
   const cookieHeader = cookies.map((c) => `${c.name}=${c.value}`).join("; ");
   const ua =
@@ -223,7 +224,7 @@ async function defaultFetchVideo(
   resp.headers.forEach((v, k) => {
     headers[k] = v;
   });
-  return { bytes: new Uint8Array(buf), headers, sourceUrl: cdnUrl };
+  return { bytes: new Uint8Array(buf), status: resp.status, headers, sourceUrl: cdnUrl };
 }
 
 // --- Main resolver ---
@@ -296,7 +297,7 @@ export async function resolveDouyinVideoWithBrowser(
       aweme_detail?: { aweme_id?: string; video?: { play_addr?: { url_list?: string[] } } };
     };
     const responseAwemeId = detailObj?.aweme_detail?.aweme_id;
-    if (responseAwemeId && String(responseAwemeId) !== awemeId)
+    if (responseAwemeId === undefined || responseAwemeId === null || String(responseAwemeId) !== awemeId)
       throw new DouyinImportError("AWEME_ID_MISMATCH", "作品详情中的作品 ID 与目标不匹配", 422);
 
     const urlList: string[] = detailObj?.aweme_detail?.video?.play_addr?.url_list ?? [];
@@ -308,7 +309,7 @@ export async function resolveDouyinVideoWithBrowser(
     // Actively download the video
     const videoData = await vidFetcher(context, targetUrl, finalUrl.href);
     validateFullResponse({
-      status: 200,
+      status: videoData.status,
       headers: videoData.headers,
       byteLength: videoData.bytes.byteLength,
     });
