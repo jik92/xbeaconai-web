@@ -67,6 +67,7 @@ export class AihubmixClient {
       } catch (error) {
         lastError = error;
         if (
+          init.signal?.aborted ||
           !retryableMethod ||
           (error instanceof Error && (error as Error & { safeRetry?: boolean }).safeRetry === false) ||
           attempt === attempts - 1
@@ -78,8 +79,10 @@ export class AihubmixClient {
     throw lastError;
   }
 
-  async listModels() {
-    const body = (await this.request("/api/v1/models").then((response) => response.json())) as {
+  async listModels(timeoutMs?: number) {
+    const body = (await this.request("/api/v1/models", {
+      signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined,
+    }).then((response) => response.json())) as {
       data?: AihubmixModel[];
     };
     return body.data ?? [];
@@ -88,11 +91,12 @@ export class AihubmixClient {
   async generateText(
     prompt: string,
     model = "gpt-4.1-nano-free",
-    options: { maxTokens?: number; temperature?: number; json?: boolean } = {},
+    options: { maxTokens?: number; temperature?: number; json?: boolean; timeoutMs?: number } = {},
   ) {
     const body = (await this.request("/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: options.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined,
       body: JSON.stringify({
         model,
         messages: [{ role: "user", content: prompt }],
