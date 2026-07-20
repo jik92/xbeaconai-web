@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { authenticatedBlobUrl } from "@/api/api-client";
 
 export function AuthenticatedMedia({
@@ -18,6 +18,7 @@ export function AuthenticatedMedia({
 }) {
   const [source, setSource] = useState<string>();
   const [loadError, setLoadError] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     let active = true,
       current: string | undefined;
@@ -37,11 +38,15 @@ export function AuthenticatedMedia({
       if (current) URL.revokeObjectURL(current);
     };
   }, [url]);
+  useEffect(() => {
+    if (autoPlay && source) void videoRef.current?.play().catch(() => undefined);
+  }, [autoPlay, source]);
   if (loadError) return <span>预览不可用</span>;
   if (!source) return <span>正在载入结果预览…</span>;
   if (mimeType.startsWith("video/"))
     return (
       <video
+        ref={videoRef}
         controls={controls}
         autoPlay={autoPlay}
         muted={!controls}

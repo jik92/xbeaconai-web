@@ -9,6 +9,7 @@ import {
   Files,
   Image as ImageIcon,
   Package,
+  Play,
   Plus,
   Search,
   Trash2,
@@ -31,6 +32,7 @@ import { AuthenticatedMedia } from "@/components/domain/authenticated-media";
 import { DataTable } from "@/components/ui/data-table";
 import type { LibraryAsset, LibraryProduct } from "@/entities/types";
 import { AssetFolderSpace } from "./asset-folder-space";
+import { fitMediaPreviewSize } from "./media-preview-size";
 import "./asset-library.css";
 
 type LibraryKind = "media" | "product" | "voice";
@@ -298,6 +300,33 @@ async function inspectMediaFile(file: File): Promise<MediaMetadata> {
   }
 }
 
+function LazyVideoPreview({
+  asset,
+  onMetadata,
+}: {
+  asset: LibraryAsset;
+  onMetadata: (metadata: MediaMetadata) => void;
+}) {
+  const [playing, setPlaying] = useState(false);
+  return (
+    <div className="lazy-video-preview">
+      <AuthenticatedMedia
+        url={asset.url}
+        mimeType={asset.mimeType}
+        alt={asset.name}
+        controls={playing}
+        autoPlay={playing}
+        onMetadata={onMetadata}
+      />
+      {!playing && (
+        <button type="button" aria-label={`播放 ${asset.name}`} onClick={() => setPlaying(true)}>
+          <Play /> 播放
+        </button>
+      )}
+    </div>
+  );
+}
+
 function formatDuration(durationSec?: number) {
   if (durationSec === undefined || !Number.isFinite(durationSec)) return "—";
   const seconds = Math.max(0, Math.round(durationSec));
@@ -336,15 +365,30 @@ function MediaAssetTable({
         size: 260,
         cell: ({ row }) => {
           const asset = row.original;
+          const metadata = loadedMetadata[asset.id];
+          const previewSize = fitMediaPreviewSize(asset.width ?? metadata?.width, asset.height ?? metadata?.height);
+          const media = asset.mimeType.startsWith("video/") ? (
+            <LazyVideoPreview asset={asset} onMetadata={(next) => onMetadata(asset.id, next)} />
+          ) : (
+            <AuthenticatedMedia
+              url={asset.url}
+              mimeType={asset.mimeType}
+              alt={asset.name}
+              controls={asset.mimeType.startsWith("audio/")}
+              onMetadata={(next) => onMetadata(asset.id, next)}
+            />
+          );
           return (
-            <div className={`media-table-preview ${asset.mimeType.startsWith("audio/") ? "audio" : ""}`}>
-              <AuthenticatedMedia
-                url={asset.url}
-                mimeType={asset.mimeType}
-                alt={asset.name}
-                controls={asset.mimeType.startsWith("audio/")}
-                onMetadata={(next) => onMetadata(asset.id, next)}
-              />
+            <div
+              className={`media-table-preview ${asset.mimeType.startsWith("audio/") ? "audio" : asset.mimeType.startsWith("video/") ? "video" : ""}`}
+            >
+              {asset.mimeType.startsWith("audio/") ? (
+                media
+              ) : (
+                <div className="media-table-preview-content" style={previewSize ?? { width: "100%", height: "100%" }}>
+                  {media}
+                </div>
+              )}
             </div>
           );
         },

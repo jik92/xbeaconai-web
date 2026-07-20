@@ -40,6 +40,10 @@ test("deletes uploaded media and complete products", async ({ page }) => {
   });
   await page.getByRole("button", { name: "确认上传" }).click();
   await expect(page.getByText("deletion-media", { exact: true })).toBeVisible();
+  const imagePreview = page.locator(".media-table-preview img");
+  await expect(imagePreview).toHaveCSS("object-fit", "contain");
+  const imageBox = await imagePreview.boundingBox();
+  expect(imageBox?.width).toBe(imageBox?.height);
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "删除 deletion-media" }).click();
   await expect(page.getByText("deletion-media", { exact: true })).toHaveCount(0);
@@ -61,4 +65,31 @@ test("deletes uploaded media and complete products", async ({ page }) => {
   await detail.getByRole("button", { name: "删除商品" }).click();
   await expect(detail).toBeHidden();
   await expect(page.getByText("待删除商品", { exact: true })).toHaveCount(0);
+});
+
+test("shows a video frame before loading playback controls", async ({ page }) => {
+  await page.route("**/api/uploads/direct", (route) =>
+    route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ error: { code: "DIRECT_UPLOAD_UNAVAILABLE", message: "test fallback" } }),
+    }),
+  );
+  await page.getByRole("button", { name: "上传素材" }).click();
+  await page.locator('.asset-upload-modal input[type="file"]').setInputFiles({
+    name: "preview-video.mp4",
+    mimeType: "video/mp4",
+    buffer: Buffer.from("video-preview-fixture"),
+  });
+  await page.getByRole("button", { name: "确认上传" }).click();
+
+  const preview = page.locator(".media-table-preview.video");
+  await expect(preview).toBeVisible();
+  await expect(preview.locator("video")).not.toHaveAttribute("controls", "");
+  await preview.hover();
+  const play = preview.getByRole("button", { name: "播放 preview-video" });
+  await expect(play).toBeVisible();
+  await play.click();
+  await expect(preview.locator("video")).toHaveAttribute("controls", "");
+  await expect(preview.locator("video")).toHaveCSS("object-fit", "contain");
 });
