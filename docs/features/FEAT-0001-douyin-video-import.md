@@ -51,3 +51,53 @@
 
 - 部署必须安装 `playwright` 运行时依赖及 Chromium；不可用时 API/Worker 返回明确配置错误。
 - 可通过移除素材库入口与拒绝新导入请求回滚；已保存素材沿用现有资产删除流程。
+
+## 服务端日志
+
+Worker 在执行过程中输出结构化 JSON 日志，前缀为 `[douyin-import]`。
+
+### 查询方式
+
+```bash
+# 按 jobId 查询一条任务的完整日志
+grep '\[douyin-import\]' server.log | grep '"jobId":"<job-id>"'
+```
+
+### 日志阶段
+
+| 阶段 | 含义 |
+| --- | --- |
+| `download_start` / `download_complete` / `download_failure` | 浏览器下载 |
+| `probe_start` / `probe_complete` / `probe_failure` | ffprobe 视频校验（仅生产路径） |
+| `save_local_start` / `save_local_complete` / `save_local_failure` | 本地文件写入 `.data/uploads/` |
+| `tos_upload_start` / `tos_upload_complete` / `tos_upload_failure` | TOS 对象存储上传 |
+| `tos_skip` | TOS 未配置，仅本地存储 |
+| `asset_created` / `asset_create_failure` | SQLite 素材记录创建 |
+| `success` | 任务成功 |
+| `cancel` | 任务被取消 |
+| `failure` | 任务整体失败 |
+| `cleanup` | 临时文件清理完成 |
+
+### 常见失败排查
+
+| 阶段 | 常见错误 | 排查方向 |
+| --- | --- | --- |
+| `download_complete` 未出现 | 下载超时/`access_restricted` | 确认链接公开可访问，检查 Playwright/Chromium 可用 |
+| `probe_complete` 未出现 | ffprobe 不可用 | 确认 `ffprobe` 已安装 |
+| `save_local_complete` 未出现 | 磁盘空间不足或权限问题 | 检查 `YAOZUO_DATA_DIR` 可写 |
+| `tos_upload_complete` 未出现 | TOS 配置或网络问题 | 检查 TOS 凭证和 endpoint |
+
+### 脱敏规则
+
+日志**严格禁止**记录：
+- CDN 临时地址（如 `v26-web.douyinvod.com`）
+- 分享文案全文或提取的 URL
+- Cookie、请求头、Token
+- 用户凭据或 JWT
+
+日志**可以**记录：
+- `jobId`（用于关联检索）
+- 阶段名称、耗时（`durationMs`）
+- 文件大小（`fileSizeBytes`，仅非敏感数值）
+- 稳定错误码（如 `access_restricted`、`config_error`）
+- 脱敏后的错误摘要（URL 替换为 `[REDACTED_URL]`）

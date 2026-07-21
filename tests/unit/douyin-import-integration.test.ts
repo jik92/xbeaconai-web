@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AccountStore } from "../../server/accounts/account-store";
@@ -248,10 +248,10 @@ describe("douyin import integration", () => {
       idempotencyKey,
       values: { ...makeJob(userId, folderId).values, normalizedUrl: shareUrl },
     });
-    const job2 = makeJob(userId, folderId, {
-      idempotencyKey,
-      values: { ...makeJob(userId, folderId).values, normalizedUrl: shareUrl },
-    });
+    // const job2 = makeJob(userId, folderId, {
+    //   idempotencyKey,
+    //   values: { ...makeJob(userId, folderId).values, normalizedUrl: shareUrl },
+    // });
 
     store.create(job1);
     const existing = store.getByIdempotencyKey(userId, idempotencyKey);

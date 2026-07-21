@@ -1,0 +1,285 @@
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { AccountStore } from "../../server/accounts/account-store";
+import type { ImportLogEvent, ImportStage } from "../../server/imports/import-logger";
+import { SqliteJobStore } from "../../server/jobs/sqlite-job-store";
+import type { JobRecord } from "../../server/types";
+import { douyinVideoImportJob } from "../../worker/jobs/job-douyin-video-import";
+import type { JobHandlerContext } from "../../worker/jobs/types";
+
+const databases: string[] = [];
+const tempDirs: string[] = [];
+const capturedLogs: ImportLogEvent[] = [];
+let originalConsoleLog: typeof console.log;
+
+function cleanup() {
+  for (const db of databases) {
+    try {
+      rmSync(db, { force: true });
+    } catch {
+      /* ok */
+    }
+    try {
+      rmSync(`${db}-wal`, { force: true });
+    } catch {
+      /* ok */
+    }
+    try {
+      rmSync(`${db}-shm`, { force: true });
+    } catch {
+      /* ok */
+    }
+  }
+  databases.length = 0;
+  for (const dir of tempDirs) {
+    try {
+      rmSync(dir, { recursive: true, force: true });
+    } catch {
+      /* ok */
+    }
+  }
+  tempDirs.length = 0;
+}
+
+afterEach(cleanup);
+
+function makeTempDir() {
+  const dir = mkdtempSync(join(tmpdir(), "dy-log-test-"));
+  tempDirs.push(dir);
+  return dir;
+}
+
+function makeSharedStoreAndAccounts(): { store: SqliteJobStore; accounts: AccountStore } {
+  const path = join(tmpdir(), `dy-log-integration-${crypto.randomUUID()}.sqlite`);
+  databases.push(path);
+  return {
+    store: new SqliteJobStore(path),
+    accounts: new AccountStore(path),
+  };
+}
+
+function makeJob(ownerUserId: string, folderId: string): JobRecord {
+  const ts = new Date().toISOString();
+  return {
+    id: crypto.randomUUID(),
+    ownerUserId,
+    moduleId: "share-content-import",
+    title: "日志集成测试",
+    status: "queued",
+    progress: 0,
+    stage: "排队中",
+    overallExecutionMode: "real",
+    values: {
+      platformId: "douyin",
+      normalizedUrl: "https://v.douyin.com/test123/",
+      folderId,
+      folderName: "测试",
+    },
+    executionPlan: [],
+    provenance: [],
+    cancelRequested: false,
+    providerCancelState: "none",
+    stagingKeys: [],
+    jobSchemaVersion: 2,
+    createdAt: ts,
+    updatedAt: ts,
+  };
+}
+
+function mockDownload(bytes = 4096) {
+  return async () => {
+    const dir = makeTempDir();
+    const fp = join(dir, "video.mp4");
+    writeFileSync(fp, Buffer.alloc(bytes));
+    return { filePath: fp, tempDir: dir, mimeType: "video/mp4", byteSize: bytes };
+  };
+}
+
+beforeAll(() => {
+  originalConsoleLog = console.log;
+  console.log = (line: string) => {
+    const prefix = "[douyin-import] ";
+    if (typeof line === "string" && line.startsWith(prefix)) {
+      try {
+        capturedLogs.push(JSON.parse(line.slice(prefix.length)));
+      } catch {
+        /* not our log */
+      }
+    }
+  };
+});
+
+afterAll(() => {
+  console.log = originalConsoleLog;
+});
+
+beforeEach(() => {
+  capturedLogs.length = 0;
+});
+
+describe("import logger integration", () => {
+  let store: SqliteJobStore;
+  let accounts: AccountStore;
+  let userId: string;
+  let folderId: string;
+  let job: JobRecord;
+
+  beforeEach(async () => {
+    const created = makeSharedStoreAndAccounts();
+    store = created.store;
+    accounts = created.accounts;
+    const reg = await accounts.register({
+      email: `log-test-${crypto.randomUUID().slice(0, 8)}@example.com`,
+      password: "LogTest12345!@#$",
+      displayName: "Logger Test",
+    });
+    userId = reg.user.id;
+    accounts.ensureDefaultAssetFolder(userId);
+    const f = accounts.getAssetFolder(userId, accounts.getDefaultAssetFolderId(userId));
+    if (!f) throw new Error("default folder not found");
+    folderId = f.id;
+    job = makeJob(userId, folderId);
+    store.create(job);
+  });
+
+  afterEach(() => {
+    accounts.close();
+    store.close();
+  });
+
+  function context(dl?: JobHandlerContext["downloadFn"]): JobHandlerContext {
+    return { store, accounts, change: (id, p) => store.update(id, p), downloadFn: dl };
+  }
+
+  test("success path emits logs for all expected stages with correct jobId", async () => {
+    await douyinVideoImportJob.execute(job, context(mockDownload(2048)));
+
+    expect(store.get(job.id)?.status).toBe("succeeded");
+
+    const stages = capturedLogs.map((l) => l.stage);
+    // Must include key stages (probe skipped for mocked download)
+    expect(stages).toContain("download_start");
+    expect(stages).toContain("download_complete");
+    expect(stages).toContain("save_local_start");
+    expect(stages).toContain("save_local_complete");
+    expect(stages).toContain("tos_skip");
+    expect(stages).toContain("asset_created");
+    expect(stages).toContain("success");
+    expect(stages).toContain("cleanup");
+
+    // Every log must have the correct jobId
+    for (const log of capturedLogs) {
+      expect(log.jobId).toBe(job.id);
+    }
+  });
+
+  test("failure path emits failure log with error code and without sensitive data", async () => {
+    const failingDl = async () => {
+      throw new Error("Download failed: https://v26-web.douyinvod.com/secret/video.mp4 token=abc123");
+    };
+
+    await douyinVideoImportJob.execute(job, context(failingDl));
+
+    expect(store.get(job.id)?.status).toBe("failed");
+
+    const failLogs = capturedLogs.filter((l) => l.stage === "failure");
+    expect(failLogs.length).toBe(1);
+    const failLog = failLogs[0];
+
+    expect(failLog.jobId).toBe(job.id);
+    expect(failLog.result).toBe("error");
+    expect(failLog.errorCode).toBeTruthy();
+    expect(failLog.errorSummary).toBeTruthy();
+
+    // Must NOT contain sensitive URL/CDN data
+    const raw = JSON.stringify(failLog);
+    expect(raw).not.toContain("douyinvod.com");
+    expect(raw).not.toContain("secret");
+    expect(raw).not.toContain("https://");
+    // Error summary should contain redaction markers
+    expect(raw).toContain("[REDACTED_URL]");
+  });
+
+  test("cancel path emits cancel log", async () => {
+    // Cancel before execution by setting cancelRequested
+    store.update(job.id, { cancelRequested: true });
+
+    await douyinVideoImportJob.execute(job, context());
+
+    const cancelLogs = capturedLogs.filter((l) => l.stage === "cancel");
+    expect(cancelLogs.length).toBeGreaterThanOrEqual(1);
+    expect(cancelLogs[0].jobId).toBe(job.id);
+    expect(cancelLogs[0].result).toBe("error");
+  });
+
+  test("all log stages are valid ImportStage values", () => {
+    const validStages: ImportStage[] = [
+      "download_start",
+      "download_complete",
+      "download_failure",
+      "probe_start",
+      "probe_complete",
+      "probe_failure",
+      "save_local_start",
+      "save_local_complete",
+      "save_local_failure",
+      "tos_upload_start",
+      "tos_upload_complete",
+      "tos_upload_failure",
+      "tos_skip",
+      "asset_created",
+      "asset_create_failure",
+      "success",
+      "cancel",
+      "failure",
+      "cleanup",
+    ];
+    for (const log of capturedLogs) {
+      expect(validStages).toContain(log.stage);
+    }
+  });
+
+  test("no log contains URL, cookie, header, or token field names", async () => {
+    await douyinVideoImportJob.execute(job, context(mockDownload(1024)));
+
+    for (const log of capturedLogs) {
+      const raw = JSON.stringify(log);
+      expect(raw).not.toContain('"url"');
+      expect(raw).not.toContain('"shareUrl"');
+      expect(raw).not.toContain('"cookie"');
+      expect(raw).not.toContain('"token"');
+      expect(raw).not.toContain('"header"');
+      expect(raw).not.toContain('"referer"');
+      expect(raw).not.toContain('"userAgent"');
+      expect(raw).not.toContain('"cd"');
+      // Must contain safe fields
+      expect(raw).toContain('"jobId"');
+    }
+  });
+
+  test("each log has required fields: jobId, stage, result, durationMs", async () => {
+    await douyinVideoImportJob.execute(job, context(mockDownload(2048)));
+
+    expect(capturedLogs.length).toBeGreaterThan(0);
+    for (const log of capturedLogs) {
+      expect(typeof log.jobId).toBe("string");
+      expect(log.jobId).toBe(job.id);
+      expect(typeof log.stage).toBe("string");
+      expect(log.stage.length).toBeGreaterThan(0);
+      expect(["ok", "error"]).toContain(log.result);
+      expect(typeof log.durationMs).toBe("number");
+    }
+  });
+
+  test("download_complete and asset_created include fileSizeBytes", async () => {
+    await douyinVideoImportJob.execute(job, context(mockDownload(8192)));
+
+    const dlLog = capturedLogs.find((l) => l.stage === "download_complete");
+    expect(dlLog?.fileSizeBytes).toBe(8192);
+
+    const assetLog = capturedLogs.find((l) => l.stage === "asset_created");
+    expect(assetLog?.fileSizeBytes).toBe(8192);
+  });
+});

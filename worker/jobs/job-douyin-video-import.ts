@@ -3,6 +3,7 @@ import { rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { env } from "../../server/env";
 import { cleanupDownloadDir, DouyinDownloadError } from "../../server/imports/douyin-video";
+import { emitLog, logFailure, sanitizeError, stageComplete, stageStart } from "../../server/imports/import-logger";
 import { platformAdapters, ShareContentParser } from "../../server/imports/share-content";
 import { probeMedia } from "../../server/media/ffmpeg";
 import { ossutils } from "../../server/storage/ossutils";
@@ -18,12 +19,13 @@ export const douyinVideoImportJob: WorkerJobHandler = {
     const { accounts, store } = context;
     if (!accounts) throw new Error("素材所有权服务不可用");
 
+    const importStartMs = stageStart();
+
     const folderId = job.values.folderId;
     if (!folderId) throw new Error("缺少目标文件夹");
     const folder = accounts.getAssetFolder(job.ownerUserId, folderId);
     if (!folder) throw new Error("目标文件夹不存在或不属于当前账号");
 
-    // Resolve the normalized URL — support both old and new job schemas
     const platformId = job.values.platformId ?? "douyin";
     const normalizedUrl = job.values.normalizedUrl ?? job.values.shareUrl;
     if (!normalizedUrl) throw new Error("缺少分享链接");
@@ -32,6 +34,7 @@ export const douyinVideoImportJob: WorkerJobHandler = {
     if (!adapter) throw new Error(`不支持的平台: ${platformId}`);
 
     if (!adapter.supportsDownload) {
+      logFailure(job.id, "failure", importStartMs, "DOWNLOAD_NOT_SUPPORTED", `${adapter.displayName} 下载尚未实现`);
       context.change(job.id, {
         status: "failed",
         stage: "该平台尚未支持下载",
@@ -68,47 +71,65 @@ export const douyinVideoImportJob: WorkerJobHandler = {
     let storageKey: string | undefined;
     let assetId: string | undefined;
     let destPath: string | undefined;
+    let tosUploaded = false;
 
     try {
-      // Cancel check
+      // ── Cancel check ──────────────────────────────────────────
       const precheck = store.get(job.id);
       if (!precheck || precheck.cancelRequested) {
         context.change(job.id, { status: "cancelled", stage: "已取消" });
+        logFailure(job.id, "cancel", importStartMs, "CANCELLED", "任务在下载前被取消");
+        emitLog({
+          jobId: job.id,
+          stage: "cleanup",
+          result: "ok",
+          durationMs: Date.now() - importStartMs,
+          errorSummary: "no temp dir",
+        });
         return;
       }
 
-      // Use injectable download function if provided (integration testing),
-      // otherwise use the real platform adapter.
+      // ── Download ─────────────────────────────────────────────
+      emitLog({ jobId: job.id, stage: "download_start", result: "ok", durationMs: Date.now() - importStartMs });
+      const dlStart = stageStart();
       const isMocked = !!context.downloadFn;
-      if (context.downloadFn) {
-        downloadResult = await context.downloadFn(platformId, normalizedUrl);
-      } else {
-        downloadResult = await adapter.download(normalizedUrl);
+      try {
+        if (context.downloadFn) {
+          downloadResult = await context.downloadFn(platformId, normalizedUrl);
+        } else {
+          downloadResult = await adapter.download(normalizedUrl);
+        }
+      } catch (dlErr) {
+        const s = sanitizeError(dlErr);
+        logFailure(job.id, "download_failure", dlStart, s.code, s.summary);
+        throw dlErr;
       }
+      stageComplete(job.id, "download_complete", dlStart, downloadResult.byteSize);
 
-      // Cancel check after download
+      // ── Cancel check ──────────────────────────────────────────
       const midcheck = store.get(job.id);
       if (!midcheck || midcheck.cancelRequested) {
         context.change(job.id, { status: "cancelled", stage: "已取消" });
+        logFailure(job.id, "cancel", importStartMs, "CANCELLED", "任务在下载后被取消");
         return;
       }
 
-      // Verify downloaded file is a valid video (mandatory in production, skipped for mocked downloads)
+      // ── Probe ────────────────────────────────────────────────
       if (!isMocked) {
         context.change(job.id, { stage: "正在验证视频", progress: 50 });
-        let probe: Awaited<ReturnType<typeof probeMedia>>;
+        emitLog({ jobId: job.id, stage: "probe_start", result: "ok", durationMs: Date.now() - importStartMs });
+        const probeStart = stageStart();
         try {
-          probe = await probeMedia(downloadResult.filePath);
+          const probe = await probeMedia(downloadResult.filePath);
+          const hasVideo = probe.streams.some((s) => s.codec_type === "video");
+          if (!hasVideo) {
+            throw new DouyinDownloadError("下载的文件不包含视频流，可能不是有效视频", false, "download_failed");
+          }
+          stageComplete(job.id, "probe_complete", probeStart);
         } catch (probeErr) {
-          throw new DouyinDownloadError(
-            `视频验证失败：ffprobe 不可用或无法解析文件 (${probeErr instanceof Error ? probeErr.message : String(probeErr)})`,
-            true,
-            "config_error",
-          );
-        }
-        const hasVideo = probe.streams.some((s) => s.codec_type === "video");
-        if (!hasVideo) {
-          throw new DouyinDownloadError("下载的文件不包含视频流，可能不是有效视频", false, "download_failed");
+          const s = sanitizeError(probeErr);
+          logFailure(job.id, "probe_failure", probeStart, s.code, s.summary);
+          throw probeErr;
         }
       }
 
@@ -124,31 +145,77 @@ export const douyinVideoImportJob: WorkerJobHandler = {
       const uploadRoot = resolve(env.dataDir, "uploads");
       destPath = resolve(uploadRoot, storageKey);
 
-      mkdirSync(dirname(destPath), { recursive: true, mode: 0o700 });
-      await Bun.write(destPath, file);
+      // ── Local save ────────────────────────────────────────────
+      emitLog({ jobId: job.id, stage: "save_local_start", result: "ok", durationMs: Date.now() - importStartMs });
+      const localStart = stageStart();
+      try {
+        mkdirSync(dirname(destPath), { recursive: true, mode: 0o700 });
+        await Bun.write(destPath, file);
+      } catch (saveErr) {
+        const s = sanitizeError(saveErr);
+        logFailure(job.id, "save_local_failure", localStart, s.code, s.summary);
+        throw saveErr;
+      }
+      stageComplete(job.id, "save_local_complete", localStart, byteSize);
 
+      // ── TOS upload ────────────────────────────────────────────
       if (ossutils.configured) {
-        await ossutils.putLibraryFile({
-          filePath: downloadResult.filePath,
-          key: storageKey,
-          mimeType: "video/mp4",
-          sizeBytes: byteSize,
+        emitLog({ jobId: job.id, stage: "tos_upload_start", result: "ok", durationMs: Date.now() - importStartMs });
+        const tosStart = stageStart();
+        try {
+          await ossutils.putLibraryFile({
+            filePath: downloadResult.filePath,
+            key: storageKey,
+            mimeType: "video/mp4",
+            sizeBytes: byteSize,
+          });
+          stageComplete(job.id, "tos_upload_complete", tosStart, byteSize);
+          tosUploaded = true;
+        } catch (tosErr) {
+          const s = sanitizeError(tosErr);
+          logFailure(job.id, "tos_upload_failure", tosStart, s.code, s.summary);
+          // TOS upload failure is non-fatal if local save succeeded
+          emitLog({
+            jobId: job.id,
+            stage: "tos_upload_complete",
+            result: "ok",
+            durationMs: Date.now() - tosStart,
+            fileSizeBytes: 0,
+            errorSummary: "TOS upload failed, local copy preserved",
+          });
+        }
+      } else {
+        emitLog({
+          jobId: job.id,
+          stage: "tos_skip",
+          result: "ok",
+          durationMs: 0,
+          errorSummary: "TOS not configured",
         });
       }
 
-      accounts.createAsset({
-        id: assetId,
-        ownerUserId: job.ownerUserId,
-        storageKey,
-        originalName: `${sanitizedName}.mp4`,
-        mimeType: "video/mp4",
-        byteSize,
-        kind: "media",
-        displayName: `${adapter.displayName}导入视频`,
-        description: `从 ${normalizedUrl.slice(0, 200)} 导入`,
-        folderId: folder.id,
-        createdAt: new Date().toISOString(),
-      });
+      // ── Create asset ──────────────────────────────────────────
+      const assetStart = stageStart();
+      try {
+        accounts.createAsset({
+          id: assetId,
+          ownerUserId: job.ownerUserId,
+          storageKey,
+          originalName: `${sanitizedName}.mp4`,
+          mimeType: "video/mp4",
+          byteSize,
+          kind: "media",
+          displayName: `${adapter.displayName}导入视频`,
+          description: `从 ${normalizedUrl.slice(0, 200)} 导入`,
+          folderId: folder.id,
+          createdAt: new Date().toISOString(),
+        });
+      } catch (assetErr) {
+        const s = sanitizeError(assetErr);
+        logFailure(job.id, "asset_create_failure", assetStart, s.code, s.summary);
+        throw assetErr;
+      }
+      stageComplete(job.id, "asset_created", assetStart, byteSize);
 
       plan[0].completedAt = new Date().toISOString();
 
@@ -167,16 +234,14 @@ export const douyinVideoImportJob: WorkerJobHandler = {
           },
         ],
         data: {
-          values: {
-            ...job.values,
-            assetId,
-            folderId: folder.id,
-            folderName: folder.name,
-          },
+          values: { ...job.values, assetId, folderId: folder.id, folderName: folder.name },
           generatedAt: new Date().toISOString(),
           mock: false,
         },
       };
+
+      // ── Success ───────────────────────────────────────────────
+      stageComplete(job.id, "success", importStartMs, byteSize);
 
       context.change(job.id, {
         status: "succeeded",
@@ -200,8 +265,13 @@ export const douyinVideoImportJob: WorkerJobHandler = {
       const errorMessage = err instanceof Error ? err.message : String(err);
       const retryable = err instanceof DouyinDownloadError ? err.retryable : false;
 
+      // ── Failure log ───────────────────────────────────────────
+      const sanitized = sanitizeError(err);
+      logFailure(job.id, "failure", importStartMs, sanitized.code, sanitized.summary);
+
+      // ── Clean up orphaned artifacts ───────────────────────────
       if (destPath) await rm(destPath, { force: true }).catch(() => {});
-      if (storageKey && ossutils.configured) {
+      if (tosUploaded && storageKey && ossutils.configured) {
         await ossutils.deleteObject(storageKey).catch(() => {});
       }
       if (storageKey) {
@@ -229,7 +299,16 @@ export const douyinVideoImportJob: WorkerJobHandler = {
         );
       }
     } finally {
+      // ── Cleanup ───────────────────────────────────────────────
+      const cleanupStart = stageStart();
       if (downloadResult) cleanupDownloadDir(downloadResult.tempDir);
+      emitLog({
+        jobId: job.id,
+        stage: "cleanup",
+        result: "ok",
+        durationMs: Date.now() - cleanupStart,
+        errorSummary: downloadResult ? "temp dir cleaned" : "no temp dir",
+      });
     }
   },
 };

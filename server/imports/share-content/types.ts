@@ -1,4 +1,4 @@
-import type { DouyinDownloadResult } from "../douyin-video";
+// import type { DouyinDownloadResult } from "../douyin-video";
 
 /** A candidate URL or share code extracted from free text. */
 export interface ShareCandidate {
