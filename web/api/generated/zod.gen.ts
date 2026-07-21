@@ -11,6 +11,12 @@ export const zApiErrorResponse = z.object({
     })
 });
 
+export const zPasswordSetupChallenge = z.object({
+    phone: z.string().regex(/^1[3-9]\d{9}$/),
+    setupToken: z.string().min(32),
+    expiresAt: z.string()
+});
+
 export const zUserSummary = z.object({
     id: z.uuid(),
     phone: z.string().regex(/^1[3-9]\d{9}$/),
@@ -667,7 +673,8 @@ export const zGetHealthResponse = z.object({
 });
 
 export const zSendSmsVerificationCodeBody = z.object({
-    phone: z.string().regex(/^1[3-9]\d{9}$/)
+    phone: z.string().regex(/^1[3-9]\d{9}$/),
+    purpose: z.enum(['register', 'reset_password'])
 });
 
 /**
@@ -680,15 +687,33 @@ export const zSendSmsVerificationCodeResponse = z.object({
 
 export const zRegisterBody = z.object({
     phone: z.string().regex(/^1[3-9]\d{9}$/),
-    verificationCode: z.string().regex(/^\d{6}$/),
-    password: z.string().min(10).max(128).regex(/[A-Za-z]/),
-    displayName: z.string().min(2).max(40)
+    verificationCode: z.string().regex(/^\d{6}$/)
 });
 
 /**
- * Registered
+ * Registered and waiting for password setup
  */
-export const zRegisterResponse = zAuthResponse;
+export const zRegisterResponse = zPasswordSetupChallenge;
+
+export const zVerifyPasswordResetBody = z.object({
+    phone: z.string().regex(/^1[3-9]\d{9}$/),
+    verificationCode: z.string().regex(/^\d{6}$/)
+});
+
+/**
+ * Phone verified for password reset
+ */
+export const zVerifyPasswordResetResponse = zPasswordSetupChallenge;
+
+export const zSetupPasswordBody = z.object({
+    setupToken: z.string().min(32).max(256),
+    password: z.string().min(10).max(128).regex(/[A-Za-z]/)
+});
+
+/**
+ * Password set and logged in
+ */
+export const zSetupPasswordResponse = zAuthResponse;
 
 export const zLoginBody = z.object({
     phone: z.string().regex(/^1[3-9]\d{9}$/),

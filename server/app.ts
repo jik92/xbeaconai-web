@@ -302,6 +302,8 @@ const publicApiPaths = new Set([
   "/api/creation/capabilities",
   "/api/auth/register",
   "/api/auth/sms-code",
+  "/api/auth/password/verify",
+  "/api/auth/password/setup",
   "/api/auth/login",
   "/api/auth/logout",
 ]);
@@ -459,6 +461,10 @@ const VerificationCodeSchema = z
   .string()
   .trim()
   .regex(/^\d{6}$/, "请输入 6 位数字验证码");
+const SmsPurposeSchema = z.enum(["register", "reset_password"]);
+const PasswordSetupChallengeSchema = z
+  .object({ phone: PhoneSchema, setupToken: z.string().min(32), expiresAt: z.string() })
+  .openapi("PasswordSetupChallenge");
 const authRate = new Map<string, { count: number; reset: number }>();
 function rateLimited(key: string) {
   const time = Date.now(),
@@ -476,7 +482,10 @@ const sendSmsCodeRoute = createRoute({
   path: "/api/auth/sms-code",
   operationId: "sendSmsVerificationCode",
   request: {
-    body: { required: true, content: { "application/json": { schema: z.object({ phone: PhoneSchema }) } } },
+    body: {
+      required: true,
+      content: { "application/json": { schema: z.object({ phone: PhoneSchema, purpose: SmsPurposeSchema }) } },
+    },
   },
   responses: {
     200: {
@@ -488,13 +497,14 @@ const sendSmsCodeRoute = createRoute({
       },
     },
     409: { description: "Phone exists", content: { "application/json": { schema: ErrorSchema } } },
+    404: { description: "Phone not registered", content: { "application/json": { schema: ErrorSchema } } },
     422: { description: "Invalid phone", content: { "application/json": { schema: ErrorSchema } } },
     429: { description: "Rate limited", content: { "application/json": { schema: ErrorSchema } } },
   },
 });
 app.openapi(sendSmsCodeRoute, async (c) => {
-  const phone = c.req.valid("json").phone;
-  if (rateLimited(`sms:${c.req.header("x-forwarded-for") ?? "local"}`))
+  const { phone, purpose } = c.req.valid("json");
+  if (rateLimited(`sms:${purpose}:${c.req.header("x-forwarded-for") ?? "local"}`))
     return c.json(
       {
         error: {
@@ -507,7 +517,7 @@ app.openapi(sendSmsCodeRoute, async (c) => {
       429,
     );
   try {
-    return c.json(await accounts.sendRegistrationCode(phone), 200);
+    return c.json(await accounts.sendSmsCode(phone, purpose), 200);
   } catch (error) {
     if (error instanceof AccountError) {
       const body = {
@@ -519,6 +529,7 @@ app.openapi(sendSmsCodeRoute, async (c) => {
         },
       };
       if (error.status === 409) return c.json(body, 409);
+      if (error.status === 404) return c.json(body, 404);
       if (error.status === 429) return c.json(body, 429);
       return c.json(body, 422);
     }
@@ -538,15 +549,16 @@ const registerRoute = createRoute({
           schema: z.object({
             phone: PhoneSchema,
             verificationCode: VerificationCodeSchema,
-            password: PasswordSchema,
-            displayName: z.string().trim().min(2).max(40),
           }),
         },
       },
     },
   },
   responses: {
-    201: { description: "Registered", content: { "application/json": { schema: AuthSchema } } },
+    201: {
+      description: "Registered and waiting for password setup",
+      content: { "application/json": { schema: PasswordSetupChallengeSchema } },
+    },
     409: { description: "Phone exists", content: { "application/json": { schema: ErrorSchema } } },
     422: { description: "Validation error", content: { "application/json": { schema: ErrorSchema } } },
     429: { description: "Rate limited", content: { "application/json": { schema: ErrorSchema } } },
@@ -567,21 +579,24 @@ app.openapi(registerRoute, async (c) => {
     );
   try {
     const registration = await accounts.register(c.req.valid("json"));
-    const materialFolder = accounts.ensureDefaultAssetFolder(registration.user.id);
+    const materialFolder = accounts.ensureDefaultAssetFolder(registration.userId);
     mkdirSync(resolve(env.dataDir, "uploads", materialFolder.storagePrefix), { recursive: true, mode: 0o700 });
     if (ossutils.configured)
       await Promise.all([
-        ossutils.ensureDirectory(`${registration.user.id}/`),
+        ossutils.ensureDirectory(`${registration.userId}/`),
         ossutils.ensureDirectory(materialFolder.storagePrefix),
       ]).catch((error) => console.error("Failed to initialize user TOS directories", error));
     if (registration.claimedLegacy)
       await Promise.all(
         store
           .recoverable()
-          .filter((job) => job.ownerUserId === registration.user.id)
+          .filter((job) => job.ownerUserId === registration.userId)
           .map((job) => queue.enqueue(job.id)),
       );
-    return c.json(await issueToken(accounts, registration.user), 201);
+    return c.json(
+      { phone: registration.phone, setupToken: registration.setupToken, expiresAt: registration.expiresAt },
+      201,
+    );
   } catch (error) {
     if (error instanceof AccountError) {
       const body = {
@@ -589,6 +604,104 @@ app.openapi(registerRoute, async (c) => {
       };
       if (error.status === 409) return c.json(body, 409);
       if (error.status === 429) return c.json(body, 429);
+      return c.json(body, 422);
+    }
+    throw error;
+  }
+});
+
+const verifyPasswordResetRoute = createRoute({
+  method: "post",
+  path: "/api/auth/password/verify",
+  operationId: "verifyPasswordReset",
+  request: {
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: z.object({ phone: PhoneSchema, verificationCode: VerificationCodeSchema }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: "Phone verified for password reset",
+      content: { "application/json": { schema: PasswordSetupChallengeSchema } },
+    },
+    404: { description: "Phone not registered", content: { "application/json": { schema: ErrorSchema } } },
+    422: { description: "Verification failed", content: { "application/json": { schema: ErrorSchema } } },
+    429: { description: "Rate limited", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(verifyPasswordResetRoute, async (c) => {
+  if (rateLimited(`password-reset:${c.req.header("x-forwarded-for") ?? "local"}`))
+    return c.json(
+      {
+        error: {
+          code: "RATE_LIMITED",
+          message: "操作过于频繁，请稍后再试",
+          retryable: true,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      429,
+    );
+  try {
+    return c.json(await accounts.verifyPasswordReset(c.req.valid("json")), 200);
+  } catch (error) {
+    if (error instanceof AccountError) {
+      const body = {
+        error: { code: error.code, message: error.message, retryable: false, requestId: crypto.randomUUID() },
+      };
+      if (error.status === 404) return c.json(body, 404);
+      return c.json(body, 422);
+    }
+    throw error;
+  }
+});
+
+const setupPasswordRoute = createRoute({
+  method: "post",
+  path: "/api/auth/password/setup",
+  operationId: "setupPassword",
+  request: {
+    body: {
+      required: true,
+      content: {
+        "application/json": { schema: z.object({ setupToken: z.string().min(32).max(256), password: PasswordSchema }) },
+      },
+    },
+  },
+  responses: {
+    200: { description: "Password set and logged in", content: { "application/json": { schema: AuthSchema } } },
+    404: { description: "User not found", content: { "application/json": { schema: ErrorSchema } } },
+    422: { description: "Invalid setup token", content: { "application/json": { schema: ErrorSchema } } },
+    429: { description: "Rate limited", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(setupPasswordRoute, async (c) => {
+  if (rateLimited(`password-setup:${c.req.header("x-forwarded-for") ?? "local"}`))
+    return c.json(
+      {
+        error: {
+          code: "RATE_LIMITED",
+          message: "操作过于频繁，请稍后再试",
+          retryable: true,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      429,
+    );
+  try {
+    const body = c.req.valid("json");
+    return c.json(await issueToken(accounts, await accounts.setupPassword(body.setupToken, body.password)), 200);
+  } catch (error) {
+    if (error instanceof AccountError) {
+      const body = {
+        error: { code: error.code, message: error.message, retryable: false, requestId: crypto.randomUUID() },
+      };
+      if (error.status === 404) return c.json(body, 404);
       return c.json(body, 422);
     }
     throw error;

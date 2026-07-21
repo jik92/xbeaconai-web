@@ -13,6 +13,12 @@ export type ApiErrorResponse = {
     };
 };
 
+export type PasswordSetupChallenge = {
+    phone: string;
+    setupToken: string;
+    expiresAt: string;
+};
+
 export type AuthResponse = {
     token: string;
     tokenType: 'Bearer';
@@ -406,6 +412,7 @@ export type GetHealthResponse = GetHealthResponses[keyof GetHealthResponses];
 export type SendSmsVerificationCodeData = {
     body: {
         phone: string;
+        purpose: 'register' | 'reset_password';
     };
     path?: never;
     query?: never;
@@ -413,6 +420,10 @@ export type SendSmsVerificationCodeData = {
 };
 
 export type SendSmsVerificationCodeErrors = {
+    /**
+     * Phone not registered
+     */
+    404: ApiErrorResponse;
     /**
      * Phone exists
      */
@@ -445,8 +456,6 @@ export type RegisterData = {
     body: {
         phone: string;
         verificationCode: string;
-        password: string;
-        displayName: string;
     };
     path?: never;
     query?: never;
@@ -472,12 +481,84 @@ export type RegisterError = RegisterErrors[keyof RegisterErrors];
 
 export type RegisterResponses = {
     /**
-     * Registered
+     * Registered and waiting for password setup
      */
-    201: AuthResponse;
+    201: PasswordSetupChallenge;
 };
 
 export type RegisterResponse = RegisterResponses[keyof RegisterResponses];
+
+export type VerifyPasswordResetData = {
+    body: {
+        phone: string;
+        verificationCode: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/auth/password/verify';
+};
+
+export type VerifyPasswordResetErrors = {
+    /**
+     * Phone not registered
+     */
+    404: ApiErrorResponse;
+    /**
+     * Verification failed
+     */
+    422: ApiErrorResponse;
+    /**
+     * Rate limited
+     */
+    429: ApiErrorResponse;
+};
+
+export type VerifyPasswordResetError = VerifyPasswordResetErrors[keyof VerifyPasswordResetErrors];
+
+export type VerifyPasswordResetResponses = {
+    /**
+     * Phone verified for password reset
+     */
+    200: PasswordSetupChallenge;
+};
+
+export type VerifyPasswordResetResponse = VerifyPasswordResetResponses[keyof VerifyPasswordResetResponses];
+
+export type SetupPasswordData = {
+    body: {
+        setupToken: string;
+        password: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/auth/password/setup';
+};
+
+export type SetupPasswordErrors = {
+    /**
+     * User not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Invalid setup token
+     */
+    422: ApiErrorResponse;
+    /**
+     * Rate limited
+     */
+    429: ApiErrorResponse;
+};
+
+export type SetupPasswordError = SetupPasswordErrors[keyof SetupPasswordErrors];
+
+export type SetupPasswordResponses = {
+    /**
+     * Password set and logged in
+     */
+    200: AuthResponse;
+};
+
+export type SetupPasswordResponse = SetupPasswordResponses[keyof SetupPasswordResponses];
 
 export type LoginData = {
     body: {

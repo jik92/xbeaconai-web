@@ -47,16 +47,24 @@ const phone = `139${Date.now().toString().slice(-8)}`;
 const smsCode = await request("/api/auth/sms-code", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ phone }),
+  body: JSON.stringify({ phone, purpose: "register" }),
 });
 if (smsCode.status !== 200) throw new Error(`SMS_CODE_${smsCode.status}:${await smsCode.text()}`);
 const registration = await request("/api/auth/register", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ phone, password, displayName: "Seedance 实测", verificationCode: "246810" }),
+  body: JSON.stringify({ phone, verificationCode: "246810" }),
 });
 if (registration.status !== 201) throw new Error(`REGISTER_${registration.status}:${await registration.text()}`);
-const token = ((await registration.json()) as { token: string }).token;
+const setupToken = ((await registration.json()) as { setupToken: string }).setupToken;
+const passwordSetup = await request("/api/auth/password/setup", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ setupToken, password }),
+});
+if (passwordSetup.status !== 200)
+  throw new Error(`PASSWORD_SETUP_${passwordSetup.status}:${await passwordSetup.text()}`);
+const token = ((await passwordSetup.json()) as { token: string }).token;
 const auth = { Authorization: `Bearer ${token}` };
 
 async function upload(path: string, name: string, mimeType: string) {

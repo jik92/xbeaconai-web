@@ -37,6 +37,27 @@
           "error"
         ]
       },
+      "PasswordSetupChallenge": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "pattern": "^1[3-9]\\d{9}$"
+          },
+          "setupToken": {
+            "type": "string",
+            "minLength": 32
+          },
+          "expiresAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "phone",
+          "setupToken",
+          "expiresAt"
+        ]
+      },
       "AuthResponse": {
         "type": "object",
         "properties": {
@@ -2078,10 +2099,18 @@
                   "phone": {
                     "type": "string",
                     "pattern": "^1[3-9]\\d{9}$"
+                  },
+                  "purpose": {
+                    "type": "string",
+                    "enum": [
+                      "register",
+                      "reset_password"
+                    ]
                   }
                 },
                 "required": [
-                  "phone"
+                  "phone",
+                  "purpose"
                 ]
               }
             }
@@ -2107,6 +2136,16 @@
                     "expiresAt",
                     "retryAfterSeconds"
                   ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Phone not registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
             }
@@ -2161,24 +2200,11 @@
                   "verificationCode": {
                     "type": "string",
                     "pattern": "^\\d{6}$"
-                  },
-                  "password": {
-                    "type": "string",
-                    "minLength": 10,
-                    "maxLength": 128,
-                    "pattern": "[A-Za-z]"
-                  },
-                  "displayName": {
-                    "type": "string",
-                    "minLength": 2,
-                    "maxLength": 40
                   }
                 },
                 "required": [
                   "phone",
-                  "verificationCode",
-                  "password",
-                  "displayName"
+                  "verificationCode"
                 ]
               }
             }
@@ -2186,11 +2212,11 @@
         },
         "responses": {
           "201": {
-            "description": "Registered",
+            "description": "Registered and waiting for password setup",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AuthResponse"
+                  "$ref": "#/components/schemas/PasswordSetupChallenge"
                 }
               }
             }
@@ -2207,6 +2233,151 @@
           },
           "422": {
             "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/password/verify": {
+      "post": {
+        "operationId": "verifyPasswordReset",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "pattern": "^1[3-9]\\d{9}$"
+                  },
+                  "verificationCode": {
+                    "type": "string",
+                    "pattern": "^\\d{6}$"
+                  }
+                },
+                "required": [
+                  "phone",
+                  "verificationCode"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Phone verified for password reset",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordSetupChallenge"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Phone not registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Verification failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/password/setup": {
+      "post": {
+        "operationId": "setupPassword",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "setupToken": {
+                    "type": "string",
+                    "minLength": 32,
+                    "maxLength": 256
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 10,
+                    "maxLength": 128,
+                    "pattern": "[A-Za-z]"
+                  }
+                },
+                "required": [
+                  "setupToken",
+                  "password"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password set and logged in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid setup token",
             "content": {
               "application/json": {
                 "schema": {

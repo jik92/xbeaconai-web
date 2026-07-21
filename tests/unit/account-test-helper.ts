@@ -14,5 +14,11 @@ export async function registerTestAccount(
   input: { phone: string; password: string; displayName: string },
 ) {
   await store.sendRegistrationCode(input.phone);
-  return store.register({ ...input, verificationCode: TEST_SMS_CODE });
+  const challenge = await store.register({ phone: input.phone, verificationCode: TEST_SMS_CODE });
+  await store.setupPassword(challenge.setupToken, input.password);
+  const user = store.updateProfile(challenge.userId, {
+    displayName: input.displayName,
+    avatarText: input.displayName.slice(0, 2),
+  });
+  return { ...challenge, user };
 }

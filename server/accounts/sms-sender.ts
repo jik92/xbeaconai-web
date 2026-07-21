@@ -1,7 +1,7 @@
 export interface SmsMessage {
   phone: string;
   code: string;
-  purpose: "register";
+  purpose: "register" | "reset_password";
   expiresAt: string;
 }
 
