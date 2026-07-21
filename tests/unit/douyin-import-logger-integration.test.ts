@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { AccountStore } from "../../server/accounts/account-store";
 import type { ImportLogEvent, ImportStage } from "../../server/imports/import-logger";
 import { SqliteJobStore } from "../../server/jobs/sqlite-job-store";
+import { userPreferences, users } from "../../server/db/schema";
 import type { JobRecord } from "../../server/types";
 import { douyinVideoImportJob } from "../../worker/jobs/job-douyin-video-import";
 import type { JobHandlerContext } from "../../worker/jobs/types";
@@ -127,12 +128,16 @@ describe("import logger integration", () => {
     const created = makeSharedStoreAndAccounts();
     store = created.store;
     accounts = created.accounts;
-    const reg = await accounts.register({
-      email: `log-test-${crypto.randomUUID().slice(0, 8)}@example.com`,
-      password: "LogTest12345!@#$",
-      displayName: "Logger Test",
-    });
-    userId = reg.user.id;
+    // Create user directly via DB (bypass SMS verification for tests)
+    userId = crypto.randomUUID();
+    const phone = `138${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`;
+    const now = new Date().toISOString();
+    store.db.insert(users).values({
+      id: userId, phone, passwordHash: await Bun.password.hash("LogTest12345!@#$"),
+      displayName: "Logger Test", avatarText: "L", credits: 2480,
+      status: "active", passwordVersion: 1, createdAt: now, updatedAt: now,
+    }).run();
+    store.db.insert(userPreferences).values({ userId, updatedAt: now }).run();
     accounts.ensureDefaultAssetFolder(userId);
     const f = accounts.getAssetFolder(userId, accounts.getDefaultAssetFolderId(userId));
     if (!f) throw new Error("default folder not found");

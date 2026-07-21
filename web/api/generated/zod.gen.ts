@@ -81,7 +81,7 @@ export const zProviderCredentialName = z.enum([
     'MEDIAKIT_API_KEY'
 ]);
 
-export const zModuleId = z.enum([
+export const zJobModuleId = z.enum([
     'video-remix',
     'video-create',
     'ad-script',
@@ -93,13 +93,11 @@ export const zModuleId = z.enum([
     'video-renewal',
     'subtitle-erase',
     'video-enhancement',
+    'video-extract',
+    'video-editor',
     'kickart',
     'douyin-video-import',
     'share-content-import'
-    'video-extract',
-    'video-editor',
-    'kickart'
-
 ]);
 
 export const zSeedanceModelId = z.enum([
@@ -225,6 +223,23 @@ export const zJob = z.object({
     createdAt: z.string(),
     updatedAt: z.string()
 });
+
+export const zModuleId = z.enum([
+    'video-remix',
+    'video-create',
+    'ad-script',
+    'ai-generate',
+    'video-cut',
+    'media-understand',
+    'video-mashup',
+    'voice-clone',
+    'video-renewal',
+    'subtitle-erase',
+    'video-enhancement',
+    'video-extract',
+    'video-editor',
+    'kickart'
+]);
 
 export const zAdScriptInput = z.object({
     sceneCategory: z.enum(['marketing', 'placement']),
@@ -665,21 +680,6 @@ export const zVideoCreateProject = z.object({
     })),
     canCompose: z.boolean()
 });
-
-export const zModuleId = z.enum([
-    'video-remix',
-    'video-create',
-    'ad-script',
-    'ai-generate',
-    'video-cut',
-    'media-understand',
-    'video-mashup',
-    'voice-clone',
-    'video-renewal',
-    'subtitle-erase',
-    'video-enhancement',
-    'kickart'
-]);
 
 export const zShareParseResult = z.object({
     candidates: z.array(z.object({

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { AccountStore } from "../../server/accounts/account-store";
 import { env } from "../../server/env";
 import { SqliteJobStore } from "../../server/jobs/sqlite-job-store";
+import { userPreferences, users } from "../../server/db/schema";
 import type { JobRecord } from "../../server/types";
 import { douyinVideoImportJob } from "../../worker/jobs/job-douyin-video-import";
 import type { JobHandlerContext } from "../../worker/jobs/types";
@@ -124,13 +125,18 @@ describe("douyin import integration", () => {
     const created = makeStoreAndAccounts();
     store = created.store;
     accounts = created.accounts;
-    // Register a user
-    const registration = await accounts.register({
-      email: `test-${crypto.randomUUID().slice(0, 8)}@example.com`,
-      password: "Test1234!@#$password",
-      displayName: "Test User",
-    });
-    userId = registration.user.id;
+    // Create user directly via DB (bypass SMS verification for tests)
+    userId = crypto.randomUUID();
+    const phone = `138${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`;
+    const now = new Date().toISOString();
+    store.db.insert(users).values({
+      id: userId, phone, passwordHash: await Bun.password.hash("Test1234!@#$"),
+      displayName: "Test User", avatarText: "T", credits: 2480,
+      status: "active", passwordVersion: 1, createdAt: now, updatedAt: now,
+    }).run();
+    store.db.insert(userPreferences).values({
+      userId, updatedAt: now,
+    }).run();
     // Ensure default folder
     accounts.ensureDefaultAssetFolder(userId);
     const defaultFolderId = accounts.getDefaultAssetFolderId(userId);
@@ -224,15 +230,19 @@ describe("douyin import integration", () => {
   });
 
   test("rejects import to folder owned by another user", async () => {
-    // Create another user and their folder (same accounts instance, different user)
-    const otherRegistration = await accounts.register({
-      email: `other-${crypto.randomUUID().slice(0, 8)}@example.com`,
-      password: "OtherUser12345!@#",
-      displayName: "Other",
-    });
-    accounts.ensureDefaultAssetFolder(otherRegistration.user.id);
-    const otherFolderId = accounts.getDefaultAssetFolderId(otherRegistration.user.id);
-    const otherFolder = accounts.getAssetFolder(otherRegistration.user.id, otherFolderId)!;
+    // Create another user directly
+    const otherUserId = crypto.randomUUID();
+    const otherPhone = `139${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`;
+    const now = new Date().toISOString();
+    store.db.insert(users).values({
+      id: otherUserId, phone: otherPhone, passwordHash: await Bun.password.hash("OtherUser12345!@#"),
+      displayName: "Other", avatarText: "O", credits: 2480,
+      status: "active", passwordVersion: 1, createdAt: now, updatedAt: now,
+    }).run();
+    store.db.insert(userPreferences).values({ userId: otherUserId, updatedAt: now }).run();
+    accounts.ensureDefaultAssetFolder(otherUserId);
+    const otherFolderId = accounts.getDefaultAssetFolderId(otherUserId);
+    const otherFolder = accounts.getAssetFolder(otherUserId, otherFolderId)!;
 
     // Try to import to other user's folder using userId
     const job = makeJob(userId, otherFolder.id);

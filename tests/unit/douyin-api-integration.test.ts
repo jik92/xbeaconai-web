@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:tes
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { userPreferences, users } from "../../server/db/schema";
 
 // ── Isolated test database ──────────────────────────────────────────
 // The app module creates singletons at import time using env.databasePath.
@@ -52,14 +53,23 @@ describe("douyin API integration (isolated DB)", () => {
   let otherUserId: string;
   let otherFolderId: string;
 
+  function makePhone() { return `138${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`; }
+  async function createUser(phone: string, displayName: string) {
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    realStore.db.insert(users).values({
+      id, phone, passwordHash: await Bun.password.hash("ApiTest12345!@#$"),
+      displayName, avatarText: displayName.slice(0, 2), credits: 2480,
+      status: "active", passwordVersion: 1, createdAt: now, updatedAt: now,
+    }).run();
+    realStore.db.insert(userPreferences).values({ userId: id, updatedAt: now }).run();
+    return { id, phone, displayName, avatarText: displayName.slice(0, 2), credits: 2480, isAdmin: false };
+  }
+
   beforeEach(async () => {
-    const registration = await realAccounts.register({
-      email: `api-test-${crypto.randomUUID().slice(0, 8)}@example.com`,
-      password: "ApiTest12345!@#password",
-      displayName: "API Tester",
-    });
-    userId = registration.user.id;
-    const auth = await issueToken(realAccounts, registration.user);
+    const user = await createUser(makePhone(), "API Tester");
+    userId = user.id;
+    const auth = await issueToken(realAccounts, user);
     token = auth.token;
 
     realAccounts.ensureDefaultAssetFolder(userId);
@@ -67,12 +77,8 @@ describe("douyin API integration (isolated DB)", () => {
     const folder = realAccounts.getAssetFolder(userId, defaultId);
     folderId = folder!.id;
 
-    const otherReg = await realAccounts.register({
-      email: `api-other-${crypto.randomUUID().slice(0, 8)}@example.com`,
-      password: "OtherApiTest12345!",
-      displayName: "Other User",
-    });
-    otherUserId = otherReg.user.id;
+    const otherUser = await createUser(makePhone(), "Other User");
+    otherUserId = otherUser.id;
     realAccounts.ensureDefaultAssetFolder(otherUserId);
     const otherDefaultId = realAccounts.getDefaultAssetFolderId(otherUserId);
     const otherFolder = realAccounts.getAssetFolder(otherUserId, otherDefaultId);

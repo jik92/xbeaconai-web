@@ -255,7 +255,7 @@
           "MEDIAKIT_API_KEY"
         ]
       },
-      "ModuleId": {
+      "JobModuleId": {
         "type": "string",
         "enum": [
           "video-remix",
@@ -271,7 +271,9 @@
           "video-enhancement",
           "video-extract",
           "video-editor",
-          "kickart"
+          "kickart",
+          "douyin-video-import",
+          "share-content-import"
         ]
       },
       "SeedanceModelId": {
@@ -653,7 +655,7 @@
           "updatedAt"
         ]
       },
-      "JobModuleId": {
+      "ModuleId": {
         "type": "string",
         "enum": [
           "video-remix",
@@ -667,17 +669,9 @@
           "video-renewal",
           "subtitle-erase",
           "video-enhancement",
-          "kickart",
-          "douyin-video-import",
-          "share-content-import"
-        ]
-      },
-      "SeedanceModelId": {
-        "type": "string",
-        "enum": [
-          "doubao-seedance-2-0-260128",
-          "doubao-seedance-2-0-mini-260615",
-          "doubao-seedance-2-0-fast-260128"
+          "video-extract",
+          "video-editor",
+          "kickart"
         ]
       },
       "AdScriptProject": {
@@ -2061,23 +2055,6 @@
           "segmentCount",
           "requirements",
           "scriptStyle"
-        ]
-      },
-      "ModuleId": {
-        "type": "string",
-        "enum": [
-          "video-remix",
-          "video-create",
-          "ad-script",
-          "ai-generate",
-          "video-cut",
-          "media-understand",
-          "video-mashup",
-          "voice-clone",
-          "video-renewal",
-          "subtitle-erase",
-          "video-enhancement",
-          "kickart"
         ]
       },
       "ShareParseResult": {
