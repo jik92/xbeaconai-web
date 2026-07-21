@@ -5,7 +5,7 @@ import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
 import { parseVideoMashupConfig, type VideoMashupConfig } from "../shared/video-mashup/config";
-import { APP_CONFIG, isAdminEmail, isModuleOpen } from "../web/app/config";
+import { APP_CONFIG, isModuleOpen } from "../web/app/config";
 import type { ModuleId } from "../web/entities/types";
 import {
   AccountError,
@@ -291,7 +291,7 @@ export const videoCreates = new VideoCreateStore();
 export const queue = new BullJobQueue();
 function adminUser(userId: string) {
   const user = accounts.getUser(userId);
-  return Boolean(user && isAdminEmail(user.email));
+  return Boolean(user?.isAdmin);
 }
 type AppEnv = { Variables: { userId: string; sessionId: string } };
 const app = new OpenAPIHono<AppEnv>();
@@ -301,6 +301,7 @@ const publicApiPaths = new Set([
   "/api/models",
   "/api/creation/capabilities",
   "/api/auth/register",
+  "/api/auth/sms-code",
   "/api/auth/login",
   "/api/auth/logout",
 ]);
@@ -434,10 +435,11 @@ app.openapi(healthRoute, (c) =>
 const UserSchema = z
   .object({
     id: z.string().uuid(),
-    email: z.string().email(),
+    phone: z.string().regex(/^1[3-9]\d{9}$/),
     displayName: z.string(),
     avatarText: z.string(),
     credits: z.number().int().nonnegative(),
+    isAdmin: z.boolean(),
   })
   .openapi("UserSummary");
 const AuthSchema = z
@@ -449,6 +451,14 @@ const PasswordSchema = z
   .max(128)
   .regex(/[A-Za-z]/, "密码必须包含字母")
   .regex(/[0-9]/, "密码必须包含数字");
+const PhoneSchema = z
+  .string()
+  .trim()
+  .regex(/^1[3-9]\d{9}$/, "请输入有效的中国大陆手机号");
+const VerificationCodeSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{6}$/, "请输入 6 位数字验证码");
 const authRate = new Map<string, { count: number; reset: number }>();
 function rateLimited(key: string) {
   const time = Date.now(),
@@ -461,6 +471,61 @@ function rateLimited(key: string) {
   return entry.count > env.authRateLimitMax;
 }
 
+const sendSmsCodeRoute = createRoute({
+  method: "post",
+  path: "/api/auth/sms-code",
+  operationId: "sendSmsVerificationCode",
+  request: {
+    body: { required: true, content: { "application/json": { schema: z.object({ phone: PhoneSchema }) } } },
+  },
+  responses: {
+    200: {
+      description: "Verification code sent",
+      content: {
+        "application/json": {
+          schema: z.object({ expiresAt: z.string(), retryAfterSeconds: z.number().int().min(1) }),
+        },
+      },
+    },
+    409: { description: "Phone exists", content: { "application/json": { schema: ErrorSchema } } },
+    422: { description: "Invalid phone", content: { "application/json": { schema: ErrorSchema } } },
+    429: { description: "Rate limited", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(sendSmsCodeRoute, async (c) => {
+  const phone = c.req.valid("json").phone;
+  if (rateLimited(`sms:${c.req.header("x-forwarded-for") ?? "local"}`))
+    return c.json(
+      {
+        error: {
+          code: "RATE_LIMITED",
+          message: "验证码请求过于频繁，请稍后再试",
+          retryable: true,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      429,
+    );
+  try {
+    return c.json(await accounts.sendRegistrationCode(phone), 200);
+  } catch (error) {
+    if (error instanceof AccountError) {
+      const body = {
+        error: {
+          code: error.code,
+          message: error.message,
+          retryable: error.status === 429,
+          requestId: crypto.randomUUID(),
+        },
+      };
+      if (error.status === 409) return c.json(body, 409);
+      if (error.status === 429) return c.json(body, 429);
+      return c.json(body, 422);
+    }
+    throw error;
+  }
+});
+
 const registerRoute = createRoute({
   method: "post",
   path: "/api/auth/register",
@@ -471,7 +536,8 @@ const registerRoute = createRoute({
       content: {
         "application/json": {
           schema: z.object({
-            email: z.string().email().max(254),
+            phone: PhoneSchema,
+            verificationCode: VerificationCodeSchema,
             password: PasswordSchema,
             displayName: z.string().trim().min(2).max(40),
           }),
@@ -481,7 +547,7 @@ const registerRoute = createRoute({
   },
   responses: {
     201: { description: "Registered", content: { "application/json": { schema: AuthSchema } } },
-    409: { description: "Email exists", content: { "application/json": { schema: ErrorSchema } } },
+    409: { description: "Phone exists", content: { "application/json": { schema: ErrorSchema } } },
     422: { description: "Validation error", content: { "application/json": { schema: ErrorSchema } } },
     429: { description: "Rate limited", content: { "application/json": { schema: ErrorSchema } } },
   },
@@ -517,11 +583,14 @@ app.openapi(registerRoute, async (c) => {
       );
     return c.json(await issueToken(accounts, registration.user), 201);
   } catch (error) {
-    if (error instanceof AccountError && error.status === 409)
-      return c.json(
-        { error: { code: error.code, message: error.message, retryable: false, requestId: crypto.randomUUID() } },
-        409,
-      );
+    if (error instanceof AccountError) {
+      const body = {
+        error: { code: error.code, message: error.message, retryable: false, requestId: crypto.randomUUID() },
+      };
+      if (error.status === 409) return c.json(body, 409);
+      if (error.status === 429) return c.json(body, 429);
+      return c.json(body, 422);
+    }
     throw error;
   }
 });
@@ -534,7 +603,7 @@ const loginRoute = createRoute({
     body: {
       required: true,
       content: {
-        "application/json": { schema: z.object({ email: z.string().email(), password: z.string().min(1).max(128) }) },
+        "application/json": { schema: z.object({ phone: PhoneSchema, password: z.string().min(1).max(128) }) },
       },
     },
   },
@@ -559,7 +628,7 @@ app.openapi(loginRoute, async (c) => {
     );
   try {
     const body = c.req.valid("json"),
-      user = await accounts.verifyCredentials(body.email, body.password);
+      user = await accounts.verifyCredentials(body.phone, body.password);
     return c.json(await issueToken(accounts, user), 200);
   } catch (error) {
     if (error instanceof AccountError)
@@ -619,7 +688,6 @@ const profileRoute = createRoute({
       content: {
         "application/json": {
           schema: z.object({
-            email: z.string().email().max(254),
             displayName: z.string().trim().min(2).max(40),
             avatarText: z.string().trim().min(1).max(2),
           }),
@@ -632,20 +700,10 @@ const profileRoute = createRoute({
       description: "Updated profile",
       content: { "application/json": { schema: z.object({ user: UserSchema }) } },
     },
-    409: { description: "Email exists", content: { "application/json": { schema: ErrorSchema } } },
   },
 });
 app.openapi(profileRoute, (c) => {
-  try {
-    return c.json({ user: accounts.updateProfile(c.get("userId"), c.req.valid("json")) }, 200);
-  } catch (error) {
-    if (error instanceof AccountError)
-      return c.json(
-        { error: { code: error.code, message: error.message, retryable: false, requestId: crypto.randomUUID() } },
-        409,
-      );
-    throw error;
-  }
+  return c.json({ user: accounts.updateProfile(c.get("userId"), c.req.valid("json")) }, 200);
 });
 
 const changePasswordRoute = createRoute({
@@ -1757,7 +1815,7 @@ const AdminCredentialSchema = z.object({
   maskedValue: z.string().optional(),
   updatedAt: z.string().optional(),
 });
-const AdminJobSchema = JobSchema.extend({ ownerEmail: z.string() });
+const AdminJobSchema = JobSchema.extend({ ownerPhone: z.string() });
 const AdminEnvKeyImportSchema = z.object({
   updated: z.array(ProviderCredentialNameSchema),
   skipped: z.array(ProviderCredentialNameSchema),
@@ -1973,7 +2031,7 @@ const listAdminJobsRoute = createRoute({
       pageSize: z.coerce.number().int().min(10).max(100).default(25),
       moduleId: ModuleSchema.optional(),
       status: JobStatusSchema.optional(),
-      email: z.string().trim().max(254).optional(),
+      phone: z.string().trim().max(32).optional(),
     }),
   },
   responses: {

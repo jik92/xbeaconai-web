@@ -82,6 +82,25 @@
   display: flex;
   position: relative;
 }
+.verification-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 112px;
+  gap: 8px;
+}
+.verification-field button {
+  height: 42px;
+  margin-top: 7px;
+  border: 1px solid #cfd8e6;
+  border-radius: 8px;
+  background: #f7f9fc;
+  color: #246bfd;
+  font-size: 12px;
+  font-weight: 700;
+}
+.verification-field button:disabled {
+  color: #9aa4b2;
+  cursor: not-allowed;
+}
 .password-field input {
   padding-right: 42px;
 }
@@ -102,6 +121,14 @@
   font-size: 11px;
   color: #c83e51;
   background: #fff0f2;
+  border-radius: 7px;
+  padding: 9px;
+  margin: 10px 0;
+}
+.form-notice {
+  font-size: 11px;
+  color: #24734a;
+  background: #edf9f2;
   border-radius: 7px;
   padding: 9px;
   margin: 10px 0;

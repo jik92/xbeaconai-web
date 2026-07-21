@@ -6,6 +6,7 @@ import {
   login as loginRequest,
   logout as logoutRequest,
   register as registerRequest,
+  sendSmsVerificationCode,
 } from "@/api/generated/sdk.gen";
 import type { UserSummary } from "@/api/generated/types.gen";
 
@@ -22,13 +23,14 @@ function configureClient(token = getAuthToken()) {
   });
 }
 
-type Credentials = { email: string; password: string };
-type RegisterInput = Credentials & { displayName: string };
+type Credentials = { phone: string; password: string };
+type RegisterInput = Credentials & { displayName: string; verificationCode: string };
 type AuthContextValue = {
   status: "loading" | "anonymous" | "authenticated";
   user?: UserSummary;
   login: (input: Credentials) => Promise<void>;
   register: (input: RegisterInput) => Promise<void>;
+  sendRegistrationCode: (phone: string) => Promise<{ expiresAt: string; retryAfterSeconds: number }>;
   logout: () => Promise<void>;
   setUser: (user: UserSummary) => void;
   refresh: () => Promise<void>;
@@ -87,6 +89,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     [accept],
   );
+  const sendRegistrationCode = useCallback(async (phone: string) => {
+    configureClient(null);
+    const { data } = await sendSmsVerificationCode({ body: { phone }, throwOnError: true });
+    if (!data) throw new Error("验证码发送失败");
+    return data;
+  }, []);
   const logout = useCallback(async () => {
     try {
       configureClient();
@@ -98,8 +106,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [clear]);
   const value = useMemo(
-    () => ({ status, user, login, register, logout, setUser: setUserState, refresh }),
-    [status, user, login, register, logout, refresh],
+    () => ({ status, user, login, register, sendRegistrationCode, logout, setUser: setUserState, refresh }),
+    [status, user, login, register, sendRegistrationCode, logout, refresh],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

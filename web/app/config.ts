@@ -14,7 +14,6 @@ export interface MenuFeatureConfig {
 
 export interface PublicAppConfig {
   readonly projectName: string;
-  readonly adminEmails: readonly string[];
   readonly providerDefaults: {
     readonly openai: { readonly baseUrl: string; readonly videoAnalysisModel: string };
     readonly volcSpeech: {
@@ -36,7 +35,6 @@ export interface PublicAppConfig {
  */
 export const APP_CONFIG = {
   projectName: "烽火AI",
-  adminEmails: ["zuo.zhong@163.com"],
   providerDefaults: {
     openai: {
       baseUrl: "https://aihubmix.com",
@@ -85,11 +83,6 @@ export const APP_CONFIG = {
     },
   },
 } as const satisfies PublicAppConfig;
-
-export function isAdminEmail(email: string, config: PublicAppConfig = APP_CONFIG): boolean {
-  const normalized = email.trim().toLowerCase();
-  return config.adminEmails.some((item) => item.trim().toLowerCase() === normalized);
-}
 
 const MODULE_GROUP = {
   "video-remix": "creationWorkflow",

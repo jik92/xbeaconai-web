@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { listNotifications } from "@/api/generated/sdk.gen";
-import { APP_CONFIG, isAdminEmail, isAssetOpen, isModuleOpen } from "@/app/config";
+import { APP_CONFIG, isAssetOpen, isModuleOpen } from "@/app/config";
 import { modules } from "@/app/routes";
 import { useAuth } from "@/features/account/auth-context";
 import { AuthScreen } from "@/features/account/auth-screen";
@@ -274,7 +274,7 @@ export function AppShell() {
               </nav>
             );
           })}
-          {isAdminEmail(user.email) && (
+          {user.isAdmin && (
             <nav aria-label="系统管理">
               <h3>系统管理</h3>
               <Link

@@ -15,7 +15,6 @@ import {
   uploadAdminEnvKey,
 } from "@/api/api-client";
 import type { ModuleId, ProviderCredentialName } from "@/api/generated/types.gen";
-import { isAdminEmail } from "@/app/config";
 import { DataTable } from "@/components/ui/data-table";
 import { apiErrorMessage, useAuth } from "@/features/account/auth-context";
 import "./admin-page.css";
@@ -148,17 +147,17 @@ function JobsPanel() {
   const [page, setPage] = useState(1);
   const [moduleId, setModuleId] = useState("");
   const [status, setStatus] = useState("");
-  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [selected, setSelected] = useState<AdminJob>();
   const query = useQuery({
-    queryKey: ["admin-jobs", page, moduleId, status, email],
+    queryKey: ["admin-jobs", page, moduleId, status, phone],
     queryFn: () =>
       fetchAdminJobs({
         page,
         pageSize: 25,
         moduleId: moduleId ? (moduleId as ModuleId) : undefined,
         status: status ? (status as AdminJob["status"]) : undefined,
-        email: email.trim() || undefined,
+        phone: phone.trim() || undefined,
       }),
     refetchInterval: 5_000,
   });
@@ -174,7 +173,7 @@ function JobsPanel() {
           </button>
         ),
       },
-      { accessorKey: "ownerEmail", header: "用户", size: 210 },
+      { accessorKey: "ownerPhone", header: "用户", size: 160 },
       { accessorKey: "moduleId", header: "模块", size: 150 },
       { accessorKey: "title", header: "标题", size: 220 },
       {
@@ -214,11 +213,11 @@ function JobsPanel() {
     <div className="admin-jobs">
       <div className="admin-job-filters">
         <input
-          placeholder="搜索用户邮箱"
-          value={email}
+          placeholder="搜索用户手机号"
+          value={phone}
           onChange={(event) => {
             setPage(1);
-            setEmail(event.target.value);
+            setPhone(event.target.value.replace(/\D/g, "").slice(0, 11));
           }}
         />
         <select
@@ -294,7 +293,7 @@ function JobsPanel() {
               <dt>任务 ID</dt>
               <dd>{selected.id}</dd>
               <dt>用户</dt>
-              <dd>{selected.ownerEmail}</dd>
+              <dd>{selected.ownerPhone}</dd>
               <dt>阶段</dt>
               <dd>{selected.stage}</dd>
               <dt>Provider 状态</dt>
@@ -321,7 +320,7 @@ export function AdminPage() {
   const [importNotice, setImportNotice] = useState("");
   const [importFailed, setImportFailed] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
-  if (!user || !isAdminEmail(user.email)) return <Navigate to="/" />;
+  if (!user?.isAdmin) return <Navigate to="/" />;
   const importFile = async (file?: File) => {
     if (!file) return;
     setUploading(true);

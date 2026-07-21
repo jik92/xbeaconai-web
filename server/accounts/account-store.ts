@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { APP_CONFIG } from "../../web/app/config";
 import { type AppDatabase, openDatabase } from "../db/database";
@@ -10,17 +11,20 @@ import {
   migrationState,
   notifications,
   rechargeOrders,
+  smsVerificationCodes,
   userPreferences,
   users,
 } from "../db/schema";
 import { env } from "../env";
+import { ConsoleSmsSender, type SmsSender } from "./sms-sender";
 
 export interface UserSummary {
   id: string;
-  email: string;
+  phone: string;
   displayName: string;
   avatarText: string;
   credits: number;
+  isAdmin: boolean;
 }
 export interface Preferences {
   theme: "light" | "system";
@@ -95,7 +99,7 @@ export class AccountError extends Error {
   constructor(
     readonly code: string,
     message: string,
-    readonly status: 400 | 401 | 404 | 409 | 422 = 400,
+    readonly status: 400 | 401 | 404 | 409 | 422 | 429 = 400,
   ) {
     super(message);
   }
@@ -112,14 +116,16 @@ type MediaAssetRow = typeof mediaAssets.$inferSelect;
 type AssetFolderRow = typeof assetFolders.$inferSelect;
 type OrderRow = typeof rechargeOrders.$inferSelect;
 
-const normalizeEmail = (email: string) => email.trim().toLowerCase();
+export const normalizePhone = (phone: string) => phone.trim().replaceAll(/[^\d]/g, "");
+export const isMainlandPhone = (phone: string) => /^1[3-9]\d{9}$/.test(normalizePhone(phone));
 const now = () => new Date().toISOString();
 const userSummary = (row: UserRow): UserSummary => ({
   id: row.id,
-  email: row.email,
+  phone: row.phone,
   displayName: row.displayName,
   avatarText: row.avatarText,
   credits: row.credits,
+  isAdmin: row.phone === env.adminPhone,
 });
 const mediaAsset = (row: MediaAssetRow): MediaAsset => ({
   id: row.id,
@@ -150,11 +156,17 @@ const assetFolder = (row: AssetFolderRow): AssetFolder => ({
 export class AccountStore {
   readonly db: AppDatabase;
   private readonly client: ReturnType<typeof openDatabase>["client"];
+  private readonly smsSender: SmsSender;
+  private readonly generateSmsCode: () => string;
 
-  constructor(path = env.databasePath) {
+  constructor(path = env.databasePath, options: { smsSender?: SmsSender; generateSmsCode?: () => string } = {}) {
     const connection = openDatabase(path);
     this.client = connection.client;
     this.db = connection.db;
+    this.smsSender = options.smsSender ?? new ConsoleSmsSender();
+    this.generateSmsCode =
+      options.generateSmsCode ??
+      (() => env.smsVerificationFixedCode || randomInt(0, 1_000_000).toString().padStart(6, "0"));
     this.db
       .update(mediaAssets)
       .set({ displayName: mediaAssets.originalName })
@@ -166,8 +178,69 @@ export class AccountStore {
     this.client.close();
   }
 
-  async register(input: { email: string; password: string; displayName: string }) {
-    const email = normalizeEmail(input.email);
+  async sendRegistrationCode(rawPhone: string) {
+    const phone = normalizePhone(rawPhone);
+    if (!isMainlandPhone(phone)) throw new AccountError("INVALID_PHONE", "请输入有效的中国大陆手机号", 422);
+    if (this.db.select({ id: users.id }).from(users).where(eq(users.phone, phone)).get())
+      throw new AccountError("PHONE_ALREADY_REGISTERED", "该手机号已注册", 409);
+    const recent = this.db
+      .select()
+      .from(smsVerificationCodes)
+      .where(and(eq(smsVerificationCodes.phone, phone), eq(smsVerificationCodes.purpose, "register")))
+      .orderBy(desc(smsVerificationCodes.createdAt))
+      .get();
+    if (recent) {
+      const retryAfterSeconds = Math.ceil((Date.parse(recent.createdAt) + 60_000 - Date.now()) / 1_000);
+      if (retryAfterSeconds > 0)
+        throw new AccountError("SMS_CODE_COOLDOWN", `请在 ${retryAfterSeconds} 秒后重新获取验证码`, 429);
+    }
+    const code = this.generateSmsCode();
+    if (!/^\d{6}$/.test(code)) throw new Error("SMS verification code generator must return 6 digits");
+    const createdAt = now();
+    const expiresAt = new Date(Date.now() + 5 * 60_000).toISOString();
+    const codeHash = await Bun.password.hash(code);
+    const id = crypto.randomUUID();
+    this.db
+      .insert(smsVerificationCodes)
+      .values({ id, phone, purpose: "register", codeHash, expiresAt, createdAt })
+      .run();
+    try {
+      await this.smsSender.send({ phone, code, purpose: "register", expiresAt });
+    } catch (error) {
+      this.db.delete(smsVerificationCodes).where(eq(smsVerificationCodes.id, id)).run();
+      throw error;
+    }
+    return { expiresAt, retryAfterSeconds: 60 };
+  }
+
+  async register(input: { phone: string; password: string; displayName: string; verificationCode: string }) {
+    const phone = normalizePhone(input.phone);
+    if (!isMainlandPhone(phone)) throw new AccountError("INVALID_PHONE", "请输入有效的中国大陆手机号", 422);
+    const verification = this.db
+      .select()
+      .from(smsVerificationCodes)
+      .where(and(eq(smsVerificationCodes.phone, phone), eq(smsVerificationCodes.purpose, "register")))
+      .orderBy(desc(smsVerificationCodes.createdAt))
+      .get();
+    if (!verification || verification.consumedAt) throw new AccountError("SMS_CODE_INVALID", "验证码错误或已失效", 422);
+    if (Date.parse(verification.expiresAt) <= Date.now())
+      throw new AccountError("SMS_CODE_EXPIRED", "验证码已过期，请重新获取", 422);
+    if (verification.attempts >= 5)
+      throw new AccountError("SMS_CODE_ATTEMPTS_EXCEEDED", "验证码错误次数过多，请重新获取", 422);
+    const codeValid = await Bun.password.verify(input.verificationCode, verification.codeHash);
+    if (!codeValid) {
+      const attempts = verification.attempts + 1;
+      this.db
+        .update(smsVerificationCodes)
+        .set({ attempts, consumedAt: attempts >= 5 ? now() : null })
+        .where(and(eq(smsVerificationCodes.id, verification.id), isNull(smsVerificationCodes.consumedAt)))
+        .run();
+      throw new AccountError(
+        attempts >= 5 ? "SMS_CODE_ATTEMPTS_EXCEEDED" : "SMS_CODE_INVALID",
+        attempts >= 5 ? "验证码错误次数过多，请重新获取" : "验证码错误",
+        422,
+      );
+    }
     const passwordHash = await Bun.password.hash(input.password);
     const id = crypto.randomUUID();
     const created = now();
@@ -177,7 +250,7 @@ export class AccountStore {
           tx.insert(users)
             .values({
               id,
-              email,
+              phone,
               passwordHash,
               displayName: input.displayName.trim(),
               avatarText: input.displayName.trim().slice(0, 2) || "曜",
@@ -185,6 +258,16 @@ export class AccountStore {
               updatedAt: created,
             })
             .run();
+          tx.update(smsVerificationCodes)
+            .set({ consumedAt: created })
+            .where(and(eq(smsVerificationCodes.id, verification.id), isNull(smsVerificationCodes.consumedAt)))
+            .run();
+          const consumed = tx
+            .select({ consumedAt: smsVerificationCodes.consumedAt })
+            .from(smsVerificationCodes)
+            .where(eq(smsVerificationCodes.id, verification.id))
+            .get();
+          if (consumed?.consumedAt !== created) throw new AccountError("SMS_CODE_INVALID", "验证码已被使用", 422);
           const defaultFolderId = crypto.randomUUID();
           tx.insert(assetFolders)
             .values({
@@ -222,23 +305,24 @@ export class AccountStore {
       if (!user) throw new Error("注册后无法读取账号");
       return { user, claimedLegacy };
     } catch (error) {
-      if (String(error).includes("UNIQUE")) throw new AccountError("EMAIL_ALREADY_REGISTERED", "该邮箱已注册", 409);
+      if (String(error).includes("UNIQUE")) throw new AccountError("PHONE_ALREADY_REGISTERED", "该手机号已注册", 409);
       throw error;
     }
   }
 
-  async verifyCredentials(email: string, password: string) {
+  async verifyCredentials(phone: string, password: string) {
     const row = this.db
       .select()
       .from(users)
-      .where(eq(users.email, normalizeEmail(email)))
+      .where(eq(users.phone, normalizePhone(phone)))
       .get();
     const valid = row
       ? await Bun.password.verify(password, row.passwordHash)
       : await Bun.password
           .verify(password, "$2b$10$7EqJtq98hPqEX7fNZaFWoOhiLK9IrXAMiE0gfs7JZ/fH5rVgqpE7i")
           .catch(() => false);
-    if (!row || !valid || row.status !== "active") throw new AccountError("INVALID_CREDENTIALS", "邮箱或密码错误", 401);
+    if (!row || !valid || row.status !== "active")
+      throw new AccountError("INVALID_CREDENTIALS", "手机号或密码错误", 401);
     return userSummary(row);
   }
 
@@ -295,22 +379,16 @@ export class AccountStore {
       .run();
   }
 
-  updateProfile(userId: string, input: { email: string; displayName: string; avatarText: string }) {
-    try {
-      this.db
-        .update(users)
-        .set({
-          email: normalizeEmail(input.email),
-          displayName: input.displayName.trim(),
-          avatarText: input.avatarText.trim().slice(0, 2),
-          updatedAt: now(),
-        })
-        .where(eq(users.id, userId))
-        .run();
-    } catch (error) {
-      if (String(error).includes("UNIQUE")) throw new AccountError("EMAIL_ALREADY_REGISTERED", "该邮箱已被使用", 409);
-      throw error;
-    }
+  updateProfile(userId: string, input: { displayName: string; avatarText: string }) {
+    this.db
+      .update(users)
+      .set({
+        displayName: input.displayName.trim(),
+        avatarText: input.avatarText.trim().slice(0, 2),
+        updatedAt: now(),
+      })
+      .where(eq(users.id, userId))
+      .run();
     const user = this.getUser(userId);
     if (!user) throw new AccountError("USER_NOT_FOUND", "账号不存在", 404);
     return user;

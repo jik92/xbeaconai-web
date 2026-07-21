@@ -7,7 +7,7 @@ export const users = sqliteTable(
   "users",
   {
     id: text("id").primaryKey(),
-    email: text("email").notNull().unique(),
+    phone: text("phone").notNull().unique(),
     passwordHash: text("password_hash").notNull(),
     displayName: text("display_name").notNull(),
     avatarText: text("avatar_text").notNull(),
@@ -19,7 +19,22 @@ export const users = sqliteTable(
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
-  (table) => [uniqueIndex("users_email_idx").on(table.email)],
+  (table) => [uniqueIndex("users_phone_idx").on(table.phone)],
+);
+
+export const smsVerificationCodes = sqliteTable(
+  "sms_verification_codes",
+  {
+    id: text("id").primaryKey(),
+    phone: text("phone").notNull(),
+    purpose: text("purpose", { enum: ["register"] }).notNull(),
+    codeHash: text("code_hash").notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    expiresAt: text("expires_at").notNull(),
+    consumedAt: text("consumed_at"),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [index("sms_codes_phone_purpose_created_idx").on(table.phone, table.purpose, table.createdAt)],
 );
 
 export const providerCredentials = sqliteTable("provider_credentials", {

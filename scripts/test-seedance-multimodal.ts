@@ -9,6 +9,7 @@ const tempDir = await mkdtemp(resolve(tmpdir(), "yaozuo-seedance-matrix-"));
 process.env.YAOZUO_DATA_DIR = tempDir;
 process.env.ALLOW_MOCK_FALLBACK = "false";
 process.env.FORCE_MOCK = "false";
+process.env.SMS_VERIFICATION_FIXED_CODE = "246810";
 await mkdir(resolve(tempDir, "results"), { recursive: true });
 const capabilitySource = Bun.file(resolve(".data/capabilities.json"));
 if (!(await capabilitySource.exists())) throw new Error("MODEL_CAPABILITY_REPORT_REQUIRED");
@@ -42,10 +43,17 @@ await extractFrame(fixtureVideo, fixtureImage);
 await extractAudio(fixtureVideo, fixtureAudio);
 const request = (path: string, init: RequestInit = {}) => app.request(`http://${env.host}:${env.port}${path}`, init);
 const password = "SeedanceMatrix12345";
+const phone = `139${Date.now().toString().slice(-8)}`;
+const smsCode = await request("/api/auth/sms-code", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ phone }),
+});
+if (smsCode.status !== 200) throw new Error(`SMS_CODE_${smsCode.status}:${await smsCode.text()}`);
 const registration = await request("/api/auth/register", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ email: `seedance-matrix-${Date.now()}@example.com`, password, displayName: "Seedance 实测" }),
+  body: JSON.stringify({ phone, password, displayName: "Seedance 实测", verificationCode: "246810" }),
 });
 if (registration.status !== 201) throw new Error(`REGISTER_${registration.status}:${await registration.text()}`);
 const token = ((await registration.json()) as { token: string }).token;

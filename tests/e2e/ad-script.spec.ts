@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
+import { registerFromAuthScreen } from "./auth-helpers";
 
-test.beforeEach(async ({ page }, testInfo) => {
+test.beforeEach(async ({ page }) => {
   await page.goto("/aigc/ad-script");
   if (
     await page
@@ -8,12 +9,7 @@ test.beforeEach(async ({ page }, testInfo) => {
       .isVisible()
       .catch(() => false)
   ) {
-    await page.getByRole("button", { name: "注册", exact: true }).click();
-    await page.getByLabel("显示名称").fill("口播脚本测试用户");
-    await page.getByLabel("邮箱").fill(`ad-script-${testInfo.project.name}-${crypto.randomUUID()}@example.test`);
-    await page.locator('input[type="password"]').fill("AdScript2026");
-    await page.getByRole("button", { name: "创建账号并登录" }).click();
-    await expect(page.locator(".auth-page")).toBeHidden();
+    await registerFromAuthScreen(page, "口播脚本测试用户", "AdScript2026");
     await page.goto("/aigc/ad-script");
   }
 });

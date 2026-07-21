@@ -2,7 +2,6 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { AccountStore } from "../../server/accounts/account-store";
 import { AdScriptStore, AdScriptVersionConflictError } from "../../server/ad-script/ad-script-store";
 import { checkAdScriptCompliance } from "../../server/ad-script/compliance";
 import { parseAdScriptModelJson } from "../../server/ad-script/model";
@@ -15,6 +14,7 @@ import {
   totalScore,
 } from "../../server/ad-script/types";
 import type { JobRecord } from "../../server/types";
+import { createTestAccountStore, registerTestAccount } from "./account-test-helper";
 
 const databases: string[] = [];
 afterEach(() => {
@@ -98,15 +98,15 @@ describe("ad script domain", () => {
   test("isolates owners, versions batches, and only refunds a fully failed batch once", async () => {
     const path = join(tmpdir(), `ad-script-${crypto.randomUUID()}.sqlite`);
     databases.push(path);
-    const accounts = new AccountStore(path);
+    const accounts = createTestAccountStore(path);
     const store = new AdScriptStore(path);
-    const registration = await accounts.register({
-      email: "ad-script@example.com",
+    const registration = await registerTestAccount(accounts, {
+      phone: "13800000007",
       password: "Password123",
       displayName: "脚本用户",
     });
-    const otherUser = await accounts.register({
-      email: "ad-script-other@example.com",
+    const otherUser = await registerTestAccount(accounts, {
+      phone: "13800000008",
       password: "Password123",
       displayName: "其他用户",
     });

@@ -184,15 +184,15 @@ export class SqliteJobStore {
     pageSize: number;
     moduleId?: ModuleId;
     status?: JobRecord["status"];
-    email?: string;
+    phone?: string;
   }) {
     const conditions: SQL[] = [];
     if (input.moduleId) conditions.push(eq(jobs.moduleId, input.moduleId));
     if (input.status) conditions.push(eq(jobs.status, input.status));
-    if (input.email?.trim()) conditions.push(like(users.email, `%${input.email.trim().toLowerCase()}%`));
+    if (input.phone?.trim()) conditions.push(like(users.phone, `%${input.phone.trim()}%`));
     const where = conditions.length ? and(...conditions) : undefined;
     const rows = this.db
-      .select({ job: jobs, ownerEmail: users.email })
+      .select({ job: jobs, ownerPhone: users.phone })
       .from(jobs)
       .leftJoin(users, eq(jobs.ownerUserId, users.id))
       .where(where)
@@ -204,7 +204,7 @@ export class SqliteJobStore {
       this.db.select({ value: count() }).from(jobs).leftJoin(users, eq(jobs.ownerUserId, users.id)).where(where).get()
         ?.value ?? 0;
     return {
-      jobs: rows.map((row) => ({ ...this.fromRow(row.job), ownerEmail: row.ownerEmail ?? "legacy" })),
+      jobs: rows.map((row) => ({ ...this.fromRow(row.job), ownerPhone: row.ownerPhone ?? "legacy" })),
       total,
       page: input.page,
       pageSize: input.pageSize,

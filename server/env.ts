@@ -38,6 +38,8 @@ export const env = {
   tos: APP_CONFIG.providerDefaults.tos,
   jwtSecret: process.env.JWT_SECRET ?? generatedJwtSecret,
   authRateLimitMax: Number(process.env.AUTH_RATE_LIMIT_MAX ?? 12),
+  adminPhone: process.env.ADMIN_PHONE ?? "17688743518",
+  smsVerificationFixedCode: process.env.SMS_VERIFICATION_FIXED_CODE ?? "",
   allowedOrigins: new Set([
     "http://127.0.0.1:5173",
     "http://localhost:5173",
@@ -48,6 +50,9 @@ export const env = {
     ...configuredAllowedOrigins,
   ]),
 };
+
+if (process.env.NODE_ENV === "production" && env.smsVerificationFixedCode)
+  throw new Error("生产环境禁止配置 SMS_VERIFICATION_FIXED_CODE");
 
 if (process.env.NODE_ENV === "production" && env.byokEncryptionKey.length < 32)
   throw new Error("生产启动必须配置至少 32 字符的 BYOK_ENCRYPTION_KEY");

@@ -2,21 +2,6 @@
 
 import * as z from 'zod';
 
-export const zUserSummary = z.object({
-    id: z.uuid(),
-    email: z.email(),
-    displayName: z.string(),
-    avatarText: z.string(),
-    credits: z.int().gte(0)
-});
-
-export const zAuthResponse = z.object({
-    token: z.string(),
-    tokenType: z.enum(['Bearer']),
-    expiresAt: z.string(),
-    user: zUserSummary
-});
-
 export const zApiErrorResponse = z.object({
     error: z.object({
         code: z.string(),
@@ -24,6 +9,22 @@ export const zApiErrorResponse = z.object({
         retryable: z.boolean(),
         requestId: z.string()
     })
+});
+
+export const zUserSummary = z.object({
+    id: z.uuid(),
+    phone: z.string().regex(/^1[3-9]\d{9}$/),
+    displayName: z.string(),
+    avatarText: z.string(),
+    credits: z.int().gte(0),
+    isAdmin: z.boolean()
+});
+
+export const zAuthResponse = z.object({
+    token: z.string(),
+    tokenType: z.enum(['Bearer']),
+    expiresAt: z.string(),
+    user: zUserSummary
 });
 
 export const zPreferences = z.object({
@@ -665,8 +666,21 @@ export const zGetHealthResponse = z.object({
     queue: z.enum(['bullmq'])
 });
 
+export const zSendSmsVerificationCodeBody = z.object({
+    phone: z.string().regex(/^1[3-9]\d{9}$/)
+});
+
+/**
+ * Verification code sent
+ */
+export const zSendSmsVerificationCodeResponse = z.object({
+    expiresAt: z.string(),
+    retryAfterSeconds: z.int().gte(1)
+});
+
 export const zRegisterBody = z.object({
-    email: z.email().max(254),
+    phone: z.string().regex(/^1[3-9]\d{9}$/),
+    verificationCode: z.string().regex(/^\d{6}$/),
     password: z.string().min(10).max(128).regex(/[A-Za-z]/),
     displayName: z.string().min(2).max(40)
 });
@@ -677,7 +691,7 @@ export const zRegisterBody = z.object({
 export const zRegisterResponse = zAuthResponse;
 
 export const zLoginBody = z.object({
-    email: z.email(),
+    phone: z.string().regex(/^1[3-9]\d{9}$/),
     password: z.string().min(1).max(128)
 });
 
@@ -699,7 +713,6 @@ export const zGetCurrentUserResponse = z.object({
 });
 
 export const zUpdateProfileBody = z.object({
-    email: z.email().max(254),
     displayName: z.string().min(2).max(40),
     avatarText: z.string().min(1).max(2)
 });
@@ -1123,7 +1136,7 @@ export const zListAdminJobsQuery = z.object({
         'failed',
         'cancelled'
     ]).optional(),
-    email: z.string().max(254).optional()
+    phone: z.string().max(32).optional()
 });
 
 /**
@@ -1131,7 +1144,7 @@ export const zListAdminJobsQuery = z.object({
  */
 export const zListAdminJobsResponse = z.object({
     jobs: z.array(zJob.and(z.object({
-        ownerEmail: z.string()
+        ownerPhone: z.string()
     }))),
     total: z.int(),
     page: z.int(),

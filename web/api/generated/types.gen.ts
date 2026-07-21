@@ -4,6 +4,15 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});
 };
 
+export type ApiErrorResponse = {
+    error: {
+        code: string;
+        message: string;
+        retryable: boolean;
+        requestId: string;
+    };
+};
+
 export type AuthResponse = {
     token: string;
     tokenType: 'Bearer';
@@ -13,19 +22,11 @@ export type AuthResponse = {
 
 export type UserSummary = {
     id: string;
-    email: string;
+    phone: string;
     displayName: string;
     avatarText: string;
     credits: number;
-};
-
-export type ApiErrorResponse = {
-    error: {
-        code: string;
-        message: string;
-        retryable: boolean;
-        requestId: string;
-    };
+    isAdmin: boolean;
 };
 
 export type Preferences = {
@@ -402,9 +403,48 @@ export type GetHealthResponses = {
 
 export type GetHealthResponse = GetHealthResponses[keyof GetHealthResponses];
 
+export type SendSmsVerificationCodeData = {
+    body: {
+        phone: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/auth/sms-code';
+};
+
+export type SendSmsVerificationCodeErrors = {
+    /**
+     * Phone exists
+     */
+    409: ApiErrorResponse;
+    /**
+     * Invalid phone
+     */
+    422: ApiErrorResponse;
+    /**
+     * Rate limited
+     */
+    429: ApiErrorResponse;
+};
+
+export type SendSmsVerificationCodeError = SendSmsVerificationCodeErrors[keyof SendSmsVerificationCodeErrors];
+
+export type SendSmsVerificationCodeResponses = {
+    /**
+     * Verification code sent
+     */
+    200: {
+        expiresAt: string;
+        retryAfterSeconds: number;
+    };
+};
+
+export type SendSmsVerificationCodeResponse = SendSmsVerificationCodeResponses[keyof SendSmsVerificationCodeResponses];
+
 export type RegisterData = {
     body: {
-        email: string;
+        phone: string;
+        verificationCode: string;
         password: string;
         displayName: string;
     };
@@ -415,7 +455,7 @@ export type RegisterData = {
 
 export type RegisterErrors = {
     /**
-     * Email exists
+     * Phone exists
      */
     409: ApiErrorResponse;
     /**
@@ -441,7 +481,7 @@ export type RegisterResponse = RegisterResponses[keyof RegisterResponses];
 
 export type LoginData = {
     body: {
-        email: string;
+        phone: string;
         password: string;
     };
     path?: never;
@@ -525,7 +565,6 @@ export type GetCurrentUserResponse = GetCurrentUserResponses[keyof GetCurrentUse
 
 export type UpdateProfileData = {
     body: {
-        email: string;
         displayName: string;
         avatarText: string;
     };
@@ -533,15 +572,6 @@ export type UpdateProfileData = {
     query?: never;
     url: '/api/account/profile';
 };
-
-export type UpdateProfileErrors = {
-    /**
-     * Email exists
-     */
-    409: ApiErrorResponse;
-};
-
-export type UpdateProfileError = UpdateProfileErrors[keyof UpdateProfileErrors];
 
 export type UpdateProfileResponses = {
     /**
@@ -1384,7 +1414,7 @@ export type ListAdminJobsData = {
         pageSize?: number;
         moduleId?: ModuleId;
         status?: 'queued' | 'processing' | 'succeeded' | 'partially_succeeded' | 'failed' | 'cancelled';
-        email?: string;
+        phone?: string;
     };
     url: '/api/admin/jobs';
 };
@@ -1404,7 +1434,7 @@ export type ListAdminJobsResponses = {
      */
     200: {
         jobs: Array<Job & {
-            ownerEmail: string;
+            ownerPhone: string;
         }>;
         total: number;
         page: number;

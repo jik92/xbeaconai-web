@@ -105,7 +105,7 @@ export async function fetchAdminJobs(query: {
   pageSize: number;
   moduleId?: ModuleId;
   status?: AdminJob["status"];
-  email?: string;
+  phone?: string;
 }) {
   configure();
   const { data } = await listAdminJobs({ query, headers: authHeaders(), throwOnError: true });

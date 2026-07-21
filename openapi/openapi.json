@@ -6,6 +6,37 @@
   },
   "components": {
     "schemas": {
+      "ApiErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "retryable": {
+                "type": "boolean"
+              },
+              "requestId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message",
+              "retryable",
+              "requestId"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
       "AuthResponse": {
         "type": "object",
         "properties": {
@@ -39,9 +70,9 @@
             "type": "string",
             "format": "uuid"
           },
-          "email": {
+          "phone": {
             "type": "string",
-            "format": "email"
+            "pattern": "^1[3-9]\\d{9}$"
           },
           "displayName": {
             "type": "string"
@@ -52,45 +83,18 @@
           "credits": {
             "type": "integer",
             "minimum": 0
+          },
+          "isAdmin": {
+            "type": "boolean"
           }
         },
         "required": [
           "id",
-          "email",
+          "phone",
           "displayName",
           "avatarText",
-          "credits"
-        ]
-      },
-      "ApiErrorResponse": {
-        "type": "object",
-        "properties": {
-          "error": {
-            "type": "object",
-            "properties": {
-              "code": {
-                "type": "string"
-              },
-              "message": {
-                "type": "string"
-              },
-              "retryable": {
-                "type": "boolean"
-              },
-              "requestId": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "code",
-              "message",
-              "retryable",
-              "requestId"
-            ]
-          }
-        },
-        "required": [
-          "error"
+          "credits",
+          "isAdmin"
         ]
       },
       "Preferences": {
@@ -2061,6 +2065,85 @@
         }
       }
     },
+    "/api/auth/sms-code": {
+      "post": {
+        "operationId": "sendSmsVerificationCode",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "pattern": "^1[3-9]\\d{9}$"
+                  }
+                },
+                "required": [
+                  "phone"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verification code sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "expiresAt": {
+                      "type": "string"
+                    },
+                    "retryAfterSeconds": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  },
+                  "required": [
+                    "expiresAt",
+                    "retryAfterSeconds"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Phone exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid phone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/register": {
       "post": {
         "operationId": "register",
@@ -2071,10 +2154,13 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "email": {
+                  "phone": {
                     "type": "string",
-                    "maxLength": 254,
-                    "format": "email"
+                    "pattern": "^1[3-9]\\d{9}$"
+                  },
+                  "verificationCode": {
+                    "type": "string",
+                    "pattern": "^\\d{6}$"
                   },
                   "password": {
                     "type": "string",
@@ -2089,7 +2175,8 @@
                   }
                 },
                 "required": [
-                  "email",
+                  "phone",
+                  "verificationCode",
                   "password",
                   "displayName"
                 ]
@@ -2109,7 +2196,7 @@
             }
           },
           "409": {
-            "description": "Email exists",
+            "description": "Phone exists",
             "content": {
               "application/json": {
                 "schema": {
@@ -2151,9 +2238,9 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "email": {
+                  "phone": {
                     "type": "string",
-                    "format": "email"
+                    "pattern": "^1[3-9]\\d{9}$"
                   },
                   "password": {
                     "type": "string",
@@ -2162,7 +2249,7 @@
                   }
                 },
                 "required": [
-                  "email",
+                  "phone",
                   "password"
                 ]
               }
@@ -2268,11 +2355,6 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "email": {
-                    "type": "string",
-                    "maxLength": 254,
-                    "format": "email"
-                  },
                   "displayName": {
                     "type": "string",
                     "minLength": 2,
@@ -2285,7 +2367,6 @@
                   }
                 },
                 "required": [
-                  "email",
                   "displayName",
                   "avatarText"
                 ]
@@ -2308,16 +2389,6 @@
                   "required": [
                     "user"
                   ]
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Email exists",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
             }
@@ -4226,10 +4297,10 @@
           {
             "schema": {
               "type": "string",
-              "maxLength": 254
+              "maxLength": 32
             },
             "required": false,
-            "name": "email",
+            "name": "phone",
             "in": "query"
           }
         ],
@@ -4251,12 +4322,12 @@
                           {
                             "type": "object",
                             "properties": {
-                              "ownerEmail": {
+                              "ownerPhone": {
                                 "type": "string"
                               }
                             },
                             "required": [
-                              "ownerEmail"
+                              "ownerPhone"
                             ]
                           }
                         ]

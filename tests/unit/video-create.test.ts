@@ -2,7 +2,6 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { AccountStore } from "../../server/accounts/account-store";
 import { env } from "../../server/env";
 import { SqliteJobStore } from "../../server/jobs/sqlite-job-store";
 import type { JobRecord } from "../../server/types";
@@ -14,6 +13,7 @@ import {
   VideoCreateVersionConflictError,
 } from "../../server/video-create/video-create-store";
 import { JobProcessor } from "../../worker/job-processor";
+import { createTestAccountStore, registerTestAccount } from "./account-test-helper";
 
 const databases: string[] = [];
 const generatedFiles: string[] = [];
@@ -91,15 +91,15 @@ describe("video create domain", () => {
   test("isolates owners, versions scripts and gates composition", async () => {
     const path = join(tmpdir(), `video-create-${crypto.randomUUID()}.sqlite`);
     databases.push(path);
-    const accounts = new AccountStore(path);
+    const accounts = createTestAccountStore(path);
     const store = new VideoCreateStore(path);
-    const owner = await accounts.register({
-      email: "video-create@example.com",
+    const owner = await registerTestAccount(accounts, {
+      phone: "13800000009",
       password: "Password123",
       displayName: "成片用户",
     });
-    const other = await accounts.register({
-      email: "video-create-other@example.com",
+    const other = await registerTestAccount(accounts, {
+      phone: "13800000010",
       password: "Password123",
       displayName: "其他用户",
     });
@@ -180,11 +180,11 @@ describe("video create domain", () => {
   test("marks automated video generation as explicit mock without calling Seedance", async () => {
     const path = join(tmpdir(), `video-create-mock-${crypto.randomUUID()}.sqlite`);
     databases.push(path);
-    const accounts = new AccountStore(path);
+    const accounts = createTestAccountStore(path);
     const projects = new VideoCreateStore(path);
     const jobs = new SqliteJobStore(path);
-    const owner = await accounts.register({
-      email: "video-create-mock@example.com",
+    const owner = await registerTestAccount(accounts, {
+      phone: "13800000011",
       password: "Password123",
       displayName: "Mock 视频用户",
     });
