@@ -4,6 +4,7 @@ import { dirname, extname, isAbsolute, relative, resolve } from "node:path";
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
+import { parseVideoMashupConfig, type VideoMashupConfig } from "../shared/video-mashup/config";
 import { APP_CONFIG, isModuleOpen } from "../web/app/config";
 import type { ModuleId } from "../web/entities/types";
 import {
@@ -2841,6 +2842,7 @@ app.openapi(createJobRoute, async (c) => {
   const body = c.req.valid("json");
   const ownerUserId = c.get("userId");
   const jobValues = { ...body.values };
+  let mashupConfig: VideoMashupConfig | undefined;
   if (moduleId === "voice-clone") {
     jobValues.operation = "synthesize";
     jobValues.voiceSource = "preset";
@@ -2867,11 +2869,45 @@ app.openapi(createJobRoute, async (c) => {
         422,
       );
   }
+  if (moduleId === "video-mashup" && jobValues.mergeMode !== "video-cut-clips") {
+    try {
+      mashupConfig = parseVideoMashupConfig(jobValues.config ?? "");
+    } catch (error) {
+      return c.json(
+        {
+          error: {
+            code: "INVALID_VIDEO_MASHUP_CONFIG",
+            message: error instanceof Error ? error.message : "混剪配置无效",
+            retryable: false,
+            requestId: crypto.randomUUID(),
+          },
+        },
+        422,
+      );
+    }
+    const unavailable = mashupConfig.groups
+      .flatMap((group) => group.assetIds)
+      .find((assetId) => !accounts.getOwnedAsset(ownerUserId, assetId)?.mimeType.startsWith("video/"));
+    if (unavailable)
+      return c.json(
+        {
+          error: {
+            code: "VIDEO_MASHUP_ASSET_NOT_AVAILABLE",
+            message: "混剪素材不存在、不属于当前账号或不是视频",
+            retryable: false,
+            requestId: crypto.randomUUID(),
+          },
+        },
+        422,
+      );
+    jobValues.outputFolderId = mashupConfig.outputFolderId;
+    jobValues.saveLocation = mashupConfig.outputFolderId;
+  }
   if (
     moduleId === "video-cut" ||
     moduleId === "video-extract" ||
     moduleId === "video-editor" ||
-    (moduleId === "video-mashup" && jobValues.mergeMode === "video-cut-clips")
+    moduleId === "video-mashup"
   ) {
     const outputFolderId = jobValues.outputFolderId || accounts.getDefaultAssetFolderId(ownerUserId);
     if (!accounts.getAssetFolder(ownerUserId, outputFolderId))

@@ -158,6 +158,80 @@ export async function concatVideos(inputs: string[], output: string) {
   return output;
 }
 
+export async function normalizeMashupVideo(input: {
+  source: string;
+  output: string;
+  width: number;
+  height: number;
+  hasAudio: boolean;
+}) {
+  await outputDir(input.output);
+  const args = ["-y", "-i", input.source];
+  if (!input.hasAudio) args.push("-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000");
+  args.push(
+    "-map",
+    "0:v:0",
+    "-map",
+    input.hasAudio ? "0:a:0" : "1:a:0",
+    "-vf",
+    `scale=${input.width}:${input.height}:force_original_aspect_ratio=decrease,pad=${input.width}:${input.height}:(ow-iw)/2:(oh-ih)/2:black,fps=30,format=yuv420p`,
+    "-c:v",
+    "libx264",
+    "-preset",
+    "veryfast",
+    "-c:a",
+    "aac",
+    "-ar",
+    "48000",
+    "-ac",
+    "2",
+    "-shortest",
+    "-movflags",
+    "+faststart",
+    input.output,
+  );
+  await run("ffmpeg", args);
+  return input.output;
+}
+
+export async function concatMashupVideos(inputs: string[], output: string) {
+  if (inputs.length < 2) throw new Error("混剪至少需要两个视频片段");
+  await outputDir(output);
+  const args = ["-y"];
+  for (const input of inputs) args.push("-i", input);
+  const filters: string[] = [];
+  const concatInputs: string[] = [];
+  for (let index = 0; index < inputs.length; index += 1) {
+    filters.push(`[${index}:v]setpts=PTS-STARTPTS[v${index}]`);
+    filters.push(
+      index === 0
+        ? `[${index}:a]asetpts=PTS-STARTPTS[a${index}]`
+        : `[${index}:a]volume=0,asetpts=PTS-STARTPTS[a${index}]`,
+    );
+    concatInputs.push(`[v${index}][a${index}]`);
+  }
+  filters.push(`${concatInputs.join("")}concat=n=${inputs.length}:v=1:a=1[v][a]`);
+  args.push(
+    "-filter_complex",
+    filters.join(";"),
+    "-map",
+    "[v]",
+    "-map",
+    "[a]",
+    "-c:v",
+    "libx264",
+    "-preset",
+    "veryfast",
+    "-c:a",
+    "aac",
+    "-movflags",
+    "+faststart",
+    output,
+  );
+  await run("ffmpeg", args);
+  return output;
+}
+
 export async function composeMedia(video: string, audio: string, output: string) {
   await outputDir(output);
   await run("ffmpeg", [

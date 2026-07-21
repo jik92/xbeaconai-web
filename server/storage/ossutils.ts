@@ -89,13 +89,20 @@ export class OssUtils {
     mimeType: string;
     sizeBytes: number;
     onProgress?: (percent: number) => void;
+    signal?: AbortSignal;
   }) {
     if (!this.configured) return;
+    if (input.signal?.aborted) throw new Error("TOS_UPLOAD_ABORTED");
     const release = await uploadGate.acquire(input.sizeBytes);
+    const key = input.key.replace(/^\/+/, "");
+    let uploadId: string | undefined;
+    const cancelSource = TosClient.CancelToken.source();
+    const abort = () => cancelSource.cancel("upload aborted");
+    input.signal?.addEventListener("abort", abort, { once: true });
     try {
       await this.ready().uploadFile({
         bucket: env.tos.bucket,
-        key: input.key.replace(/^\/+/, ""),
+        key,
         file: input.filePath,
         partSize: 8 * 1024 * 1024,
         taskNum: 2,
@@ -103,8 +110,23 @@ export class OssUtils {
         contentType: input.mimeType,
         serverSideEncryption: "AES256",
         progress: (percent) => input.onProgress?.(percent),
+        uploadEventChange: (event) => {
+          uploadId = event.uploadId || uploadId;
+        },
+        cancelToken: cancelSource.token,
       });
+    } catch (error) {
+      if (uploadId)
+        await this.ready()
+          .abortMultipartUpload({ bucket: env.tos.bucket, key, uploadId })
+          .catch(() => undefined);
+      await this.abortDanglingUploads(key).catch(() => undefined);
+      await this.ready()
+        .deleteObject({ bucket: env.tos.bucket, key })
+        .catch(() => undefined);
+      throw error;
     } finally {
+      input.signal?.removeEventListener("abort", abort);
       release();
     }
   }

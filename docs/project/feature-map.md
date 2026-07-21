@@ -7,7 +7,8 @@
 | 爆款二创 | `/aigc/video-remix` | 是 | 专用页面、项目接口、视频分析 Job |
 | 一键成片 | `/aigc/video-create` | 是 | 专用工作台、`server/video-create/`、专用 Job |
 | 口播脚本 | `/aigc/ad-script` | 是 | 专用页面、`server/ad-script/`、专用 Job |
-| AI 创作、素材理解、视频混剪 | `/tools/*` | 否 | 专用/通用页面与任务定义已保留 |
+| 视频混剪 | `/tools/video-mashup` | 是 | 专用视频组页面、组合规划、FFmpeg 批量 Worker、TOS 输出 |
+| AI 创作、素材理解 | `/tools/*` | 否 | 专用/通用页面与任务定义已保留 |
 | 视频分割、音色克隆 | `/tools/video-cut`、`/tools/voice-clone` | 是 | `ModulePage`、专用 Handler |
 | 视频修复、字幕擦除、画质增强、爆款裂变 | `/tools/*` | 否 | `ModulePage`、通用 Job 定义 |
 | 媒体、商品、音色、人像库 | `/assets/*` | 是 | 资产库、人像库、账号/上传/TOS 接口 |

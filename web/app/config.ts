@@ -33,7 +33,7 @@ export const APP_CONFIG = {
       "ai-generate": false,
       "video-cut": true,
       "media-understand": false,
-      "video-mashup": false,
+      "video-mashup": true,
       "voice-clone": true,
       "video-renewal": false,
       "subtitle-erase": true,

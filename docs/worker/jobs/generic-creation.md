@@ -10,5 +10,4 @@
 - 新增专用 Job 时，先添加专用 Handler 并放在 `registry.ts` 的 fallback 前，避免通用流程抢占。
 - `buildExecutionPlan` 和 `stageMap` 是任务来源、进度和结果一致性的共享基础；修改需要回归所有使用该 Definition 的模块。
 
-当前通用 Definition 包含 AI 创作、素材理解、视频混剪、视频修复、字幕擦除、画质增强、爆款裂变等模块；实际开放状态以 `web/app/config.ts` 为准。
-
+当前通用 Definition 包含 AI 创作、素材理解、视频修复、爆款裂变等尚未被专用 Handler 接管的模块；实际开放状态以 `web/app/config.ts` 为准。视频混剪已由 `job-video-mashup.ts` 接管。

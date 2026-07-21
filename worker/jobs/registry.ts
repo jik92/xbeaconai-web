@@ -7,6 +7,7 @@ import { videoCreateJob } from "./job-video-create";
 import { videoCutJob } from "./job-video-cut";
 import { videoEditorJob } from "./job-video-editor";
 import { videoExtractJob } from "./job-video-extract";
+import { videoMashupJob } from "./job-video-mashup";
 import { videoRemixAnalysisJob } from "./job-video-remix-analysis";
 import { voiceCloneJob } from "./job-voice-clone";
 import type { WorkerJobHandler } from "./types";
@@ -19,6 +20,7 @@ export const jobHandlers: readonly WorkerJobHandler[] = [
   videoCutJob,
   videoExtractJob,
   videoEditorJob,
+  videoMashupJob,
   voiceCloneJob,
   subtitleEraseJob,
   videoEnhancementJob,

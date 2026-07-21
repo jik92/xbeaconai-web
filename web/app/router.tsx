@@ -10,6 +10,7 @@ import { PortraitLibrary } from "@/features/portrait-library/portrait-library";
 import { VideoCreatePage } from "@/features/video-create/video-create-page";
 import { VideoEditorPage } from "@/features/video-editor/video-editor-page";
 import { VideoExtractPage } from "@/features/video-extract/video-extract-page";
+import { VideoMashupPage } from "@/features/video-mashup/video-mashup-page";
 import { RemixProject } from "@/features/video-remix/remix-project";
 import { isAssetOpen, isModuleOpen } from "./config";
 import { homeDestination, modules } from "./routes";
@@ -42,6 +43,8 @@ const moduleRoutes = modules.map((config) =>
         <VideoExtractPage />
       ) : config.id === "video-editor" ? (
         <VideoEditorPage />
+      ) : config.id === "video-mashup" ? (
+        <VideoMashupPage />
       ) : (
         <ModulePage config={config} />
       ),
