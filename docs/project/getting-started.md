@@ -36,7 +36,7 @@ make run-worker
 | `bun run api:spec` / `api:generate` | 导出 OpenAPI / 生成 SDK |
 | `bun run db:generate` / `db:check` / `db:migrate` | 生成、校验、执行 migration |
 
-模型、TOS、FFmpeg、语音专项命令可能消耗配额或依赖本机环境，非普通改动的默认验证。
+模型、TOS、FFmpeg、语音专项命令可能消耗配额或依赖本机环境，非普通改动的默认验证。CI 会安装 FFmpeg，因为视频 Mock 单测需要生成并探测可播放的测试产物；CI 不运行真实模型、TOS 或语音专项测试。
 
 Playwright 覆盖 `1440x900` Desktop 与 `1024x768` Tablet。修改路由、任务状态、关键表单或共享布局时应运行相关 E2E；外部能力未运行时，交付中说明原因。
 
