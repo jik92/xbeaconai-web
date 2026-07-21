@@ -102,6 +102,17 @@ export class OssUtils {
     }
   }
 
+  async putLibraryBytes(input: { bytes: Uint8Array; key: string; mimeType: string }) {
+    await this.ready().putObject({
+      bucket: env.tos.bucket,
+      key: input.key.replace(/^\/+/, ""),
+      body: Buffer.from(input.bytes),
+      acl: TosClient.ACLType.ACLPrivate,
+      contentType: input.mimeType,
+      serverSideEncryption: "AES256",
+    });
+  }
+
   async downloadLibraryFile(key: string, filePath: string) {
     await this.ready().downloadFile({
       bucket: env.tos.bucket,

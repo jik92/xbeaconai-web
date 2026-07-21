@@ -46,6 +46,8 @@ describe("worker job registry", () => {
     expect(findJobHandler(job("video-cut", { mergeMode: "video-cut-clips" })).name).toBe("video-clip-merge");
     expect(findJobHandler(job("video-cut")).name).toBe("video-cut");
     expect(findJobHandler(job("voice-clone")).name).toBe("voice-clone");
+    expect(findJobHandler(job("subtitle-erase")).name).toBe("mediakit-subtitle-erase");
+    expect(findJobHandler(job("video-enhancement")).name).toBe("mediakit-video-enhancement");
     expect(findJobHandler(job("ad-script")).name).toBe("ad-script");
     expect(findJobHandler(job("ai-generate")).name).toBe("generic-creation");
   });

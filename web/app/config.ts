@@ -34,8 +34,8 @@ export const APP_CONFIG = {
       "video-mashup": false,
       "voice-clone": true,
       "video-renewal": false,
-      "subtitle-erase": false,
-      "video-enhancement": false,
+      "subtitle-erase": true,
+      "video-enhancement": true,
       kickart: false,
     },
     assets: {

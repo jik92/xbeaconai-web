@@ -1,6 +1,7 @@
 import type { JobRecord } from "../../server/types";
 import { adScriptJob } from "./job-ad-script";
 import { genericCreationJob } from "./job-generic-creation";
+import { subtitleEraseJob, videoEnhancementJob } from "./job-mediakit-video";
 import { videoClipMergeJob } from "./job-video-clip-merge";
 import { videoCreateJob } from "./job-video-create";
 import { videoCutJob } from "./job-video-cut";
@@ -15,6 +16,8 @@ export const jobHandlers: readonly WorkerJobHandler[] = [
   videoClipMergeJob,
   videoCutJob,
   voiceCloneJob,
+  subtitleEraseJob,
+  videoEnhancementJob,
   genericCreationJob,
 ];
 

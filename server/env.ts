@@ -38,6 +38,12 @@ export const env = {
     pollIntervalMs: Math.max(500, Number(process.env.VOLC_SPEECH_POLL_INTERVAL_MS ?? 2_000)),
     pollTimeoutMs: Math.max(10_000, Number(process.env.VOLC_SPEECH_POLL_TIMEOUT_MS ?? 180_000)),
   },
+  mediaKit: {
+    apiKey: process.env.MEDIAKIT_API_KEY ?? "",
+    baseUrl: process.env.MEDIAKIT_BASE_URL ?? "https://mediakit.cn-beijing.volces.com",
+    pollIntervalMs: Math.max(1_000, Number(process.env.MEDIAKIT_POLL_INTERVAL_MS ?? 5_000)),
+    pollTimeoutMs: Math.max(30_000, Number(process.env.MEDIAKIT_POLL_TIMEOUT_MS ?? 30 * 60_000)),
+  },
   tos: {
     accessKeyId: process.env.TOS_ACCESS_KEY_ID ?? "",
     accessKeySecret: process.env.TOS_SECRET_ACCESS_KEY ?? "",

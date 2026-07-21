@@ -24,6 +24,8 @@
     "test:tos": "bun scripts/test-tos-sdk.ts",
     "test:ffmpeg": "bun scripts/test-ffmpeg-sdk.ts",
     "test:voice-clone": "bun scripts/test-volc-speech.ts",
+    "test:subtitle-erase": "bun scripts/test-subtitle-erase.ts",
+    "test:video-enhancement": "MEDIAKIT_TOOL=enhance-video-fast bun scripts/test-subtitle-erase.ts",
     "test:ad-script": "bun scripts/test-ad-script-model.ts",
     "test:ad-script:performance": "bun scripts/test-ad-script-performance.ts",
     "test:video-create:text": "bun scripts/test-video-create-text.ts",
