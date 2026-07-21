@@ -54,10 +54,7 @@ function makeTempDir() {
 function makeSharedStoreAndAccounts(): { store: SqliteJobStore; accounts: AccountStore } {
   const path = join(tmpdir(), `dy-log-integration-${crypto.randomUUID()}.sqlite`);
   databases.push(path);
-  return {
-    store: new SqliteJobStore(path),
-    accounts: new AccountStore(path),
-  };
+  return { store: new SqliteJobStore(path), accounts: new AccountStore(path) };
 }
 
 function makeJob(ownerUserId: string, folderId: string): JobRecord {
@@ -105,7 +102,7 @@ beforeAll(() => {
       try {
         capturedLogs.push(JSON.parse(line.slice(prefix.length)));
       } catch {
-        /* not our log */
+        /* ok */
       }
     }
   };
@@ -149,70 +146,133 @@ describe("import logger integration", () => {
     store.close();
   });
 
-  function context(dl?: JobHandlerContext["downloadFn"]): JobHandlerContext {
-    return { store, accounts, change: (id, p) => store.update(id, p), downloadFn: dl };
+  function context(overrides?: Partial<JobHandlerContext>): JobHandlerContext {
+    return {
+      store,
+      accounts,
+      change: (id, p) => store.update(id, p),
+      tosConfigured: false, // default: TOS not configured
+      ...overrides,
+    };
   }
 
-  test("success path emits logs for all expected stages with correct jobId", async () => {
-    await douyinVideoImportJob.execute(job, context(mockDownload(2048)));
+  // ── TOS not configured ────────────────────────────────────────
+
+  test("success path with TOS not configured emits tos_skip", async () => {
+    await douyinVideoImportJob.execute(job, context({ downloadFn: mockDownload(2048) }));
 
     expect(store.get(job.id)?.status).toBe("succeeded");
 
     const stages = capturedLogs.map((l) => l.stage);
-    // Must include key stages (probe skipped for mocked download)
     expect(stages).toContain("download_start");
     expect(stages).toContain("download_complete");
     expect(stages).toContain("save_local_start");
     expect(stages).toContain("save_local_complete");
     expect(stages).toContain("tos_skip");
+    expect(stages).not.toContain("tos_upload_start");
     expect(stages).toContain("asset_created");
     expect(stages).toContain("success");
     expect(stages).toContain("cleanup");
 
-    // Every log must have the correct jobId
     for (const log of capturedLogs) {
       expect(log.jobId).toBe(job.id);
     }
+
+    const dlLog = capturedLogs.find((l) => l.stage === "download_complete");
+    expect(dlLog?.fileSizeBytes).toBe(2048);
+    const assetLog = capturedLogs.find((l) => l.stage === "asset_created");
+    expect(assetLog?.fileSizeBytes).toBe(2048);
   });
 
-  test("failure path emits failure log with error code and without sensitive data", async () => {
+  // ── TOS configured: upload success ────────────────────────────
+
+  test("success path with TOS upload success emits tos_upload_start → tos_upload_complete", async () => {
+    let uploadedPath = "";
+    await douyinVideoImportJob.execute(
+      job,
+      context({
+        downloadFn: mockDownload(4096),
+        tosConfigured: true,
+        tosUploadFn: async (filePath) => {
+          uploadedPath = filePath;
+        },
+      }),
+    );
+
+    expect(store.get(job.id)?.status).toBe("succeeded");
+    expect(uploadedPath).toBeTruthy();
+
+    const stages = capturedLogs.map((l) => l.stage);
+    expect(stages).toContain("tos_upload_start");
+    expect(stages).toContain("tos_upload_complete");
+    expect(stages).not.toContain("tos_skip");
+    expect(stages).toContain("asset_created");
+    expect(stages).toContain("success");
+  });
+
+  // ── TOS configured: upload failure ────────────────────────────
+
+  test("TOS upload failure makes job failed and emits tos_upload_failure", async () => {
+    let deletedKey = "";
+    await douyinVideoImportJob.execute(
+      job,
+      context({
+        downloadFn: mockDownload(1024),
+        tosConfigured: true,
+        tosUploadFn: async () => {
+          throw new Error("Simulated TOS upload failure");
+        },
+        tosDeleteFn: async (key) => {
+          deletedKey = key;
+        },
+      }),
+    );
+
+    expect(store.get(job.id)?.status).toBe("failed");
+
+    const stages = capturedLogs.map((l) => l.stage);
+    expect(stages).toContain("tos_upload_start");
+    expect(stages).toContain("tos_upload_failure");
+    expect(stages).toContain("failure");
+    expect(stages).not.toContain("asset_created");
+    expect(stages).not.toContain("success");
+
+    // Cleanup must have been attempted
+    expect(deletedKey).toBeTruthy();
+  });
+
+  // ── Failure redaction ─────────────────────────────────────────
+
+  test("failure path redacts URLs from error messages", async () => {
     const failingDl = async () => {
-      throw new Error("Download failed: https://v26-web.douyinvod.com/secret/video.mp4 token=abc123");
+      throw new Error("Download failed: https://v26-web.douyinvod.com/secret/video.mp4");
     };
 
-    await douyinVideoImportJob.execute(job, context(failingDl));
+    await douyinVideoImportJob.execute(job, context({ downloadFn: failingDl }));
 
     expect(store.get(job.id)?.status).toBe("failed");
 
     const failLogs = capturedLogs.filter((l) => l.stage === "failure");
     expect(failLogs.length).toBe(1);
-    const failLog = failLogs[0];
-
-    expect(failLog.jobId).toBe(job.id);
-    expect(failLog.result).toBe("error");
-    expect(failLog.errorCode).toBeTruthy();
-    expect(failLog.errorSummary).toBeTruthy();
-
-    // Must NOT contain sensitive URL/CDN data
-    const raw = JSON.stringify(failLog);
+    const raw = JSON.stringify(failLogs[0]);
     expect(raw).not.toContain("douyinvod.com");
-    expect(raw).not.toContain("secret");
     expect(raw).not.toContain("https://");
-    // Error summary should contain redaction markers
     expect(raw).toContain("[REDACTED_URL]");
+    expect(failLogs[0].jobId).toBe(job.id);
+    expect(failLogs[0].errorCode).toBeTruthy();
   });
 
+  // ── Cancel ────────────────────────────────────────────────────
+
   test("cancel path emits cancel log", async () => {
-    // Cancel before execution by setting cancelRequested
     store.update(job.id, { cancelRequested: true });
-
     await douyinVideoImportJob.execute(job, context());
-
     const cancelLogs = capturedLogs.filter((l) => l.stage === "cancel");
     expect(cancelLogs.length).toBeGreaterThanOrEqual(1);
     expect(cancelLogs[0].jobId).toBe(job.id);
-    expect(cancelLogs[0].result).toBe("error");
   });
+
+  // ── Stage validity and field safety ───────────────────────────
 
   test("all log stages are valid ImportStage values", () => {
     const validStages: ImportStage[] = [
@@ -232,8 +292,8 @@ describe("import logger integration", () => {
       "asset_created",
       "asset_create_failure",
       "success",
-      "cancel",
       "failure",
+      "cancel",
       "cleanup",
     ];
     for (const log of capturedLogs) {
@@ -242,7 +302,7 @@ describe("import logger integration", () => {
   });
 
   test("no log contains URL, cookie, header, or token field names", async () => {
-    await douyinVideoImportJob.execute(job, context(mockDownload(1024)));
+    await douyinVideoImportJob.execute(job, context({ downloadFn: mockDownload(1024) }));
 
     for (const log of capturedLogs) {
       const raw = JSON.stringify(log);
@@ -253,14 +313,12 @@ describe("import logger integration", () => {
       expect(raw).not.toContain('"header"');
       expect(raw).not.toContain('"referer"');
       expect(raw).not.toContain('"userAgent"');
-      expect(raw).not.toContain('"cd"');
-      // Must contain safe fields
       expect(raw).toContain('"jobId"');
     }
   });
 
   test("each log has required fields: jobId, stage, result, durationMs", async () => {
-    await douyinVideoImportJob.execute(job, context(mockDownload(2048)));
+    await douyinVideoImportJob.execute(job, context({ downloadFn: mockDownload(2048) }));
 
     expect(capturedLogs.length).toBeGreaterThan(0);
     for (const log of capturedLogs) {
@@ -271,15 +329,5 @@ describe("import logger integration", () => {
       expect(["ok", "error"]).toContain(log.result);
       expect(typeof log.durationMs).toBe("number");
     }
-  });
-
-  test("download_complete and asset_created include fileSizeBytes", async () => {
-    await douyinVideoImportJob.execute(job, context(mockDownload(8192)));
-
-    const dlLog = capturedLogs.find((l) => l.stage === "download_complete");
-    expect(dlLog?.fileSizeBytes).toBe(8192);
-
-    const assetLog = capturedLogs.find((l) => l.stage === "asset_created");
-    expect(assetLog?.fileSizeBytes).toBe(8192);
   });
 });

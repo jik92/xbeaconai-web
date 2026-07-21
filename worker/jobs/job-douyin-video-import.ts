@@ -72,6 +72,7 @@ export const douyinVideoImportJob: WorkerJobHandler = {
     let assetId: string | undefined;
     let destPath: string | undefined;
     let tosUploaded = false;
+    const tosConfigured = context.tosConfigured ?? ossutils.configured;
 
     try {
       // ── Cancel check ──────────────────────────────────────────
@@ -159,30 +160,25 @@ export const douyinVideoImportJob: WorkerJobHandler = {
       stageComplete(job.id, "save_local_complete", localStart, byteSize);
 
       // ── TOS upload ────────────────────────────────────────────
-      if (ossutils.configured) {
+      if (tosConfigured) {
         emitLog({ jobId: job.id, stage: "tos_upload_start", result: "ok", durationMs: Date.now() - importStartMs });
         const tosStart = stageStart();
+        const uploadFn =
+          context.tosUploadFn ??
+          ((fp: string, key: string, mt: string, sz: number) =>
+            ossutils.putLibraryFile({ filePath: fp, key, mimeType: mt, sizeBytes: sz }));
         try {
-          await ossutils.putLibraryFile({
-            filePath: downloadResult.filePath,
-            key: storageKey,
-            mimeType: "video/mp4",
-            sizeBytes: byteSize,
-          });
+          await uploadFn(downloadResult.filePath, storageKey, "video/mp4", byteSize);
           stageComplete(job.id, "tos_upload_complete", tosStart, byteSize);
           tosUploaded = true;
         } catch (tosErr) {
           const s = sanitizeError(tosErr);
           logFailure(job.id, "tos_upload_failure", tosStart, s.code, s.summary);
-          // TOS upload failure is non-fatal if local save succeeded
-          emitLog({
-            jobId: job.id,
-            stage: "tos_upload_complete",
-            result: "ok",
-            durationMs: Date.now() - tosStart,
-            fileSizeBytes: 0,
-            errorSummary: "TOS upload failed, local copy preserved",
-          });
+          // TOS upload failure is fatal when TOS is configured
+          if (destPath) await rm(destPath, { force: true }).catch(() => {});
+          const delFn = context.tosDeleteFn ?? ((key: string) => ossutils.deleteObject(key));
+          await delFn(storageKey).catch(() => {});
+          throw new DouyinDownloadError(`TOS 上传失败: ${s.summary}`, true, "download_failed");
         }
       } else {
         emitLog({
@@ -271,8 +267,9 @@ export const douyinVideoImportJob: WorkerJobHandler = {
 
       // ── Clean up orphaned artifacts ───────────────────────────
       if (destPath) await rm(destPath, { force: true }).catch(() => {});
-      if (tosUploaded && storageKey && ossutils.configured) {
-        await ossutils.deleteObject(storageKey).catch(() => {});
+      if (tosUploaded && storageKey && tosConfigured) {
+        const delFn2 = context.tosDeleteFn ?? ((key: string) => ossutils.deleteObject(key));
+        await delFn2(storageKey).catch(() => {});
       }
       if (storageKey) {
         store.scheduleObjectCleanup(job.id, storageKey, err);

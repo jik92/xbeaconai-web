@@ -15,6 +15,12 @@ export interface JobHandlerContext {
     normalizedUrl: string,
     timeoutMs?: number,
   ) => Promise<{ filePath: string; tempDir: string; mimeType: string; byteSize: number }>;
+  /** Override TOS configuration for testing. When false, tos_skip is emitted. */
+  readonly tosConfigured?: boolean;
+  /** Mock TOS upload. Required when tosConfigured is true in tests. */
+  readonly tosUploadFn?: (filePath: string, key: string, mimeType: string, sizeBytes: number) => Promise<void>;
+  /** Mock TOS delete. Called on failure cleanup when tosConfigured is true. */
+  readonly tosDeleteFn?: (key: string) => Promise<void>;
   change(id: string, patch: Partial<JobRecord>): JobRecord | undefined;
 }
 

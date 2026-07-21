@@ -97,6 +97,9 @@ function makeContext(
     accounts,
     change: (id, patch) => store.update(id, patch),
     downloadFn,
+    // This suite exercises local Asset persistence. It must never inherit
+    // host TOS credentials or attempt a real network upload.
+    tosConfigured: false,
   };
 }
 
