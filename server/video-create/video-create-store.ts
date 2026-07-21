@@ -16,7 +16,7 @@ import type {
   VideoCreateRecommendation,
   VideoCreateShotStatus,
 } from "./types";
-import { VIDEO_CREATE_TEXT_MODEL } from "./types";
+import { VIDEO_CREATE_TEXT_MODEL, VideoCreateInputSchema, VideoCreateRecommendationSchema } from "./types";
 
 type ProjectRow = typeof videoCreateProjects.$inferSelect;
 type SectionRow = typeof videoCreateScriptSections.$inferSelect;
@@ -336,6 +336,13 @@ export class VideoCreateStore {
   }
 
   private aggregate(project: ProjectRow): VideoCreateAggregate {
+    const normalizedProject: ProjectRow = {
+      ...project,
+      input: VideoCreateInputSchema.parse(project.input),
+      recommendation: project.recommendation
+        ? VideoCreateRecommendationSchema.parse(project.recommendation)
+        : project.recommendation,
+    };
     const sections = this.db
       .select()
       .from(videoCreateScriptSections)
@@ -362,7 +369,7 @@ export class VideoCreateStore {
       .orderBy(asc(videoCreateShots.ordinal))
       .all();
     return {
-      project,
+      project: normalizedProject,
       sections: enriched,
       shots,
       canCompose:

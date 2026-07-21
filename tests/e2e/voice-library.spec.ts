@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { registerFromAuthScreen } from "./auth-helpers";
 
 function wavFixture() {
   const sampleRate = 8_000;
@@ -19,7 +20,7 @@ function wavFixture() {
   return bytes;
 }
 
-test.beforeEach(async ({ page }, testInfo) => {
+test.beforeEach(async ({ page }) => {
   await page.goto("/assets/voices");
   if (
     await page
@@ -27,12 +28,7 @@ test.beforeEach(async ({ page }, testInfo) => {
       .isVisible()
       .catch(() => false)
   ) {
-    await page.getByRole("button", { name: "注册", exact: true }).click();
-    await page.getByLabel("显示名称").fill("音色库测试用户");
-    await page.getByLabel("邮箱").fill(`voice-library-${testInfo.project.name}-${Date.now()}@example.test`);
-    await page.locator('input[type="password"]').fill("VoiceTest2026");
-    await page.getByRole("button", { name: "创建账号并登录" }).click();
-    await expect(page.locator(".auth-page")).toBeHidden();
+    await registerFromAuthScreen(page, "音色库测试用户", "VoiceTest2026");
     await page.goto("/assets/voices");
   }
 });

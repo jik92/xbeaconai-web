@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
+import { registerFromAuthScreen } from "./auth-helpers";
 
-test.beforeEach(async ({ page }, testInfo) => {
+test.beforeEach(async ({ page }) => {
   await page.goto("/aigc/video-create");
   if (
     await page
@@ -8,12 +9,7 @@ test.beforeEach(async ({ page }, testInfo) => {
       .isVisible()
       .catch(() => false)
   ) {
-    await page.getByRole("button", { name: "注册", exact: true }).click();
-    await page.getByLabel("显示名称").fill("一键成片测试用户");
-    await page.getByLabel("邮箱").fill(`video-create-${testInfo.project.name}-${crypto.randomUUID()}@example.test`);
-    await page.locator('input[type="password"]').fill("VideoCreate2026");
-    await page.getByRole("button", { name: "创建账号并登录" }).click();
-    await expect(page.locator(".auth-page")).toBeHidden();
+    await registerFromAuthScreen(page, "一键成片测试用户", "VideoCreate2026");
     await page.goto("/aigc/video-create");
   }
 });
@@ -29,12 +25,33 @@ test("opens the dedicated two-column video create workbench", async ({ page }) =
   await expect(page.locator(".vc-output-panel")).toBeInViewport();
 });
 
-test("edits project parameters and opens recoverable history", async ({ page }) => {
+test("edits the complete parameter panels and opens recoverable history", async ({ page }) => {
   await page.getByRole("button", { name: "短视频带货" }).click();
   await page.getByText("视频时长").locator("..").getByRole("button", { name: "30s" }).click();
   await page.getByText("分镜段数").locator("..").getByRole("button", { name: "＋" }).click();
   await page.getByRole("button", { name: /广告诉求/ }).click();
+  await page.getByRole("button", { name: "电商转化", exact: true }).click();
+  await page.getByRole("button", { name: "职场白领", exact: true }).click();
+  await expect(page.getByRole("button", { name: /广告诉求 2 已选/ })).toBeVisible();
+  await page.getByPlaceholder("例：夏天防晒产品总是厚重泛白").fill("通勤衬衫容易闷热");
+  await page.getByRole("button", { name: /脚本风格/ }).click();
+  await page.getByRole("button", { name: "好物推荐员", exact: true }).click();
+  await page.getByRole("button", { name: "痛点直击", exact: true }).click();
+  await expect(page.getByRole("button", { name: /脚本风格 2 已选/ })).toBeVisible();
+  await page.getByRole("button", { name: /高级设置/ }).click();
+  await page.getByRole("button", { name: "场景展示", exact: true }).click();
   await expect(page.getByText("视频模型")).toBeVisible();
+  const configScroll = page.locator(".vc-config-scroll");
+  const metrics = await configScroll.evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+  }));
+  expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight);
+  await configScroll.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
+  await expect.poll(() => configScroll.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  await expect(page.getByText("NEW PROJECT")).toBeInViewport();
+  await expect(page.getByRole("button", { name: /生成脚本/ })).toBeInViewport();
+  await expect(page.locator(".vc-advanced-field strong")).toBeInViewport();
   await page.getByRole("button", { name: /生成记录/ }).click();
   await expect(page.getByRole("heading", { name: "生成记录" })).toBeVisible();
   await expect(page.getByText("暂无生成记录")).toBeVisible();

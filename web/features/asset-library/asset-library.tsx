@@ -19,7 +19,7 @@ import {
   X,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createShareImport,
   deleteLibraryAsset,
@@ -363,6 +363,14 @@ function MediaAssetTable({
   onDelete: (asset: LibraryAsset) => void;
   deleting: boolean;
 }) {
+  const loadedMetadataRef = useRef(loadedMetadata);
+  const onMetadataRef = useRef(onMetadata);
+  const onDeleteRef = useRef(onDelete);
+  const deletingRef = useRef(deleting);
+  loadedMetadataRef.current = loadedMetadata;
+  onMetadataRef.current = onMetadata;
+  onDeleteRef.current = onDelete;
+  deletingRef.current = deleting;
   const columns = useMemo<ColumnDef<LibraryAsset, unknown>[]>(
     () => [
       {
@@ -371,17 +379,17 @@ function MediaAssetTable({
         size: 260,
         cell: ({ row }) => {
           const asset = row.original;
-          const metadata = loadedMetadata[asset.id];
+          const metadata = loadedMetadataRef.current[asset.id];
           const previewSize = fitMediaPreviewSize(asset.width ?? metadata?.width, asset.height ?? metadata?.height);
           const media = asset.mimeType.startsWith("video/") ? (
-            <LazyVideoPreview asset={asset} onMetadata={(next) => onMetadata(asset.id, next)} />
+            <LazyVideoPreview asset={asset} onMetadata={(next) => onMetadataRef.current(asset.id, next)} />
           ) : (
             <AuthenticatedMedia
               url={asset.url}
               mimeType={asset.mimeType}
               alt={asset.name}
               controls={asset.mimeType.startsWith("audio/")}
-              onMetadata={(next) => onMetadata(asset.id, next)}
+              onMetadata={(next) => onMetadataRef.current(asset.id, next)}
             />
           );
           return (
@@ -416,8 +424,8 @@ function MediaAssetTable({
         size: 130,
         cell: ({ row }) => {
           const asset = row.original;
-          const width = asset.width ?? loadedMetadata[asset.id]?.width;
-          const height = asset.height ?? loadedMetadata[asset.id]?.height;
+          const width = asset.width ?? loadedMetadataRef.current[asset.id]?.width;
+          const height = asset.height ?? loadedMetadataRef.current[asset.id]?.height;
           return width && height ? `${width} × ${height}` : "—";
         },
       },
@@ -427,7 +435,7 @@ function MediaAssetTable({
         size: 130,
         cell: ({ row }) => {
           const asset = row.original;
-          return formatDuration(asset.durationSec ?? loadedMetadata[asset.id]?.durationSec);
+          return formatDuration(asset.durationSec ?? loadedMetadataRef.current[asset.id]?.durationSec);
         },
       },
       {
@@ -444,16 +452,16 @@ function MediaAssetTable({
           <button
             type="button"
             className="media-asset-delete"
-            disabled={deleting}
+            disabled={deletingRef.current}
             aria-label={`删除 ${row.original.name}`}
-            onClick={() => onDelete(row.original)}
+            onClick={() => onDeleteRef.current(row.original)}
           >
             <Trash2 /> 删除
           </button>
         ),
       },
     ],
-    [deleting, loadedMetadata, onDelete, onMetadata],
+    [],
   );
 
   return (
@@ -515,6 +523,8 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
     queryKey: ["asset-library", kind, selectedFolderId],
     queryFn: () => fetchLibraryAssets(kind, kind === "media" ? selectedFolderId || undefined : undefined),
   });
+  const dataRef = useRef(data);
+  dataRef.current = data;
   const upload = useMutation({
     mutationFn: async () => {
       if (!file) throw new Error("请选择上传文件");
@@ -576,28 +586,31 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
       window.alert(error instanceof Error ? error.message : `${typeName}删除失败`);
     }
   };
-  const recordMetadata = (assetId: string, metadata: MediaMetadata) => {
-    setLoadedMetadata((current) => {
-      const previous = current[assetId];
-      if (
-        previous?.width === metadata.width &&
-        previous?.height === metadata.height &&
-        previous?.durationSec === metadata.durationSec
-      )
-        return current;
-      return { ...current, [assetId]: { ...previous, ...metadata } };
-    });
-    const asset = data.find((item) => item.id === assetId);
-    const hasNewMetadata =
-      (!asset?.width && metadata.width) ||
-      (!asset?.height && metadata.height) ||
-      (asset?.durationSec === undefined && metadata.durationSec !== undefined);
-    if (!asset || !hasNewMetadata || metadataSaving.current.has(assetId)) return;
-    metadataSaving.current.add(assetId);
-    void saveAssetMetadata(assetId, metadata)
-      .then(() => queryClient.invalidateQueries({ queryKey: ["asset-library", kind] }))
-      .finally(() => metadataSaving.current.delete(assetId));
-  };
+  const recordMetadata = useCallback(
+    (assetId: string, metadata: MediaMetadata) => {
+      setLoadedMetadata((current) => {
+        const previous = current[assetId];
+        if (
+          previous?.width === metadata.width &&
+          previous?.height === metadata.height &&
+          previous?.durationSec === metadata.durationSec
+        )
+          return current;
+        return { ...current, [assetId]: { ...previous, ...metadata } };
+      });
+      const asset = dataRef.current.find((item) => item.id === assetId);
+      const hasNewMetadata =
+        (!asset?.width && metadata.width) ||
+        (!asset?.height && metadata.height) ||
+        (asset?.durationSec === undefined && metadata.durationSec !== undefined);
+      if (!asset || !hasNewMetadata || metadataSaving.current.has(assetId)) return;
+      metadataSaving.current.add(assetId);
+      void saveAssetMetadata(assetId, metadata)
+        .then(() => queryClient.invalidateQueries({ queryKey: ["asset-library", kind] }))
+        .finally(() => metadataSaving.current.delete(assetId));
+    },
+    [kind, queryClient],
+  );
 
   return (
     <div className={`asset-library-page ${kind === "media" ? "material-library-page" : ""}`}>

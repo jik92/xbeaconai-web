@@ -6,20 +6,60 @@ export const users = sqliteTable(
   "users",
   {
     id: text("id").primaryKey(),
-    email: text("email").notNull().unique(),
+    phone: text("phone").notNull().unique(),
     passwordHash: text("password_hash").notNull(),
     displayName: text("display_name").notNull(),
     avatarText: text("avatar_text").notNull(),
     credits: integer("credits").notNull().default(2480),
-    status: text("status", { enum: ["active", "disabled"] })
+    status: text("status", { enum: ["pending_password", "active", "disabled"] })
       .notNull()
       .default("active"),
     passwordVersion: integer("password_version").notNull().default(1),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
-  (table) => [uniqueIndex("users_email_idx").on(table.email)],
+  (table) => [uniqueIndex("users_phone_idx").on(table.phone)],
 );
+
+export const smsVerificationCodes = sqliteTable(
+  "sms_verification_codes",
+  {
+    id: text("id").primaryKey(),
+    phone: text("phone").notNull(),
+    purpose: text("purpose", { enum: ["register", "reset_password"] }).notNull(),
+    codeHash: text("code_hash").notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    expiresAt: text("expires_at").notNull(),
+    consumedAt: text("consumed_at"),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [index("sms_codes_phone_purpose_created_idx").on(table.phone, table.purpose, table.createdAt)],
+);
+
+export const passwordSetupTokens = sqliteTable(
+  "password_setup_tokens",
+  {
+    tokenHash: text("token_hash").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    purpose: text("purpose", { enum: ["initial_setup", "reset_password"] }).notNull(),
+    expiresAt: text("expires_at").notNull(),
+    consumedAt: text("consumed_at"),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [index("password_setup_tokens_user_created_idx").on(table.userId, table.createdAt)],
+);
+
+export const providerCredentials = sqliteTable("provider_credentials", {
+  name: text("name").primaryKey(),
+  ciphertext: text("ciphertext").notNull(),
+  nonce: text("nonce").notNull(),
+  authTag: text("auth_tag").notNull(),
+  lastFour: text("last_four").notNull(),
+  updatedByUserId: text("updated_by_user_id"),
+  updatedAt: text("updated_at").notNull(),
+});
 
 export const assetFolders = sqliteTable(
   "asset_folders",

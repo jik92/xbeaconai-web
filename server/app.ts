@@ -4,6 +4,7 @@ import { dirname, extname, isAbsolute, relative, resolve } from "node:path";
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
+import { parseVideoMashupConfig, type VideoMashupConfig } from "../shared/video-mashup/config";
 import { APP_CONFIG, isModuleOpen } from "../web/app/config";
 import type { ModuleId } from "../web/entities/types";
 import {
@@ -26,6 +27,8 @@ import {
   AdScriptVariantStatusSchema,
   AdScriptVersionSourceSchema,
 } from "./ad-script/types";
+import { type ProviderCredentialName, providerCredentialNames, providerCredentials } from "./byok/credential-store";
+import { maxEnvKeyBytes, parseEnvKey } from "./byok/env-key";
 import { creationCapabilities, quoteCreation, validateCreationValues } from "./creation/capabilities";
 import { env } from "./env";
 import { platformAdapters, ShareContentParser } from "./imports/share-content";
@@ -71,6 +74,8 @@ const moduleIds = [
   "video-renewal",
   "subtitle-erase",
   "video-enhancement",
+  "video-extract",
+  "video-editor",
   "kickart",
 ] as const;
 const backgroundJobTypes = ["douyin-video-import", "share-content-import"] as const;
@@ -79,6 +84,7 @@ const ModuleSchema = z.enum(moduleIds).openapi("ModuleId");
 const JobModuleSchema = z.enum(jobModuleIds).openapi("JobModuleId");
 const VideoModelIdSchema = z.enum(seedanceModelIds).openapi("SeedanceModelId");
 const JobStatusSchema = z.enum(["queued", "processing", "succeeded", "partially_succeeded", "failed", "cancelled"]);
+const ProviderCredentialNameSchema = z.enum(providerCredentialNames).openapi("ProviderCredentialName");
 const StageSchema = z.object({
   id: z.string(),
   capability: z.string(),
@@ -290,6 +296,10 @@ export const accounts = new AccountStore();
 export const adScripts = new AdScriptStore();
 export const videoCreates = new VideoCreateStore();
 export const queue = new BullJobQueue();
+function adminUser(userId: string) {
+  const user = accounts.getUser(userId);
+  return Boolean(user?.isAdmin);
+}
 type AppEnv = { Variables: { userId: string; sessionId: string } };
 const app = new OpenAPIHono<AppEnv>();
 const publicApiPaths = new Set([
@@ -298,6 +308,9 @@ const publicApiPaths = new Set([
   "/api/models",
   "/api/creation/capabilities",
   "/api/auth/register",
+  "/api/auth/sms-code",
+  "/api/auth/password/verify",
+  "/api/auth/password/setup",
   "/api/auth/login",
   "/api/auth/logout",
 ]);
@@ -346,7 +359,7 @@ app.use(
   cors({
     origin: (origin) => (env.allowedOrigins.has(origin) ? origin : ""),
     allowHeaders: ["Content-Type", "Authorization", "Idempotency-Key", "Last-Event-ID"],
-    allowMethods: ["GET", "POST", "PATCH", "PUT", "OPTIONS"],
+    allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     credentials: false,
   }),
 );
@@ -431,10 +444,11 @@ app.openapi(healthRoute, (c) =>
 const UserSchema = z
   .object({
     id: z.string().uuid(),
-    email: z.string().email(),
+    phone: z.string().regex(/^1[3-9]\d{9}$/),
     displayName: z.string(),
     avatarText: z.string(),
     credits: z.number().int().nonnegative(),
+    isAdmin: z.boolean(),
   })
   .openapi("UserSummary");
 const AuthSchema = z
@@ -446,6 +460,18 @@ const PasswordSchema = z
   .max(128)
   .regex(/[A-Za-z]/, "密码必须包含字母")
   .regex(/[0-9]/, "密码必须包含数字");
+const PhoneSchema = z
+  .string()
+  .trim()
+  .regex(/^1[3-9]\d{9}$/, "请输入有效的中国大陆手机号");
+const VerificationCodeSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{6}$/, "请输入 6 位数字验证码");
+const SmsPurposeSchema = z.enum(["register", "reset_password"]);
+const PasswordSetupChallengeSchema = z
+  .object({ phone: PhoneSchema, setupToken: z.string().min(32), expiresAt: z.string() })
+  .openapi("PasswordSetupChallenge");
 const authRate = new Map<string, { count: number; reset: number }>();
 function rateLimited(key: string) {
   const time = Date.now(),
@@ -458,6 +484,70 @@ function rateLimited(key: string) {
   return entry.count > env.authRateLimitMax;
 }
 
+const sendSmsCodeRoute = createRoute({
+  method: "post",
+  path: "/api/auth/sms-code",
+  operationId: "sendSmsVerificationCode",
+  request: {
+    body: {
+      required: true,
+      content: { "application/json": { schema: z.object({ phone: PhoneSchema, purpose: SmsPurposeSchema }) } },
+    },
+  },
+  responses: {
+    200: {
+      description: "Verification code sent",
+      content: {
+        "application/json": {
+          schema: z.object({
+            expiresAt: z.string(),
+            retryAfterSeconds: z.number().int().min(1),
+            verificationCode: VerificationCodeSchema,
+          }),
+        },
+      },
+    },
+    409: { description: "Phone exists", content: { "application/json": { schema: ErrorSchema } } },
+    404: { description: "Phone not registered", content: { "application/json": { schema: ErrorSchema } } },
+    422: { description: "Invalid phone", content: { "application/json": { schema: ErrorSchema } } },
+    429: { description: "Rate limited", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(sendSmsCodeRoute, async (c) => {
+  const { phone, purpose } = c.req.valid("json");
+  if (rateLimited(`sms:${purpose}:${c.req.header("x-forwarded-for") ?? "local"}`))
+    return c.json(
+      {
+        error: {
+          code: "RATE_LIMITED",
+          message: "验证码请求过于频繁，请稍后再试",
+          retryable: true,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      429,
+    );
+  try {
+    return c.json(await accounts.sendSmsCode(phone, purpose), 200);
+  } catch (error) {
+    if (error instanceof AccountError) {
+      const body = {
+        error: {
+          code: error.code,
+          message: error.message,
+          retryable: error.status === 429,
+          requestId: crypto.randomUUID(),
+        },
+      };
+      if (error.status === 409) return c.json(body, 409);
+      if (error.status === 404) return c.json(body, 404);
+      if (error.status === 429) return c.json(body, 429);
+      return c.json(body, 422);
+    }
+    throw error;
+  }
+});
+
 const registerRoute = createRoute({
   method: "post",
   path: "/api/auth/register",
@@ -468,17 +558,19 @@ const registerRoute = createRoute({
       content: {
         "application/json": {
           schema: z.object({
-            email: z.string().email().max(254),
-            password: PasswordSchema,
-            displayName: z.string().trim().min(2).max(40),
+            phone: PhoneSchema,
+            verificationCode: VerificationCodeSchema,
           }),
         },
       },
     },
   },
   responses: {
-    201: { description: "Registered", content: { "application/json": { schema: AuthSchema } } },
-    409: { description: "Email exists", content: { "application/json": { schema: ErrorSchema } } },
+    201: {
+      description: "Registered and waiting for password setup",
+      content: { "application/json": { schema: PasswordSetupChallengeSchema } },
+    },
+    409: { description: "Phone exists", content: { "application/json": { schema: ErrorSchema } } },
     422: { description: "Validation error", content: { "application/json": { schema: ErrorSchema } } },
     429: { description: "Rate limited", content: { "application/json": { schema: ErrorSchema } } },
   },
@@ -498,27 +590,131 @@ app.openapi(registerRoute, async (c) => {
     );
   try {
     const registration = await accounts.register(c.req.valid("json"));
-    const materialFolder = accounts.ensureDefaultAssetFolder(registration.user.id);
+    const materialFolder = accounts.ensureDefaultAssetFolder(registration.userId);
     mkdirSync(resolve(env.dataDir, "uploads", materialFolder.storagePrefix), { recursive: true, mode: 0o700 });
     if (ossutils.configured)
       await Promise.all([
-        ossutils.ensureDirectory(`${registration.user.id}/`),
+        ossutils.ensureDirectory(`${registration.userId}/`),
         ossutils.ensureDirectory(materialFolder.storagePrefix),
       ]).catch((error) => console.error("Failed to initialize user TOS directories", error));
     if (registration.claimedLegacy)
       await Promise.all(
         store
           .recoverable()
-          .filter((job) => job.ownerUserId === registration.user.id)
+          .filter((job) => job.ownerUserId === registration.userId)
           .map((job) => queue.enqueue(job.id)),
       );
-    return c.json(await issueToken(accounts, registration.user), 201);
+    return c.json(
+      { phone: registration.phone, setupToken: registration.setupToken, expiresAt: registration.expiresAt },
+      201,
+    );
   } catch (error) {
-    if (error instanceof AccountError && error.status === 409)
-      return c.json(
-        { error: { code: error.code, message: error.message, retryable: false, requestId: crypto.randomUUID() } },
-        409,
-      );
+    if (error instanceof AccountError) {
+      const body = {
+        error: { code: error.code, message: error.message, retryable: false, requestId: crypto.randomUUID() },
+      };
+      if (error.status === 409) return c.json(body, 409);
+      if (error.status === 429) return c.json(body, 429);
+      return c.json(body, 422);
+    }
+    throw error;
+  }
+});
+
+const verifyPasswordResetRoute = createRoute({
+  method: "post",
+  path: "/api/auth/password/verify",
+  operationId: "verifyPasswordReset",
+  request: {
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: z.object({ phone: PhoneSchema, verificationCode: VerificationCodeSchema }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: "Phone verified for password reset",
+      content: { "application/json": { schema: PasswordSetupChallengeSchema } },
+    },
+    404: { description: "Phone not registered", content: { "application/json": { schema: ErrorSchema } } },
+    422: { description: "Verification failed", content: { "application/json": { schema: ErrorSchema } } },
+    429: { description: "Rate limited", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(verifyPasswordResetRoute, async (c) => {
+  if (rateLimited(`password-reset:${c.req.header("x-forwarded-for") ?? "local"}`))
+    return c.json(
+      {
+        error: {
+          code: "RATE_LIMITED",
+          message: "操作过于频繁，请稍后再试",
+          retryable: true,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      429,
+    );
+  try {
+    return c.json(await accounts.verifyPasswordReset(c.req.valid("json")), 200);
+  } catch (error) {
+    if (error instanceof AccountError) {
+      const body = {
+        error: { code: error.code, message: error.message, retryable: false, requestId: crypto.randomUUID() },
+      };
+      if (error.status === 404) return c.json(body, 404);
+      return c.json(body, 422);
+    }
+    throw error;
+  }
+});
+
+const setupPasswordRoute = createRoute({
+  method: "post",
+  path: "/api/auth/password/setup",
+  operationId: "setupPassword",
+  request: {
+    body: {
+      required: true,
+      content: {
+        "application/json": { schema: z.object({ setupToken: z.string().min(32).max(256), password: PasswordSchema }) },
+      },
+    },
+  },
+  responses: {
+    200: { description: "Password set and logged in", content: { "application/json": { schema: AuthSchema } } },
+    404: { description: "User not found", content: { "application/json": { schema: ErrorSchema } } },
+    422: { description: "Invalid setup token", content: { "application/json": { schema: ErrorSchema } } },
+    429: { description: "Rate limited", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(setupPasswordRoute, async (c) => {
+  if (rateLimited(`password-setup:${c.req.header("x-forwarded-for") ?? "local"}`))
+    return c.json(
+      {
+        error: {
+          code: "RATE_LIMITED",
+          message: "操作过于频繁，请稍后再试",
+          retryable: true,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      429,
+    );
+  try {
+    const body = c.req.valid("json");
+    return c.json(await issueToken(accounts, await accounts.setupPassword(body.setupToken, body.password)), 200);
+  } catch (error) {
+    if (error instanceof AccountError) {
+      const body = {
+        error: { code: error.code, message: error.message, retryable: false, requestId: crypto.randomUUID() },
+      };
+      if (error.status === 404) return c.json(body, 404);
+      return c.json(body, 422);
+    }
     throw error;
   }
 });
@@ -531,7 +727,7 @@ const loginRoute = createRoute({
     body: {
       required: true,
       content: {
-        "application/json": { schema: z.object({ email: z.string().email(), password: z.string().min(1).max(128) }) },
+        "application/json": { schema: z.object({ phone: PhoneSchema, password: z.string().min(1).max(128) }) },
       },
     },
   },
@@ -556,7 +752,7 @@ app.openapi(loginRoute, async (c) => {
     );
   try {
     const body = c.req.valid("json"),
-      user = await accounts.verifyCredentials(body.email, body.password);
+      user = await accounts.verifyCredentials(body.phone, body.password);
     return c.json(await issueToken(accounts, user), 200);
   } catch (error) {
     if (error instanceof AccountError)
@@ -616,7 +812,6 @@ const profileRoute = createRoute({
       content: {
         "application/json": {
           schema: z.object({
-            email: z.string().email().max(254),
             displayName: z.string().trim().min(2).max(40),
             avatarText: z.string().trim().min(1).max(2),
           }),
@@ -629,20 +824,10 @@ const profileRoute = createRoute({
       description: "Updated profile",
       content: { "application/json": { schema: z.object({ user: UserSchema }) } },
     },
-    409: { description: "Email exists", content: { "application/json": { schema: ErrorSchema } } },
   },
 });
 app.openapi(profileRoute, (c) => {
-  try {
-    return c.json({ user: accounts.updateProfile(c.get("userId"), c.req.valid("json")) }, 200);
-  } catch (error) {
-    if (error instanceof AccountError)
-      return c.json(
-        { error: { code: error.code, message: error.message, retryable: false, requestId: crypto.randomUUID() } },
-        409,
-      );
-    throw error;
-  }
+  return c.json({ user: accounts.updateProfile(c.get("userId"), c.req.valid("json")) }, 200);
 });
 
 const changePasswordRoute = createRoute({
@@ -1746,6 +1931,261 @@ app.openapi(assetContentRoute, async (c) => {
   });
 });
 
+const AdminCredentialSchema = z.object({
+  name: ProviderCredentialNameSchema,
+  provider: z.string(),
+  label: z.string(),
+  configured: z.boolean(),
+  maskedValue: z.string().optional(),
+  updatedAt: z.string().optional(),
+});
+const AdminJobSchema = JobSchema.extend({ ownerPhone: z.string() });
+const AdminEnvKeyImportSchema = z.object({
+  updated: z.array(ProviderCredentialNameSchema),
+  skipped: z.array(ProviderCredentialNameSchema),
+  ignored: z.array(z.string()),
+});
+const adminCredentialsRoute = createRoute({
+  method: "get",
+  path: "/api/admin/credentials",
+  operationId: "listAdminCredentials",
+  responses: {
+    200: {
+      description: "Masked provider credentials",
+      content: { "application/json": { schema: z.object({ credentials: z.array(AdminCredentialSchema) }) } },
+    },
+    403: { description: "Admin required", content: { "application/json": { schema: ErrorSchema } } },
+    503: { description: "BYOK unavailable", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(adminCredentialsRoute, (c) => {
+  if (!adminUser(c.get("userId")))
+    return c.json(
+      {
+        error: { code: "ADMIN_REQUIRED", message: "仅管理员可访问", retryable: false, requestId: crypto.randomUUID() },
+      },
+      403,
+    );
+  if (!providerCredentials.available)
+    return c.json(
+      {
+        error: {
+          code: "BYOK_UNAVAILABLE",
+          message: "BYOK_ENCRYPTION_KEY 未配置",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      503,
+    );
+  return c.json({ credentials: providerCredentials.listMasked() }, 200);
+});
+
+const updateAdminCredentialRoute = createRoute({
+  method: "put",
+  path: "/api/admin/credentials/{name}",
+  operationId: "updateAdminCredential",
+  request: {
+    params: z.object({ name: ProviderCredentialNameSchema }),
+    body: {
+      required: true,
+      content: { "application/json": { schema: z.object({ value: z.string().trim().min(1).max(4_096) }) } },
+    },
+  },
+  responses: {
+    200: { description: "Updated", content: { "application/json": { schema: AdminCredentialSchema } } },
+    403: { description: "Admin required", content: { "application/json": { schema: ErrorSchema } } },
+    503: { description: "BYOK unavailable", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(updateAdminCredentialRoute, (c) => {
+  if (!adminUser(c.get("userId")))
+    return c.json(
+      {
+        error: { code: "ADMIN_REQUIRED", message: "仅管理员可访问", retryable: false, requestId: crypto.randomUUID() },
+      },
+      403,
+    );
+  if (!providerCredentials.available)
+    return c.json(
+      {
+        error: {
+          code: "BYOK_UNAVAILABLE",
+          message: "BYOK_ENCRYPTION_KEY 未配置",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      503,
+    );
+  const name = c.req.valid("param").name as ProviderCredentialName;
+  providerCredentials.set(name, c.req.valid("json").value, c.get("userId"));
+  const credential = providerCredentials.listMasked().find((item) => item.name === name);
+  if (!credential) throw new Error("CREDENTIAL_UPDATE_FAILED");
+  return c.json(credential, 200);
+});
+
+const deleteAdminCredentialRoute = createRoute({
+  method: "delete",
+  path: "/api/admin/credentials/{name}",
+  operationId: "deleteAdminCredential",
+  request: { params: z.object({ name: ProviderCredentialNameSchema }) },
+  responses: {
+    200: { description: "Deleted", content: { "application/json": { schema: AdminCredentialSchema } } },
+    403: { description: "Admin required", content: { "application/json": { schema: ErrorSchema } } },
+    503: { description: "BYOK unavailable", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(deleteAdminCredentialRoute, (c) => {
+  if (!adminUser(c.get("userId")))
+    return c.json(
+      {
+        error: { code: "ADMIN_REQUIRED", message: "仅管理员可访问", retryable: false, requestId: crypto.randomUUID() },
+      },
+      403,
+    );
+  if (!providerCredentials.available)
+    return c.json(
+      {
+        error: {
+          code: "BYOK_UNAVAILABLE",
+          message: "BYOK_ENCRYPTION_KEY 未配置",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      503,
+    );
+  const name = c.req.valid("param").name as ProviderCredentialName;
+  providerCredentials.delete(name);
+  const credential = providerCredentials.listMasked().find((item) => item.name === name);
+  if (!credential) throw new Error("CREDENTIAL_DELETE_FAILED");
+  return c.json(credential, 200);
+});
+
+const importAdminEnvKeyRoute = createRoute({
+  method: "post",
+  path: "/api/admin/credentials/import",
+  operationId: "importAdminEnvKey",
+  request: {
+    body: {
+      required: true,
+      content: {
+        "multipart/form-data": {
+          schema: z.object({ file: z.file().openapi({ type: "string", format: "binary" }) }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: { description: "Imported", content: { "application/json": { schema: AdminEnvKeyImportSchema } } },
+    400: { description: "Invalid env key file", content: { "application/json": { schema: ErrorSchema } } },
+    403: { description: "Admin required", content: { "application/json": { schema: ErrorSchema } } },
+    413: { description: "File too large", content: { "application/json": { schema: ErrorSchema } } },
+    415: { description: "Unsupported file", content: { "application/json": { schema: ErrorSchema } } },
+    503: { description: "BYOK unavailable", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(importAdminEnvKeyRoute, async (c) => {
+  const requestId = crypto.randomUUID();
+  if (!adminUser(c.get("userId")))
+    return c.json({ error: { code: "ADMIN_REQUIRED", message: "仅管理员可访问", retryable: false, requestId } }, 403);
+  if (!providerCredentials.available)
+    return c.json(
+      {
+        error: {
+          code: "BYOK_UNAVAILABLE",
+          message: "BYOK_ENCRYPTION_KEY 未配置",
+          retryable: false,
+          requestId,
+        },
+      },
+      503,
+    );
+  const file = (await c.req.formData()).get("file");
+  if (!(file instanceof File) || !file.size)
+    return c.json(
+      { error: { code: "INVALID_ENV_KEY", message: "请选择有效的 .env.key 文件", retryable: false, requestId } },
+      400,
+    );
+  if (file.name !== ".env.key")
+    return c.json(
+      { error: { code: "INVALID_ENV_KEY_NAME", message: "文件名必须是 .env.key", retryable: false, requestId } },
+      415,
+    );
+  if (file.size > maxEnvKeyBytes)
+    return c.json(
+      { error: { code: "ENV_KEY_TOO_LARGE", message: ".env.key 不能超过 64KB", retryable: false, requestId } },
+      413,
+    );
+  try {
+    const parsed = parseEnvKey(await file.text());
+    const updated = providerCredentials.setMany(parsed.values, c.get("userId"));
+    const updatedSet = new Set(updated);
+    return c.json(
+      {
+        updated,
+        skipped: providerCredentialNames.filter((name) => !updatedSet.has(name)),
+        ignored: parsed.ignored,
+      },
+      200,
+    );
+  } catch (error) {
+    return c.json(
+      {
+        error: {
+          code: "INVALID_ENV_KEY_CONTENT",
+          message: error instanceof Error ? error.message : ".env.key 内容无效",
+          retryable: false,
+          requestId,
+        },
+      },
+      400,
+    );
+  }
+});
+
+const listAdminJobsRoute = createRoute({
+  method: "get",
+  path: "/api/admin/jobs",
+  operationId: "listAdminJobs",
+  request: {
+    query: z.object({
+      page: z.coerce.number().int().min(1).default(1),
+      pageSize: z.coerce.number().int().min(10).max(100).default(25),
+      moduleId: ModuleSchema.optional(),
+      status: JobStatusSchema.optional(),
+      phone: z.string().trim().max(32).optional(),
+    }),
+  },
+  responses: {
+    200: {
+      description: "All queue jobs",
+      content: {
+        "application/json": {
+          schema: z.object({
+            jobs: z.array(AdminJobSchema),
+            total: z.number().int(),
+            page: z.number().int(),
+            pageSize: z.number().int(),
+          }),
+        },
+      },
+    },
+    403: { description: "Admin required", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(listAdminJobsRoute, (c) => {
+  if (!adminUser(c.get("userId")))
+    return c.json(
+      {
+        error: { code: "ADMIN_REQUIRED", message: "仅管理员可访问", retryable: false, requestId: crypto.randomUUID() },
+      },
+      403,
+    );
+  return c.json(store.listAll(c.req.valid("query")), 200);
+});
+
 const listRoute = createRoute({
   method: "get",
   path: "/api/jobs",
@@ -2846,6 +3286,7 @@ app.openapi(createJobRoute, async (c) => {
   const body = c.req.valid("json");
   const ownerUserId = c.get("userId");
   const jobValues = { ...body.values };
+  let mashupConfig: VideoMashupConfig | undefined;
   if (moduleId === "voice-clone") {
     jobValues.operation = "synthesize";
     jobValues.voiceSource = "preset";
@@ -2872,7 +3313,46 @@ app.openapi(createJobRoute, async (c) => {
         422,
       );
   }
-  if (moduleId === "video-cut" || (moduleId === "video-mashup" && jobValues.mergeMode === "video-cut-clips")) {
+  if (moduleId === "video-mashup" && jobValues.mergeMode !== "video-cut-clips") {
+    try {
+      mashupConfig = parseVideoMashupConfig(jobValues.config ?? "");
+    } catch (error) {
+      return c.json(
+        {
+          error: {
+            code: "INVALID_VIDEO_MASHUP_CONFIG",
+            message: error instanceof Error ? error.message : "混剪配置无效",
+            retryable: false,
+            requestId: crypto.randomUUID(),
+          },
+        },
+        422,
+      );
+    }
+    const unavailable = mashupConfig.groups
+      .flatMap((group) => group.assetIds)
+      .find((assetId) => !accounts.getOwnedAsset(ownerUserId, assetId)?.mimeType.startsWith("video/"));
+    if (unavailable)
+      return c.json(
+        {
+          error: {
+            code: "VIDEO_MASHUP_ASSET_NOT_AVAILABLE",
+            message: "混剪素材不存在、不属于当前账号或不是视频",
+            retryable: false,
+            requestId: crypto.randomUUID(),
+          },
+        },
+        422,
+      );
+    jobValues.outputFolderId = mashupConfig.outputFolderId;
+    jobValues.saveLocation = mashupConfig.outputFolderId;
+  }
+  if (
+    moduleId === "video-cut" ||
+    moduleId === "video-extract" ||
+    moduleId === "video-editor" ||
+    moduleId === "video-mashup"
+  ) {
     const outputFolderId = jobValues.outputFolderId || accounts.getDefaultAssetFolderId(ownerUserId);
     if (!accounts.getAssetFolder(ownerUserId, outputFolderId))
       return c.json(
@@ -2888,6 +3368,24 @@ app.openapi(createJobRoute, async (c) => {
       );
     jobValues.outputFolderId = outputFolderId;
     jobValues.saveLocation = outputFolderId;
+  }
+  if (moduleId === "video-extract") {
+    try {
+      const url = new URL(jobValues.url ?? "");
+      if (!new Set(["http:", "https:"]).has(url.protocol)) throw new Error();
+    } catch {
+      return c.json(
+        {
+          error: {
+            code: "INVALID_VIDEO_URL",
+            message: "请输入有效的 HTTP 或 HTTPS 视频地址",
+            retryable: false,
+            requestId: crypto.randomUUID(),
+          },
+        },
+        422,
+      );
+    }
   }
   const needsVideoModel = moduleId === "video-remix" || (moduleId === "ai-generate" && body.values.type === "视频");
   let creationQuote = 0;

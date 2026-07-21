@@ -3,11 +3,15 @@ import { AppShell } from "@/components/domain/app-shell";
 import { ComingSoonPage, ProjectComingSoonPage } from "@/components/domain/coming-soon-page";
 import { ModulePage } from "@/components/domain/module-page";
 import { AdScriptPage } from "@/features/ad-script/ad-script-page";
+import { AdminPage } from "@/features/admin/admin-page";
 import { AiGeneratePage } from "@/features/ai-generate/ai-generate-page";
 import { AssetLibrary } from "@/features/asset-library/asset-library";
 import { MediaUnderstandPage } from "@/features/media-understand/media-understand-page";
 import { PortraitLibrary } from "@/features/portrait-library/portrait-library";
 import { VideoCreatePage } from "@/features/video-create/video-create-page";
+import { VideoEditorPage } from "@/features/video-editor/video-editor-page";
+import { VideoExtractPage } from "@/features/video-extract/video-extract-page";
+import { VideoMashupPage } from "@/features/video-mashup/video-mashup-page";
 import { RemixProject } from "@/features/video-remix/remix-project";
 import { isAssetOpen, isModuleOpen } from "./config";
 import { homeDestination, modules } from "./routes";
@@ -36,6 +40,12 @@ const moduleRoutes = modules.map((config) =>
         <AiGeneratePage />
       ) : config.id === "media-understand" ? (
         <MediaUnderstandPage />
+      ) : config.id === "video-extract" ? (
+        <VideoExtractPage />
+      ) : config.id === "video-editor" ? (
+        <VideoEditorPage />
+      ) : config.id === "video-mashup" ? (
+        <VideoMashupPage />
       ) : (
         <ModulePage config={config} />
       ),
@@ -77,6 +87,11 @@ const voiceRoute = createRoute({
       <ComingSoonPage config={{ id: "voices", label: "音色库" }} />
     ),
 });
+const adminRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin",
+  component: AdminPage,
+});
 const routeTree = rootRoute.addChildren([
   indexRoute,
   ...moduleRoutes,
@@ -84,6 +99,7 @@ const routeTree = rootRoute.addChildren([
   portraitRoute,
   productRoute,
   voiceRoute,
+  adminRoute,
 ]);
 export const router = createRouter({ routeTree, defaultPreload: "intent" });
 declare module "@tanstack/react-router" {

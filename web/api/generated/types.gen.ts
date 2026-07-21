@@ -4,6 +4,21 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});
 };
 
+export type ApiErrorResponse = {
+    error: {
+        code: string;
+        message: string;
+        retryable: boolean;
+        requestId: string;
+    };
+};
+
+export type PasswordSetupChallenge = {
+    phone: string;
+    setupToken: string;
+    expiresAt: string;
+};
+
 export type AuthResponse = {
     token: string;
     tokenType: 'Bearer';
@@ -13,19 +28,11 @@ export type AuthResponse = {
 
 export type UserSummary = {
     id: string;
-    email: string;
+    phone: string;
     displayName: string;
     avatarText: string;
     credits: number;
-};
-
-export type ApiErrorResponse = {
-    error: {
-        code: string;
-        message: string;
-        retryable: boolean;
-        requestId: string;
-    };
+    isAdmin: boolean;
 };
 
 export type Preferences = {
@@ -57,6 +64,12 @@ export type RechargeOrder = {
 };
 
 export type AssetKind = 'media' | 'product' | 'portrait' | 'voice';
+
+export type ProviderCredentialName = 'OPENAI_KEY' | 'VOLC_SPEECH_API_KEY_ID' | 'VOLC_SPEECH_API_KEY' | 'TOS_ACCESS_KEY_ID' | 'TOS_SECRET_ACCESS_KEY' | 'MEDIAKIT_API_KEY';
+
+export type ModuleId = 'video-remix' | 'video-create' | 'ad-script' | 'ai-generate' | 'video-cut' | 'media-understand' | 'video-mashup' | 'voice-clone' | 'video-renewal' | 'subtitle-erase' | 'video-enhancement' | 'video-extract' | 'video-editor' | 'kickart';
+
+export type SeedanceModelId = 'doubao-seedance-2-0-260128' | 'doubao-seedance-2-0-mini-260615' | 'doubao-seedance-2-0-fast-260128';
 
 export type Job = {
     id: string;
@@ -332,6 +345,21 @@ export type VideoCreateInput = {
     speechRate: 'slow' | 'medium' | 'fast';
     requirements?: string;
     scriptStyle?: string;
+    marketingGoals?: Array<'电商转化' | '品牌曝光' | 'App下载' | '门店到店' | '直播引流'>;
+    targetAudiences?: Array<'18-24岁女性' | '25-35岁女性' | '18-24岁男性' | '25-35岁男性' | '宝妈' | '学生' | '职场白领' | '中老年' | '全年龄段'>;
+    audiencePainPoints?: string;
+    productBenefits?: string;
+    presenterRoles?: Array<'好物推荐员' | '普通用户' | '行业专家' | '品牌官方'>;
+    presenterGenders?: Array<'不区分' | '男声' | '女声'>;
+    contentStyles?: Array<'种草' | '专业测评' | '情绪共鸣' | '悬念叙事' | '故事' | '数据说话'>;
+    openingStyles?: Array<'自动匹配' | '痛点直击' | '数字冲击' | '福利诱惑' | '问句互动' | '品牌声量' | '随机'>;
+    closingGuides?: Array<'硬引导购买' | '软种草' | '互动提问'>;
+    scriptTopics?: Array<'直播带货' | '产品功能讲解' | '痛点解决' | '对比测评' | '情感共鸣' | '节日营销'>;
+    materialTopics?: Array<'产品外观' | '使用体验' | '价格优势' | '品质保障' | '售后服务' | '用户口碑' | '生活方式' | '成分功效' | '限时优惠'>;
+    marketingMethods?: Array<'场景展示' | '痛点解决' | '竞品对比' | '用户证言' | '专家背书' | '限时促销'>;
+    templates?: Array<'常规' | '节日营销' | '明星同款' | '爆款复制'>;
+    sensitiveWords?: string;
+    customRequirements?: string;
     videoModel?: 'doubao-seedance-2-0-260128' | 'doubao-seedance-2-0-mini-260615' | 'doubao-seedance-2-0-fast-260128';
     voiceAssetId?: string;
     ratio?: '9:16' | '16:9' | '1:1';
@@ -347,6 +375,21 @@ export type VideoCreateRecommendation = {
     segmentCount: number;
     requirements: string;
     scriptStyle: string;
+    marketingGoals?: Array<'电商转化' | '品牌曝光' | 'App下载' | '门店到店' | '直播引流'>;
+    targetAudiences?: Array<'18-24岁女性' | '25-35岁女性' | '18-24岁男性' | '25-35岁男性' | '宝妈' | '学生' | '职场白领' | '中老年' | '全年龄段'>;
+    audiencePainPoints?: string;
+    productBenefits?: string;
+    presenterRoles?: Array<'好物推荐员' | '普通用户' | '行业专家' | '品牌官方'>;
+    presenterGenders?: Array<'不区分' | '男声' | '女声'>;
+    contentStyles?: Array<'种草' | '专业测评' | '情绪共鸣' | '悬念叙事' | '故事' | '数据说话'>;
+    openingStyles?: Array<'自动匹配' | '痛点直击' | '数字冲击' | '福利诱惑' | '问句互动' | '品牌声量' | '随机'>;
+    closingGuides?: Array<'硬引导购买' | '软种草' | '互动提问'>;
+    scriptTopics?: Array<'直播带货' | '产品功能讲解' | '痛点解决' | '对比测评' | '情感共鸣' | '节日营销'>;
+    materialTopics?: Array<'产品外观' | '使用体验' | '价格优势' | '品质保障' | '售后服务' | '用户口碑' | '生活方式' | '成分功效' | '限时优惠'>;
+    marketingMethods?: Array<'场景展示' | '痛点解决' | '竞品对比' | '用户证言' | '专家背书' | '限时促销'>;
+    templates?: Array<'常规' | '节日营销' | '明星同款' | '爆款复制'>;
+    sensitiveWords?: string;
+    customRequirements?: string;
 };
 
 export type ModuleId = 'video-remix' | 'video-create' | 'ad-script' | 'ai-generate' | 'video-cut' | 'media-understand' | 'video-mashup' | 'voice-clone' | 'video-renewal' | 'subtitle-erase' | 'video-enhancement' | 'kickart';
@@ -385,11 +428,54 @@ export type GetHealthResponses = {
 
 export type GetHealthResponse = GetHealthResponses[keyof GetHealthResponses];
 
+export type SendSmsVerificationCodeData = {
+    body: {
+        phone: string;
+        purpose: 'register' | 'reset_password';
+    };
+    path?: never;
+    query?: never;
+    url: '/api/auth/sms-code';
+};
+
+export type SendSmsVerificationCodeErrors = {
+    /**
+     * Phone not registered
+     */
+    404: ApiErrorResponse;
+    /**
+     * Phone exists
+     */
+    409: ApiErrorResponse;
+    /**
+     * Invalid phone
+     */
+    422: ApiErrorResponse;
+    /**
+     * Rate limited
+     */
+    429: ApiErrorResponse;
+};
+
+export type SendSmsVerificationCodeError = SendSmsVerificationCodeErrors[keyof SendSmsVerificationCodeErrors];
+
+export type SendSmsVerificationCodeResponses = {
+    /**
+     * Verification code sent
+     */
+    200: {
+        expiresAt: string;
+        retryAfterSeconds: number;
+        verificationCode: string;
+    };
+};
+
+export type SendSmsVerificationCodeResponse = SendSmsVerificationCodeResponses[keyof SendSmsVerificationCodeResponses];
+
 export type RegisterData = {
     body: {
-        email: string;
-        password: string;
-        displayName: string;
+        phone: string;
+        verificationCode: string;
     };
     path?: never;
     query?: never;
@@ -398,7 +484,7 @@ export type RegisterData = {
 
 export type RegisterErrors = {
     /**
-     * Email exists
+     * Phone exists
      */
     409: ApiErrorResponse;
     /**
@@ -415,16 +501,88 @@ export type RegisterError = RegisterErrors[keyof RegisterErrors];
 
 export type RegisterResponses = {
     /**
-     * Registered
+     * Registered and waiting for password setup
      */
-    201: AuthResponse;
+    201: PasswordSetupChallenge;
 };
 
 export type RegisterResponse = RegisterResponses[keyof RegisterResponses];
 
+export type VerifyPasswordResetData = {
+    body: {
+        phone: string;
+        verificationCode: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/auth/password/verify';
+};
+
+export type VerifyPasswordResetErrors = {
+    /**
+     * Phone not registered
+     */
+    404: ApiErrorResponse;
+    /**
+     * Verification failed
+     */
+    422: ApiErrorResponse;
+    /**
+     * Rate limited
+     */
+    429: ApiErrorResponse;
+};
+
+export type VerifyPasswordResetError = VerifyPasswordResetErrors[keyof VerifyPasswordResetErrors];
+
+export type VerifyPasswordResetResponses = {
+    /**
+     * Phone verified for password reset
+     */
+    200: PasswordSetupChallenge;
+};
+
+export type VerifyPasswordResetResponse = VerifyPasswordResetResponses[keyof VerifyPasswordResetResponses];
+
+export type SetupPasswordData = {
+    body: {
+        setupToken: string;
+        password: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/auth/password/setup';
+};
+
+export type SetupPasswordErrors = {
+    /**
+     * User not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Invalid setup token
+     */
+    422: ApiErrorResponse;
+    /**
+     * Rate limited
+     */
+    429: ApiErrorResponse;
+};
+
+export type SetupPasswordError = SetupPasswordErrors[keyof SetupPasswordErrors];
+
+export type SetupPasswordResponses = {
+    /**
+     * Password set and logged in
+     */
+    200: AuthResponse;
+};
+
+export type SetupPasswordResponse = SetupPasswordResponses[keyof SetupPasswordResponses];
+
 export type LoginData = {
     body: {
-        email: string;
+        phone: string;
         password: string;
     };
     path?: never;
@@ -508,7 +666,6 @@ export type GetCurrentUserResponse = GetCurrentUserResponses[keyof GetCurrentUse
 
 export type UpdateProfileData = {
     body: {
-        email: string;
         displayName: string;
         avatarText: string;
     };
@@ -516,15 +673,6 @@ export type UpdateProfileData = {
     query?: never;
     url: '/api/account/profile';
 };
-
-export type UpdateProfileErrors = {
-    /**
-     * Email exists
-     */
-    409: ApiErrorResponse;
-};
-
-export type UpdateProfileError = UpdateProfileErrors[keyof UpdateProfileErrors];
 
 export type UpdateProfileResponses = {
     /**
@@ -1195,6 +1343,207 @@ export type GetAssetContentResponses = {
 };
 
 export type GetAssetContentResponse = GetAssetContentResponses[keyof GetAssetContentResponses];
+
+export type ListAdminCredentialsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/credentials';
+};
+
+export type ListAdminCredentialsErrors = {
+    /**
+     * Admin required
+     */
+    403: ApiErrorResponse;
+    /**
+     * BYOK unavailable
+     */
+    503: ApiErrorResponse;
+};
+
+export type ListAdminCredentialsError = ListAdminCredentialsErrors[keyof ListAdminCredentialsErrors];
+
+export type ListAdminCredentialsResponses = {
+    /**
+     * Masked provider credentials
+     */
+    200: {
+        credentials: Array<{
+            name: ProviderCredentialName;
+            provider: string;
+            label: string;
+            configured: boolean;
+            maskedValue?: string;
+            updatedAt?: string;
+        }>;
+    };
+};
+
+export type ListAdminCredentialsResponse = ListAdminCredentialsResponses[keyof ListAdminCredentialsResponses];
+
+export type DeleteAdminCredentialData = {
+    body?: never;
+    path: {
+        name: ProviderCredentialName;
+    };
+    query?: never;
+    url: '/api/admin/credentials/{name}';
+};
+
+export type DeleteAdminCredentialErrors = {
+    /**
+     * Admin required
+     */
+    403: ApiErrorResponse;
+    /**
+     * BYOK unavailable
+     */
+    503: ApiErrorResponse;
+};
+
+export type DeleteAdminCredentialError = DeleteAdminCredentialErrors[keyof DeleteAdminCredentialErrors];
+
+export type DeleteAdminCredentialResponses = {
+    /**
+     * Deleted
+     */
+    200: {
+        name: ProviderCredentialName;
+        provider: string;
+        label: string;
+        configured: boolean;
+        maskedValue?: string;
+        updatedAt?: string;
+    };
+};
+
+export type DeleteAdminCredentialResponse = DeleteAdminCredentialResponses[keyof DeleteAdminCredentialResponses];
+
+export type UpdateAdminCredentialData = {
+    body: {
+        value: string;
+    };
+    path: {
+        name: ProviderCredentialName;
+    };
+    query?: never;
+    url: '/api/admin/credentials/{name}';
+};
+
+export type UpdateAdminCredentialErrors = {
+    /**
+     * Admin required
+     */
+    403: ApiErrorResponse;
+    /**
+     * BYOK unavailable
+     */
+    503: ApiErrorResponse;
+};
+
+export type UpdateAdminCredentialError = UpdateAdminCredentialErrors[keyof UpdateAdminCredentialErrors];
+
+export type UpdateAdminCredentialResponses = {
+    /**
+     * Updated
+     */
+    200: {
+        name: ProviderCredentialName;
+        provider: string;
+        label: string;
+        configured: boolean;
+        maskedValue?: string;
+        updatedAt?: string;
+    };
+};
+
+export type UpdateAdminCredentialResponse = UpdateAdminCredentialResponses[keyof UpdateAdminCredentialResponses];
+
+export type ImportAdminEnvKeyData = {
+    body: {
+        file: Blob | File;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/admin/credentials/import';
+};
+
+export type ImportAdminEnvKeyErrors = {
+    /**
+     * Invalid env key file
+     */
+    400: ApiErrorResponse;
+    /**
+     * Admin required
+     */
+    403: ApiErrorResponse;
+    /**
+     * File too large
+     */
+    413: ApiErrorResponse;
+    /**
+     * Unsupported file
+     */
+    415: ApiErrorResponse;
+    /**
+     * BYOK unavailable
+     */
+    503: ApiErrorResponse;
+};
+
+export type ImportAdminEnvKeyError = ImportAdminEnvKeyErrors[keyof ImportAdminEnvKeyErrors];
+
+export type ImportAdminEnvKeyResponses = {
+    /**
+     * Imported
+     */
+    200: {
+        updated: Array<ProviderCredentialName>;
+        skipped: Array<ProviderCredentialName>;
+        ignored: Array<string>;
+    };
+};
+
+export type ImportAdminEnvKeyResponse = ImportAdminEnvKeyResponses[keyof ImportAdminEnvKeyResponses];
+
+export type ListAdminJobsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        pageSize?: number;
+        moduleId?: ModuleId;
+        status?: 'queued' | 'processing' | 'succeeded' | 'partially_succeeded' | 'failed' | 'cancelled';
+        phone?: string;
+    };
+    url: '/api/admin/jobs';
+};
+
+export type ListAdminJobsErrors = {
+    /**
+     * Admin required
+     */
+    403: ApiErrorResponse;
+};
+
+export type ListAdminJobsError = ListAdminJobsErrors[keyof ListAdminJobsErrors];
+
+export type ListAdminJobsResponses = {
+    /**
+     * All queue jobs
+     */
+    200: {
+        jobs: Array<Job & {
+            ownerPhone: string;
+        }>;
+        total: number;
+        page: number;
+        pageSize: number;
+    };
+};
+
+export type ListAdminJobsResponse = ListAdminJobsResponses[keyof ListAdminJobsResponses];
 
 export type ListJobsData = {
     body?: never;

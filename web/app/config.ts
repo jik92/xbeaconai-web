@@ -1,17 +1,31 @@
 import type { ModuleId } from "@/entities/types";
 
 export type CreationWorkflowId = "video-remix" | "video-create" | "ad-script";
-export type AiToolboxId = Exclude<ModuleId, CreationWorkflowId>;
+export type UtilityId = "video-extract" | "video-editor";
+export type AiToolboxId = Exclude<ModuleId, CreationWorkflowId | UtilityId>;
 export type AssetFeatureId = "materials" | "portraits" | "products" | "voices";
 
 export interface MenuFeatureConfig {
   readonly creationWorkflow: Readonly<Record<CreationWorkflowId, boolean>>;
   readonly aiToolbox: Readonly<Record<AiToolboxId, boolean>>;
+  readonly utilities: Readonly<Record<UtilityId, boolean>>;
   readonly assets: Readonly<Record<AssetFeatureId, boolean>>;
 }
 
 export interface PublicAppConfig {
   readonly projectName: string;
+  readonly providerDefaults: {
+    readonly openai: { readonly baseUrl: string; readonly videoAnalysisModel: string };
+    readonly volcSpeech: {
+      readonly baseUrl: string;
+      readonly cloneResourceId: string;
+      readonly ttsResourceId: string;
+      readonly presetTtsResourceId: string;
+      readonly pollIntervalMs: number;
+      readonly pollTimeoutMs: number;
+    };
+    readonly tos: { readonly region: string; readonly endpoint: string; readonly bucket: string };
+  };
   readonly menuFeatures: MenuFeatureConfig;
 }
 
@@ -21,6 +35,25 @@ export interface PublicAppConfig {
  */
 export const APP_CONFIG = {
   projectName: "烽火AI",
+  providerDefaults: {
+    openai: {
+      baseUrl: "https://aihubmix.com",
+      videoAnalysisModel: "gemini-3.5-flash",
+    },
+    volcSpeech: {
+      baseUrl: "https://openspeech.bytedance.com",
+      cloneResourceId: "seed-icl-2.0",
+      ttsResourceId: "seed-icl-2.0",
+      presetTtsResourceId: "seed-tts-2.0",
+      pollIntervalMs: 2_000,
+      pollTimeoutMs: 180_000,
+    },
+    tos: {
+      region: "cn-beijing",
+      endpoint: "tos-cn-beijing.volces.com",
+      bucket: "xbeacon",
+    },
+  },
   menuFeatures: {
     creationWorkflow: {
       "video-remix": true,
@@ -31,12 +64,16 @@ export const APP_CONFIG = {
       "ai-generate": false,
       "video-cut": true,
       "media-understand": false,
-      "video-mashup": false,
+      "video-mashup": true,
       "voice-clone": true,
       "video-renewal": false,
-      "subtitle-erase": false,
-      "video-enhancement": false,
+      "subtitle-erase": true,
+      "video-enhancement": true,
       kickart: false,
+    },
+    utilities: {
+      "video-extract": true,
+      "video-editor": true,
     },
     assets: {
       materials: true,
@@ -60,10 +97,13 @@ const MODULE_GROUP = {
   "subtitle-erase": "aiToolbox",
   "video-enhancement": "aiToolbox",
   kickart: "aiToolbox",
-} as const satisfies Record<ModuleId, "creationWorkflow" | "aiToolbox">;
+  "video-extract": "utilities",
+  "video-editor": "utilities",
+} as const satisfies Record<ModuleId, "creationWorkflow" | "aiToolbox" | "utilities">;
 
 export function isModuleOpen(moduleId: ModuleId, config: PublicAppConfig = APP_CONFIG): boolean {
   const group = MODULE_GROUP[moduleId];
+  if (group === "utilities") return config.menuFeatures.utilities[moduleId as UtilityId];
   return group === "creationWorkflow"
     ? config.menuFeatures.creationWorkflow[moduleId as CreationWorkflowId]
     : config.menuFeatures.aiToolbox[moduleId as AiToolboxId];

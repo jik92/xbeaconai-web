@@ -2,10 +2,10 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { AccountStore } from "../../server/accounts/account-store";
 import { env } from "../../server/env";
 import { SqliteJobStore } from "../../server/jobs/sqlite-job-store";
 import type { JobRecord } from "../../server/types";
+import { normalizeVideoCreateRecommendation } from "../../server/video-create/model";
 import type { VideoCreateInput } from "../../server/video-create/types";
 import {
   VideoCreateStateError,
@@ -13,6 +13,7 @@ import {
   VideoCreateVersionConflictError,
 } from "../../server/video-create/video-create-store";
 import { JobProcessor } from "../../worker/job-processor";
+import { createTestAccountStore, registerTestAccount } from "./account-test-helper";
 
 const databases: string[] = [];
 const generatedFiles: string[] = [];
@@ -35,6 +36,21 @@ const input: VideoCreateInput = {
   speechRate: "medium",
   requirements: "面向职场女性",
   scriptStyle: "自然种草",
+  marketingGoals: ["电商转化"],
+  targetAudiences: ["职场白领"],
+  audiencePainPoints: "通勤衬衫闷热且容易显得没精神",
+  productBenefits: "亲肤透气，剪裁利落",
+  presenterRoles: ["好物推荐员"],
+  presenterGenders: ["女声"],
+  contentStyles: ["种草"],
+  openingStyles: ["痛点直击"],
+  closingGuides: ["软种草"],
+  scriptTopics: ["痛点解决"],
+  materialTopics: ["使用体验"],
+  marketingMethods: ["场景展示"],
+  templates: ["常规"],
+  sensitiveWords: "最 最佳",
+  customRequirements: "语气自然克制",
   videoModel: "doubao-seedance-2-0-fast-260128",
   ratio: "9:16",
   subtitles: true,
@@ -42,18 +58,48 @@ const input: VideoCreateInput = {
 };
 
 describe("video create domain", () => {
+  test("normalizes model aliases and drops unsupported recommendation tags", () => {
+    const recommendation = normalizeVideoCreateRecommendation({
+      productName: "通勤衬衫",
+      sellingPoints: ["亲肤"],
+      scene: "内容种草",
+      durationSec: 15,
+      segmentCount: 2,
+      requirements: "",
+      scriptStyle: "自然种草",
+      marketingGoals: ["销售转化", "未知目标"],
+      targetAudiences: ["职场女性"],
+      presenterRoles: ["产品推荐官"],
+      contentStyles: ["真实体验"],
+      openingStyles: [],
+      closingGuides: [],
+      scriptTopics: [],
+      materialTopics: [],
+      marketingMethods: ["场景化展示"],
+      templates: [],
+      audiencePainPoints: "",
+      productBenefits: "",
+      sensitiveWords: "",
+      customRequirements: "",
+    });
+    expect(recommendation.marketingGoals).toEqual(["电商转化"]);
+    expect(recommendation.targetAudiences).toEqual(["职场白领"]);
+    expect(recommendation.presenterRoles).toEqual(["好物推荐员"]);
+    expect(recommendation.marketingMethods).toEqual(["场景展示"]);
+  });
+
   test("isolates owners, versions scripts and gates composition", async () => {
     const path = join(tmpdir(), `video-create-${crypto.randomUUID()}.sqlite`);
     databases.push(path);
-    const accounts = new AccountStore(path);
+    const accounts = createTestAccountStore(path);
     const store = new VideoCreateStore(path);
-    const owner = await accounts.register({
-      email: "video-create@example.com",
+    const owner = await registerTestAccount(accounts, {
+      phone: "13800000009",
       password: "Password123",
       displayName: "成片用户",
     });
-    const other = await accounts.register({
-      email: "video-create-other@example.com",
+    const other = await registerTestAccount(accounts, {
+      phone: "13800000010",
       password: "Password123",
       displayName: "其他用户",
     });
@@ -66,6 +112,7 @@ describe("video create domain", () => {
       idempotencyKey: "video-create-1",
     });
     expect(created.project.status).toBe("draft");
+    expect(created.project.input.marketingGoals).toEqual(["电商转化"]);
     expect(store.getOwned(projectId, other.user.id)).toBeUndefined();
     expect(
       store.createDraft({
@@ -133,11 +180,11 @@ describe("video create domain", () => {
   test("marks automated video generation as explicit mock without calling Seedance", async () => {
     const path = join(tmpdir(), `video-create-mock-${crypto.randomUUID()}.sqlite`);
     databases.push(path);
-    const accounts = new AccountStore(path);
+    const accounts = createTestAccountStore(path);
     const projects = new VideoCreateStore(path);
     const jobs = new SqliteJobStore(path);
-    const owner = await accounts.register({
-      email: "video-create-mock@example.com",
+    const owner = await registerTestAccount(accounts, {
+      phone: "13800000011",
       password: "Password123",
       displayName: "Mock 视频用户",
     });

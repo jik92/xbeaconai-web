@@ -1,5 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
+import { APP_CONFIG } from "../web/app/config";
 
 const dataDir = resolve(process.env.YAOZUO_DATA_DIR ?? ".data");
 const apiPort = Number(process.env.API_PORT ?? 8787);
@@ -22,6 +23,7 @@ export const env = {
   allowMockFallback: process.env.ALLOW_MOCK_FALLBACK !== "false",
   forceMock: process.env.FORCE_MOCK === "true",
   blockAiOutbound: process.env.BLOCK_AI_OUTBOUND === "true",
+  byokEncryptionKey: process.env.BYOK_ENCRYPTION_KEY ?? "",
   redisUrl: process.env.REDIS_URL ?? "redis://127.0.0.1:6379",
   redisQueueName: process.env.REDIS_QUEUE_NAME ?? "yaozuo-jobs",
   workerConcurrency: Math.max(1, Number(process.env.WORKER_CONCURRENCY ?? 2)),
@@ -33,28 +35,19 @@ export const env = {
     120_000,
     Math.max(0, Number(process.env.DOUYIN_LOGIN_GUIDANCE_WAIT_MS ?? 30_000)),
   ),
-  openaiBaseUrl: process.env.OPENAI_BASE_URL ?? "",
-  openaiKey: process.env.OPENAI_KEY ?? "",
-  videoAnalysisModel: process.env.VIDEO_ANALYSIS_MODEL ?? "gemini-3.5-flash",
-  volcSpeech: {
-    apiKeyId: process.env.VOLC_SPEECH_API_KEY_ID ?? "",
-    apiKey: process.env.VOLC_SPEECH_API_KEY ?? "",
-    baseUrl: process.env.VOLC_SPEECH_BASE_URL ?? "https://openspeech.bytedance.com",
-    cloneResourceId: process.env.VOLC_SPEECH_CLONE_RESOURCE_ID ?? "seed-icl-2.0",
-    ttsResourceId: process.env.VOLC_SPEECH_TTS_RESOURCE_ID ?? "seed-icl-2.0",
-    presetTtsResourceId: process.env.VOLC_SPEECH_PRESET_TTS_RESOURCE_ID ?? "seed-tts-2.0",
-    pollIntervalMs: Math.max(500, Number(process.env.VOLC_SPEECH_POLL_INTERVAL_MS ?? 2_000)),
-    pollTimeoutMs: Math.max(10_000, Number(process.env.VOLC_SPEECH_POLL_TIMEOUT_MS ?? 180_000)),
+  openaiBaseUrl: APP_CONFIG.providerDefaults.openai.baseUrl,
+  videoAnalysisModel: APP_CONFIG.providerDefaults.openai.videoAnalysisModel,
+  volcSpeech: APP_CONFIG.providerDefaults.volcSpeech,
+  mediaKit: {
+    baseUrl: process.env.MEDIAKIT_BASE_URL ?? "https://mediakit.cn-beijing.volces.com",
+    pollIntervalMs: Math.max(1_000, Number(process.env.MEDIAKIT_POLL_INTERVAL_MS ?? 5_000)),
+    pollTimeoutMs: Math.max(30_000, Number(process.env.MEDIAKIT_POLL_TIMEOUT_MS ?? 30 * 60_000)),
   },
-  tos: {
-    accessKeyId: process.env.TOS_ACCESS_KEY_ID ?? "",
-    accessKeySecret: process.env.TOS_SECRET_ACCESS_KEY ?? "",
-    region: process.env.TOS_REGION ?? "cn-beijing",
-    endpoint: process.env.TOS_ENDPOINT ?? "tos-cn-beijing.volces.com",
-    bucket: process.env.TOS_BUCKET ?? "xbeacon",
-  },
+  tos: APP_CONFIG.providerDefaults.tos,
   jwtSecret: process.env.JWT_SECRET ?? generatedJwtSecret,
   authRateLimitMax: Number(process.env.AUTH_RATE_LIMIT_MAX ?? 12),
+  adminPhone: process.env.ADMIN_PHONE ?? "17688743518",
+  smsVerificationFixedCode: process.env.SMS_VERIFICATION_FIXED_CODE ?? "",
   allowedOrigins: new Set([
     "http://127.0.0.1:5173",
     "http://localhost:5173",
@@ -66,9 +59,11 @@ export const env = {
   ]),
 };
 
-export const tosConfigured = Boolean(
-  env.tos.accessKeyId && env.tos.accessKeySecret && env.tos.region && env.tos.endpoint && env.tos.bucket,
-);
+if (process.env.NODE_ENV === "production" && env.smsVerificationFixedCode)
+  throw new Error("生产环境禁止配置 SMS_VERIFICATION_FIXED_CODE");
+
+if (process.env.NODE_ENV === "production" && env.byokEncryptionKey.length < 32)
+  throw new Error("生产启动必须配置至少 32 字符的 BYOK_ENCRYPTION_KEY");
 
 if (env.host !== "127.0.0.1" && env.host !== "localhost" && env.host !== "::1") {
   throw new Error("Local development API refuses to bind a non-loopback host");

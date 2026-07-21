@@ -20,6 +20,8 @@ export type ModuleId =
   | "video-renewal"
   | "subtitle-erase"
   | "video-enhancement"
+  | "video-extract"
+  | "video-editor"
   | "kickart";
 export interface MockTask {
   id: string;

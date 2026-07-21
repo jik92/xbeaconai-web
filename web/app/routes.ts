@@ -2,6 +2,7 @@ import {
   AudioLines,
   BadgeCheck,
   Clapperboard,
+  Download,
   Eraser,
   FileText,
   Film,
@@ -11,6 +12,7 @@ import {
   Scissors,
   Shuffle,
   Sparkles,
+  Video,
   Wrench,
 } from "lucide-react";
 import type { ModuleId } from "@/entities/types";
@@ -63,7 +65,7 @@ export interface ModuleConfig {
   id: ModuleId;
   path: string;
   label: string;
-  group: "创作工作流" | "AI 工具箱";
+  group: "创作工作流" | "AI 工具箱" | "实用工具";
   icon: LucideIcon;
   eyebrow: string;
   description: string;
@@ -78,6 +80,38 @@ export interface ModuleConfig {
 
 const module = (config: ModuleConfig) => config;
 export const modules: ModuleConfig[] = [
+  module({
+    id: "video-extract",
+    path: "/utilities/video-extract",
+    label: "视频提取",
+    group: "实用工具",
+    icon: Download,
+    eyebrow: "公开视频保存",
+    description: "从视频直链或公开分享页提取视频，并保存到指定素材文件夹。",
+    steps: ["填写地址", "后台下载", "保存素材"],
+    fields: [],
+    action: "新建提取任务",
+    cost: 0,
+    duration: "取决于源站与文件大小",
+    result: { kind: "finished-video", label: "提取视频", actions: ["预览", "下载"] },
+    tips: ["仅支持公开且有权下载的内容"],
+  }),
+  module({
+    id: "video-editor",
+    path: "/utilities/video-editor",
+    label: "视频剪辑",
+    group: "实用工具",
+    icon: Video,
+    eyebrow: "Remotion 单轨编辑器",
+    description: "添加素材，完成切分、合并、删除和导出。",
+    steps: ["添加视频", "编辑时间线", "导出成片"],
+    fields: [],
+    action: "打开编辑器",
+    cost: 0,
+    duration: "取决于成片时长",
+    result: { kind: "finished-video", label: "剪辑视频", actions: ["预览", "下载"] },
+    tips: ["导出任务可在后台继续运行"],
+  }),
   module({
     id: "video-remix",
     path: "/aigc/video-remix",
@@ -405,23 +439,12 @@ export const modules: ModuleConfig[] = [
     eyebrow: "智能移除画面文字",
     description: "追踪字幕、贴纸和水印区域，逐帧擦除并使用邻近画面补全背景。",
     steps: ["上传视频", "框选区域", "擦除补全"],
-    fields: [
-      { id: "source", label: "选择视频", kind: "video", required: true },
-      { id: "autoSave", label: "自动保存", kind: "checkbox" },
-      {
-        id: "region",
-        label: "字幕所在区域",
-        kind: "region",
-        required: true,
-        hint: "拖动选框覆盖需要擦除的区域",
-        defaultValue: "底部字幕区域",
-      },
-    ],
+    fields: [{ id: "source", label: "选择视频", kind: "video", required: true }],
     action: "开始擦除字幕",
     cost: 8,
     duration: "约 2–6 分钟",
     result: { kind: "clean-video", label: "无字幕视频", actions: ["前后对比", "检查关键帧", "下载视频", "重新框选"] },
-    tips: ["选框应略大于文字边缘", "移动水印建议使用智能跟随", "复杂背景使用精细补全效果更自然"],
+    tips: ["自动识别画面中的对话字幕", "结果将保存到默认素材文件夹", "复杂背景会使用精细补全减少擦除痕迹"],
   }),
   module({
     id: "video-enhancement",
@@ -432,47 +455,12 @@ export const modules: ModuleConfig[] = [
     eyebrow: "清晰度与质感升级",
     description: "提升分辨率、锐度、色彩与人脸细节，使低清素材达到平台发布标准。",
     steps: ["评估画质", "设置增强", "输出高清"],
-    fields: [
-      {
-        id: "mode",
-        label: "模式",
-        kind: "select",
-        required: true,
-        options: ["标准版", "专业版"],
-        defaultValue: "标准版",
-      },
-      {
-        id: "scene",
-        label: "使用场景",
-        kind: "select",
-        required: true,
-        options: ["AIGC 内容", "实拍内容"],
-        defaultValue: "AIGC 内容",
-      },
-      {
-        id: "fps",
-        label: "帧率",
-        kind: "select",
-        required: true,
-        options: ["原视频帧率", "30FPS", "60FPS"],
-        defaultValue: "原视频帧率",
-      },
-      {
-        id: "resolution",
-        label: "分辨率",
-        kind: "select",
-        required: true,
-        options: ["1080P", "2K", "4K"],
-        defaultValue: "1080P",
-      },
-      { id: "autoSave", label: "自动保存", kind: "checkbox" },
-      { id: "source", label: "选择视频", kind: "video", required: true },
-    ],
+    fields: [{ id: "source", label: "选择视频", kind: "video", required: true }],
     action: "增强视频画质",
     cost: 12,
     duration: "约 5–12 分钟",
     result: { kind: "enhanced-video", label: "高清视频", actions: ["分屏对比", "100% 放大", "下载视频", "调整参数"] },
-    tips: ["2K 是清晰度与成本的平衡选择", "人像优先会重点修复五官细节", "补帧适合运动和镜头移动画面"],
+    tips: ["极速版优先控制成本和等待时间", "服务会自动选择适合素材的增强策略", "结果将保存到默认素材文件夹"],
   }),
   module({
     id: "kickart",

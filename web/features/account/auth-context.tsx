@@ -6,8 +6,11 @@ import {
   login as loginRequest,
   logout as logoutRequest,
   register as registerRequest,
+  sendSmsVerificationCode,
+  setupPassword as setupPasswordRequest,
+  verifyPasswordReset as verifyPasswordResetRequest,
 } from "@/api/generated/sdk.gen";
-import type { UserSummary } from "@/api/generated/types.gen";
+import type { PasswordSetupChallenge, UserSummary } from "@/api/generated/types.gen";
 
 const TOKEN_KEY = "yaozuo:auth-token:v1";
 
@@ -22,13 +25,20 @@ function configureClient(token = getAuthToken()) {
   });
 }
 
-type Credentials = { email: string; password: string };
-type RegisterInput = Credentials & { displayName: string };
+type Credentials = { phone: string; password: string };
+type VerificationInput = { phone: string; verificationCode: string };
+type SmsPurpose = "register" | "reset_password";
 type AuthContextValue = {
   status: "loading" | "anonymous" | "authenticated";
   user?: UserSummary;
   login: (input: Credentials) => Promise<void>;
-  register: (input: RegisterInput) => Promise<void>;
+  register: (input: VerificationInput) => Promise<PasswordSetupChallenge>;
+  verifyPasswordReset: (input: VerificationInput) => Promise<PasswordSetupChallenge>;
+  setupPassword: (input: { setupToken: string; password: string }) => Promise<void>;
+  sendVerificationCode: (
+    phone: string,
+    purpose: SmsPurpose,
+  ) => Promise<{ expiresAt: string; retryAfterSeconds: number; verificationCode: string }>;
   logout: () => Promise<void>;
   setUser: (user: UserSummary) => void;
   refresh: () => Promise<void>;
@@ -78,15 +88,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     [accept],
   );
-  const register = useCallback(
-    async (input: RegisterInput) => {
+  const register = useCallback(async (input: VerificationInput) => {
+    configureClient(null);
+    const { data } = await registerRequest({ body: input, throwOnError: true });
+    if (!data) throw new Error("注册失败");
+    return data;
+  }, []);
+  const verifyPasswordReset = useCallback(async (input: VerificationInput) => {
+    configureClient(null);
+    const { data } = await verifyPasswordResetRequest({ body: input, throwOnError: true });
+    if (!data) throw new Error("手机号验证失败");
+    return data;
+  }, []);
+  const setupPassword = useCallback(
+    async (input: { setupToken: string; password: string }) => {
       configureClient(null);
-      const { data } = await registerRequest({ body: input, throwOnError: true });
-      if (!data) throw new Error("注册失败");
+      const { data } = await setupPasswordRequest({ body: input, throwOnError: true });
+      if (!data) throw new Error("密码设置失败");
       accept(data.token, data.user);
     },
     [accept],
   );
+  const sendVerificationCode = useCallback(async (phone: string, purpose: SmsPurpose) => {
+    configureClient(null);
+    const { data } = await sendSmsVerificationCode({ body: { phone, purpose }, throwOnError: true });
+    if (!data) throw new Error("验证码发送失败");
+    return data;
+  }, []);
   const logout = useCallback(async () => {
     try {
       configureClient();
@@ -98,8 +126,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [clear]);
   const value = useMemo(
-    () => ({ status, user, login, register, logout, setUser: setUserState, refresh }),
-    [status, user, login, register, logout, refresh],
+    () => ({
+      status,
+      user,
+      login,
+      register,
+      verifyPasswordReset,
+      setupPassword,
+      sendVerificationCode,
+      logout,
+      setUser: setUserState,
+      refresh,
+    }),
+    [status, user, login, register, verifyPasswordReset, setupPassword, sendVerificationCode, logout, refresh],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

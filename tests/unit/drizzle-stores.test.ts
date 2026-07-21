@@ -2,9 +2,9 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { AccountStore } from "../../server/accounts/account-store";
 import { SqliteJobStore } from "../../server/jobs/sqlite-job-store";
 import type { JobRecord } from "../../server/types";
+import { createTestAccountStore, registerTestAccount } from "./account-test-helper";
 
 const databases: string[] = [];
 afterEach(() => {
@@ -19,18 +19,23 @@ describe("Drizzle SQLite stores", () => {
   test("shares typed account, credit, job and cleanup state without raw queries", async () => {
     const path = join(tmpdir(), `drizzle-stores-${crypto.randomUUID()}.sqlite`);
     databases.push(path);
-    const accounts = new AccountStore(path);
+    const accounts = createTestAccountStore(path);
     const jobs = new SqliteJobStore(path);
-    const registration = await accounts.register({
-      email: "drizzle@example.com",
+    const registration = await registerTestAccount(accounts, {
+      phone: "13800000005",
       password: "Password123",
       displayName: "Drizzle 用户",
+    });
+    const otherRegistration = await registerTestAccount(accounts, {
+      phone: "13800000006",
+      password: "Password123",
+      displayName: "其他用户",
     });
 
     const session = accounts.createSession(registration.user.id, new Date(Date.now() + 60_000).toISOString());
     expect(
-      accounts.validateSession(registration.user.id, session.id, session.jti, session.passwordVersion)?.user.email,
-    ).toBe("drizzle@example.com");
+      accounts.validateSession(registration.user.id, session.id, session.jti, session.passwordVersion)?.user.phone,
+    ).toBe("13800000005");
     accounts.savePreferences(registration.user.id, {
       theme: "light",
       defaultRatio: "16:9",
@@ -65,6 +70,22 @@ describe("Drizzle SQLite stores", () => {
     expect(jobs.getOwned(job.id, registration.user.id)?.values.method).toBe("按固定时长");
     expect(jobs.update(job.id, { status: "succeeded", progress: 100 })?.status).toBe("succeeded");
     expect(accounts.getUser(registration.user.id)?.credits).toBe(3476);
+
+    jobs.create({
+      ...job,
+      id: crypto.randomUUID(),
+      ownerUserId: otherRegistration.user.id,
+      title: "其他用户任务",
+      status: "failed",
+      updatedAt: new Date(Date.now() + 1).toISOString(),
+    });
+    expect(jobs.listAll({ page: 1, pageSize: 10 }).total).toBe(2);
+    expect(jobs.listAll({ page: 1, pageSize: 10, phone: "000006" }).jobs).toMatchObject([
+      { ownerPhone: "13800000006", title: "其他用户任务" },
+    ]);
+    expect(jobs.listAll({ page: 1, pageSize: 10, status: "succeeded" }).jobs).toMatchObject([
+      { ownerPhone: "13800000005", id: job.id },
+    ]);
 
     jobs.scheduleObjectCleanup(job.id, "test/object.mp4", new Error("retry"));
     expect(jobs.pendingObjectCleanup()).toEqual([{ object_key: "test/object.mp4", job_id: job.id, attempts: 1 }]);

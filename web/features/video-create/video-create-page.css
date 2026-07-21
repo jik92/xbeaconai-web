@@ -7,7 +7,7 @@
   grid-template-columns: 390px minmax(0, 1fr);
   width: 100%;
   height: calc(100vh - 56px);
-  min-height: 680px;
+  min-height: 0;
   overflow: hidden;
   background: #f7f9fc;
   color: var(--vc-text);
@@ -23,8 +23,11 @@
 }
 .vc-config-panel {
   display: flex;
+  height: 100%;
   min-width: 0;
+  min-height: 0;
   flex-direction: column;
+  overflow: hidden;
   background: #f8faff;
   border-right: 1px solid var(--vc-line);
 }
@@ -60,7 +63,11 @@
 .vc-config-scroll {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
   padding: 18px 18px 30px;
 }
 .vc-field {
@@ -70,7 +77,6 @@
 .vc-field > label,
 .vc-field-label,
 label.vc-field > span,
-.vc-advanced > label,
 .vc-advanced-field {
   display: block;
   margin-bottom: 10px;
@@ -87,9 +93,9 @@ label.vc-field > span,
 .vc-field input,
 .vc-field textarea,
 .vc-field select,
-.vc-advanced input,
-.vc-advanced textarea,
-.vc-advanced select {
+.vc-parameter-content input,
+.vc-parameter-content textarea,
+.vc-parameter-content select {
   width: 100%;
   border: 1px solid #dce2ea;
   border-radius: 9px;
@@ -100,9 +106,9 @@ label.vc-field > span,
 }
 .vc-field input:focus,
 .vc-field textarea:focus,
-.vc-advanced input:focus,
-.vc-advanced textarea:focus,
-.vc-advanced select:focus {
+.vc-parameter-content input:focus,
+.vc-parameter-content textarea:focus,
+.vc-parameter-content select:focus {
   border-color: var(--vc-blue);
   box-shadow: 0 0 0 3px #176bff12;
 }
@@ -326,6 +332,30 @@ label.vc-field > span,
   background: #fff;
   font-weight: 650;
 }
+.vc-collapse > span {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.vc-collapse b {
+  font-size: 15px;
+}
+.vc-collapse i {
+  min-width: 23px;
+  height: 23px;
+  display: grid;
+  place-items: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--vc-blue);
+  color: #fff;
+  font-style: normal;
+  font-size: 12px;
+}
+.vc-collapse small {
+  color: #a4adbc;
+  font-weight: 400;
+}
 .vc-collapse svg {
   color: #9aa4b5;
   transition: 0.2s;
@@ -333,27 +363,74 @@ label.vc-field > span,
 .vc-collapse svg.open {
   transform: rotate(180deg);
 }
-.vc-advanced {
-  display: grid;
-  gap: 14px;
-  margin-top: 12px;
-  padding: 14px;
-  border-radius: 11px;
-  background: #fff;
-  border: 1px solid var(--vc-line);
+.vc-parameter-panel {
+  margin-bottom: 12px;
 }
-.vc-advanced > label,
-.vc-advanced-field {
+.vc-parameter-panel.open .vc-collapse {
+  border-radius: 11px 11px 0 0;
+}
+.vc-parameter-content {
+  display: grid;
+  gap: 21px;
+  padding: 18px 14px;
+  border: 1px solid var(--vc-line);
+  border-top: 0;
+  border-radius: 0 0 11px 11px;
+  background: #fff;
+}
+.vc-choice-group > strong,
+.vc-text-option > strong,
+.vc-advanced-field > strong {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+.vc-choice-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.vc-choice-list button {
+  min-height: 35px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 11px;
+  border: 1px solid #dce2ea;
+  border-radius: 999px;
+  color: #68758a;
+  background: #fbfcfe;
+}
+.vc-choice-list button:hover {
+  border-color: #9bbdff;
+  color: var(--vc-blue);
+}
+.vc-choice-list button.active {
+  border-color: var(--vc-blue);
+  background: var(--vc-blue-soft);
+  color: var(--vc-blue);
+  font-weight: 650;
+}
+.vc-choice-list button svg {
+  width: 13px;
+  height: 13px;
+}
+.vc-text-option {
   margin: 0;
 }
-.vc-advanced textarea {
-  min-height: 74px;
+.vc-text-option textarea {
+  min-height: 76px;
   resize: vertical;
-  margin-top: 7px;
 }
-.vc-advanced input,
-.vc-advanced select {
-  margin-top: 7px;
+.vc-advanced-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.vc-advanced-grid label {
+  display: grid;
+  gap: 7px;
+  font-weight: 650;
 }
 .vc-select-asset {
   width: 100%;
@@ -978,6 +1055,13 @@ label.vc-field > span,
   .vc-config-panel,
   .vc-output-panel {
     min-height: calc(100vh - 56px);
+  }
+  .vc-config-panel {
+    height: auto;
+    overflow: visible;
+  }
+  .vc-config-scroll {
+    overflow: visible;
   }
   .vc-output-panel {
     border-top: 8px solid #eef2f7;

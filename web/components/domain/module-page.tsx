@@ -581,48 +581,29 @@ function ToolboxCreatorForm({
     );
   } else if (config.id === "subtitle-erase") {
     content = (
-      <div className="subtitle-form">
-        <section>
-          <div className="subtitle-preview">
-            <span>{values.source ? "拖动白色选框，框住需要擦除的字幕区域" : "请先选择视频"}</span>
-            {values.source && <i />}
-          </div>
-          <p>拖拽白色选框，框住需要擦除的字幕区域</p>
-        </section>
-        <section className="subtitle-settings">
-          <div className={`tool-form-row upload-row ${invalid("source") ? "invalid" : ""}`}>
-            {requiredLabel("选择视频", true)}
-            {upload("source")}
-          </div>
-          <div className="tool-form-row compact-row">
-            {requiredLabel("自动保存")}
-            <ToolboxSwitch value={values.autoSave ?? ""} onChange={(value) => setValue("autoSave", value)} />
-          </div>
-        </section>
+      <div className="tool-simple-form subtitle-settings">
+        <div className="tool-form-row combo-summary">
+          {requiredLabel("处理方式")}
+          <span>
+            <b>精细化自动擦除</b>
+            <small>自动识别字幕并逐帧补全背景</small>
+          </span>
+        </div>
+        <div className={`tool-form-row upload-row ${invalid("source") ? "invalid" : ""}`}>
+          {requiredLabel("选择视频", true)}
+          {upload("source")}
+        </div>
       </div>
     );
   } else if (config.id === "video-enhancement") {
     content = (
       <div className="tool-simple-form enhancement-form">
-        <div className="tool-form-row">
-          {requiredLabel("模式", true)}
-          {select("mode")}
-        </div>
-        <div className="tool-form-row">
-          {requiredLabel("使用场景", true)}
-          {select("scene")}
-        </div>
-        <div className="tool-form-row">
-          {requiredLabel("帧率", true)}
-          {select("fps")}
-        </div>
-        <div className="tool-form-row">
-          {requiredLabel("分辨率", true)}
-          {select("resolution")}
-        </div>
-        <div className="tool-form-row compact-row">
-          {requiredLabel("自动保存")}
-          <ToolboxSwitch value={values.autoSave ?? ""} onChange={(value) => setValue("autoSave", value)} />
+        <div className="tool-form-row combo-summary">
+          {requiredLabel("处理方式")}
+          <span>
+            <b>极速画质增强</b>
+            <small>自动改善清晰度、噪点和画面质感</small>
+          </span>
         </div>
         <div className={`tool-form-row upload-row ${invalid("source") ? "invalid" : ""}`}>
           {requiredLabel("选择视频", true)}
@@ -1236,7 +1217,7 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
                 <h2>{toolboxDisplayName(config)}</h2>
                 {config.id === "subtitle-erase" && (
                   <span>
-                    字幕擦除 · 精细擦除 <small>仅擦除框选区域内的字幕</small>
+                    字幕擦除 · 精细擦除 <small>自动识别画面字幕</small>
                   </span>
                 )}
               </div>

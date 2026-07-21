@@ -307,7 +307,7 @@ function AccountPanel({ open }: { open: (panel: WorkspacePanel) => void }) {
         <i>{user?.avatarText}</i>
         <div>
           <b>{user?.displayName}</b>
-          <span>{user?.email}</span>
+          <span>{user?.phone}</span>
           <small>{user?.credits.toLocaleString()} 创作点</small>
         </div>
       </div>
@@ -315,7 +315,7 @@ function AccountPanel({ open }: { open: (panel: WorkspacePanel) => void }) {
         <UserRound />
         <span>
           <b>个人资料</b>
-          <small>名称、头像文字与邮箱</small>
+          <small>名称、头像文字与手机号</small>
         </span>
         <ChevronRight />
       </button>
@@ -337,15 +337,14 @@ function AccountPanel({ open }: { open: (panel: WorkspacePanel) => void }) {
 
 function ProfilePanel() {
   const { user, setUser } = useAuth();
-  const [email, setEmail] = useState(user?.email ?? ""),
-    [displayName, setDisplayName] = useState(user?.displayName ?? ""),
+  const [displayName, setDisplayName] = useState(user?.displayName ?? ""),
     [avatarText, setAvatarText] = useState(user?.avatarText ?? ""),
     [busy, setBusy] = useState(false);
   async function submit(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
     try {
-      const { data } = await updateProfile({ body: { email, displayName, avatarText }, throwOnError: true });
+      const { data } = await updateProfile({ body: { displayName, avatarText }, throwOnError: true });
       if (data) {
         setUser(data.user);
         toast.success("个人资料已更新");
@@ -380,8 +379,8 @@ function ProfilePanel() {
         />
       </label>
       <label>
-        登录邮箱
-        <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+        登录手机号
+        <input type="tel" value={user?.phone ?? ""} disabled />
       </label>
       <button className="panel-primary" disabled={busy}>
         {busy ? "保存中…" : "保存个人资料"}

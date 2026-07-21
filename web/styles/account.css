@@ -57,6 +57,28 @@
   font-weight: 700;
   box-shadow: 0 2px 8px #17203310;
 }
+.auth-flow-heading {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 18px;
+}
+.auth-flow-heading button,
+.auth-text-action {
+  width: fit-content;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #246bfd;
+  font-size: 11px;
+}
+.auth-flow-heading b {
+  color: #263248;
+  font-size: 17px;
+}
+.auth-flow-heading span {
+  color: #8a94a5;
+  font-size: 11px;
+}
 .auth-card form > label,
 .panel-form > label {
   display: block;
@@ -82,6 +104,25 @@
   display: flex;
   position: relative;
 }
+.verification-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 112px;
+  gap: 8px;
+}
+.verification-field button {
+  height: 42px;
+  margin-top: 7px;
+  border: 1px solid #cfd8e6;
+  border-radius: 8px;
+  background: #f7f9fc;
+  color: #246bfd;
+  font-size: 12px;
+  font-weight: 700;
+}
+.verification-field button:disabled {
+  color: #9aa4b2;
+  cursor: not-allowed;
+}
 .password-field input {
   padding-right: 42px;
 }
@@ -105,6 +146,37 @@
   border-radius: 7px;
   padding: 9px;
   margin: 10px 0;
+}
+.form-notice {
+  font-size: 11px;
+  color: #24734a;
+  background: #edf9f2;
+  border-radius: 7px;
+  padding: 9px;
+  margin: 10px 0;
+}
+
+.verification-code-display {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: -2px 0 0;
+  padding: 10px 12px;
+  border: 1px solid #b7d2ff;
+  border-radius: 10px;
+  background: #eef5ff;
+  color: #345173;
+  font-size: 13px;
+}
+
+.verification-code-display strong {
+  color: #1769e8;
+  font-size: 18px;
+  letter-spacing: 0.16em;
+}
+.auth-text-action {
+  display: block;
+  margin: -3px 0 13px auto;
 }
 .auth-submit,
 .panel-primary {

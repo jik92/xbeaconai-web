@@ -7,7 +7,9 @@ import { subtitleEraseDefinition } from "./subtitle-erase";
 import type { JobDefinition } from "./types";
 import { videoCreateDefinition } from "./video-create";
 import { videoCutDefinition } from "./video-cut";
+import { videoEditorDefinition } from "./video-editor";
 import { videoEnhancementDefinition } from "./video-enhancement";
+import { videoExtractDefinition } from "./video-extract";
 import { videoMashupDefinition } from "./video-mashup";
 import { videoRemixDefinition } from "./video-remix";
 import { videoRenewalDefinition } from "./video-renewal";
@@ -25,6 +27,8 @@ const definitions = [
   videoRenewalDefinition,
   subtitleEraseDefinition,
   videoEnhancementDefinition,
+  videoExtractDefinition,
+  videoEditorDefinition,
   kickartDefinition,
 ];
 

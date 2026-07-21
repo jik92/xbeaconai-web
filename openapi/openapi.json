@@ -6,6 +6,58 @@
   },
   "components": {
     "schemas": {
+      "ApiErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "retryable": {
+                "type": "boolean"
+              },
+              "requestId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message",
+              "retryable",
+              "requestId"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "PasswordSetupChallenge": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "pattern": "^1[3-9]\\d{9}$"
+          },
+          "setupToken": {
+            "type": "string",
+            "minLength": 32
+          },
+          "expiresAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "phone",
+          "setupToken",
+          "expiresAt"
+        ]
+      },
       "AuthResponse": {
         "type": "object",
         "properties": {
@@ -39,9 +91,9 @@
             "type": "string",
             "format": "uuid"
           },
-          "email": {
+          "phone": {
             "type": "string",
-            "format": "email"
+            "pattern": "^1[3-9]\\d{9}$"
           },
           "displayName": {
             "type": "string"
@@ -52,45 +104,18 @@
           "credits": {
             "type": "integer",
             "minimum": 0
+          },
+          "isAdmin": {
+            "type": "boolean"
           }
         },
         "required": [
           "id",
-          "email",
+          "phone",
           "displayName",
           "avatarText",
-          "credits"
-        ]
-      },
-      "ApiErrorResponse": {
-        "type": "object",
-        "properties": {
-          "error": {
-            "type": "object",
-            "properties": {
-              "code": {
-                "type": "string"
-              },
-              "message": {
-                "type": "string"
-              },
-              "retryable": {
-                "type": "boolean"
-              },
-              "requestId": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "code",
-              "message",
-              "retryable",
-              "requestId"
-            ]
-          }
-        },
-        "required": [
-          "error"
+          "credits",
+          "isAdmin"
         ]
       },
       "Preferences": {
@@ -217,6 +242,44 @@
           "product",
           "portrait",
           "voice"
+        ]
+      },
+      "ProviderCredentialName": {
+        "type": "string",
+        "enum": [
+          "OPENAI_KEY",
+          "VOLC_SPEECH_API_KEY_ID",
+          "VOLC_SPEECH_API_KEY",
+          "TOS_ACCESS_KEY_ID",
+          "TOS_SECRET_ACCESS_KEY",
+          "MEDIAKIT_API_KEY"
+        ]
+      },
+      "ModuleId": {
+        "type": "string",
+        "enum": [
+          "video-remix",
+          "video-create",
+          "ad-script",
+          "ai-generate",
+          "video-cut",
+          "media-understand",
+          "video-mashup",
+          "voice-clone",
+          "video-renewal",
+          "subtitle-erase",
+          "video-enhancement",
+          "video-extract",
+          "video-editor",
+          "kickart"
+        ]
+      },
+      "SeedanceModelId": {
+        "type": "string",
+        "enum": [
+          "doubao-seedance-2-0-260128",
+          "doubao-seedance-2-0-mini-260615",
+          "doubao-seedance-2-0-fast-260128"
         ]
       },
       "Job": {
@@ -1519,6 +1582,198 @@
             "maxLength": 100,
             "default": "自然种草"
           },
+          "marketingGoals": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "电商转化",
+                "品牌曝光",
+                "App下载",
+                "门店到店",
+                "直播引流"
+              ]
+            },
+            "maxItems": 5,
+            "default": []
+          },
+          "targetAudiences": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "18-24岁女性",
+                "25-35岁女性",
+                "18-24岁男性",
+                "25-35岁男性",
+                "宝妈",
+                "学生",
+                "职场白领",
+                "中老年",
+                "全年龄段"
+              ]
+            },
+            "maxItems": 9,
+            "default": []
+          },
+          "audiencePainPoints": {
+            "type": "string",
+            "maxLength": 500,
+            "default": ""
+          },
+          "productBenefits": {
+            "type": "string",
+            "maxLength": 500,
+            "default": ""
+          },
+          "presenterRoles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "好物推荐员",
+                "普通用户",
+                "行业专家",
+                "品牌官方"
+              ]
+            },
+            "maxItems": 4,
+            "default": []
+          },
+          "presenterGenders": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "不区分",
+                "男声",
+                "女声"
+              ]
+            },
+            "maxItems": 3,
+            "default": []
+          },
+          "contentStyles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "种草",
+                "专业测评",
+                "情绪共鸣",
+                "悬念叙事",
+                "故事",
+                "数据说话"
+              ]
+            },
+            "maxItems": 6,
+            "default": []
+          },
+          "openingStyles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "自动匹配",
+                "痛点直击",
+                "数字冲击",
+                "福利诱惑",
+                "问句互动",
+                "品牌声量",
+                "随机"
+              ]
+            },
+            "maxItems": 7,
+            "default": []
+          },
+          "closingGuides": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "硬引导购买",
+                "软种草",
+                "互动提问"
+              ]
+            },
+            "maxItems": 3,
+            "default": []
+          },
+          "scriptTopics": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "直播带货",
+                "产品功能讲解",
+                "痛点解决",
+                "对比测评",
+                "情感共鸣",
+                "节日营销"
+              ]
+            },
+            "maxItems": 6,
+            "default": []
+          },
+          "materialTopics": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "产品外观",
+                "使用体验",
+                "价格优势",
+                "品质保障",
+                "售后服务",
+                "用户口碑",
+                "生活方式",
+                "成分功效",
+                "限时优惠"
+              ]
+            },
+            "maxItems": 9,
+            "default": []
+          },
+          "marketingMethods": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "场景展示",
+                "痛点解决",
+                "竞品对比",
+                "用户证言",
+                "专家背书",
+                "限时促销"
+              ]
+            },
+            "maxItems": 6,
+            "default": []
+          },
+          "templates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "常规",
+                "节日营销",
+                "明星同款",
+                "爆款复制"
+              ]
+            },
+            "maxItems": 4,
+            "default": []
+          },
+          "sensitiveWords": {
+            "type": "string",
+            "maxLength": 500,
+            "default": ""
+          },
+          "customRequirements": {
+            "type": "string",
+            "maxLength": 1000,
+            "default": ""
+          },
           "videoModel": {
             "type": "string",
             "enum": [
@@ -1604,6 +1859,198 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 100
+          },
+          "marketingGoals": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "电商转化",
+                "品牌曝光",
+                "App下载",
+                "门店到店",
+                "直播引流"
+              ]
+            },
+            "maxItems": 5,
+            "default": []
+          },
+          "targetAudiences": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "18-24岁女性",
+                "25-35岁女性",
+                "18-24岁男性",
+                "25-35岁男性",
+                "宝妈",
+                "学生",
+                "职场白领",
+                "中老年",
+                "全年龄段"
+              ]
+            },
+            "maxItems": 9,
+            "default": []
+          },
+          "audiencePainPoints": {
+            "type": "string",
+            "maxLength": 500,
+            "default": ""
+          },
+          "productBenefits": {
+            "type": "string",
+            "maxLength": 500,
+            "default": ""
+          },
+          "presenterRoles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "好物推荐员",
+                "普通用户",
+                "行业专家",
+                "品牌官方"
+              ]
+            },
+            "maxItems": 4,
+            "default": []
+          },
+          "presenterGenders": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "不区分",
+                "男声",
+                "女声"
+              ]
+            },
+            "maxItems": 3,
+            "default": []
+          },
+          "contentStyles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "种草",
+                "专业测评",
+                "情绪共鸣",
+                "悬念叙事",
+                "故事",
+                "数据说话"
+              ]
+            },
+            "maxItems": 6,
+            "default": []
+          },
+          "openingStyles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "自动匹配",
+                "痛点直击",
+                "数字冲击",
+                "福利诱惑",
+                "问句互动",
+                "品牌声量",
+                "随机"
+              ]
+            },
+            "maxItems": 7,
+            "default": []
+          },
+          "closingGuides": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "硬引导购买",
+                "软种草",
+                "互动提问"
+              ]
+            },
+            "maxItems": 3,
+            "default": []
+          },
+          "scriptTopics": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "直播带货",
+                "产品功能讲解",
+                "痛点解决",
+                "对比测评",
+                "情感共鸣",
+                "节日营销"
+              ]
+            },
+            "maxItems": 6,
+            "default": []
+          },
+          "materialTopics": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "产品外观",
+                "使用体验",
+                "价格优势",
+                "品质保障",
+                "售后服务",
+                "用户口碑",
+                "生活方式",
+                "成分功效",
+                "限时优惠"
+              ]
+            },
+            "maxItems": 9,
+            "default": []
+          },
+          "marketingMethods": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "场景展示",
+                "痛点解决",
+                "竞品对比",
+                "用户证言",
+                "专家背书",
+                "限时促销"
+              ]
+            },
+            "maxItems": 6,
+            "default": []
+          },
+          "templates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "常规",
+                "节日营销",
+                "明星同款",
+                "爆款复制"
+              ]
+            },
+            "maxItems": 4,
+            "default": []
+          },
+          "sensitiveWords": {
+            "type": "string",
+            "maxLength": 500,
+            "default": ""
+          },
+          "customRequirements": {
+            "type": "string",
+            "maxLength": 1000,
+            "default": ""
           }
         },
         "required": [
@@ -1733,6 +2180,108 @@
         }
       }
     },
+    "/api/auth/sms-code": {
+      "post": {
+        "operationId": "sendSmsVerificationCode",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "pattern": "^1[3-9]\\d{9}$"
+                  },
+                  "purpose": {
+                    "type": "string",
+                    "enum": [
+                      "register",
+                      "reset_password"
+                    ]
+                  }
+                },
+                "required": [
+                  "phone",
+                  "purpose"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verification code sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "expiresAt": {
+                      "type": "string"
+                    },
+                    "retryAfterSeconds": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "verificationCode": {
+                      "type": "string",
+                      "pattern": "^\\d{6}$"
+                    }
+                  },
+                  "required": [
+                    "expiresAt",
+                    "retryAfterSeconds",
+                    "verificationCode"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Phone not registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Phone exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid phone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/register": {
       "post": {
         "operationId": "register",
@@ -1743,27 +2292,18 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "email": {
+                  "phone": {
                     "type": "string",
-                    "maxLength": 254,
-                    "format": "email"
+                    "pattern": "^1[3-9]\\d{9}$"
                   },
-                  "password": {
+                  "verificationCode": {
                     "type": "string",
-                    "minLength": 10,
-                    "maxLength": 128,
-                    "pattern": "[A-Za-z]"
-                  },
-                  "displayName": {
-                    "type": "string",
-                    "minLength": 2,
-                    "maxLength": 40
+                    "pattern": "^\\d{6}$"
                   }
                 },
                 "required": [
-                  "email",
-                  "password",
-                  "displayName"
+                  "phone",
+                  "verificationCode"
                 ]
               }
             }
@@ -1771,17 +2311,17 @@
         },
         "responses": {
           "201": {
-            "description": "Registered",
+            "description": "Registered and waiting for password setup",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AuthResponse"
+                  "$ref": "#/components/schemas/PasswordSetupChallenge"
                 }
               }
             }
           },
           "409": {
-            "description": "Email exists",
+            "description": "Phone exists",
             "content": {
               "application/json": {
                 "schema": {
@@ -1813,6 +2353,151 @@
         }
       }
     },
+    "/api/auth/password/verify": {
+      "post": {
+        "operationId": "verifyPasswordReset",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "pattern": "^1[3-9]\\d{9}$"
+                  },
+                  "verificationCode": {
+                    "type": "string",
+                    "pattern": "^\\d{6}$"
+                  }
+                },
+                "required": [
+                  "phone",
+                  "verificationCode"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Phone verified for password reset",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordSetupChallenge"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Phone not registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Verification failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/password/setup": {
+      "post": {
+        "operationId": "setupPassword",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "setupToken": {
+                    "type": "string",
+                    "minLength": 32,
+                    "maxLength": 256
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 10,
+                    "maxLength": 128,
+                    "pattern": "[A-Za-z]"
+                  }
+                },
+                "required": [
+                  "setupToken",
+                  "password"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password set and logged in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid setup token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/login": {
       "post": {
         "operationId": "login",
@@ -1823,9 +2508,9 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "email": {
+                  "phone": {
                     "type": "string",
-                    "format": "email"
+                    "pattern": "^1[3-9]\\d{9}$"
                   },
                   "password": {
                     "type": "string",
@@ -1834,7 +2519,7 @@
                   }
                 },
                 "required": [
-                  "email",
+                  "phone",
                   "password"
                 ]
               }
@@ -1940,11 +2625,6 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "email": {
-                    "type": "string",
-                    "maxLength": 254,
-                    "format": "email"
-                  },
                   "displayName": {
                     "type": "string",
                     "minLength": 2,
@@ -1957,7 +2637,6 @@
                   }
                 },
                 "required": [
-                  "email",
                   "displayName",
                   "avatarText"
                 ]
@@ -1980,16 +2659,6 @@
                   "required": [
                     "user"
                   ]
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Email exists",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
             }
@@ -3490,6 +4159,476 @@
               "text/plain": {
                 "schema": {
                   "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/credentials": {
+      "get": {
+        "operationId": "listAdminCredentials",
+        "responses": {
+          "200": {
+            "description": "Masked provider credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "credentials": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "$ref": "#/components/schemas/ProviderCredentialName"
+                          },
+                          "provider": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "configured": {
+                            "type": "boolean"
+                          },
+                          "maskedValue": {
+                            "type": "string"
+                          },
+                          "updatedAt": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "provider",
+                          "label",
+                          "configured"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "credentials"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "BYOK unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/credentials/{name}": {
+      "put": {
+        "operationId": "updateAdminCredential",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/ProviderCredentialName"
+            },
+            "required": true,
+            "name": "name",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  }
+                },
+                "required": [
+                  "value"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "$ref": "#/components/schemas/ProviderCredentialName"
+                    },
+                    "provider": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "configured": {
+                      "type": "boolean"
+                    },
+                    "maskedValue": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "provider",
+                    "label",
+                    "configured"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "BYOK unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteAdminCredential",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/ProviderCredentialName"
+            },
+            "required": true,
+            "name": "name",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "$ref": "#/components/schemas/ProviderCredentialName"
+                    },
+                    "provider": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "configured": {
+                      "type": "boolean"
+                    },
+                    "maskedValue": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "provider",
+                    "label",
+                    "configured"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "BYOK unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/credentials/import": {
+      "post": {
+        "operationId": "importAdminEnvKey",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Imported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "updated": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ProviderCredentialName"
+                      }
+                    },
+                    "skipped": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ProviderCredentialName"
+                      }
+                    },
+                    "ignored": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "updated",
+                    "skipped",
+                    "ignored"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid env key file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "File too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "BYOK unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/jobs": {
+      "get": {
+        "operationId": "listAdminJobs",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 100,
+              "default": 25
+            },
+            "required": false,
+            "name": "pageSize",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/ModuleId"
+            },
+            "required": false,
+            "name": "moduleId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "queued",
+                "processing",
+                "succeeded",
+                "partially_succeeded",
+                "failed",
+                "cancelled"
+              ]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 32
+            },
+            "required": false,
+            "name": "phone",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "All queue jobs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jobs": {
+                      "type": "array",
+                      "items": {
+                        "allOf": [
+                          {
+                            "$ref": "#/components/schemas/Job"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "ownerPhone": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "ownerPhone"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "pageSize": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "jobs",
+                    "total",
+                    "page",
+                    "pageSize"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
             }

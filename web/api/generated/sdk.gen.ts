@@ -20,8 +20,35 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 
 export const getHealth = <ThrowOnError extends boolean = false>(options?: Options<GetHealthData, ThrowOnError>): RequestResult<GetHealthResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetHealthResponses, unknown, ThrowOnError>({ url: '/api/health', ...options });
 
+export const sendSmsVerificationCode = <ThrowOnError extends boolean = false>(options: Options<SendSmsVerificationCodeData, ThrowOnError>): RequestResult<SendSmsVerificationCodeResponses, SendSmsVerificationCodeErrors, ThrowOnError> => (options.client ?? client).post<SendSmsVerificationCodeResponses, SendSmsVerificationCodeErrors, ThrowOnError>({
+    url: '/api/auth/sms-code',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
 export const register = <ThrowOnError extends boolean = false>(options: Options<RegisterData, ThrowOnError>): RequestResult<RegisterResponses, RegisterErrors, ThrowOnError> => (options.client ?? client).post<RegisterResponses, RegisterErrors, ThrowOnError>({
     url: '/api/auth/register',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const verifyPasswordReset = <ThrowOnError extends boolean = false>(options: Options<VerifyPasswordResetData, ThrowOnError>): RequestResult<VerifyPasswordResetResponses, VerifyPasswordResetErrors, ThrowOnError> => (options.client ?? client).post<VerifyPasswordResetResponses, VerifyPasswordResetErrors, ThrowOnError>({
+    url: '/api/auth/password/verify',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const setupPassword = <ThrowOnError extends boolean = false>(options: Options<SetupPasswordData, ThrowOnError>): RequestResult<SetupPasswordResponses, SetupPasswordErrors, ThrowOnError> => (options.client ?? client).post<SetupPasswordResponses, SetupPasswordErrors, ThrowOnError>({
+    url: '/api/auth/password/setup',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -42,7 +69,7 @@ export const logout = <ThrowOnError extends boolean = false>(options?: Options<L
 
 export const getCurrentUser = <ThrowOnError extends boolean = false>(options?: Options<GetCurrentUserData, ThrowOnError>): RequestResult<GetCurrentUserResponses, GetCurrentUserErrors, ThrowOnError> => (options?.client ?? client).get<GetCurrentUserResponses, GetCurrentUserErrors, ThrowOnError>({ url: '/api/auth/me', ...options });
 
-export const updateProfile = <ThrowOnError extends boolean = false>(options: Options<UpdateProfileData, ThrowOnError>): RequestResult<UpdateProfileResponses, UpdateProfileErrors, ThrowOnError> => (options.client ?? client).patch<UpdateProfileResponses, UpdateProfileErrors, ThrowOnError>({
+export const updateProfile = <ThrowOnError extends boolean = false>(options: Options<UpdateProfileData, ThrowOnError>): RequestResult<UpdateProfileResponses, unknown, ThrowOnError> => (options.client ?? client).patch<UpdateProfileResponses, unknown, ThrowOnError>({
     url: '/api/account/profile',
     ...options,
     headers: {
@@ -140,6 +167,31 @@ export const saveAssetMetadata = <ThrowOnError extends boolean = false>(options:
 });
 
 export const getAssetContent = <ThrowOnError extends boolean = false>(options: Options<GetAssetContentData, ThrowOnError>): RequestResult<GetAssetContentResponses, GetAssetContentErrors, ThrowOnError> => (options.client ?? client).get<GetAssetContentResponses, GetAssetContentErrors, ThrowOnError>({ url: '/api/assets/{assetId}/content', ...options });
+
+export const listAdminCredentials = <ThrowOnError extends boolean = false>(options?: Options<ListAdminCredentialsData, ThrowOnError>): RequestResult<ListAdminCredentialsResponses, ListAdminCredentialsErrors, ThrowOnError> => (options?.client ?? client).get<ListAdminCredentialsResponses, ListAdminCredentialsErrors, ThrowOnError>({ url: '/api/admin/credentials', ...options });
+
+export const deleteAdminCredential = <ThrowOnError extends boolean = false>(options: Options<DeleteAdminCredentialData, ThrowOnError>): RequestResult<DeleteAdminCredentialResponses, DeleteAdminCredentialErrors, ThrowOnError> => (options.client ?? client).delete<DeleteAdminCredentialResponses, DeleteAdminCredentialErrors, ThrowOnError>({ url: '/api/admin/credentials/{name}', ...options });
+
+export const updateAdminCredential = <ThrowOnError extends boolean = false>(options: Options<UpdateAdminCredentialData, ThrowOnError>): RequestResult<UpdateAdminCredentialResponses, UpdateAdminCredentialErrors, ThrowOnError> => (options.client ?? client).put<UpdateAdminCredentialResponses, UpdateAdminCredentialErrors, ThrowOnError>({
+    url: '/api/admin/credentials/{name}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const importAdminEnvKey = <ThrowOnError extends boolean = false>(options: Options<ImportAdminEnvKeyData, ThrowOnError>): RequestResult<ImportAdminEnvKeyResponses, ImportAdminEnvKeyErrors, ThrowOnError> => (options.client ?? client).post<ImportAdminEnvKeyResponses, ImportAdminEnvKeyErrors, ThrowOnError>({
+    ...formDataBodySerializer,
+    url: '/api/admin/credentials/import',
+    ...options,
+    headers: {
+        'Content-Type': null,
+        ...options.headers
+    }
+});
+
+export const listAdminJobs = <ThrowOnError extends boolean = false>(options?: Options<ListAdminJobsData, ThrowOnError>): RequestResult<ListAdminJobsResponses, ListAdminJobsErrors, ThrowOnError> => (options?.client ?? client).get<ListAdminJobsResponses, ListAdminJobsErrors, ThrowOnError>({ url: '/api/admin/jobs', ...options });
 
 export const listJobs = <ThrowOnError extends boolean = false>(options?: Options<ListJobsData, ThrowOnError>): RequestResult<ListJobsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListJobsResponses, unknown, ThrowOnError>({ url: '/api/jobs', ...options });
 

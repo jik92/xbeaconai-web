@@ -4,9 +4,9 @@ import { analyzeImagesWithGemini } from "../server/providers/gemini-video-analys
 import {
   generateVideoCreateScript,
   generateVideoCreateStoryboard,
+  normalizeVideoCreateRecommendation,
   regenerateVideoCreateSection,
 } from "../server/video-create/model";
-import { VideoCreateRecommendationSchema } from "../server/video-create/types";
 import type { VideoCreateAggregate } from "../server/video-create/video-create-store";
 
 const timestamp = new Date().toISOString();
@@ -27,6 +27,21 @@ const aggregate: VideoCreateAggregate = {
       speechRate: "medium",
       requirements: "面向职场女性，表达自然克制",
       scriptStyle: "真实体验种草",
+      marketingGoals: ["电商转化"],
+      targetAudiences: ["职场白领"],
+      audiencePainPoints: "夏季通勤衬衫容易闷热、缺少精神",
+      productBenefits: "亲肤透气，剪裁利落",
+      presenterRoles: ["好物推荐员"],
+      presenterGenders: ["女声"],
+      contentStyles: ["种草"],
+      openingStyles: ["痛点直击"],
+      closingGuides: ["软种草"],
+      scriptTopics: ["痛点解决"],
+      materialTopics: ["使用体验"],
+      marketingMethods: ["场景展示"],
+      templates: ["常规"],
+      sensitiveWords: "最佳 极致",
+      customRequirements: "语气自然克制，不制造焦虑",
       videoModel: "doubao-seedance-2-0-fast-260128",
       ratio: "9:16",
       subtitles: true,
@@ -48,9 +63,9 @@ const aggregate: VideoCreateAggregate = {
 
 const imageResult = await analyzeImagesWithGemini({
   images: [{ path: resolve("public/logo.png"), mimeType: "image/png" }],
-  prompt: `分析图片并按短视频商品策划格式返回 JSON：{"productName":"","sellingPoints":[],"scene":"内容种草","durationSec":15,"segmentCount":3,"requirements":"","scriptStyle":"自然种草"}。即使图片不是商品，也要如实描述，不得虚构。`,
+  prompt: `分析图片并按短视频商品策划格式返回 JSON：{"productName":"","sellingPoints":[],"scene":"内容种草","durationSec":15,"segmentCount":3,"requirements":"","scriptStyle":"自然种草","marketingGoals":[],"targetAudiences":[],"audiencePainPoints":"","productBenefits":"","presenterRoles":[],"presenterGenders":[],"contentStyles":[],"openingStyles":[],"closingGuides":[],"scriptTopics":[],"materialTopics":[],"marketingMethods":[],"templates":[],"sensitiveWords":"","customRequirements":""}。即使图片不是商品，也要如实描述，不得虚构；多选字段没有可靠依据时返回空数组。`,
 });
-const recommendation = VideoCreateRecommendationSchema.parse(parseAdScriptModelJson(imageResult.text));
+const recommendation = normalizeVideoCreateRecommendation(parseAdScriptModelJson(imageResult.text));
 const script = await generateVideoCreateScript(aggregate);
 aggregate.sections = script.sections.map((section, index) => {
   const sectionId = crypto.randomUUID();

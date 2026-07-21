@@ -2,7 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { AccountStore, type MediaAsset } from "../../server/accounts/account-store";
+import type { MediaAsset } from "../../server/accounts/account-store";
+import { createTestAccountStore, registerTestAccount } from "./account-test-helper";
 
 const temporaryDirectories: string[] = [];
 
@@ -14,9 +15,9 @@ describe("product library", () => {
   test("binds multiple ordered images to one product", async () => {
     const directory = await mkdtemp(resolve(tmpdir(), "yaozuo-product-test-"));
     temporaryDirectories.push(directory);
-    const store = new AccountStore(resolve(directory, "test.sqlite"));
-    const registration = await store.register({
-      email: `product-${crypto.randomUUID()}@example.com`,
+    const store = createTestAccountStore(resolve(directory, "test.sqlite"));
+    const registration = await registerTestAccount(store, {
+      phone: "13800000001",
       password: "Test-password-123",
       displayName: "商品测试",
     });
@@ -52,8 +53,8 @@ describe("product library", () => {
     expect(products[0]?.name).toBe("草编礼帽");
     expect(products[0]?.sharingScope).toBe("team");
     expect(products[0]?.images.map((image) => image.originalName)).toEqual(["主图.png", "侧面.png", "细节.png"]);
-    const other = await store.register({
-      email: `other-product-${crypto.randomUUID()}@example.com`,
+    const other = await registerTestAccount(store, {
+      phone: "13800000002",
       password: "Test-password-123",
       displayName: "其他用户",
     });

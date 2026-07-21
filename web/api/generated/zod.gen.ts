@@ -2,21 +2,6 @@
 
 import * as z from 'zod';
 
-export const zUserSummary = z.object({
-    id: z.uuid(),
-    email: z.email(),
-    displayName: z.string(),
-    avatarText: z.string(),
-    credits: z.int().gte(0)
-});
-
-export const zAuthResponse = z.object({
-    token: z.string(),
-    tokenType: z.enum(['Bearer']),
-    expiresAt: z.string(),
-    user: zUserSummary
-});
-
 export const zApiErrorResponse = z.object({
     error: z.object({
         code: z.string(),
@@ -24,6 +9,28 @@ export const zApiErrorResponse = z.object({
         retryable: z.boolean(),
         requestId: z.string()
     })
+});
+
+export const zPasswordSetupChallenge = z.object({
+    phone: z.string().regex(/^1[3-9]\d{9}$/),
+    setupToken: z.string().min(32),
+    expiresAt: z.string()
+});
+
+export const zUserSummary = z.object({
+    id: z.uuid(),
+    phone: z.string().regex(/^1[3-9]\d{9}$/),
+    displayName: z.string(),
+    avatarText: z.string(),
+    credits: z.int().gte(0),
+    isAdmin: z.boolean()
+});
+
+export const zAuthResponse = z.object({
+    token: z.string(),
+    tokenType: z.enum(['Bearer']),
+    expiresAt: z.string(),
+    user: zUserSummary
 });
 
 export const zPreferences = z.object({
@@ -65,7 +72,16 @@ export const zAssetKind = z.enum([
     'voice'
 ]);
 
-export const zJobModuleId = z.enum([
+export const zProviderCredentialName = z.enum([
+    'OPENAI_KEY',
+    'VOLC_SPEECH_API_KEY_ID',
+    'VOLC_SPEECH_API_KEY',
+    'TOS_ACCESS_KEY_ID',
+    'TOS_SECRET_ACCESS_KEY',
+    'MEDIAKIT_API_KEY'
+]);
+
+export const zModuleId = z.enum([
     'video-remix',
     'video-create',
     'ad-script',
@@ -80,6 +96,10 @@ export const zJobModuleId = z.enum([
     'kickart',
     'douyin-video-import',
     'share-content-import'
+    'video-extract',
+    'video-editor',
+    'kickart'
+
 ]);
 
 export const zSeedanceModelId = z.enum([
@@ -343,6 +363,94 @@ export const zVideoCreateInput = z.object({
     ]),
     requirements: z.string().max(1000).optional().default(''),
     scriptStyle: z.string().max(100).optional().default('自然种草'),
+    marketingGoals: z.array(z.enum([
+        '电商转化',
+        '品牌曝光',
+        'App下载',
+        '门店到店',
+        '直播引流'
+    ])).max(5).optional().default([]),
+    targetAudiences: z.array(z.enum([
+        '18-24岁女性',
+        '25-35岁女性',
+        '18-24岁男性',
+        '25-35岁男性',
+        '宝妈',
+        '学生',
+        '职场白领',
+        '中老年',
+        '全年龄段'
+    ])).max(9).optional().default([]),
+    audiencePainPoints: z.string().max(500).optional().default(''),
+    productBenefits: z.string().max(500).optional().default(''),
+    presenterRoles: z.array(z.enum([
+        '好物推荐员',
+        '普通用户',
+        '行业专家',
+        '品牌官方'
+    ])).max(4).optional().default([]),
+    presenterGenders: z.array(z.enum([
+        '不区分',
+        '男声',
+        '女声'
+    ])).max(3).optional().default([]),
+    contentStyles: z.array(z.enum([
+        '种草',
+        '专业测评',
+        '情绪共鸣',
+        '悬念叙事',
+        '故事',
+        '数据说话'
+    ])).max(6).optional().default([]),
+    openingStyles: z.array(z.enum([
+        '自动匹配',
+        '痛点直击',
+        '数字冲击',
+        '福利诱惑',
+        '问句互动',
+        '品牌声量',
+        '随机'
+    ])).max(7).optional().default([]),
+    closingGuides: z.array(z.enum([
+        '硬引导购买',
+        '软种草',
+        '互动提问'
+    ])).max(3).optional().default([]),
+    scriptTopics: z.array(z.enum([
+        '直播带货',
+        '产品功能讲解',
+        '痛点解决',
+        '对比测评',
+        '情感共鸣',
+        '节日营销'
+    ])).max(6).optional().default([]),
+    materialTopics: z.array(z.enum([
+        '产品外观',
+        '使用体验',
+        '价格优势',
+        '品质保障',
+        '售后服务',
+        '用户口碑',
+        '生活方式',
+        '成分功效',
+        '限时优惠'
+    ])).max(9).optional().default([]),
+    marketingMethods: z.array(z.enum([
+        '场景展示',
+        '痛点解决',
+        '竞品对比',
+        '用户证言',
+        '专家背书',
+        '限时促销'
+    ])).max(6).optional().default([]),
+    templates: z.array(z.enum([
+        '常规',
+        '节日营销',
+        '明星同款',
+        '爆款复制'
+    ])).max(4).optional().default([]),
+    sensitiveWords: z.string().max(500).optional().default(''),
+    customRequirements: z.string().max(1000).optional().default(''),
     videoModel: z.enum([
         'doubao-seedance-2-0-260128',
         'doubao-seedance-2-0-mini-260615',
@@ -365,7 +473,95 @@ export const zVideoCreateRecommendation = z.object({
     durationSec: z.int().gte(15).lte(180),
     segmentCount: z.int().gte(1).lte(12),
     requirements: z.string().max(1000),
-    scriptStyle: z.string().min(1).max(100)
+    scriptStyle: z.string().min(1).max(100),
+    marketingGoals: z.array(z.enum([
+        '电商转化',
+        '品牌曝光',
+        'App下载',
+        '门店到店',
+        '直播引流'
+    ])).max(5).optional().default([]),
+    targetAudiences: z.array(z.enum([
+        '18-24岁女性',
+        '25-35岁女性',
+        '18-24岁男性',
+        '25-35岁男性',
+        '宝妈',
+        '学生',
+        '职场白领',
+        '中老年',
+        '全年龄段'
+    ])).max(9).optional().default([]),
+    audiencePainPoints: z.string().max(500).optional().default(''),
+    productBenefits: z.string().max(500).optional().default(''),
+    presenterRoles: z.array(z.enum([
+        '好物推荐员',
+        '普通用户',
+        '行业专家',
+        '品牌官方'
+    ])).max(4).optional().default([]),
+    presenterGenders: z.array(z.enum([
+        '不区分',
+        '男声',
+        '女声'
+    ])).max(3).optional().default([]),
+    contentStyles: z.array(z.enum([
+        '种草',
+        '专业测评',
+        '情绪共鸣',
+        '悬念叙事',
+        '故事',
+        '数据说话'
+    ])).max(6).optional().default([]),
+    openingStyles: z.array(z.enum([
+        '自动匹配',
+        '痛点直击',
+        '数字冲击',
+        '福利诱惑',
+        '问句互动',
+        '品牌声量',
+        '随机'
+    ])).max(7).optional().default([]),
+    closingGuides: z.array(z.enum([
+        '硬引导购买',
+        '软种草',
+        '互动提问'
+    ])).max(3).optional().default([]),
+    scriptTopics: z.array(z.enum([
+        '直播带货',
+        '产品功能讲解',
+        '痛点解决',
+        '对比测评',
+        '情感共鸣',
+        '节日营销'
+    ])).max(6).optional().default([]),
+    materialTopics: z.array(z.enum([
+        '产品外观',
+        '使用体验',
+        '价格优势',
+        '品质保障',
+        '售后服务',
+        '用户口碑',
+        '生活方式',
+        '成分功效',
+        '限时优惠'
+    ])).max(9).optional().default([]),
+    marketingMethods: z.array(z.enum([
+        '场景展示',
+        '痛点解决',
+        '竞品对比',
+        '用户证言',
+        '专家背书',
+        '限时促销'
+    ])).max(6).optional().default([]),
+    templates: z.array(z.enum([
+        '常规',
+        '节日营销',
+        '明星同款',
+        '爆款复制'
+    ])).max(4).optional().default([]),
+    sensitiveWords: z.string().max(500).optional().default(''),
+    customRequirements: z.string().max(1000).optional().default('')
 });
 
 export const zVideoCreateProject = z.object({
@@ -510,19 +706,52 @@ export const zGetHealthResponse = z.object({
     queue: z.enum(['bullmq'])
 });
 
-export const zRegisterBody = z.object({
-    email: z.email().max(254),
-    password: z.string().min(10).max(128).regex(/[A-Za-z]/),
-    displayName: z.string().min(2).max(40)
+export const zSendSmsVerificationCodeBody = z.object({
+    phone: z.string().regex(/^1[3-9]\d{9}$/),
+    purpose: z.enum(['register', 'reset_password'])
 });
 
 /**
- * Registered
+ * Verification code sent
  */
-export const zRegisterResponse = zAuthResponse;
+export const zSendSmsVerificationCodeResponse = z.object({
+    expiresAt: z.string(),
+    retryAfterSeconds: z.int().gte(1),
+    verificationCode: z.string().regex(/^\d{6}$/)
+});
+
+export const zRegisterBody = z.object({
+    phone: z.string().regex(/^1[3-9]\d{9}$/),
+    verificationCode: z.string().regex(/^\d{6}$/)
+});
+
+/**
+ * Registered and waiting for password setup
+ */
+export const zRegisterResponse = zPasswordSetupChallenge;
+
+export const zVerifyPasswordResetBody = z.object({
+    phone: z.string().regex(/^1[3-9]\d{9}$/),
+    verificationCode: z.string().regex(/^\d{6}$/)
+});
+
+/**
+ * Phone verified for password reset
+ */
+export const zVerifyPasswordResetResponse = zPasswordSetupChallenge;
+
+export const zSetupPasswordBody = z.object({
+    setupToken: z.string().min(32).max(256),
+    password: z.string().min(10).max(128).regex(/[A-Za-z]/)
+});
+
+/**
+ * Password set and logged in
+ */
+export const zSetupPasswordResponse = zAuthResponse;
 
 export const zLoginBody = z.object({
-    email: z.email(),
+    phone: z.string().regex(/^1[3-9]\d{9}$/),
     password: z.string().min(1).max(128)
 });
 
@@ -544,7 +773,6 @@ export const zGetCurrentUserResponse = z.object({
 });
 
 export const zUpdateProfileBody = z.object({
-    email: z.email().max(254),
     displayName: z.string().min(2).max(40),
     avatarText: z.string().min(1).max(2)
 });
@@ -892,6 +1120,96 @@ export const zGetAssetContentPath = z.object({
  * Asset binary
  */
 export const zGetAssetContentResponse = z.string();
+
+/**
+ * Masked provider credentials
+ */
+export const zListAdminCredentialsResponse = z.object({
+    credentials: z.array(z.object({
+        name: zProviderCredentialName,
+        provider: z.string(),
+        label: z.string(),
+        configured: z.boolean(),
+        maskedValue: z.string().optional(),
+        updatedAt: z.string().optional()
+    }))
+});
+
+export const zDeleteAdminCredentialPath = z.object({
+    name: zProviderCredentialName
+});
+
+/**
+ * Deleted
+ */
+export const zDeleteAdminCredentialResponse = z.object({
+    name: zProviderCredentialName,
+    provider: z.string(),
+    label: z.string(),
+    configured: z.boolean(),
+    maskedValue: z.string().optional(),
+    updatedAt: z.string().optional()
+});
+
+export const zUpdateAdminCredentialBody = z.object({
+    value: z.string().min(1).max(4096)
+});
+
+export const zUpdateAdminCredentialPath = z.object({
+    name: zProviderCredentialName
+});
+
+/**
+ * Updated
+ */
+export const zUpdateAdminCredentialResponse = z.object({
+    name: zProviderCredentialName,
+    provider: z.string(),
+    label: z.string(),
+    configured: z.boolean(),
+    maskedValue: z.string().optional(),
+    updatedAt: z.string().optional()
+});
+
+export const zImportAdminEnvKeyBody = z.object({
+    file: z.string()
+});
+
+/**
+ * Imported
+ */
+export const zImportAdminEnvKeyResponse = z.object({
+    updated: z.array(zProviderCredentialName),
+    skipped: z.array(zProviderCredentialName),
+    ignored: z.array(z.string())
+});
+
+export const zListAdminJobsQuery = z.object({
+    page: z.int().gte(1).optional().default(1),
+    pageSize: z.int().gte(10).lte(100).optional().default(25),
+    moduleId: zModuleId.optional(),
+    status: z.enum([
+        'queued',
+        'processing',
+        'succeeded',
+        'partially_succeeded',
+        'failed',
+        'cancelled'
+    ]).optional(),
+    phone: z.string().max(32).optional()
+});
+
+/**
+ * All queue jobs
+ */
+export const zListAdminJobsResponse = z.object({
+    jobs: z.array(zJob.and(z.object({
+        ownerPhone: z.string()
+    }))),
+    total: z.int(),
+    page: z.int(),
+    pageSize: z.int()
+});
 
 export const zListJobsQuery = z.object({
     moduleId: zJobModuleId.optional()

@@ -2,7 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { AccountError, AccountStore } from "../../server/accounts/account-store";
+import { AccountError } from "../../server/accounts/account-store";
+import { createTestAccountStore, registerTestAccount } from "./account-test-helper";
 
 const databases: string[] = [];
 afterEach(() => {
@@ -13,9 +14,9 @@ describe("asset folder mapping", () => {
   test("creates a user-scoped default folder and nested storage prefixes", async () => {
     const path = join(tmpdir(), `asset-folders-${crypto.randomUUID()}.sqlite`);
     databases.push(path);
-    const store = new AccountStore(path);
-    const { user } = await store.register({
-      email: "folders@example.com",
+    const store = createTestAccountStore(path);
+    const { user } = await registerTestAccount(store, {
+      phone: "13800000003",
       password: "Password123",
       displayName: "目录用户",
     });
@@ -51,8 +52,8 @@ describe("asset folder mapping", () => {
       { width: 1080, height: 1920, durationSec: 15 },
     ]);
     const [asset] = store.listAssets(user.id, "media", child.id);
-    const other = await store.register({
-      email: "other-folders@example.com",
+    const other = await registerTestAccount(store, {
+      phone: "13800000004",
       password: "Password123",
       displayName: "其他用户",
     });

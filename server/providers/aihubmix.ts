@@ -1,3 +1,4 @@
+import { providerCredentials } from "../byok/credential-store";
 import { env } from "../env";
 import type { SeedanceModelId, SeedanceReferenceKind } from "../models/video-models";
 
@@ -35,15 +36,20 @@ export interface SeedanceVideoInput {
 export class AihubmixClient {
   constructor(
     private readonly baseUrl = env.openaiBaseUrl || "https://aihubmix.com",
-    private readonly apiKey = env.openaiKey,
+    private readonly configuredApiKey?: string,
   ) {}
+
+  private get apiKey() {
+    return this.configuredApiKey ?? providerCredentials.get("OPENAI_KEY") ?? "";
+  }
 
   get configured() {
     return Boolean(this.apiKey && this.baseUrl);
   }
 
   private async request(path: string, init: RequestInit = {}) {
-    if (!this.configured) throw new Error("AIHUBMIX_NOT_CONFIGURED");
+    const apiKey = this.apiKey;
+    if (!apiKey || !this.baseUrl) throw new Error("AIHUBMIX_NOT_CONFIGURED");
     if (env.blockAiOutbound) throw new Error(`AI_OUTBOUND_BLOCKED:${path}`);
     const method = (init.method ?? "GET").toUpperCase();
     const retryableMethod = method === "GET" || method === "HEAD" || method === "DELETE";
@@ -53,7 +59,7 @@ export class AihubmixClient {
       try {
         const response = await fetch(new URL(path, this.baseUrl), {
           ...init,
-          headers: { Authorization: `Bearer ${this.apiKey}`, ...init.headers },
+          headers: { Authorization: `Bearer ${apiKey}`, ...init.headers },
           signal: init.signal ?? AbortSignal.timeout(120_000),
         });
         if (response.ok) return response;
