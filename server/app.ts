@@ -5,7 +5,7 @@ import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
 import { parseVideoMashupConfig, type VideoMashupConfig } from "../shared/video-mashup/config";
-import { APP_CONFIG, isModuleOpen } from "../web/app/config";
+import { APP_CONFIG, isAdminEmail, isModuleOpen } from "../web/app/config";
 import type { ModuleId } from "../web/entities/types";
 import {
   AccountError,
@@ -27,6 +27,8 @@ import {
   AdScriptVariantStatusSchema,
   AdScriptVersionSourceSchema,
 } from "./ad-script/types";
+import { type ProviderCredentialName, providerCredentialNames, providerCredentials } from "./byok/credential-store";
+import { maxEnvKeyBytes, parseEnvKey } from "./byok/env-key";
 import { creationCapabilities, quoteCreation, validateCreationValues } from "./creation/capabilities";
 import { env } from "./env";
 import { BullJobQueue } from "./jobs/bull-job-queue";
@@ -75,6 +77,7 @@ const moduleIds = [
 const ModuleSchema = z.enum(moduleIds).openapi("ModuleId");
 const VideoModelIdSchema = z.enum(seedanceModelIds).openapi("SeedanceModelId");
 const JobStatusSchema = z.enum(["queued", "processing", "succeeded", "partially_succeeded", "failed", "cancelled"]);
+const ProviderCredentialNameSchema = z.enum(providerCredentialNames).openapi("ProviderCredentialName");
 const StageSchema = z.object({
   id: z.string(),
   capability: z.string(),
@@ -286,6 +289,10 @@ export const accounts = new AccountStore();
 export const adScripts = new AdScriptStore();
 export const videoCreates = new VideoCreateStore();
 export const queue = new BullJobQueue();
+function adminUser(userId: string) {
+  const user = accounts.getUser(userId);
+  return Boolean(user && isAdminEmail(user.email));
+}
 type AppEnv = { Variables: { userId: string; sessionId: string } };
 const app = new OpenAPIHono<AppEnv>();
 const publicApiPaths = new Set([
@@ -342,7 +349,7 @@ app.use(
   cors({
     origin: (origin) => (env.allowedOrigins.has(origin) ? origin : ""),
     allowHeaders: ["Content-Type", "Authorization", "Idempotency-Key", "Last-Event-ID"],
-    allowMethods: ["GET", "POST", "PATCH", "PUT", "OPTIONS"],
+    allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     credentials: false,
   }),
 );
@@ -1740,6 +1747,261 @@ app.openapi(assetContentRoute, async (c) => {
       "Cache-Control": "private, max-age=300",
     },
   });
+});
+
+const AdminCredentialSchema = z.object({
+  name: ProviderCredentialNameSchema,
+  provider: z.string(),
+  label: z.string(),
+  configured: z.boolean(),
+  maskedValue: z.string().optional(),
+  updatedAt: z.string().optional(),
+});
+const AdminJobSchema = JobSchema.extend({ ownerEmail: z.string() });
+const AdminEnvKeyImportSchema = z.object({
+  updated: z.array(ProviderCredentialNameSchema),
+  skipped: z.array(ProviderCredentialNameSchema),
+  ignored: z.array(z.string()),
+});
+const adminCredentialsRoute = createRoute({
+  method: "get",
+  path: "/api/admin/credentials",
+  operationId: "listAdminCredentials",
+  responses: {
+    200: {
+      description: "Masked provider credentials",
+      content: { "application/json": { schema: z.object({ credentials: z.array(AdminCredentialSchema) }) } },
+    },
+    403: { description: "Admin required", content: { "application/json": { schema: ErrorSchema } } },
+    503: { description: "BYOK unavailable", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(adminCredentialsRoute, (c) => {
+  if (!adminUser(c.get("userId")))
+    return c.json(
+      {
+        error: { code: "ADMIN_REQUIRED", message: "仅管理员可访问", retryable: false, requestId: crypto.randomUUID() },
+      },
+      403,
+    );
+  if (!providerCredentials.available)
+    return c.json(
+      {
+        error: {
+          code: "BYOK_UNAVAILABLE",
+          message: "BYOK_ENCRYPTION_KEY 未配置",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      503,
+    );
+  return c.json({ credentials: providerCredentials.listMasked() }, 200);
+});
+
+const updateAdminCredentialRoute = createRoute({
+  method: "put",
+  path: "/api/admin/credentials/{name}",
+  operationId: "updateAdminCredential",
+  request: {
+    params: z.object({ name: ProviderCredentialNameSchema }),
+    body: {
+      required: true,
+      content: { "application/json": { schema: z.object({ value: z.string().trim().min(1).max(4_096) }) } },
+    },
+  },
+  responses: {
+    200: { description: "Updated", content: { "application/json": { schema: AdminCredentialSchema } } },
+    403: { description: "Admin required", content: { "application/json": { schema: ErrorSchema } } },
+    503: { description: "BYOK unavailable", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(updateAdminCredentialRoute, (c) => {
+  if (!adminUser(c.get("userId")))
+    return c.json(
+      {
+        error: { code: "ADMIN_REQUIRED", message: "仅管理员可访问", retryable: false, requestId: crypto.randomUUID() },
+      },
+      403,
+    );
+  if (!providerCredentials.available)
+    return c.json(
+      {
+        error: {
+          code: "BYOK_UNAVAILABLE",
+          message: "BYOK_ENCRYPTION_KEY 未配置",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      503,
+    );
+  const name = c.req.valid("param").name as ProviderCredentialName;
+  providerCredentials.set(name, c.req.valid("json").value, c.get("userId"));
+  const credential = providerCredentials.listMasked().find((item) => item.name === name);
+  if (!credential) throw new Error("CREDENTIAL_UPDATE_FAILED");
+  return c.json(credential, 200);
+});
+
+const deleteAdminCredentialRoute = createRoute({
+  method: "delete",
+  path: "/api/admin/credentials/{name}",
+  operationId: "deleteAdminCredential",
+  request: { params: z.object({ name: ProviderCredentialNameSchema }) },
+  responses: {
+    200: { description: "Deleted", content: { "application/json": { schema: AdminCredentialSchema } } },
+    403: { description: "Admin required", content: { "application/json": { schema: ErrorSchema } } },
+    503: { description: "BYOK unavailable", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(deleteAdminCredentialRoute, (c) => {
+  if (!adminUser(c.get("userId")))
+    return c.json(
+      {
+        error: { code: "ADMIN_REQUIRED", message: "仅管理员可访问", retryable: false, requestId: crypto.randomUUID() },
+      },
+      403,
+    );
+  if (!providerCredentials.available)
+    return c.json(
+      {
+        error: {
+          code: "BYOK_UNAVAILABLE",
+          message: "BYOK_ENCRYPTION_KEY 未配置",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      503,
+    );
+  const name = c.req.valid("param").name as ProviderCredentialName;
+  providerCredentials.delete(name);
+  const credential = providerCredentials.listMasked().find((item) => item.name === name);
+  if (!credential) throw new Error("CREDENTIAL_DELETE_FAILED");
+  return c.json(credential, 200);
+});
+
+const importAdminEnvKeyRoute = createRoute({
+  method: "post",
+  path: "/api/admin/credentials/import",
+  operationId: "importAdminEnvKey",
+  request: {
+    body: {
+      required: true,
+      content: {
+        "multipart/form-data": {
+          schema: z.object({ file: z.file().openapi({ type: "string", format: "binary" }) }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: { description: "Imported", content: { "application/json": { schema: AdminEnvKeyImportSchema } } },
+    400: { description: "Invalid env key file", content: { "application/json": { schema: ErrorSchema } } },
+    403: { description: "Admin required", content: { "application/json": { schema: ErrorSchema } } },
+    413: { description: "File too large", content: { "application/json": { schema: ErrorSchema } } },
+    415: { description: "Unsupported file", content: { "application/json": { schema: ErrorSchema } } },
+    503: { description: "BYOK unavailable", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(importAdminEnvKeyRoute, async (c) => {
+  const requestId = crypto.randomUUID();
+  if (!adminUser(c.get("userId")))
+    return c.json({ error: { code: "ADMIN_REQUIRED", message: "仅管理员可访问", retryable: false, requestId } }, 403);
+  if (!providerCredentials.available)
+    return c.json(
+      {
+        error: {
+          code: "BYOK_UNAVAILABLE",
+          message: "BYOK_ENCRYPTION_KEY 未配置",
+          retryable: false,
+          requestId,
+        },
+      },
+      503,
+    );
+  const file = (await c.req.formData()).get("file");
+  if (!(file instanceof File) || !file.size)
+    return c.json(
+      { error: { code: "INVALID_ENV_KEY", message: "请选择有效的 .env.key 文件", retryable: false, requestId } },
+      400,
+    );
+  if (file.name !== ".env.key")
+    return c.json(
+      { error: { code: "INVALID_ENV_KEY_NAME", message: "文件名必须是 .env.key", retryable: false, requestId } },
+      415,
+    );
+  if (file.size > maxEnvKeyBytes)
+    return c.json(
+      { error: { code: "ENV_KEY_TOO_LARGE", message: ".env.key 不能超过 64KB", retryable: false, requestId } },
+      413,
+    );
+  try {
+    const parsed = parseEnvKey(await file.text());
+    const updated = providerCredentials.setMany(parsed.values, c.get("userId"));
+    const updatedSet = new Set(updated);
+    return c.json(
+      {
+        updated,
+        skipped: providerCredentialNames.filter((name) => !updatedSet.has(name)),
+        ignored: parsed.ignored,
+      },
+      200,
+    );
+  } catch (error) {
+    return c.json(
+      {
+        error: {
+          code: "INVALID_ENV_KEY_CONTENT",
+          message: error instanceof Error ? error.message : ".env.key 内容无效",
+          retryable: false,
+          requestId,
+        },
+      },
+      400,
+    );
+  }
+});
+
+const listAdminJobsRoute = createRoute({
+  method: "get",
+  path: "/api/admin/jobs",
+  operationId: "listAdminJobs",
+  request: {
+    query: z.object({
+      page: z.coerce.number().int().min(1).default(1),
+      pageSize: z.coerce.number().int().min(10).max(100).default(25),
+      moduleId: ModuleSchema.optional(),
+      status: JobStatusSchema.optional(),
+      email: z.string().trim().max(254).optional(),
+    }),
+  },
+  responses: {
+    200: {
+      description: "All queue jobs",
+      content: {
+        "application/json": {
+          schema: z.object({
+            jobs: z.array(AdminJobSchema),
+            total: z.number().int(),
+            page: z.number().int(),
+            pageSize: z.number().int(),
+          }),
+        },
+      },
+    },
+    403: { description: "Admin required", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(listAdminJobsRoute, (c) => {
+  if (!adminUser(c.get("userId")))
+    return c.json(
+      {
+        error: { code: "ADMIN_REQUIRED", message: "仅管理员可访问", retryable: false, requestId: crypto.randomUUID() },
+      },
+      403,
+    );
+  return c.json(store.listAll(c.req.valid("query")), 200);
 });
 
 const listRoute = createRoute({

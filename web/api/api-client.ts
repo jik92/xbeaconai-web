@@ -9,6 +9,7 @@ import {
   createAdScriptProject,
   createJob,
   createVideoCreateProject,
+  deleteAdminCredential,
   deleteAsset as deleteAssetRequest,
   deleteProduct as deleteProductRequest,
   exportAdScriptVersion,
@@ -17,6 +18,9 @@ import {
   getJob,
   getModels,
   getVideoCreateProject,
+  importAdminEnvKey,
+  listAdminCredentials,
+  listAdminJobs,
   listJobs,
   listVideoCreateProjects,
   parseAdScriptSource,
@@ -26,6 +30,7 @@ import {
   runVideoCreateAction,
   saveAdScriptVersion,
   saveVideoCreateSection,
+  updateAdminCredential,
   updateVideoCreateProject,
   updateVideoCreateShotSettings,
   uploadMedia,
@@ -34,11 +39,17 @@ import type {
   AdScriptInput,
   AdScriptProject,
   Job,
+  ListAdminCredentialsResponse,
+  ListAdminJobsResponse,
   ModuleId,
+  ProviderCredentialName,
   SeedanceModelId,
   VideoCreateInput,
   VideoCreateProject,
 } from "./generated/types.gen";
+
+export type AdminCredential = ListAdminCredentialsResponse["credentials"][number];
+export type AdminJob = ListAdminJobsResponse["jobs"][number];
 
 const configure = () =>
   client.setConfig({
@@ -55,6 +66,51 @@ export async function fetchJobs(moduleId: ModuleId) {
   configure();
   const { data } = await listJobs({ query: { moduleId }, headers: authHeaders(), throwOnError: true });
   return data?.jobs ?? [];
+}
+
+export async function fetchAdminCredentials() {
+  configure();
+  const { data } = await listAdminCredentials({ headers: authHeaders(), throwOnError: true });
+  return data?.credentials ?? [];
+}
+
+export async function saveAdminCredential(name: ProviderCredentialName, value: string) {
+  configure();
+  const { data } = await updateAdminCredential({
+    path: { name },
+    body: { value },
+    headers: authHeaders(),
+    throwOnError: true,
+  });
+  if (!data) throw new Error("密钥更新失败");
+  return data;
+}
+
+export async function removeAdminCredential(name: ProviderCredentialName) {
+  configure();
+  const { data } = await deleteAdminCredential({ path: { name }, headers: authHeaders(), throwOnError: true });
+  if (!data) throw new Error("密钥删除失败");
+  return data;
+}
+
+export async function uploadAdminEnvKey(file: File) {
+  configure();
+  const { data } = await importAdminEnvKey({ body: { file }, headers: authHeaders(), throwOnError: true });
+  if (!data) throw new Error(".env.key 导入失败");
+  return data;
+}
+
+export async function fetchAdminJobs(query: {
+  page: number;
+  pageSize: number;
+  moduleId?: ModuleId;
+  status?: AdminJob["status"];
+  email?: string;
+}) {
+  configure();
+  const { data } = await listAdminJobs({ query, headers: authHeaders(), throwOnError: true });
+  if (!data) throw new Error("队列任务加载失败");
+  return data;
 }
 export async function fetchModels() {
   configure();

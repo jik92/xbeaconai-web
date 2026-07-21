@@ -1,5 +1,6 @@
 import { mkdir, stat } from "node:fs/promises";
 import { basename, extname, resolve } from "node:path";
+import { providerCredentials } from "../server/byok/credential-store";
 import { ossutils } from "../server/storage/ossutils";
 
 const API_BASE_URL = (process.env.MEDIAKIT_BASE_URL ?? "https://mediakit.cn-beijing.volces.com").replace(/\/$/, "");
@@ -32,20 +33,8 @@ class MediaKitError extends Error {
 }
 
 function configuredApiKeys() {
-  const candidates = [
-    ["MEDIAKIT_API_KEY", process.env.MEDIAKIT_API_KEY],
-    ["VOLC_MEDIAKIT_API_KEY", process.env.VOLC_MEDIAKIT_API_KEY],
-    ["ARK_API_KEY", process.env.ARK_API_KEY],
-    ["VOLC_SPEECH_API_KEY", process.env.VOLC_SPEECH_API_KEY],
-    ["TOS_ACCESS_KEY_ID", process.env.TOS_ACCESS_KEY_ID],
-  ] as const;
-  const seen = new Set<string>();
-  return candidates.flatMap(([name, value]) => {
-    const key = value?.trim();
-    if (!key || seen.has(key)) return [];
-    seen.add(key);
-    return [{ name, key }];
-  });
+  const key = providerCredentials.get("MEDIAKIT_API_KEY")?.trim();
+  return key ? [{ name: "MEDIAKIT_API_KEY", key }] : [];
 }
 
 function describeError(payload: MediaKitResponse, status: number) {
@@ -77,7 +66,7 @@ async function request(path: string, apiKey: string, init?: RequestInit) {
 async function submitWithAvailableKey(videoUrl: string) {
   const candidates = configuredApiKeys();
   if (candidates.length === 0)
-    throw new MediaKitError("MEDIAKIT_API_KEY_MISSING", "未找到可探测的火山 API Key；请在 .env 配置 MEDIAKIT_API_KEY");
+    throw new MediaKitError("MEDIAKIT_API_KEY_MISSING", "未配置 MEDIAKIT_API_KEY；请导入 .env.key");
   const rejected: string[] = [];
   for (const candidate of candidates) {
     console.error(`[${TOOL_LABEL}] probing credential: ${candidate.name}`);
@@ -125,7 +114,7 @@ const inputPath = resolve(process.argv[2] ?? "");
 if (!process.argv[2]) throw new Error("用法：bun scripts/test-subtitle-erase.ts <video-path>");
 const inputStat = await stat(inputPath);
 if (!inputStat.isFile() || inputStat.size === 0) throw new Error(`输入不是有效视频文件：${inputPath}`);
-if (!ossutils.configured) throw new Error("TOS_NOT_CONFIGURED：请先配置 TOS_ACCESS_KEY_ID 等环境变量");
+if (!ossutils.configured) throw new Error("TOS_NOT_CONFIGURED：请先导入包含 TOS 凭证的 .env.key");
 
 await mkdir(ARTIFACTS_DIR, { recursive: true });
 const startedAt = new Date().toISOString();

@@ -22,6 +22,16 @@ export const users = sqliteTable(
   (table) => [uniqueIndex("users_email_idx").on(table.email)],
 );
 
+export const providerCredentials = sqliteTable("provider_credentials", {
+  name: text("name").primaryKey(),
+  ciphertext: text("ciphertext").notNull(),
+  nonce: text("nonce").notNull(),
+  authTag: text("auth_tag").notNull(),
+  lastFour: text("last_four").notNull(),
+  updatedByUserId: text("updated_by_user_id"),
+  updatedAt: text("updated_at").notNull(),
+});
+
 export const assetFolders = sqliteTable(
   "asset_folders",
   {

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, lte } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, like, lte, type SQL } from "drizzle-orm";
 import type { ModuleId } from "../../web/entities/types";
 import { type AppDatabase, openDatabase } from "../db/database";
 import { creditCharges, jobs, objectCleanup, users } from "../db/schema";
@@ -177,6 +177,38 @@ export class SqliteJobStore {
       .limit(100)
       .all()
       .map((row) => this.fromRow(row));
+  }
+
+  listAll(input: {
+    page: number;
+    pageSize: number;
+    moduleId?: ModuleId;
+    status?: JobRecord["status"];
+    email?: string;
+  }) {
+    const conditions: SQL[] = [];
+    if (input.moduleId) conditions.push(eq(jobs.moduleId, input.moduleId));
+    if (input.status) conditions.push(eq(jobs.status, input.status));
+    if (input.email?.trim()) conditions.push(like(users.email, `%${input.email.trim().toLowerCase()}%`));
+    const where = conditions.length ? and(...conditions) : undefined;
+    const rows = this.db
+      .select({ job: jobs, ownerEmail: users.email })
+      .from(jobs)
+      .leftJoin(users, eq(jobs.ownerUserId, users.id))
+      .where(where)
+      .orderBy(desc(jobs.createdAt))
+      .limit(input.pageSize)
+      .offset((input.page - 1) * input.pageSize)
+      .all();
+    const total =
+      this.db.select({ value: count() }).from(jobs).leftJoin(users, eq(jobs.ownerUserId, users.id)).where(where).get()
+        ?.value ?? 0;
+    return {
+      jobs: rows.map((row) => ({ ...this.fromRow(row.job), ownerEmail: row.ownerEmail ?? "legacy" })),
+      total,
+      page: input.page,
+      pageSize: input.pageSize,
+    };
   }
 
   recoverable(): JobRecord[] {

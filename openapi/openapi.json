@@ -219,6 +219,44 @@
           "voice"
         ]
       },
+      "ProviderCredentialName": {
+        "type": "string",
+        "enum": [
+          "OPENAI_KEY",
+          "VOLC_SPEECH_API_KEY_ID",
+          "VOLC_SPEECH_API_KEY",
+          "TOS_ACCESS_KEY_ID",
+          "TOS_SECRET_ACCESS_KEY",
+          "MEDIAKIT_API_KEY"
+        ]
+      },
+      "ModuleId": {
+        "type": "string",
+        "enum": [
+          "video-remix",
+          "video-create",
+          "ad-script",
+          "ai-generate",
+          "video-cut",
+          "media-understand",
+          "video-mashup",
+          "voice-clone",
+          "video-renewal",
+          "subtitle-erase",
+          "video-enhancement",
+          "video-extract",
+          "video-editor",
+          "kickart"
+        ]
+      },
+      "SeedanceModelId": {
+        "type": "string",
+        "enum": [
+          "doubao-seedance-2-0-260128",
+          "doubao-seedance-2-0-mini-260615",
+          "doubao-seedance-2-0-fast-260128"
+        ]
+      },
       "Job": {
         "type": "object",
         "properties": {
@@ -588,33 +626,6 @@
           "jobSchemaVersion",
           "createdAt",
           "updatedAt"
-        ]
-      },
-      "ModuleId": {
-        "type": "string",
-        "enum": [
-          "video-remix",
-          "video-create",
-          "ad-script",
-          "ai-generate",
-          "video-cut",
-          "media-understand",
-          "video-mashup",
-          "voice-clone",
-          "video-renewal",
-          "subtitle-erase",
-          "video-enhancement",
-          "video-extract",
-          "video-editor",
-          "kickart"
-        ]
-      },
-      "SeedanceModelId": {
-        "type": "string",
-        "enum": [
-          "doubao-seedance-2-0-260128",
-          "doubao-seedance-2-0-mini-260615",
-          "doubao-seedance-2-0-fast-260128"
         ]
       },
       "AdScriptProject": {
@@ -3807,6 +3818,476 @@
               "text/plain": {
                 "schema": {
                   "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/credentials": {
+      "get": {
+        "operationId": "listAdminCredentials",
+        "responses": {
+          "200": {
+            "description": "Masked provider credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "credentials": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "$ref": "#/components/schemas/ProviderCredentialName"
+                          },
+                          "provider": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "configured": {
+                            "type": "boolean"
+                          },
+                          "maskedValue": {
+                            "type": "string"
+                          },
+                          "updatedAt": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "provider",
+                          "label",
+                          "configured"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "credentials"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "BYOK unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/credentials/{name}": {
+      "put": {
+        "operationId": "updateAdminCredential",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/ProviderCredentialName"
+            },
+            "required": true,
+            "name": "name",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  }
+                },
+                "required": [
+                  "value"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "$ref": "#/components/schemas/ProviderCredentialName"
+                    },
+                    "provider": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "configured": {
+                      "type": "boolean"
+                    },
+                    "maskedValue": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "provider",
+                    "label",
+                    "configured"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "BYOK unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteAdminCredential",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/ProviderCredentialName"
+            },
+            "required": true,
+            "name": "name",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "$ref": "#/components/schemas/ProviderCredentialName"
+                    },
+                    "provider": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "configured": {
+                      "type": "boolean"
+                    },
+                    "maskedValue": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "provider",
+                    "label",
+                    "configured"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "BYOK unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/credentials/import": {
+      "post": {
+        "operationId": "importAdminEnvKey",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Imported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "updated": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ProviderCredentialName"
+                      }
+                    },
+                    "skipped": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ProviderCredentialName"
+                      }
+                    },
+                    "ignored": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "updated",
+                    "skipped",
+                    "ignored"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid env key file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "File too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "BYOK unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/jobs": {
+      "get": {
+        "operationId": "listAdminJobs",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 100,
+              "default": 25
+            },
+            "required": false,
+            "name": "pageSize",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/ModuleId"
+            },
+            "required": false,
+            "name": "moduleId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "queued",
+                "processing",
+                "succeeded",
+                "partially_succeeded",
+                "failed",
+                "cancelled"
+              ]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 254
+            },
+            "required": false,
+            "name": "email",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "All queue jobs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jobs": {
+                      "type": "array",
+                      "items": {
+                        "allOf": [
+                          {
+                            "$ref": "#/components/schemas/Job"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "ownerEmail": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "ownerEmail"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "pageSize": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "jobs",
+                    "total",
+                    "page",
+                    "pageSize"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
             }

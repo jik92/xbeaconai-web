@@ -1,6 +1,7 @@
 import { Buffer } from "node:buffer";
 import TosClient from "@volcengine/tos-sdk";
-import { env, tosConfigured } from "../env";
+import { providerCredentials } from "../byok/credential-store";
+import { env } from "../env";
 
 export interface PutStagedFileInput {
   filePath: string;
@@ -37,14 +38,28 @@ class WeightedUploadGate {
 const uploadGate = new WeightedUploadGate();
 
 export class OssUtils {
-  readonly configured = tosConfigured;
-  private readonly client?: TosClient;
+  private client?: TosClient;
+  private credentialFingerprint = "";
 
-  constructor() {
-    if (!this.configured) return;
+  private credentials() {
+    return {
+      accessKeyId: providerCredentials.get("TOS_ACCESS_KEY_ID") ?? "",
+      accessKeySecret: providerCredentials.get("TOS_SECRET_ACCESS_KEY") ?? "",
+    };
+  }
+
+  get configured() {
+    const credentials = this.credentials();
+    return Boolean(credentials.accessKeyId && credentials.accessKeySecret);
+  }
+
+  private ready() {
+    const credentials = this.credentials();
+    if (!credentials.accessKeyId || !credentials.accessKeySecret) throw new Error("TOS_NOT_CONFIGURED");
+    const fingerprint = `${credentials.accessKeyId}\0${credentials.accessKeySecret}`;
+    if (this.client && fingerprint === this.credentialFingerprint) return this.client;
     this.client = new TosClient({
-      accessKeyId: env.tos.accessKeyId,
-      accessKeySecret: env.tos.accessKeySecret,
+      ...credentials,
       region: env.tos.region,
       endpoint: env.tos.endpoint,
       bucket: env.tos.bucket,
@@ -53,10 +68,7 @@ export class OssUtils {
       connectionTimeout: 15_000,
       maxRetryCount: 2,
     });
-  }
-
-  private ready() {
-    if (!this.client) throw new Error("TOS_NOT_CONFIGURED");
+    this.credentialFingerprint = fingerprint;
     return this.client;
   }
 

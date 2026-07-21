@@ -58,6 +58,12 @@ export type RechargeOrder = {
 
 export type AssetKind = 'media' | 'product' | 'portrait' | 'voice';
 
+export type ProviderCredentialName = 'OPENAI_KEY' | 'VOLC_SPEECH_API_KEY_ID' | 'VOLC_SPEECH_API_KEY' | 'TOS_ACCESS_KEY_ID' | 'TOS_SECRET_ACCESS_KEY' | 'MEDIAKIT_API_KEY';
+
+export type ModuleId = 'video-remix' | 'video-create' | 'ad-script' | 'ai-generate' | 'video-cut' | 'media-understand' | 'video-mashup' | 'voice-clone' | 'video-renewal' | 'subtitle-erase' | 'video-enhancement' | 'video-extract' | 'video-editor' | 'kickart';
+
+export type SeedanceModelId = 'doubao-seedance-2-0-260128' | 'doubao-seedance-2-0-mini-260615' | 'doubao-seedance-2-0-fast-260128';
+
 export type Job = {
     id: string;
     moduleId: ModuleId;
@@ -142,10 +148,6 @@ export type Job = {
     createdAt: string;
     updatedAt: string;
 };
-
-export type ModuleId = 'video-remix' | 'video-create' | 'ad-script' | 'ai-generate' | 'video-cut' | 'media-understand' | 'video-mashup' | 'voice-clone' | 'video-renewal' | 'subtitle-erase' | 'video-enhancement' | 'video-extract' | 'video-editor' | 'kickart';
-
-export type SeedanceModelId = 'doubao-seedance-2-0-260128' | 'doubao-seedance-2-0-mini-260615' | 'doubao-seedance-2-0-fast-260128';
 
 export type AdScriptProject = {
     project: {
@@ -1210,6 +1212,207 @@ export type GetAssetContentResponses = {
 };
 
 export type GetAssetContentResponse = GetAssetContentResponses[keyof GetAssetContentResponses];
+
+export type ListAdminCredentialsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/credentials';
+};
+
+export type ListAdminCredentialsErrors = {
+    /**
+     * Admin required
+     */
+    403: ApiErrorResponse;
+    /**
+     * BYOK unavailable
+     */
+    503: ApiErrorResponse;
+};
+
+export type ListAdminCredentialsError = ListAdminCredentialsErrors[keyof ListAdminCredentialsErrors];
+
+export type ListAdminCredentialsResponses = {
+    /**
+     * Masked provider credentials
+     */
+    200: {
+        credentials: Array<{
+            name: ProviderCredentialName;
+            provider: string;
+            label: string;
+            configured: boolean;
+            maskedValue?: string;
+            updatedAt?: string;
+        }>;
+    };
+};
+
+export type ListAdminCredentialsResponse = ListAdminCredentialsResponses[keyof ListAdminCredentialsResponses];
+
+export type DeleteAdminCredentialData = {
+    body?: never;
+    path: {
+        name: ProviderCredentialName;
+    };
+    query?: never;
+    url: '/api/admin/credentials/{name}';
+};
+
+export type DeleteAdminCredentialErrors = {
+    /**
+     * Admin required
+     */
+    403: ApiErrorResponse;
+    /**
+     * BYOK unavailable
+     */
+    503: ApiErrorResponse;
+};
+
+export type DeleteAdminCredentialError = DeleteAdminCredentialErrors[keyof DeleteAdminCredentialErrors];
+
+export type DeleteAdminCredentialResponses = {
+    /**
+     * Deleted
+     */
+    200: {
+        name: ProviderCredentialName;
+        provider: string;
+        label: string;
+        configured: boolean;
+        maskedValue?: string;
+        updatedAt?: string;
+    };
+};
+
+export type DeleteAdminCredentialResponse = DeleteAdminCredentialResponses[keyof DeleteAdminCredentialResponses];
+
+export type UpdateAdminCredentialData = {
+    body: {
+        value: string;
+    };
+    path: {
+        name: ProviderCredentialName;
+    };
+    query?: never;
+    url: '/api/admin/credentials/{name}';
+};
+
+export type UpdateAdminCredentialErrors = {
+    /**
+     * Admin required
+     */
+    403: ApiErrorResponse;
+    /**
+     * BYOK unavailable
+     */
+    503: ApiErrorResponse;
+};
+
+export type UpdateAdminCredentialError = UpdateAdminCredentialErrors[keyof UpdateAdminCredentialErrors];
+
+export type UpdateAdminCredentialResponses = {
+    /**
+     * Updated
+     */
+    200: {
+        name: ProviderCredentialName;
+        provider: string;
+        label: string;
+        configured: boolean;
+        maskedValue?: string;
+        updatedAt?: string;
+    };
+};
+
+export type UpdateAdminCredentialResponse = UpdateAdminCredentialResponses[keyof UpdateAdminCredentialResponses];
+
+export type ImportAdminEnvKeyData = {
+    body: {
+        file: Blob | File;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/admin/credentials/import';
+};
+
+export type ImportAdminEnvKeyErrors = {
+    /**
+     * Invalid env key file
+     */
+    400: ApiErrorResponse;
+    /**
+     * Admin required
+     */
+    403: ApiErrorResponse;
+    /**
+     * File too large
+     */
+    413: ApiErrorResponse;
+    /**
+     * Unsupported file
+     */
+    415: ApiErrorResponse;
+    /**
+     * BYOK unavailable
+     */
+    503: ApiErrorResponse;
+};
+
+export type ImportAdminEnvKeyError = ImportAdminEnvKeyErrors[keyof ImportAdminEnvKeyErrors];
+
+export type ImportAdminEnvKeyResponses = {
+    /**
+     * Imported
+     */
+    200: {
+        updated: Array<ProviderCredentialName>;
+        skipped: Array<ProviderCredentialName>;
+        ignored: Array<string>;
+    };
+};
+
+export type ImportAdminEnvKeyResponse = ImportAdminEnvKeyResponses[keyof ImportAdminEnvKeyResponses];
+
+export type ListAdminJobsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        pageSize?: number;
+        moduleId?: ModuleId;
+        status?: 'queued' | 'processing' | 'succeeded' | 'partially_succeeded' | 'failed' | 'cancelled';
+        email?: string;
+    };
+    url: '/api/admin/jobs';
+};
+
+export type ListAdminJobsErrors = {
+    /**
+     * Admin required
+     */
+    403: ApiErrorResponse;
+};
+
+export type ListAdminJobsError = ListAdminJobsErrors[keyof ListAdminJobsErrors];
+
+export type ListAdminJobsResponses = {
+    /**
+     * All queue jobs
+     */
+    200: {
+        jobs: Array<Job & {
+            ownerEmail: string;
+        }>;
+        total: number;
+        page: number;
+        pageSize: number;
+    };
+};
+
+export type ListAdminJobsResponse = ListAdminJobsResponses[keyof ListAdminJobsResponses];
 
 export type ListJobsData = {
     body?: never;

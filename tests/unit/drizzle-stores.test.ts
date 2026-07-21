@@ -26,6 +26,11 @@ describe("Drizzle SQLite stores", () => {
       password: "Password123",
       displayName: "Drizzle 用户",
     });
+    const otherRegistration = await accounts.register({
+      email: "other@example.com",
+      password: "Password123",
+      displayName: "其他用户",
+    });
 
     const session = accounts.createSession(registration.user.id, new Date(Date.now() + 60_000).toISOString());
     expect(
@@ -65,6 +70,22 @@ describe("Drizzle SQLite stores", () => {
     expect(jobs.getOwned(job.id, registration.user.id)?.values.method).toBe("按固定时长");
     expect(jobs.update(job.id, { status: "succeeded", progress: 100 })?.status).toBe("succeeded");
     expect(accounts.getUser(registration.user.id)?.credits).toBe(3476);
+
+    jobs.create({
+      ...job,
+      id: crypto.randomUUID(),
+      ownerUserId: otherRegistration.user.id,
+      title: "其他用户任务",
+      status: "failed",
+      updatedAt: new Date(Date.now() + 1).toISOString(),
+    });
+    expect(jobs.listAll({ page: 1, pageSize: 10 }).total).toBe(2);
+    expect(jobs.listAll({ page: 1, pageSize: 10, email: "OTHER@EXAMPLE" }).jobs).toMatchObject([
+      { ownerEmail: "other@example.com", title: "其他用户任务" },
+    ]);
+    expect(jobs.listAll({ page: 1, pageSize: 10, status: "succeeded" }).jobs).toMatchObject([
+      { ownerEmail: "drizzle@example.com", id: job.id },
+    ]);
 
     jobs.scheduleObjectCleanup(job.id, "test/object.mp4", new Error("retry"));
     expect(jobs.pendingObjectCleanup()).toEqual([{ object_key: "test/object.mp4", job_id: job.id, attempts: 1 }]);

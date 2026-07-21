@@ -3,6 +3,7 @@ import { AppShell } from "@/components/domain/app-shell";
 import { ComingSoonPage, ProjectComingSoonPage } from "@/components/domain/coming-soon-page";
 import { ModulePage } from "@/components/domain/module-page";
 import { AdScriptPage } from "@/features/ad-script/ad-script-page";
+import { AdminPage } from "@/features/admin/admin-page";
 import { AiGeneratePage } from "@/features/ai-generate/ai-generate-page";
 import { AssetLibrary } from "@/features/asset-library/asset-library";
 import { MediaUnderstandPage } from "@/features/media-understand/media-understand-page";
@@ -86,6 +87,11 @@ const voiceRoute = createRoute({
       <ComingSoonPage config={{ id: "voices", label: "音色库" }} />
     ),
 });
+const adminRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin",
+  component: AdminPage,
+});
 const routeTree = rootRoute.addChildren([
   indexRoute,
   ...moduleRoutes,
@@ -93,6 +99,7 @@ const routeTree = rootRoute.addChildren([
   portraitRoute,
   productRoute,
   voiceRoute,
+  adminRoute,
 ]);
 export const router = createRouter({ routeTree, defaultPreload: "intent" });
 declare module "@tanstack/react-router" {

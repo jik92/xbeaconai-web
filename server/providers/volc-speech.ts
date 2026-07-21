@@ -1,4 +1,5 @@
 import { Buffer } from "node:buffer";
+import { providerCredentials } from "../byok/credential-store";
 import { env } from "../env";
 
 type VoiceStatus = 0 | 1 | 2 | 3 | 4;
@@ -44,7 +45,16 @@ export class VolcSpeechError extends Error {
 }
 
 type SpeakerReference = { speaker_id: string; custom_speaker_id?: string };
-type VolcSpeechConfig = typeof env.volcSpeech;
+type VolcSpeechConfig = {
+  apiKeyId: string;
+  apiKey: string;
+  baseUrl: string;
+  cloneResourceId: string;
+  ttsResourceId: string;
+  presetTtsResourceId: string;
+  pollIntervalMs: number;
+  pollTimeoutMs: number;
+};
 type SpeechFetch = (input: string, init?: RequestInit) => Promise<Response>;
 
 function providerError(status: number, body: { code?: number; message?: string }, logId?: string) {
@@ -58,22 +68,33 @@ function providerError(status: number, body: { code?: number; message?: string }
 }
 
 export class VolcSpeechProvider {
-  readonly configured: boolean;
-
   constructor(
-    private readonly config: VolcSpeechConfig = env.volcSpeech,
+    private readonly configuredConfig?: VolcSpeechConfig,
     private readonly request: SpeechFetch = fetch,
-  ) {
-    this.configured = Boolean(config.apiKey);
+  ) {}
+
+  private get config(): VolcSpeechConfig {
+    return (
+      this.configuredConfig ?? {
+        ...env.volcSpeech,
+        apiKeyId: providerCredentials.get("VOLC_SPEECH_API_KEY_ID") ?? "",
+        apiKey: providerCredentials.get("VOLC_SPEECH_API_KEY") ?? "",
+      }
+    );
+  }
+
+  get configured() {
+    return Boolean(this.config.apiKey);
   }
 
   private async post(path: string, body: Record<string, unknown>): Promise<VoiceCloneStatus> {
-    if (!this.configured) throw new VolcSpeechError("VOLC_SPEECH_NOT_CONFIGURED", "火山引擎语音 API Key 未配置", false);
-    const response = await this.request(`${this.config.baseUrl.replace(/\/$/, "")}${path}`, {
+    const config = this.config;
+    if (!config.apiKey) throw new VolcSpeechError("VOLC_SPEECH_NOT_CONFIGURED", "火山引擎语音 API Key 未配置", false);
+    const response = await this.request(`${config.baseUrl.replace(/\/$/, "")}${path}`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "X-Api-Key": this.config.apiKey,
+        "X-Api-Key": config.apiKey,
         "X-Api-Request-Id": crypto.randomUUID(),
       },
       body: JSON.stringify(body),
@@ -171,7 +192,8 @@ export class VolcSpeechProvider {
     contextText?: string;
     toneFidelity: boolean;
   }): Promise<VoiceSynthesisResult> {
-    if (!this.configured) throw new VolcSpeechError("VOLC_SPEECH_NOT_CONFIGURED", "火山引擎语音 API Key 未配置", false);
+    const config = this.config;
+    if (!config.apiKey) throw new VolcSpeechError("VOLC_SPEECH_NOT_CONFIGURED", "火山引擎语音 API Key 未配置", false);
     const additions = {
       disable_markdown_filter: false,
       disable_emoji_filter: false,
@@ -180,11 +202,11 @@ export class VolcSpeechProvider {
       explicit_dialect: input.explicitDialect || undefined,
       context_texts: input.contextText ? [input.contextText] : undefined,
     };
-    const response = await this.request(`${this.config.baseUrl.replace(/\/$/, "")}/api/v3/tts/unidirectional`, {
+    const response = await this.request(`${config.baseUrl.replace(/\/$/, "")}/api/v3/tts/unidirectional`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "X-Api-Key": this.config.apiKey,
+        "X-Api-Key": config.apiKey,
         "X-Api-Resource-Id": input.resourceId,
         "X-Api-Request-Id": input.requestId,
       },

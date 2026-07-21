@@ -14,6 +14,19 @@ export interface MenuFeatureConfig {
 
 export interface PublicAppConfig {
   readonly projectName: string;
+  readonly adminEmails: readonly string[];
+  readonly providerDefaults: {
+    readonly openai: { readonly baseUrl: string; readonly videoAnalysisModel: string };
+    readonly volcSpeech: {
+      readonly baseUrl: string;
+      readonly cloneResourceId: string;
+      readonly ttsResourceId: string;
+      readonly presetTtsResourceId: string;
+      readonly pollIntervalMs: number;
+      readonly pollTimeoutMs: number;
+    };
+    readonly tos: { readonly region: string; readonly endpoint: string; readonly bucket: string };
+  };
   readonly menuFeatures: MenuFeatureConfig;
 }
 
@@ -23,6 +36,26 @@ export interface PublicAppConfig {
  */
 export const APP_CONFIG = {
   projectName: "烽火AI",
+  adminEmails: ["zuo.zhong@163.com"],
+  providerDefaults: {
+    openai: {
+      baseUrl: "https://aihubmix.com",
+      videoAnalysisModel: "gemini-3.5-flash",
+    },
+    volcSpeech: {
+      baseUrl: "https://openspeech.bytedance.com",
+      cloneResourceId: "seed-icl-2.0",
+      ttsResourceId: "seed-icl-2.0",
+      presetTtsResourceId: "seed-tts-2.0",
+      pollIntervalMs: 2_000,
+      pollTimeoutMs: 180_000,
+    },
+    tos: {
+      region: "cn-beijing",
+      endpoint: "tos-cn-beijing.volces.com",
+      bucket: "xbeacon",
+    },
+  },
   menuFeatures: {
     creationWorkflow: {
       "video-remix": true,
@@ -52,6 +85,11 @@ export const APP_CONFIG = {
     },
   },
 } as const satisfies PublicAppConfig;
+
+export function isAdminEmail(email: string, config: PublicAppConfig = APP_CONFIG): boolean {
+  const normalized = email.trim().toLowerCase();
+  return config.adminEmails.some((item) => item.trim().toLowerCase() === normalized);
+}
 
 const MODULE_GROUP = {
   "video-remix": "creationWorkflow",

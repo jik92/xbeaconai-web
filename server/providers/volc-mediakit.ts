@@ -1,3 +1,4 @@
+import { providerCredentials } from "../byok/credential-store";
 import { env } from "../env";
 
 export type MediaKitTool = "erase-video-subtitle-pro" | "enhance-video-fast";
@@ -21,7 +22,7 @@ export interface MediaKitTask {
   };
 }
 
-type MediaKitConfig = typeof env.mediaKit;
+type MediaKitConfig = typeof env.mediaKit & { apiKey: string };
 type MediaKitFetch = (input: string, init?: RequestInit) => Promise<Response>;
 
 export class MediaKitError extends Error {
@@ -53,21 +54,29 @@ function providerError(status: number, payload: MediaKitTask) {
 }
 
 export class VolcMediaKitProvider {
-  readonly configured: boolean;
-
   constructor(
-    private readonly config: MediaKitConfig = env.mediaKit,
+    private readonly configuredConfig?: MediaKitConfig,
     private readonly request: MediaKitFetch = fetch,
-  ) {
-    this.configured = Boolean(config.apiKey.trim());
+  ) {}
+
+  private get config(): MediaKitConfig {
+    return {
+      ...(this.configuredConfig ?? env.mediaKit),
+      apiKey: this.configuredConfig?.apiKey ?? providerCredentials.get("MEDIAKIT_API_KEY") ?? "",
+    };
+  }
+
+  get configured() {
+    return Boolean(this.config.apiKey.trim());
   }
 
   private async call(path: string, init?: RequestInit) {
-    if (!this.configured) throw new MediaKitError("MEDIAKIT_NOT_CONFIGURED", "AI MediaKit API Key 未配置", false);
-    const response = await this.request(`${this.config.baseUrl.replace(/\/$/, "")}${path}`, {
+    const config = this.config;
+    if (!config.apiKey.trim()) throw new MediaKitError("MEDIAKIT_NOT_CONFIGURED", "AI MediaKit API Key 未配置", false);
+    const response = await this.request(`${config.baseUrl.replace(/\/$/, "")}${path}`, {
       ...init,
       headers: {
-        Authorization: `Bearer ${this.config.apiKey}`,
+        Authorization: `Bearer ${config.apiKey}`,
         "Content-Type": "application/json",
         ...init?.headers,
       },

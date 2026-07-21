@@ -2,6 +2,7 @@ node_modules
 dist
 .data
 .env
+.env.key
 .idea
 artifacts/api-tests
 playwright-report

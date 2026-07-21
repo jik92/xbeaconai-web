@@ -1,4 +1,9 @@
+import { providerCredentials } from "../byok/credential-store";
 import { env } from "../env";
+
+function openAiKey() {
+  return providerCredentials.get("OPENAI_KEY") ?? "";
+}
 
 interface GeminiGenerateContentResponse {
   candidates?: Array<{ content?: { parts?: Array<{ text?: string }> }; finishReason?: string }>;
@@ -21,7 +26,8 @@ export async function analyzeImagesWithGemini(input: {
   prompt: string;
   model?: string;
 }): Promise<VideoAnalysisResult> {
-  if (!env.openaiKey) throw new Error("AIHUBMIX_NOT_CONFIGURED");
+  const apiKey = openAiKey();
+  if (!apiKey) throw new Error("AIHUBMIX_NOT_CONFIGURED");
   if (env.blockAiOutbound) throw new Error("AI_OUTBOUND_BLOCKED:image-analysis");
   if (!input.images.length) throw new Error("IMAGE_ANALYSIS_REQUIRES_IMAGE");
   const model = input.model ?? env.videoAnalysisModel;
@@ -45,7 +51,7 @@ export async function analyzeImagesWithGemini(input: {
   const origin = new URL(env.openaiBaseUrl || "https://aihubmix.com").origin;
   const response = await fetch(`${origin}/gemini/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": env.openaiKey },
+    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
     body: JSON.stringify({
       contents: [{ role: "user", parts: [...parts, { text: input.prompt }] }],
       generationConfig: { temperature: 0.2, maxOutputTokens: 4_096, responseMimeType: "application/json" },
@@ -64,7 +70,8 @@ export async function analyzeImagesWithGemini(input: {
 }
 
 export async function transcribeMediaWithAihubmix(input: { mediaPath: string; mimeType?: string; model?: string }) {
-  if (!env.openaiKey) throw new Error("AIHUBMIX_NOT_CONFIGURED");
+  const apiKey = openAiKey();
+  if (!apiKey) throw new Error("AIHUBMIX_NOT_CONFIGURED");
   if (env.blockAiOutbound) throw new Error("AI_OUTBOUND_BLOCKED:transcription");
   const file = Bun.file(input.mediaPath);
   if (!(await file.exists())) throw new Error("TRANSCRIPTION_FILE_NOT_FOUND");
@@ -77,7 +84,7 @@ export async function transcribeMediaWithAihubmix(input: { mediaPath: string; mi
   form.set("response_format", "json");
   const response = await fetch(new URL("/v1/audio/transcriptions", env.openaiBaseUrl || "https://aihubmix.com"), {
     method: "POST",
-    headers: { Authorization: `Bearer ${env.openaiKey}` },
+    headers: { Authorization: `Bearer ${apiKey}` },
     body: form,
     signal: AbortSignal.timeout(180_000),
   });
@@ -95,7 +102,8 @@ export async function analyzeVideoWithGemini(input: {
   model?: string;
   productImages?: Array<{ path: string; mimeType: string }>;
 }): Promise<VideoAnalysisResult> {
-  if (!env.openaiKey) throw new Error("AIHUBMIX_NOT_CONFIGURED");
+  const apiKey = openAiKey();
+  if (!apiKey) throw new Error("AIHUBMIX_NOT_CONFIGURED");
   if (env.blockAiOutbound) throw new Error("AI_OUTBOUND_BLOCKED:video-analysis");
   const model = input.model ?? "gemini-3.1-pro-preview";
   const file = Bun.file(input.videoPath);
@@ -129,7 +137,7 @@ export async function analyzeVideoWithGemini(input: {
   const origin = new URL(baseUrl).origin;
   const response = await fetch(`${origin}/gemini/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": env.openaiKey },
+    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
     body: JSON.stringify({
       contents: [
         {

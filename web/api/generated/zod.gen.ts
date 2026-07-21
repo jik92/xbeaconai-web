@@ -65,6 +65,15 @@ export const zAssetKind = z.enum([
     'voice'
 ]);
 
+export const zProviderCredentialName = z.enum([
+    'OPENAI_KEY',
+    'VOLC_SPEECH_API_KEY_ID',
+    'VOLC_SPEECH_API_KEY',
+    'TOS_ACCESS_KEY_ID',
+    'TOS_SECRET_ACCESS_KEY',
+    'MEDIAKIT_API_KEY'
+]);
+
 export const zModuleId = z.enum([
     'video-remix',
     'video-create',
@@ -1038,6 +1047,96 @@ export const zGetAssetContentPath = z.object({
  * Asset binary
  */
 export const zGetAssetContentResponse = z.string();
+
+/**
+ * Masked provider credentials
+ */
+export const zListAdminCredentialsResponse = z.object({
+    credentials: z.array(z.object({
+        name: zProviderCredentialName,
+        provider: z.string(),
+        label: z.string(),
+        configured: z.boolean(),
+        maskedValue: z.string().optional(),
+        updatedAt: z.string().optional()
+    }))
+});
+
+export const zDeleteAdminCredentialPath = z.object({
+    name: zProviderCredentialName
+});
+
+/**
+ * Deleted
+ */
+export const zDeleteAdminCredentialResponse = z.object({
+    name: zProviderCredentialName,
+    provider: z.string(),
+    label: z.string(),
+    configured: z.boolean(),
+    maskedValue: z.string().optional(),
+    updatedAt: z.string().optional()
+});
+
+export const zUpdateAdminCredentialBody = z.object({
+    value: z.string().min(1).max(4096)
+});
+
+export const zUpdateAdminCredentialPath = z.object({
+    name: zProviderCredentialName
+});
+
+/**
+ * Updated
+ */
+export const zUpdateAdminCredentialResponse = z.object({
+    name: zProviderCredentialName,
+    provider: z.string(),
+    label: z.string(),
+    configured: z.boolean(),
+    maskedValue: z.string().optional(),
+    updatedAt: z.string().optional()
+});
+
+export const zImportAdminEnvKeyBody = z.object({
+    file: z.string()
+});
+
+/**
+ * Imported
+ */
+export const zImportAdminEnvKeyResponse = z.object({
+    updated: z.array(zProviderCredentialName),
+    skipped: z.array(zProviderCredentialName),
+    ignored: z.array(z.string())
+});
+
+export const zListAdminJobsQuery = z.object({
+    page: z.int().gte(1).optional().default(1),
+    pageSize: z.int().gte(10).lte(100).optional().default(25),
+    moduleId: zModuleId.optional(),
+    status: z.enum([
+        'queued',
+        'processing',
+        'succeeded',
+        'partially_succeeded',
+        'failed',
+        'cancelled'
+    ]).optional(),
+    email: z.string().max(254).optional()
+});
+
+/**
+ * All queue jobs
+ */
+export const zListAdminJobsResponse = z.object({
+    jobs: z.array(zJob.and(z.object({
+        ownerEmail: z.string()
+    }))),
+    total: z.int(),
+    page: z.int(),
+    pageSize: z.int()
+});
 
 export const zListJobsQuery = z.object({
     moduleId: zModuleId.optional()
