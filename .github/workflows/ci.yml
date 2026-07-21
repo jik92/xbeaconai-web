@@ -20,6 +20,9 @@ jobs:
         with:
           bun-version: 1.3.14
 
+      - name: Install FFmpeg for media unit tests
+        run: sudo apt-get update && sudo apt-get install --yes ffmpeg
+
       - name: Install locked dependencies
         run: bun install --frozen-lockfile
 
