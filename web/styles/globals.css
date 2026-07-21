@@ -226,6 +226,7 @@
   display: grid;
   grid-template-columns: minmax(190px, 30%) minmax(360px, 1fr) 260px;
   min-height: 0;
+  overflow: hidden;
 }
 .video-editor-sources,
 .video-editor-inspector {
@@ -243,9 +244,9 @@
   margin: 0 0 14px;
   font-size: 14px;
 }
-.video-editor-sources > button {
+.video-editor-source-item {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
+  grid-template-columns: 72px minmax(0, 1fr) 28px;
   align-items: center;
   gap: 10px;
   width: 100%;
@@ -256,13 +257,28 @@
   background: #fff;
   text-align: left;
 }
+.video-editor-source-item > button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  place-items: center;
+  color: #777169;
+  border: 0;
+  border-radius: 9999px;
+  background: transparent;
+}
+.video-editor-source-item > button:hover {
+  color: #dc2626;
+  background: #fef2f2;
+}
 .video-editor-sources video {
   width: 72px;
   height: 42px;
   object-fit: cover;
   background: #000;
 }
-.video-editor-sources span {
+.video-editor-source-item > span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -278,8 +294,19 @@
   display: grid;
   place-items: center;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   padding: 28px;
   background: #f0efed;
+  container-type: size;
+}
+.video-editor-player-frame {
+  width: min(100cqw, calc(100cqh * var(--video-aspect)));
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: var(--video-aspect);
+  overflow: hidden;
+  background: #000;
 }
 .video-editor-black {
   width: min(100%, 720px);
@@ -288,20 +315,25 @@
   background: #000;
 }
 .video-editor-timeline {
-  overflow: auto;
+  min-height: 0;
+  overflow: hidden;
   border-top: 1px solid #e7e5e4;
   background: #fff;
 }
 .video-editor-toolbar {
-  position: sticky;
-  left: 0;
-  z-index: 2;
   height: 44px;
   padding: 0 12px;
   border-bottom: 1px solid #e7e5e4;
+  overflow: hidden;
 }
 .video-editor-toolbar button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   height: 32px;
+  white-space: nowrap;
 }
 .video-editor-toolbar button svg {
   width: 15px;
@@ -312,18 +344,27 @@
   background: #2878f0;
 }
 .video-editor-toolbar > span {
+  min-width: 0;
   flex: 1;
+  overflow: hidden;
   color: #777169;
   font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .video-editor-toolbar label {
   display: flex;
+  flex: none;
   align-items: center;
   gap: 8px;
   font-size: 12px;
 }
 .video-editor-toolbar output {
   width: 38px;
+}
+.video-editor-timeline-scroll {
+  height: calc(100% - 44px);
+  overflow: auto;
 }
 .video-editor-ruler {
   position: relative;

@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
+  normalizeVideoEditorTimeline,
+  removeVideoEditorSource,
   timelineDuration,
   validateVideoEditorTimeline,
   type VideoEditorTimeline,
@@ -26,4 +28,18 @@ describe("video editor timeline", () => {
     expect(validateVideoEditorTimeline({ ...timeline, clips: [{ ...timeline.clips[0]!, outSec: 11 }] })).toBe(
       "片段时间范围无效",
     ));
+  test("replaces persisted blob URLs with stable authenticated asset URLs", () => {
+    const normalized = normalizeVideoEditorTimeline({
+      ...timeline,
+      sources: [{ ...timeline.sources[0]!, url: "blob:http://127.0.0.1/stale" }],
+    });
+    expect(normalized.sources[0]?.url).toBe("/api/assets/asset/content");
+    expect(JSON.stringify(normalized)).not.toContain("blob:");
+  });
+  test("removes a source together with all clips that reference it", () => {
+    const removed = removeVideoEditorSource(timeline, "source");
+    expect(removed.removedClipIds).toEqual(["a", "b"]);
+    expect(removed.timeline.sources).toHaveLength(0);
+    expect(removed.timeline.clips).toHaveLength(0);
+  });
 });
