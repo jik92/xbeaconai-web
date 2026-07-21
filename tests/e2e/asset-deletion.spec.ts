@@ -93,3 +93,44 @@ test("shows a video frame before loading playback controls", async ({ page }) =>
   await expect(preview.locator("video")).toHaveAttribute("controls", "");
   await expect(preview.locator("video")).toHaveCSS("object-fit", "contain");
 });
+
+test("keeps an authenticated preview mounted when the material table rerenders", async ({ page }) => {
+  await page.route("**/api/uploads/direct", (route) =>
+    route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ error: { code: "DIRECT_UPLOAD_UNAVAILABLE", message: "test fallback" } }),
+    }),
+  );
+  let previewRequests = 0;
+  page.on("request", (request) => {
+    if (/\/api\/assets\/[^/]+\/content(?:\?|$)/.test(request.url())) previewRequests += 1;
+  });
+
+  await page.getByRole("button", { name: "上传素材" }).click();
+  await page.locator('.asset-upload-modal input[type="file"]').setInputFiles({
+    name: "stable-preview.png",
+    mimeType: "image/png",
+    buffer: pngFixture,
+  });
+  await page.getByRole("button", { name: "确认上传" }).click();
+
+  const preview = page.locator(".media-table-preview img");
+  await expect(preview).toBeVisible();
+  await expect.poll(() => previewRequests).toBeGreaterThan(0);
+  await page.waitForTimeout(200);
+  const settledPreviewRequests = previewRequests;
+  await preview.evaluate((node) => {
+    (window as Window & { __stableAssetPreview?: Element }).__stableAssetPreview = node;
+  });
+
+  await page.getByPlaceholder("搜索素材库名称或描述…").fill("stable-preview");
+  await expect(page.getByText("stable-preview", { exact: true })).toBeVisible();
+  await expect
+    .poll(() =>
+      preview.evaluate((node) => node === (window as Window & { __stableAssetPreview?: Element }).__stableAssetPreview),
+    )
+    .toBe(true);
+  await page.waitForTimeout(200);
+  expect(previewRequests).toBe(settledPreviewRequests);
+});
