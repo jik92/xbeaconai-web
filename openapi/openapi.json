@@ -2130,11 +2130,16 @@
                     "retryAfterSeconds": {
                       "type": "integer",
                       "minimum": 1
+                    },
+                    "verificationCode": {
+                      "type": "string",
+                      "pattern": "^\\d{6}$"
                     }
                   },
                   "required": [
                     "expiresAt",
-                    "retryAfterSeconds"
+                    "retryAfterSeconds",
+                    "verificationCode"
                   ]
                 }
               }

@@ -19,6 +19,7 @@ export function AuthScreen() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
+  const [displayedVerificationCode, setDisplayedVerificationCode] = useState("");
   const [setupToken, setSetupToken] = useState("");
   const validPhone = /^1[3-9]\d{9}$/.test(phone);
 
@@ -33,6 +34,7 @@ export function AuthScreen() {
     setError("");
     setNotice("");
     setVerificationCode("");
+    setDisplayedVerificationCode("");
     setPassword("");
     setConfirmPassword("");
     setCountdown(0);
@@ -42,12 +44,14 @@ export function AuthScreen() {
   async function requestCode() {
     setError("");
     setNotice("");
+    setDisplayedVerificationCode("");
     setSendingCode(true);
     try {
       const purpose = view === "forgot" ? "reset_password" : "register";
       const result = await sendVerificationCode(phone, purpose);
       setCountdown(result.retryAfterSeconds);
-      setNotice("验证码已发送，请查看服务端日志");
+      setDisplayedVerificationCode(result.verificationCode);
+      setNotice("验证码已发送");
     } catch (reason) {
       setError(apiErrorMessage(reason, "验证码发送失败"));
     } finally {
@@ -219,6 +223,11 @@ export function AuthScreen() {
             </p>
           )}
           {notice && <p className="form-notice">{notice}</p>}
+          {displayedVerificationCode && (
+            <p className="verification-code-display" role="status">
+              当前验证码：<strong>{displayedVerificationCode}</strong>
+            </p>
+          )}
           <button type="submit" className="auth-submit" disabled={busy || (verificationView && sendingCode)}>
             {busy ? (
               <LoaderCircle className="spin" />

@@ -155,6 +155,25 @@
   padding: 9px;
   margin: 10px 0;
 }
+
+.verification-code-display {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: -2px 0 0;
+  padding: 10px 12px;
+  border: 1px solid #b7d2ff;
+  border-radius: 10px;
+  background: #eef5ff;
+  color: #345173;
+  font-size: 13px;
+}
+
+.verification-code-display strong {
+  color: #1769e8;
+  font-size: 18px;
+  letter-spacing: 0.16em;
+}
 .auth-text-action {
   display: block;
   margin: -3px 0 13px auto;

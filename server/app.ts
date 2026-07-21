@@ -492,7 +492,11 @@ const sendSmsCodeRoute = createRoute({
       description: "Verification code sent",
       content: {
         "application/json": {
-          schema: z.object({ expiresAt: z.string(), retryAfterSeconds: z.number().int().min(1) }),
+          schema: z.object({
+            expiresAt: z.string(),
+            retryAfterSeconds: z.number().int().min(1),
+            verificationCode: VerificationCodeSchema,
+          }),
         },
       },
     },

@@ -447,6 +447,7 @@ export type SendSmsVerificationCodeResponses = {
     200: {
         expiresAt: string;
         retryAfterSeconds: number;
+        verificationCode: string;
     };
 };
 

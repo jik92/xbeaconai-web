@@ -13,7 +13,7 @@ export async function registerFromAuthScreen(page: Page, displayName: string, pa
   await page.getByRole("button", { name: "注册", exact: true }).click();
   await page.getByLabel("手机号").fill(phone);
   await page.getByRole("button", { name: "获取验证码" }).click();
-  await expect(page.getByText("验证码已发送，请查看服务端日志")).toBeVisible();
+  await expect(page.getByRole("status")).toHaveText(`当前验证码：${E2E_SMS_CODE}`);
   await page.getByLabel("短信验证码").fill(E2E_SMS_CODE);
   await page.getByRole("button", { name: "验证并注册" }).click();
   await expect(page.getByText("手机号验证成功，账号已注册，请设置登录密码")).toBeVisible();

@@ -218,7 +218,7 @@ export class AccountStore {
       this.db.delete(smsVerificationCodes).where(eq(smsVerificationCodes.id, id)).run();
       throw error;
     }
-    return { expiresAt, retryAfterSeconds: 60 };
+    return { expiresAt, retryAfterSeconds: 60, verificationCode: code };
   }
 
   sendRegistrationCode(phone: string) {

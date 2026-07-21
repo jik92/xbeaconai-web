@@ -38,7 +38,7 @@ type AuthContextValue = {
   sendVerificationCode: (
     phone: string,
     purpose: SmsPurpose,
-  ) => Promise<{ expiresAt: string; retryAfterSeconds: number }>;
+  ) => Promise<{ expiresAt: string; retryAfterSeconds: number; verificationCode: string }>;
   logout: () => Promise<void>;
   setUser: (user: UserSummary) => void;
   refresh: () => Promise<void>;

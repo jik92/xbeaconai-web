@@ -35,6 +35,7 @@ describe("two-step phone authentication", () => {
     const { store, messages } = fixture();
     const sent = await store.sendRegistrationCode("138 0000 0021");
     expect(sent.retryAfterSeconds).toBe(60);
+    expect(sent.verificationCode).toBe("246810");
     expect(messages).toEqual([expect.objectContaining({ phone: "13800000021", code: "246810", purpose: "register" })]);
     const storedCode = store.db.select().from(smsVerificationCodes).orderBy(desc(smsVerificationCodes.createdAt)).get();
     expect(storedCode?.codeHash).not.toContain("246810");
