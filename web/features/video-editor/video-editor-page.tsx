@@ -1,13 +1,16 @@
 import { Player, type PlayerRef } from "@remotion/player";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Download, Merge, Plus, Scissors, Trash2, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { fetchAssetFolders, submitJob, uploadMediaFile } from "@/api/api-client";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { authenticatedBlobUrl, fetchAssetFolders, submitJob, uploadMediaFile } from "@/api/api-client";
 import { randomUuid } from "@/lib/random-id";
 import {
   clipDuration,
+  normalizeVideoEditorTimeline,
+  removeVideoEditorSource,
   timelineDuration,
   VIDEO_EDITOR_FPS,
+  videoEditorAssetUrl,
   type VideoEditorClip,
   type VideoEditorTimeline,
 } from "../../../shared/video-editor/timeline";
@@ -40,7 +43,8 @@ export function VideoEditorPage() {
   const folders = useQuery({ queryKey: ["asset-folders"], queryFn: fetchAssetFolders });
   const [timeline, setTimeline] = useState<VideoEditorTimeline>(() => {
     try {
-      return JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "null") ?? EMPTY_TIMELINE;
+      const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "null") as VideoEditorTimeline | null;
+      return stored ? normalizeVideoEditorTimeline(stored) : EMPTY_TIMELINE;
     } catch {
       return EMPTY_TIMELINE;
     }
@@ -54,6 +58,7 @@ export function VideoEditorPage() {
   const [exportOpen, setExportOpen] = useState(false);
   const [exportFolderId, setExportFolderId] = useState("");
   const [outputName, setOutputName] = useState("剪辑成片.mp4");
+  const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
   useEffect(() => {
     if (!exportFolderId && folders.data?.length)
       setExportFolderId(folders.data.find((folder) => folder.isDefault)?.id ?? folders.data[0]!.id);
@@ -61,12 +66,41 @@ export function VideoEditorPage() {
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(timeline));
   }, [timeline]);
+  useEffect(() => {
+    let active = true;
+    const createdUrls: string[] = [];
+    setPreviewUrls({});
+    void Promise.allSettled(
+      timeline.sources.map(async (source) => {
+        const url = await authenticatedBlobUrl(videoEditorAssetUrl(source.assetId));
+        if (active) createdUrls.push(url);
+        else URL.revokeObjectURL(url);
+        return [source.id, url] as const;
+      }),
+    ).then((results) => {
+      if (!active) return;
+      const entries = results.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
+      setPreviewUrls(Object.fromEntries(entries));
+      if (entries.length !== results.length) setMessage("部分视频素材读取失败，可移除失效素材后继续剪辑");
+    });
+    return () => {
+      active = false;
+      createdUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [timeline.sources]);
   const update = (next: VideoEditorTimeline) => {
     setHistory((items) => [...items.slice(-49), timeline]);
     setFuture([]);
     setTimeline(next);
   };
   const durationInFrames = Math.max(1, Math.ceil(timelineDuration(timeline) * timeline.fps));
+  const previewTimeline = useMemo(
+    () => ({
+      ...timeline,
+      sources: timeline.sources.map((source) => ({ ...source, url: previewUrls[source.id] ?? "" })),
+    }),
+    [previewUrls, timeline],
+  );
   const selectedClip = timeline.clips.find((clip) => clip.id === selected[0]);
   const cut = () => {
     const frame = player.current?.getCurrentFrame() ?? 0;
@@ -117,6 +151,18 @@ export function VideoEditorPage() {
       setSelected([]);
     }
   };
+  const removeSource = (sourceId: string, sourceName: string) => {
+    const removed = removeVideoEditorSource(timeline, sourceId);
+    const relatedClipIds = removed.removedClipIds;
+    if (
+      relatedClipIds.length &&
+      !window.confirm(`移除“${sourceName}”将同时删除时间轴中的 ${relatedClipIds.length} 个相关片段，是否继续？`)
+    )
+      return;
+    update(removed.timeline);
+    setSelected((items) => items.filter((id) => !relatedClipIds.includes(id)));
+    setMessage(relatedClipIds.length ? "素材及相关片段已移除，可撤销" : "素材已移除，可撤销");
+  };
   const addFiles = async (files: FileList | null) => {
     if (!files?.length) return;
     setBusy("正在上传视频…");
@@ -124,7 +170,7 @@ export function VideoEditorPage() {
       let next = timeline;
       for (const file of Array.from(files)) {
         const objectUrl = URL.createObjectURL(file);
-        const metadata = await mediaMetadata(objectUrl);
+        const metadata = await mediaMetadata(objectUrl).finally(() => URL.revokeObjectURL(objectUrl));
         const asset = await uploadMediaFile(file);
         const sourceId = randomUuid();
         next = {
@@ -137,7 +183,7 @@ export function VideoEditorPage() {
               id: sourceId,
               assetId: asset.id,
               name: file.name,
-              url: objectUrl,
+              url: videoEditorAssetUrl(asset.id),
               durationSec: metadata.duration,
               width: metadata.width,
               height: metadata.height,
@@ -210,26 +256,39 @@ export function VideoEditorPage() {
         <aside className="video-editor-sources">
           <h2>视频素材</h2>
           {timeline.sources.map((source) => (
-            <button type="button" key={source.id}>
-              <video src={source.url} muted />
+            <div className="video-editor-source-item" key={source.id}>
+              {previewUrls[source.id] ? <video src={previewUrls[source.id]} muted /> : <span>载入中</span>}
               <span>{source.name}</span>
-            </button>
+              <button
+                type="button"
+                aria-label={`移除素材 ${source.name}`}
+                title="从当前剪辑中移除"
+                onClick={() => removeSource(source.id, source.name)}
+              >
+                <X size={14} />
+              </button>
+            </div>
           ))}
           {!timeline.sources.length && <p>点击“添加”上传视频</p>}
         </aside>
         <div className="video-editor-preview">
           {timeline.clips.length ? (
-            <Player
-              ref={player}
-              component={VideoComposition}
-              inputProps={{ timeline }}
-              durationInFrames={durationInFrames}
-              compositionWidth={timeline.width || 1920}
-              compositionHeight={timeline.height || 1080}
-              fps={timeline.fps}
-              controls
-              style={{ width: "100%", maxHeight: "100%", aspectRatio: `${timeline.width}/${timeline.height}` }}
-            />
+            <div
+              className="video-editor-player-frame"
+              style={{ "--video-aspect": (timeline.width || 1920) / (timeline.height || 1080) } as CSSProperties}
+            >
+              <Player
+                ref={player}
+                component={VideoComposition}
+                inputProps={{ timeline: previewTimeline }}
+                durationInFrames={durationInFrames}
+                compositionWidth={timeline.width || 1920}
+                compositionHeight={timeline.height || 1080}
+                fps={timeline.fps}
+                controls
+                style={{ width: "100%", height: "100%" }}
+              />
+            </div>
           ) : (
             <div className="video-editor-black" />
           )}
@@ -366,37 +425,39 @@ export function VideoEditorPage() {
             <output>{zoom}%</output>
           </label>
         </div>
-        <div className="video-editor-ruler" style={{ width: totalWidth }}>
-          {Array.from({ length: Math.ceil(timelineDuration(timeline) / 2) + 1 }, (_, index) => (
-            <span key={index} style={{ left: index * 2 * zoom }}>
-              {(index * 2).toFixed(0)}s
-            </span>
-          ))}
-        </div>
-        <div className="video-editor-track" style={{ width: totalWidth }}>
-          {timeline.clips.map((clip) => {
-            const source = timeline.sources.find((item) => item.id === clip.sourceId);
-            return (
-              <button
-                type="button"
-                key={clip.id}
-                className={selected.includes(clip.id) ? "selected" : ""}
-                style={{ width: Math.max(48, clipDuration(clip) * zoom) }}
-                onClick={(event) =>
-                  setSelected(
-                    event.metaKey || event.ctrlKey
-                      ? selected.includes(clip.id)
-                        ? selected.filter((id) => id !== clip.id)
-                        : [...selected, clip.id]
-                      : [clip.id],
-                  )
-                }
-              >
-                {source?.url && <video src={source.url} muted />}
-                <span>{clip.name}</span>
-              </button>
-            );
-          })}
+        <div className="video-editor-timeline-scroll">
+          <div className="video-editor-ruler" style={{ width: totalWidth }}>
+            {Array.from({ length: Math.ceil(timelineDuration(timeline) / 2) + 1 }, (_, index) => (
+              <span key={index} style={{ left: index * 2 * zoom }}>
+                {(index * 2).toFixed(0)}s
+              </span>
+            ))}
+          </div>
+          <div className="video-editor-track" style={{ width: totalWidth }}>
+            {timeline.clips.map((clip) => {
+              const source = timeline.sources.find((item) => item.id === clip.sourceId);
+              return (
+                <button
+                  type="button"
+                  key={clip.id}
+                  className={selected.includes(clip.id) ? "selected" : ""}
+                  style={{ width: Math.max(48, clipDuration(clip) * zoom) }}
+                  onClick={(event) =>
+                    setSelected(
+                      event.metaKey || event.ctrlKey
+                        ? selected.includes(clip.id)
+                          ? selected.filter((id) => id !== clip.id)
+                          : [...selected, clip.id]
+                        : [clip.id],
+                    )
+                  }
+                >
+                  {source && previewUrls[source.id] && <video src={previewUrls[source.id]} muted />}
+                  <span>{clip.name}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </section>
       {exportOpen && (
