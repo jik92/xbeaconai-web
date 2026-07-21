@@ -2,6 +2,8 @@ export {};
 
 process.env.FORCE_MOCK = "true";
 process.env.BLOCK_AI_OUTBOUND = "true";
+process.env.TOS_ACCESS_KEY_ID = "";
+process.env.TOS_SECRET_ACCESS_KEY = "";
 process.env.YAOZUO_DATA_DIR = `.data/e2e-${process.pid}`;
 const { app } = await import("./app");
 const { env } = await import("./env");

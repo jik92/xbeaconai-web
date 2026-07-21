@@ -15,7 +15,7 @@ test.beforeEach(async ({ page }, testInfo) => {
   ) {
     await page.getByRole("button", { name: "注册", exact: true }).click();
     await page.getByLabel("显示名称").fill("资产删除测试用户");
-    await page.getByLabel("邮箱").fill(`asset-delete-${testInfo.project.name}-${Date.now()}@example.test`);
+    await page.getByLabel("邮箱").fill(`asset-delete-${testInfo.project.name}-${crypto.randomUUID()}@example.test`);
     await page.locator('input[type="password"]').fill("AssetDelete2026");
     await page.getByRole("button", { name: "创建账号并登录" }).click();
     await expect(page.locator(".auth-page")).toBeHidden();

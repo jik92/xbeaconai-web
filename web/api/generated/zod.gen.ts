@@ -341,6 +341,94 @@ export const zVideoCreateInput = z.object({
     ]),
     requirements: z.string().max(1000).optional().default(''),
     scriptStyle: z.string().max(100).optional().default('自然种草'),
+    marketingGoals: z.array(z.enum([
+        '电商转化',
+        '品牌曝光',
+        'App下载',
+        '门店到店',
+        '直播引流'
+    ])).max(5).optional().default([]),
+    targetAudiences: z.array(z.enum([
+        '18-24岁女性',
+        '25-35岁女性',
+        '18-24岁男性',
+        '25-35岁男性',
+        '宝妈',
+        '学生',
+        '职场白领',
+        '中老年',
+        '全年龄段'
+    ])).max(9).optional().default([]),
+    audiencePainPoints: z.string().max(500).optional().default(''),
+    productBenefits: z.string().max(500).optional().default(''),
+    presenterRoles: z.array(z.enum([
+        '好物推荐员',
+        '普通用户',
+        '行业专家',
+        '品牌官方'
+    ])).max(4).optional().default([]),
+    presenterGenders: z.array(z.enum([
+        '不区分',
+        '男声',
+        '女声'
+    ])).max(3).optional().default([]),
+    contentStyles: z.array(z.enum([
+        '种草',
+        '专业测评',
+        '情绪共鸣',
+        '悬念叙事',
+        '故事',
+        '数据说话'
+    ])).max(6).optional().default([]),
+    openingStyles: z.array(z.enum([
+        '自动匹配',
+        '痛点直击',
+        '数字冲击',
+        '福利诱惑',
+        '问句互动',
+        '品牌声量',
+        '随机'
+    ])).max(7).optional().default([]),
+    closingGuides: z.array(z.enum([
+        '硬引导购买',
+        '软种草',
+        '互动提问'
+    ])).max(3).optional().default([]),
+    scriptTopics: z.array(z.enum([
+        '直播带货',
+        '产品功能讲解',
+        '痛点解决',
+        '对比测评',
+        '情感共鸣',
+        '节日营销'
+    ])).max(6).optional().default([]),
+    materialTopics: z.array(z.enum([
+        '产品外观',
+        '使用体验',
+        '价格优势',
+        '品质保障',
+        '售后服务',
+        '用户口碑',
+        '生活方式',
+        '成分功效',
+        '限时优惠'
+    ])).max(9).optional().default([]),
+    marketingMethods: z.array(z.enum([
+        '场景展示',
+        '痛点解决',
+        '竞品对比',
+        '用户证言',
+        '专家背书',
+        '限时促销'
+    ])).max(6).optional().default([]),
+    templates: z.array(z.enum([
+        '常规',
+        '节日营销',
+        '明星同款',
+        '爆款复制'
+    ])).max(4).optional().default([]),
+    sensitiveWords: z.string().max(500).optional().default(''),
+    customRequirements: z.string().max(1000).optional().default(''),
     videoModel: z.enum([
         'doubao-seedance-2-0-260128',
         'doubao-seedance-2-0-mini-260615',
@@ -363,7 +451,95 @@ export const zVideoCreateRecommendation = z.object({
     durationSec: z.int().gte(15).lte(180),
     segmentCount: z.int().gte(1).lte(12),
     requirements: z.string().max(1000),
-    scriptStyle: z.string().min(1).max(100)
+    scriptStyle: z.string().min(1).max(100),
+    marketingGoals: z.array(z.enum([
+        '电商转化',
+        '品牌曝光',
+        'App下载',
+        '门店到店',
+        '直播引流'
+    ])).max(5).optional().default([]),
+    targetAudiences: z.array(z.enum([
+        '18-24岁女性',
+        '25-35岁女性',
+        '18-24岁男性',
+        '25-35岁男性',
+        '宝妈',
+        '学生',
+        '职场白领',
+        '中老年',
+        '全年龄段'
+    ])).max(9).optional().default([]),
+    audiencePainPoints: z.string().max(500).optional().default(''),
+    productBenefits: z.string().max(500).optional().default(''),
+    presenterRoles: z.array(z.enum([
+        '好物推荐员',
+        '普通用户',
+        '行业专家',
+        '品牌官方'
+    ])).max(4).optional().default([]),
+    presenterGenders: z.array(z.enum([
+        '不区分',
+        '男声',
+        '女声'
+    ])).max(3).optional().default([]),
+    contentStyles: z.array(z.enum([
+        '种草',
+        '专业测评',
+        '情绪共鸣',
+        '悬念叙事',
+        '故事',
+        '数据说话'
+    ])).max(6).optional().default([]),
+    openingStyles: z.array(z.enum([
+        '自动匹配',
+        '痛点直击',
+        '数字冲击',
+        '福利诱惑',
+        '问句互动',
+        '品牌声量',
+        '随机'
+    ])).max(7).optional().default([]),
+    closingGuides: z.array(z.enum([
+        '硬引导购买',
+        '软种草',
+        '互动提问'
+    ])).max(3).optional().default([]),
+    scriptTopics: z.array(z.enum([
+        '直播带货',
+        '产品功能讲解',
+        '痛点解决',
+        '对比测评',
+        '情感共鸣',
+        '节日营销'
+    ])).max(6).optional().default([]),
+    materialTopics: z.array(z.enum([
+        '产品外观',
+        '使用体验',
+        '价格优势',
+        '品质保障',
+        '售后服务',
+        '用户口碑',
+        '生活方式',
+        '成分功效',
+        '限时优惠'
+    ])).max(9).optional().default([]),
+    marketingMethods: z.array(z.enum([
+        '场景展示',
+        '痛点解决',
+        '竞品对比',
+        '用户证言',
+        '专家背书',
+        '限时促销'
+    ])).max(6).optional().default([]),
+    templates: z.array(z.enum([
+        '常规',
+        '节日营销',
+        '明星同款',
+        '爆款复制'
+    ])).max(4).optional().default([]),
+    sensitiveWords: z.string().max(500).optional().default(''),
+    customRequirements: z.string().max(1000).optional().default('')
 });
 
 export const zVideoCreateProject = z.object({

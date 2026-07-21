@@ -332,6 +332,21 @@ export type VideoCreateInput = {
     speechRate: 'slow' | 'medium' | 'fast';
     requirements?: string;
     scriptStyle?: string;
+    marketingGoals?: Array<'电商转化' | '品牌曝光' | 'App下载' | '门店到店' | '直播引流'>;
+    targetAudiences?: Array<'18-24岁女性' | '25-35岁女性' | '18-24岁男性' | '25-35岁男性' | '宝妈' | '学生' | '职场白领' | '中老年' | '全年龄段'>;
+    audiencePainPoints?: string;
+    productBenefits?: string;
+    presenterRoles?: Array<'好物推荐员' | '普通用户' | '行业专家' | '品牌官方'>;
+    presenterGenders?: Array<'不区分' | '男声' | '女声'>;
+    contentStyles?: Array<'种草' | '专业测评' | '情绪共鸣' | '悬念叙事' | '故事' | '数据说话'>;
+    openingStyles?: Array<'自动匹配' | '痛点直击' | '数字冲击' | '福利诱惑' | '问句互动' | '品牌声量' | '随机'>;
+    closingGuides?: Array<'硬引导购买' | '软种草' | '互动提问'>;
+    scriptTopics?: Array<'直播带货' | '产品功能讲解' | '痛点解决' | '对比测评' | '情感共鸣' | '节日营销'>;
+    materialTopics?: Array<'产品外观' | '使用体验' | '价格优势' | '品质保障' | '售后服务' | '用户口碑' | '生活方式' | '成分功效' | '限时优惠'>;
+    marketingMethods?: Array<'场景展示' | '痛点解决' | '竞品对比' | '用户证言' | '专家背书' | '限时促销'>;
+    templates?: Array<'常规' | '节日营销' | '明星同款' | '爆款复制'>;
+    sensitiveWords?: string;
+    customRequirements?: string;
     videoModel?: 'doubao-seedance-2-0-260128' | 'doubao-seedance-2-0-mini-260615' | 'doubao-seedance-2-0-fast-260128';
     voiceAssetId?: string;
     ratio?: '9:16' | '16:9' | '1:1';
@@ -347,6 +362,21 @@ export type VideoCreateRecommendation = {
     segmentCount: number;
     requirements: string;
     scriptStyle: string;
+    marketingGoals?: Array<'电商转化' | '品牌曝光' | 'App下载' | '门店到店' | '直播引流'>;
+    targetAudiences?: Array<'18-24岁女性' | '25-35岁女性' | '18-24岁男性' | '25-35岁男性' | '宝妈' | '学生' | '职场白领' | '中老年' | '全年龄段'>;
+    audiencePainPoints?: string;
+    productBenefits?: string;
+    presenterRoles?: Array<'好物推荐员' | '普通用户' | '行业专家' | '品牌官方'>;
+    presenterGenders?: Array<'不区分' | '男声' | '女声'>;
+    contentStyles?: Array<'种草' | '专业测评' | '情绪共鸣' | '悬念叙事' | '故事' | '数据说话'>;
+    openingStyles?: Array<'自动匹配' | '痛点直击' | '数字冲击' | '福利诱惑' | '问句互动' | '品牌声量' | '随机'>;
+    closingGuides?: Array<'硬引导购买' | '软种草' | '互动提问'>;
+    scriptTopics?: Array<'直播带货' | '产品功能讲解' | '痛点解决' | '对比测评' | '情感共鸣' | '节日营销'>;
+    materialTopics?: Array<'产品外观' | '使用体验' | '价格优势' | '品质保障' | '售后服务' | '用户口碑' | '生活方式' | '成分功效' | '限时优惠'>;
+    marketingMethods?: Array<'场景展示' | '痛点解决' | '竞品对比' | '用户证言' | '专家背书' | '限时促销'>;
+    templates?: Array<'常规' | '节日营销' | '明星同款' | '爆款复制'>;
+    sensitiveWords?: string;
+    customRequirements?: string;
 };
 
 export type GetHealthData = {

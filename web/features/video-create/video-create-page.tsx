@@ -19,7 +19,7 @@ import {
   WandSparkles,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import {
   createVideoCreate,
   downloadAuthenticated,
@@ -40,6 +40,37 @@ import "./video-create-page.css";
 
 const scenes = ["商城转化", "短视频带货", "引流直播间", "直播带货", "内容种草", "品牌曝光", "本地到店", "线索收集"];
 const durationOptions = [15, 30, 60, 180];
+const marketingGoals = ["电商转化", "品牌曝光", "App下载", "门店到店", "直播引流"];
+const targetAudiences = [
+  "18-24岁女性",
+  "25-35岁女性",
+  "18-24岁男性",
+  "25-35岁男性",
+  "宝妈",
+  "学生",
+  "职场白领",
+  "中老年",
+  "全年龄段",
+];
+const presenterRoles = ["好物推荐员", "普通用户", "行业专家", "品牌官方"];
+const presenterGenders = ["不区分", "男声", "女声"];
+const contentStyles = ["种草", "专业测评", "情绪共鸣", "悬念叙事", "故事", "数据说话"];
+const openingStyles = ["自动匹配", "痛点直击", "数字冲击", "福利诱惑", "问句互动", "品牌声量", "随机"];
+const closingGuides = ["硬引导购买", "软种草", "互动提问"];
+const scriptTopics = ["直播带货", "产品功能讲解", "痛点解决", "对比测评", "情感共鸣", "节日营销"];
+const materialTopics = [
+  "产品外观",
+  "使用体验",
+  "价格优势",
+  "品质保障",
+  "售后服务",
+  "用户口碑",
+  "生活方式",
+  "成分功效",
+  "限时优惠",
+];
+const marketingMethods = ["场景展示", "痛点解决", "竞品对比", "用户证言", "专家背书", "限时促销"];
+const templates = ["常规", "节日营销", "明星同款", "爆款复制"];
 const statusLabels: Record<string, string> = {
   draft: "草稿",
   analyzing: "AI 分析中",
@@ -51,6 +82,18 @@ const statusLabels: Record<string, string> = {
   completed: "已完成",
   failed: "生成失败",
 };
+type MultiSelectKey =
+  | "marketingGoals"
+  | "targetAudiences"
+  | "presenterRoles"
+  | "presenterGenders"
+  | "contentStyles"
+  | "openingStyles"
+  | "closingGuides"
+  | "scriptTopics"
+  | "materialTopics"
+  | "marketingMethods"
+  | "templates";
 
 const defaultInput: VideoCreateInput = {
   productAssetIds: [],
@@ -62,6 +105,21 @@ const defaultInput: VideoCreateInput = {
   speechRate: "medium",
   requirements: "",
   scriptStyle: "自然种草",
+  marketingGoals: [],
+  targetAudiences: [],
+  audiencePainPoints: "",
+  productBenefits: "",
+  presenterRoles: [],
+  presenterGenders: [],
+  contentStyles: [],
+  openingStyles: [],
+  closingGuides: [],
+  scriptTopics: [],
+  materialTopics: [],
+  marketingMethods: [],
+  templates: [],
+  sensitiveWords: "",
+  customRequirements: "",
   videoModel: "doubao-seedance-2-0-fast-260128",
   ratio: "9:16",
   subtitles: true,
@@ -81,6 +139,65 @@ function errorMessage(error: unknown) {
 function estimateDuration(text: string, speechRate: VideoCreateInput["speechRate"]) {
   const charactersPerSecond = speechRate === "slow" ? 3 : speechRate === "fast" ? 5 : 4;
   return Math.max(1, Math.ceil([...text.replace(/\s/g, "")].length / charactersPerSecond));
+}
+
+function ChoiceGroup({
+  label,
+  options,
+  selected,
+  onToggle,
+}: {
+  label: string;
+  options: string[];
+  selected: readonly string[];
+  onToggle: (option: string) => void;
+}) {
+  return (
+    <div className="vc-choice-group">
+      <strong>{label}</strong>
+      <div className="vc-choice-list">
+        {options.map((option) => (
+          <button
+            className={selected.includes(option) ? "active" : ""}
+            aria-pressed={selected.includes(option)}
+            key={option}
+            onClick={() => onToggle(option)}
+          >
+            {selected.includes(option) && <Check />}
+            {option}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ParameterPanel({
+  title,
+  count,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string;
+  count: number;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <section className={`vc-parameter-panel ${open ? "open" : ""}`}>
+      <button className="vc-collapse" aria-expanded={open} onClick={onToggle}>
+        <span>
+          <b>{title}</b>
+          {count > 0 && <i>{count}</i>}
+          <small>{count ? "已选" : "可选"}</small>
+        </span>
+        <ChevronDown className={open ? "open" : ""} />
+      </button>
+      {open && <div className="vc-parameter-content">{children}</div>}
+    </section>
+  );
 }
 
 function ProductImages({
@@ -171,7 +288,7 @@ export function VideoCreatePage() {
   const [project, setProject] = useState<VideoCreateProject | null>(null);
   const [productAssets, setProductAssets] = useState<AttachmentSelection[]>([]);
   const [tab, setTab] = useState<"script" | "storyboard">("script");
-  const [advanced, setAdvanced] = useState(false);
+  const [openPanels, setOpenPanels] = useState({ requirements: false, style: false, advanced: false });
   const [historyOpen, setHistoryOpen] = useState(false);
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
@@ -204,6 +321,28 @@ export function VideoCreatePage() {
 
   const mutateInput = <K extends keyof VideoCreateInput>(key: K, value: VideoCreateInput[K]) =>
     setInput((current) => ({ ...current, [key]: value }));
+  const toggleOption = (key: MultiSelectKey, option: string) =>
+    setInput((current) => {
+      const selected = (current[key] ?? []) as readonly string[];
+      return {
+        ...current,
+        [key]: selected.includes(option) ? selected.filter((item) => item !== option) : [...selected, option],
+      } as VideoCreateInput;
+    });
+  const togglePanel = (key: keyof typeof openPanels) =>
+    setOpenPanels((current) => ({ ...current, [key]: !current[key] }));
+  const requirementCount = (input.marketingGoals?.length ?? 0) + (input.targetAudiences?.length ?? 0);
+  const styleCount =
+    (input.presenterRoles?.length ?? 0) +
+    (input.presenterGenders?.length ?? 0) +
+    (input.contentStyles?.length ?? 0) +
+    (input.openingStyles?.length ?? 0) +
+    (input.closingGuides?.length ?? 0);
+  const advancedCount =
+    (input.scriptTopics?.length ?? 0) +
+    (input.materialTopics?.length ?? 0) +
+    (input.marketingMethods?.length ?? 0) +
+    (input.templates?.length ?? 0);
   const invalidate = (next?: VideoCreateProject) => {
     if (next) setProject(next);
     void queryClient.invalidateQueries({ queryKey: ["video-create-projects"] });
@@ -258,6 +397,7 @@ export function VideoCreatePage() {
     setInput(defaultInput);
     setProductAssets([]);
     setTab("script");
+    setOpenPanels({ requirements: false, style: false, advanced: false });
     setNotice("");
     setDrafts({});
   };
@@ -454,24 +594,127 @@ export function VideoCreatePage() {
             </div>
           </section>
 
-          <button className="vc-collapse" onClick={() => setAdvanced((value) => !value)}>
-            <span>广告诉求 · 脚本风格 · 高级设置</span>
-            <ChevronDown className={advanced ? "open" : ""} />
-          </button>
-          {advanced && (
-            <div className="vc-advanced">
-              <label>
-                广告诉求
-                <textarea
-                  value={input.requirements}
-                  onChange={(event) => mutateInput("requirements", event.target.value)}
-                  placeholder="目标人群、投放目标和表达要求"
-                />
-              </label>
-              <label>
-                脚本风格
-                <input value={input.scriptStyle} onChange={(event) => mutateInput("scriptStyle", event.target.value)} />
-              </label>
+          <ParameterPanel
+            title="广告诉求"
+            count={requirementCount}
+            open={openPanels.requirements}
+            onToggle={() => togglePanel("requirements")}
+          >
+            <ChoiceGroup
+              label="营销目标"
+              options={marketingGoals}
+              selected={input.marketingGoals ?? []}
+              onToggle={(option) => toggleOption("marketingGoals", option)}
+            />
+            <ChoiceGroup
+              label="目标受众"
+              options={targetAudiences}
+              selected={input.targetAudiences ?? []}
+              onToggle={(option) => toggleOption("targetAudiences", option)}
+            />
+            <label className="vc-text-option">
+              <strong>用户痛点</strong>
+              <textarea
+                value={input.audiencePainPoints}
+                onChange={(event) => mutateInput("audiencePainPoints", event.target.value)}
+                placeholder="例：夏天防晒产品总是厚重泛白"
+              />
+            </label>
+            <label className="vc-text-option">
+              <strong>产品利益点</strong>
+              <textarea
+                value={input.productBenefits}
+                onChange={(event) => mutateInput("productBenefits", event.target.value)}
+                placeholder="例：零感轻薄，一抹即化"
+              />
+            </label>
+          </ParameterPanel>
+
+          <ParameterPanel
+            title="脚本风格"
+            count={styleCount}
+            open={openPanels.style}
+            onToggle={() => togglePanel("style")}
+          >
+            <ChoiceGroup
+              label="主播角色"
+              options={presenterRoles}
+              selected={input.presenterRoles ?? []}
+              onToggle={(option) => toggleOption("presenterRoles", option)}
+            />
+            <ChoiceGroup
+              label="主播性别"
+              options={presenterGenders}
+              selected={input.presenterGenders ?? []}
+              onToggle={(option) => toggleOption("presenterGenders", option)}
+            />
+            <ChoiceGroup
+              label="内容风格"
+              options={contentStyles}
+              selected={input.contentStyles ?? []}
+              onToggle={(option) => toggleOption("contentStyles", option)}
+            />
+            <ChoiceGroup
+              label="开场方式"
+              options={openingStyles}
+              selected={input.openingStyles ?? []}
+              onToggle={(option) => toggleOption("openingStyles", option)}
+            />
+            <ChoiceGroup
+              label="结尾引导"
+              options={closingGuides}
+              selected={input.closingGuides ?? []}
+              onToggle={(option) => toggleOption("closingGuides", option)}
+            />
+          </ParameterPanel>
+
+          <ParameterPanel
+            title="高级设置"
+            count={advancedCount}
+            open={openPanels.advanced}
+            onToggle={() => togglePanel("advanced")}
+          >
+            <ChoiceGroup
+              label="脚本题材"
+              options={scriptTopics}
+              selected={input.scriptTopics ?? []}
+              onToggle={(option) => toggleOption("scriptTopics", option)}
+            />
+            <ChoiceGroup
+              label="素材话题"
+              options={materialTopics}
+              selected={input.materialTopics ?? []}
+              onToggle={(option) => toggleOption("materialTopics", option)}
+            />
+            <ChoiceGroup
+              label="营销手法"
+              options={marketingMethods}
+              selected={input.marketingMethods ?? []}
+              onToggle={(option) => toggleOption("marketingMethods", option)}
+            />
+            <ChoiceGroup
+              label="模板"
+              options={templates}
+              selected={input.templates ?? []}
+              onToggle={(option) => toggleOption("templates", option)}
+            />
+            <label className="vc-text-option">
+              <strong>敏感词</strong>
+              <input
+                value={input.sensitiveWords}
+                onChange={(event) => mutateInput("sensitiveWords", event.target.value)}
+                placeholder="用空格分隔，如：最佳 极致"
+              />
+            </label>
+            <label className="vc-text-option">
+              <strong>自定义要求</strong>
+              <textarea
+                value={input.customRequirements}
+                onChange={(event) => mutateInput("customRequirements", event.target.value)}
+                placeholder="补充品牌语气、禁用表达或其他要求"
+              />
+            </label>
+            <div className="vc-advanced-grid">
               <label>
                 视频模型
                 <select
@@ -494,20 +737,20 @@ export function VideoCreatePage() {
                   <option>1:1</option>
                 </select>
               </label>
-              <div className="vc-advanced-field">
-                配音音色
-                <AttachmentPicker
-                  accept="audio/*"
-                  onSelect={([asset]) => asset && mutateInput("voiceAssetId", asset.id)}
-                  trigger={(open) => (
-                    <button className="vc-select-asset" onClick={open}>
-                      {input.voiceAssetId ? "已选择我的音色" : "默认推荐音色（点击更换）"}
-                    </button>
-                  )}
-                />
-              </div>
             </div>
-          )}
+            <div className="vc-advanced-field">
+              <strong>配音音色</strong>
+              <AttachmentPicker
+                accept="audio/*"
+                onSelect={([asset]) => asset && mutateInput("voiceAssetId", asset.id)}
+                trigger={(open) => (
+                  <button className="vc-select-asset" onClick={open}>
+                    {input.voiceAssetId ? "已选择我的音色" : "默认推荐音色（点击更换）"}
+                  </button>
+                )}
+              />
+            </div>
+          </ParameterPanel>
         </div>
         <footer className="vc-primary-footer">
           <button
