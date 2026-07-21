@@ -6,6 +6,7 @@ import {
   cleanupDownloadDir,
   downloadDouyinVideo,
   DouyinDownloadError,
+  isAllowedDouyinVideoHost,
   validateDouyinUrl,
 } from "../../server/imports/douyin-video";
 
@@ -47,6 +48,18 @@ describe("douyin URL validation", () => {
       expect(de.retryable).toBe(false);
       expect(de.reason).toBe("invalid_url");
     }
+  });
+});
+
+describe("douyin video CDN host validation", () => {
+  test("accepts explicitly allowed video CDN hosts", () => {
+    expect(isAllowedDouyinVideoHost("https://v26-web.douyinvod.com/video.mp4")).toBe(true);
+    expect(isAllowedDouyinVideoHost("https://v11-weba.douyinvod.com/video/tos/cn/example.mp4")).toBe(true);
+  });
+
+  test("rejects unapproved lookalike subdomains", () => {
+    expect(isAllowedDouyinVideoHost("https://v11-weba.douyinvod.com.evil.example/video.mp4")).toBe(false);
+    expect(isAllowedDouyinVideoHost("https://other.douyinvod.com/video.mp4")).toBe(false);
   });
 });
 

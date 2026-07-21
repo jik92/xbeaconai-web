@@ -3404,10 +3404,17 @@ app.openapi(createShareImportRoute, async (c) => {
     );
   }
 
-  // Check idempotency
+  // The store performs this check inside an immediate transaction so two
+  // concurrent submissions cannot both create a job for the same link.
   const idempotencyKey = `sc-${ownerUserId}-${folderId}-${adapter.platformId}-${normalizedUrl}`.slice(0, 128);
   const existing = store.getByIdempotencyKey(ownerUserId, idempotencyKey);
-  if (existing) return c.json(existing, 202);
+  const existingAssetId = existing?.result?.artifacts.find((artifact) => artifact.mimeType.startsWith("video/"))?.id;
+  // Reuse a completed import only while its resulting material still exists.
+  // Asset deletion otherwise makes the historical success result stale.
+  const replaceSucceededJobId =
+    existing?.status === "succeeded" && (!existingAssetId || !accounts.getOwnedAsset(ownerUserId, existingAssetId))
+      ? existing.id
+      : undefined;
 
   const timestamp = new Date().toISOString();
   const jobId = crypto.randomUUID();
@@ -3446,7 +3453,8 @@ app.openapi(createShareImportRoute, async (c) => {
     updatedAt: timestamp,
   };
 
-  store.create(job);
+  const created = store.createShareContentImport(job, replaceSucceededJobId);
+  if (!created.created) return c.json(created.job, 202);
   await queue.enqueue(jobId);
   return c.json(job, 202);
 });

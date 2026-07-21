@@ -115,4 +115,28 @@ describe("database migration", () => {
 
     conn.client.close();
   });
+
+  test("old media_assets table gets metadata columns without losing rows", () => {
+    const path = tempDbPath();
+    const client = new Database(path, { create: true, strict: true });
+    client.run(`CREATE TABLE media_assets (
+      id TEXT PRIMARY KEY, owner_user_id TEXT NOT NULL, original_name TEXT NOT NULL,
+      storage_key TEXT NOT NULL, mime_type TEXT NOT NULL, byte_size INTEGER NOT NULL,
+      asset_kind TEXT NOT NULL, display_name TEXT NOT NULL, created_at TEXT NOT NULL
+    )`);
+    client.run(
+      "INSERT INTO media_assets (id, owner_user_id, original_name, storage_key, mime_type, byte_size, asset_kind, display_name, created_at) VALUES ('asset-1', 'user-1', 'old.mp4', 'old.mp4', 'video/mp4', 12, 'media', 'old', '2026-01-01T00:00:00Z')",
+    );
+    client.close();
+
+    const conn = openDatabase(path);
+    const columns = new Set(
+      (conn.client.query("PRAGMA table_info(media_assets)").all() as Array<{ name: string }>).map((item) => item.name),
+    );
+    expect(columns.has("width")).toBe(true);
+    expect(columns.has("height")).toBe(true);
+    expect(columns.has("duration_sec")).toBe(true);
+    expect(conn.client.query("SELECT id FROM media_assets WHERE id = 'asset-1'").get()).toBeDefined();
+    conn.client.close();
+  });
 });

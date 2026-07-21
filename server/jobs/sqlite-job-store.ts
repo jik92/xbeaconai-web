@@ -116,6 +116,31 @@ export class SqliteJobStore {
     return job;
   }
 
+  /**
+   * Inserts an import job while preserving request de-duplication for work
+   * that is still running. Failed/cancelled jobs, and a successful job whose
+   * material was later deleted, release their key for a fresh import.
+   */
+  createShareContentImport(job: JobRecord, replaceSucceededJobId?: string): { job: JobRecord; created: boolean } {
+    if (!job.idempotencyKey) return { job: this.create(job), created: true };
+    return this.db.transaction(
+      (tx) => {
+        const existing = tx
+          .select()
+          .from(jobs)
+          .where(and(eq(jobs.ownerUserId, job.ownerUserId), eq(jobs.idempotencyKey, job.idempotencyKey!)))
+          .get();
+        const replaceSucceeded = existing?.id === replaceSucceededJobId && existing?.status === "succeeded";
+        if (existing && !replaceSucceeded && !["failed", "cancelled"].includes(existing.status))
+          return { job: this.fromRow(existing), created: false };
+        if (existing) tx.update(jobs).set({ idempotencyKey: null }).where(eq(jobs.id, existing.id)).run();
+        tx.insert(jobs).values(jobValues(job)).run();
+        return { job, created: true };
+      },
+      { behavior: "immediate" },
+    );
+  }
+
   createCharged(job: JobRecord, credits: number): JobRecord {
     if (!Number.isInteger(credits) || credits <= 0) return this.create(job);
     return this.db.transaction(

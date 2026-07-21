@@ -12,6 +12,13 @@ import type { WorkerJobHandler } from "./types";
 
 const shareParser = new ShareContentParser(platformAdapters);
 
+class AssetCreateError extends Error {
+  constructor(cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause));
+    this.name = "AssetCreateError";
+  }
+}
+
 export const douyinVideoImportJob: WorkerJobHandler = {
   name: "share-content-import",
   supports: (job) => job.moduleId === "douyin-video-import" || job.moduleId === "share-content-import",
@@ -209,7 +216,7 @@ export const douyinVideoImportJob: WorkerJobHandler = {
       } catch (assetErr) {
         const s = sanitizeError(assetErr);
         logFailure(job.id, "asset_create_failure", assetStart, s.code, s.summary);
-        throw assetErr;
+        throw new AssetCreateError(assetErr);
       }
       stageComplete(job.id, "asset_created", assetStart, byteSize);
 
@@ -260,6 +267,7 @@ export const douyinVideoImportJob: WorkerJobHandler = {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       const retryable = err instanceof DouyinDownloadError ? err.retryable : false;
+      const assetCreateFailed = err instanceof AssetCreateError;
 
       // ── Failure log ───────────────────────────────────────────
       const sanitized = sanitizeError(err);
@@ -277,9 +285,13 @@ export const douyinVideoImportJob: WorkerJobHandler = {
 
       context.change(job.id, {
         status: "failed",
-        stage: err instanceof DouyinDownloadError ? err.reason : "下载失败",
+        stage: assetCreateFailed ? "素材入库失败" : err instanceof DouyinDownloadError ? err.reason : "下载失败",
         error: {
-          code: err instanceof DouyinDownloadError ? err.reason.toUpperCase() : "DOWNLOAD_FAILED",
+          code: assetCreateFailed
+            ? "ASSET_CREATE_FAILED"
+            : err instanceof DouyinDownloadError
+              ? err.reason.toUpperCase()
+              : "DOWNLOAD_FAILED",
           message: errorMessage,
           retryable,
           requestId: crypto.randomUUID(),

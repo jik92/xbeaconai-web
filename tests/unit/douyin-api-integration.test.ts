@@ -180,6 +180,85 @@ describe("douyin API integration (isolated DB)", () => {
     expect(job2.id).toBe(job1.id);
   });
 
+  test("POST /api/imports/share-content creates a fresh job after a failed import", async () => {
+    const payload = {
+      candidate: {
+        raw: "https://v.douyin.com/retry-after-failure/",
+        platformId: "douyin",
+        confidence: "high",
+        label: "抖音链接",
+      },
+      folderId,
+    };
+    const first = await honoApp.request("/api/imports/share-content", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const failedJob = (await first.json()) as { id: string };
+    realStore.update(failedJob.id, {
+      status: "failed",
+      stage: "下载失败",
+      error: { code: "ASSET_CREATE_FAILED", message: "旧错误", retryable: true, requestId: crypto.randomUUID() },
+    });
+
+    const retry = await honoApp.request("/api/imports/share-content", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+    expect(retry.status).toBe(202);
+    const retryJob = (await retry.json()) as { id: string; status: string };
+    expect(retryJob.id).not.toBe(failedJob.id);
+    expect(retryJob.status).toBe("queued");
+  });
+
+  test("POST /api/imports/share-content creates a fresh job when prior imported material was deleted", async () => {
+    const payload = {
+      candidate: {
+        raw: "https://v.douyin.com/retry-after-deletion/",
+        platformId: "douyin",
+        confidence: "high",
+        label: "抖音链接",
+      },
+      folderId,
+    };
+    const first = await honoApp.request("/api/imports/share-content", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const previousJob = (await first.json()) as { id: string };
+    const deletedAssetId = crypto.randomUUID();
+    realStore.update(previousJob.id, {
+      status: "succeeded",
+      stage: "已保存到素材文件夹",
+      result: {
+        kind: "share-content-import",
+        title: "旧导入",
+        summary: "旧导入成功",
+        artifacts: [
+          {
+            id: deletedAssetId,
+            name: "douyin_import.mp4",
+            mimeType: "video/mp4",
+            executionMode: "real",
+            lineage: [],
+          },
+        ],
+      },
+    });
+
+    const retry = await honoApp.request("/api/imports/share-content", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const retryJob = (await retry.json()) as { id: string; status: string };
+    expect(retryJob.id).not.toBe(previousJob.id);
+    expect(retryJob.status).toBe("queued");
+  });
+
   test("POST /api/imports/share-content accepts recognition-only platform", async () => {
     const res = await honoApp.request("/api/imports/share-content", {
       method: "POST",

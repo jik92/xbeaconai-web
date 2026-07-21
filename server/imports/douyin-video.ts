@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { env } from "../env";
 
 /**
  * Allowed douyin share URL pattern.
@@ -9,7 +10,16 @@ import { join } from "node:path";
 const DOUYIN_SHARE_PATTERN = /^https:\/\/v\.douyin\.com\/[a-zA-Z0-9_-]+\/?(\?.*)?$/;
 
 /** Allowed douyin video CDN hostnames — exact hostname match only. */
-const ALLOWED_VIDEO_HOSTNAMES = new Set(["v26-web.douyinvod.com", "v3-web.douyinvod.com", "sf3-sign.douyinstatic.com"]);
+const ALLOWED_VIDEO_HOSTNAMES = new Set([
+  "v26-web.douyinvod.com",
+  "v3-web.douyinvod.com",
+  "v11-weba.douyinvod.com",
+  "sf3-sign.douyinstatic.com",
+]);
+
+// Observed on the Douyin login guidance overlay. Keep this isolated so later
+// observed variants can be added without changing the download flow.
+const LOGIN_GUIDANCE_CLOSE_SELECTOR = "div.YoNA2Hyj.qKr0RhiL";
 
 export interface DouyinDownloadResult {
   filePath: string;
@@ -40,10 +50,24 @@ export function validateDouyinUrl(input: string): string {
 }
 
 /** Strict hostname check — rejects any URL where hostname is not exactly in the allowlist. */
-function isAllowedVideoHost(url: string): boolean {
+export function isAllowedDouyinVideoHost(url: string): boolean {
   try {
     const hostname = new URL(url).hostname;
     return ALLOWED_VIDEO_HOSTNAMES.has(hostname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Closes the optional login guidance overlay when its observed close control
+ * is present. A missing/changed overlay is not an error: public videos may
+ * render without it, and actual login/CAPTCHA restrictions remain respected.
+ */
+async function dismissLoginGuidance(page: import("playwright").Page): Promise<boolean> {
+  try {
+    await page.locator(LOGIN_GUIDANCE_CLOSE_SELECTOR).first().click({ timeout: 3_000, force: true });
+    return true;
   } catch {
     return false;
   }
@@ -76,8 +100,11 @@ export async function downloadDouyinVideo(shareUrl: string, timeoutMs = 30_000):
 
   try {
     browser = await playwright.chromium.launch({
-      headless: true,
+      headless: env.douyinBrowserHeadless,
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      // Match the original Python downloader: avoid Playwright's default
+      // automation marker. This does not bypass authentication or CAPTCHA.
+      ignoreDefaultArgs: ["--enable-automation"],
     });
     context = await browser.newContext({
       acceptDownloads: true,
@@ -85,6 +112,12 @@ export async function downloadDouyinVideo(shareUrl: string, timeoutMs = 30_000):
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
     });
     page = await context.newPage();
+    await page.addInitScript(() => {
+      // Small built-in equivalent for the original downloader's stealth
+      // bootstrap. It only removes the obvious WebDriver marker; access
+      // controls (login/CAPTCHA/private content) are still respected.
+      Object.defineProperty(navigator, "webdriver", { configurable: true, get: () => undefined });
+    });
 
     // Capture the first allowed video response URL using strict hostname check
     let capturedVideoUrl: string | null = null;
@@ -92,7 +125,7 @@ export async function downloadDouyinVideo(shareUrl: string, timeoutMs = 30_000):
 
     page.on("response", (response) => {
       if (!monitorSwitch) return;
-      if (isAllowedVideoHost(response.url())) {
+      if (isAllowedDouyinVideoHost(response.url())) {
         capturedVideoUrl = response.request().url();
         monitorSwitch = false;
       }
@@ -105,8 +138,27 @@ export async function downloadDouyinVideo(shareUrl: string, timeoutMs = 30_000):
       timeout: timeoutMs,
     });
 
+    // Gives a local operator time to inspect the visible page or sign in.
+    // The session is ephemeral and is discarded after this job finishes.
+    if (!env.douyinBrowserHeadless && env.douyinBrowserDebugPauseMs > 0)
+      await page.waitForTimeout(env.douyinBrowserDebugPauseMs);
+
+    // Public share pages may show a dismissible login guidance overlay. Close
+    // it only after the page has had time to render it; missing controls are normal.
+    await page.waitForTimeout(env.douyinLoginGuidanceWaitMs);
+    await dismissLoginGuidance(page);
+
     // Wait for the page to settle and video requests to fire
     await page.waitForTimeout(3_000);
+
+    // The Python prototype clicks this page control before checking the
+    // unavailable-video message. On current Douyin pages it can also trigger
+    // the first media request, so preserve that behavior when the control is present.
+    try {
+      await page.locator(".wSyUzWHW").click({ timeout: 2_000 });
+    } catch {
+      // The selector is absent on many valid pages; continue normally.
+    }
 
     // Check for "video not found" indicator
     try {

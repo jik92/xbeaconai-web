@@ -22,6 +22,23 @@
 - **已支持下载**: 抖音（douyin）— 标准 URL + 分享码提取，Playwright Chromium 下载
 - **仅识别未下载**: 快手（kuaishou）、YouTube、X (Twitter)
 
+同一用户、文件夹、平台与规范化链接的正在执行任务会被去重。失败/取消任务可以重新提交；已成功的任务只在其结果素材仍存在时复用，若用户删除了素材则会创建新的下载任务。
+
+下载器在页面打开后等待 30 秒，再关闭已观察到的、可关闭的抖音登录引导浮层，然后继续等待公开视频的媒体请求。等待值可通过 `DOUYIN_LOGIN_GUIDANCE_WAIT_MS`（0–120000 毫秒）调整。该操作不登录账号、不保存 Cookie，也不规避验证码、私密视频或其他访问限制。
+
+当前允许捕获的抖音媒体主机为精确白名单：`v26-web.douyinvod.com`、`v3-web.douyinvod.com`、`v11-weba.douyinvod.com` 和 `sf3-sign.douyinstatic.com`。新增主机必须单独验证后加入，不使用宽泛的域名后缀匹配。
+
+### 本地可视化排查
+
+默认 Worker 使用无头 Chromium。若需要观察抖音实际展示的登录、验证码或访问限制页面，可仅在本地 `.env` 设置：
+
+```dotenv
+DOUYIN_BROWSER_HEADLESS=false
+DOUYIN_BROWSER_DEBUG_PAUSE_MS=60000
+```
+
+提交一次导入任务后，会出现一个临时 Chromium 窗口并在页面打开后暂停 60 秒。该会话仅用于当前任务，任务结束即关闭并清除 Cookie；它不使用日常 Chrome 的登录态，也不应用于生产环境。
+
 ## 用户流程与详细需求
 
 | 需求 ID | 优先级 | 描述 | 验收方式 |
