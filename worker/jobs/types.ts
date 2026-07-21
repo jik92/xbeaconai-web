@@ -9,6 +9,12 @@ export interface JobHandlerContext {
   readonly accounts?: AccountStore;
   readonly adScripts?: AdScriptStore;
   readonly videoCreates?: VideoCreateStore;
+  /** Injectable download function for integration testing. */
+  readonly downloadFn?: (
+    platformId: string,
+    normalizedUrl: string,
+    timeoutMs?: number,
+  ) => Promise<{ filePath: string; tempDir: string; mimeType: string; byteSize: number }>;
   change(id: string, patch: Partial<JobRecord>): JobRecord | undefined;
 }
 

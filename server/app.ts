@@ -28,12 +28,16 @@ import {
 } from "./ad-script/types";
 import { creationCapabilities, quoteCreation, validateCreationValues } from "./creation/capabilities";
 import { env } from "./env";
+import { platformAdapters, ShareContentParser } from "./imports/share-content";
+import type { ShareCandidate } from "./imports/share-content";
+
+const shareParser = new ShareContentParser(platformAdapters);
 import { BullJobQueue } from "./jobs/bull-job-queue";
 import { InsufficientCreditsError, SqliteJobStore } from "./jobs/sqlite-job-store";
 import { seedanceModelIds, videoModels } from "./models/video-models";
 import { auditSdkRegistry } from "./sdk-registry";
 import { ossutils } from "./storage/ossutils";
-import type { JobRecord } from "./types";
+import type { JobModuleId, JobRecord } from "./types";
 import {
   directUploadExtensions,
   issueDirectUploadTicket,
@@ -69,7 +73,10 @@ const moduleIds = [
   "video-enhancement",
   "kickart",
 ] as const;
+const backgroundJobTypes = ["douyin-video-import", "share-content-import"] as const;
+const jobModuleIds = [...moduleIds, ...backgroundJobTypes] as const;
 const ModuleSchema = z.enum(moduleIds).openapi("ModuleId");
+const JobModuleSchema = z.enum(jobModuleIds).openapi("JobModuleId");
 const VideoModelIdSchema = z.enum(seedanceModelIds).openapi("SeedanceModelId");
 const JobStatusSchema = z.enum(["queued", "processing", "succeeded", "partially_succeeded", "failed", "cancelled"]);
 const StageSchema = z.object({
@@ -108,7 +115,7 @@ const JobResultSchema = z.object({
 const JobSchema = z
   .object({
     id: z.string(),
-    moduleId: ModuleSchema,
+    moduleId: JobModuleSchema,
     title: z.string(),
     status: JobStatusSchema,
     progress: z.number().int().min(0).max(100),
@@ -1743,13 +1750,13 @@ const listRoute = createRoute({
   method: "get",
   path: "/api/jobs",
   operationId: "listJobs",
-  request: { query: z.object({ moduleId: ModuleSchema.optional() }) },
+  request: { query: z.object({ moduleId: JobModuleSchema.optional() }) },
   responses: {
     200: { description: "Jobs", content: { "application/json": { schema: z.object({ jobs: z.array(JobSchema) }) } } },
   },
 });
 app.openapi(listRoute, (c) =>
-  c.json({ jobs: store.list(c.get("userId"), c.req.valid("query").moduleId as ModuleId | undefined) }, 200),
+  c.json({ jobs: store.list(c.get("userId"), c.req.valid("query").moduleId as JobModuleId | undefined) }, 200),
 );
 
 const remixFileSchema = z.object({
@@ -3154,7 +3161,7 @@ app.openapi(retryRoute, async (c) => {
       },
       409,
     );
-  if (!isModuleOpen(source.moduleId))
+  if (!isModuleOpen(source.moduleId as ModuleId))
     return c.json(
       {
         error: {
@@ -3292,6 +3299,178 @@ app.openapi(artifactRoute, async (c) => {
       "Content-Disposition": `inline; filename="${artifact.name.replaceAll('"', "")}"`,
     },
   });
+});
+
+// ── Share content import (multi-platform) ──────────────────────────────
+
+const ShareCandidateSchema = z.object({
+  raw: z.string(),
+  platformId: z.string(),
+  confidence: z.enum(["high", "medium", "low"]),
+  label: z.string(),
+});
+
+const ShareParseRequestSchema = z.object({
+  text: z.string().min(1).max(4096),
+});
+
+const ShareParseResponseSchema = z
+  .object({
+    candidates: z.array(ShareCandidateSchema),
+  })
+  .openapi("ShareParseResult");
+
+const ShareImportRequestSchema = z.object({
+  candidate: ShareCandidateSchema,
+  folderId: z.string().uuid(),
+});
+
+const ShareImportResponseSchema = JobSchema.extend({
+  values: z.record(z.string(), z.string()),
+}).openapi("ShareImportJob");
+
+// Parse: extract platform candidates from free text
+const parseShareRoute = createRoute({
+  method: "post",
+  path: "/api/imports/share-content/parse",
+  operationId: "parseShareContent",
+  request: {
+    body: { required: true, content: { "application/json": { schema: ShareParseRequestSchema } } },
+  },
+  responses: {
+    200: { description: "Parsed candidates", content: { "application/json": { schema: ShareParseResponseSchema } } },
+  },
+});
+
+app.openapi(parseShareRoute, (c) => {
+  const { text } = c.req.valid("json");
+  const candidates = shareParser.parse(text);
+  return c.json({ candidates }, 200);
+});
+
+// Create import job from confirmed candidate
+const createShareImportRoute = createRoute({
+  method: "post",
+  path: "/api/imports/share-content",
+  operationId: "createShareImport",
+  request: {
+    body: { required: true, content: { "application/json": { schema: ShareImportRequestSchema } } },
+  },
+  responses: {
+    202: { description: "Import job created", content: { "application/json": { schema: ShareImportResponseSchema } } },
+    400: { description: "Invalid candidate or folder", content: { "application/json": { schema: ErrorSchema } } },
+    422: {
+      description: "Platform not supported for download",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+  },
+});
+
+app.openapi(createShareImportRoute, async (c) => {
+  const requestId = crypto.randomUUID();
+  const ownerUserId = c.get("userId");
+  const { candidate, folderId } = c.req.valid("json");
+
+  // Validate folder ownership
+  const folder = accounts.getAssetFolder(ownerUserId, folderId);
+  if (!folder) {
+    return c.json(
+      { error: { code: "FOLDER_NOT_FOUND", message: "素材文件夹不存在或无权访问", retryable: false, requestId } },
+      400,
+    );
+  }
+
+  // Find adapter and normalize
+  const adapter = shareParser.adapterFor(candidate.platformId);
+  if (!adapter) {
+    return c.json(
+      {
+        error: {
+          code: "UNKNOWN_PLATFORM",
+          message: `不支持的平台: ${candidate.platformId}`,
+          retryable: false,
+          requestId,
+        },
+      },
+      400,
+    );
+  }
+
+  const normalizedUrl = adapter.normalize(candidate);
+  if (!normalizedUrl) {
+    return c.json(
+      { error: { code: "INVALID_CANDIDATE", message: "无法规范化候选链接", retryable: false, requestId } },
+      400,
+    );
+  }
+
+  // Check idempotency
+  const idempotencyKey = `sc-${ownerUserId}-${folderId}-${adapter.platformId}-${normalizedUrl}`.slice(0, 128);
+  const existing = store.getByIdempotencyKey(ownerUserId, idempotencyKey);
+  if (existing) return c.json(existing, 202);
+
+  const timestamp = new Date().toISOString();
+  const jobId = crypto.randomUUID();
+  const job: JobRecord = {
+    id: jobId,
+    ownerUserId,
+    moduleId: "share-content-import" as JobModuleId,
+    title: `${adapter.displayName} 内容导入`,
+    status: "queued",
+    progress: 0,
+    stage: "排队中",
+    overallExecutionMode: adapter.supportsDownload ? "real" : "mock",
+    values: {
+      platformId: adapter.platformId,
+      normalizedUrl,
+      folderId,
+      folderName: folder.name,
+      downloadSupported: String(adapter.supportsDownload),
+    },
+    executionPlan: [
+      {
+        id: "plan:0:share-download",
+        capability: "share-download",
+        executionMode: adapter.supportsDownload ? "real" : "mock",
+        implementation: adapter.supportsDownload ? "playwright-download" : "recognition-only",
+        startedAt: "",
+      },
+    ],
+    provenance: [],
+    idempotencyKey,
+    cancelRequested: false,
+    providerCancelState: "none",
+    stagingKeys: [],
+    jobSchemaVersion: 2,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+
+  store.create(job);
+  await queue.enqueue(jobId);
+  return c.json(job, 202);
+});
+
+// Query import job status (backward-compatible with old /api/douyin/imports/{jobId})
+const getShareImportRoute = createRoute({
+  method: "get",
+  path: "/api/imports/share-content/{jobId}",
+  operationId: "getShareImport",
+  request: { params: z.object({ jobId: z.string().uuid() }) },
+  responses: {
+    200: { description: "Import job", content: { "application/json": { schema: ShareImportResponseSchema } } },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+
+app.openapi(getShareImportRoute, (c) => {
+  const job = store.getOwned(c.req.valid("param").jobId, c.get("userId"));
+  if (!job)
+    return c.json(
+      { error: { code: "NOT_FOUND", message: "导入任务不存在", retryable: false, requestId: crypto.randomUUID() } },
+      404,
+    );
+  return c.json(job, 200);
 });
 
 app.doc("/openapi.json", {

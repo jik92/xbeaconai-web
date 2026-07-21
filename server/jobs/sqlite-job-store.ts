@@ -1,9 +1,8 @@
 import { and, asc, desc, eq, inArray, lte } from "drizzle-orm";
-import type { ModuleId } from "../../web/entities/types";
 import { type AppDatabase, openDatabase } from "../db/database";
 import { creditCharges, jobs, objectCleanup, users } from "../db/schema";
 import { env } from "../env";
-import type { JobRecord } from "../types";
+import type { JobModuleId, JobRecord } from "../types";
 
 type JobRow = typeof jobs.$inferSelect;
 export class InsufficientCreditsError extends Error {}
@@ -165,7 +164,7 @@ export class SqliteJobStore {
     return row ? this.fromRow(row) : undefined;
   }
 
-  list(ownerUserId: string, moduleId?: ModuleId): JobRecord[] {
+  list(ownerUserId: string, moduleId?: JobModuleId): JobRecord[] {
     const condition = moduleId
       ? and(eq(jobs.ownerUserId, ownerUserId), eq(jobs.moduleId, moduleId))
       : eq(jobs.ownerUserId, ownerUserId);

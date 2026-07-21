@@ -622,3 +622,47 @@ export async function downloadAuthenticated(url: string, name: string) {
   link.click();
   setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
 }
+
+// ── Share content import (multi-platform) ──────────────────────────────
+
+export interface ShareCandidate {
+  raw: string;
+  platformId: string;
+  confidence: "high" | "medium" | "low";
+  label: string;
+}
+
+export async function parseShareContent(text: string): Promise<ShareCandidate[]> {
+  configure();
+  const response = await fetch(apiUrl("/api/imports/share-content/parse"), {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+  if (!response.ok) throw new Error("内容解析失败");
+  const body = (await response.json()) as { candidates: ShareCandidate[] };
+  return body.candidates ?? [];
+}
+
+export async function createShareImport(candidate: ShareCandidate, folderId: string): Promise<Job> {
+  configure();
+  const response = await fetch(apiUrl("/api/imports/share-content"), {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ candidate, folderId }),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error((body as { error?: { message?: string } }).error?.message ?? "创建导入任务失败");
+  }
+  return (await response.json()) as Job;
+}
+
+export async function fetchShareImport(jobId: string): Promise<Job> {
+  configure();
+  const response = await fetch(apiUrl(`/api/imports/share-content/${jobId}`), {
+    headers: authHeaders(),
+  });
+  if (!response.ok) throw new Error("导入任务不存在");
+  return (await response.json()) as Job;
+}

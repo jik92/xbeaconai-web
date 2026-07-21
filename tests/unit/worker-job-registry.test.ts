@@ -48,6 +48,15 @@ describe("worker job registry", () => {
     expect(findJobHandler(job("voice-clone")).name).toBe("voice-clone");
     expect(findJobHandler(job("ad-script")).name).toBe("ad-script");
     expect(findJobHandler(job("ai-generate")).name).toBe("generic-creation");
+    expect(findJobHandler(job("douyin-video-import")).name).toBe("share-content-import");
+    expect(findJobHandler(job("share-content-import")).name).toBe("share-content-import");
+  });
+
+  test("share-content-import handler is registered before generic fallback", () => {
+    const index = jobHandlers.findIndex((h) => h.name === "share-content-import");
+    const fallbackIndex = jobHandlers.findIndex((h) => h.name === "generic-creation");
+    expect(index).toBeGreaterThanOrEqual(0);
+    expect(index).toBeLessThan(fallbackIndex);
   });
 
   test("keeps the generic fallback last so dedicated handlers take precedence", () => {

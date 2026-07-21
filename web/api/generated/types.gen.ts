@@ -60,7 +60,7 @@ export type AssetKind = 'media' | 'product' | 'portrait' | 'voice';
 
 export type Job = {
     id: string;
-    moduleId: ModuleId;
+    moduleId: JobModuleId;
     title: string;
     status: 'queued' | 'processing' | 'succeeded' | 'partially_succeeded' | 'failed' | 'cancelled';
     progress: number;
@@ -143,7 +143,7 @@ export type Job = {
     updatedAt: string;
 };
 
-export type ModuleId = 'video-remix' | 'video-create' | 'ad-script' | 'ai-generate' | 'video-cut' | 'media-understand' | 'video-mashup' | 'voice-clone' | 'video-renewal' | 'subtitle-erase' | 'video-enhancement' | 'kickart';
+export type JobModuleId = 'video-remix' | 'video-create' | 'ad-script' | 'ai-generate' | 'video-cut' | 'media-understand' | 'video-mashup' | 'voice-clone' | 'video-renewal' | 'subtitle-erase' | 'video-enhancement' | 'kickart' | 'douyin-video-import' | 'share-content-import';
 
 export type SeedanceModelId = 'doubao-seedance-2-0-260128' | 'doubao-seedance-2-0-mini-260615' | 'doubao-seedance-2-0-fast-260128';
 
@@ -347,6 +347,21 @@ export type VideoCreateRecommendation = {
     segmentCount: number;
     requirements: string;
     scriptStyle: string;
+};
+
+export type ModuleId = 'video-remix' | 'video-create' | 'ad-script' | 'ai-generate' | 'video-cut' | 'media-understand' | 'video-mashup' | 'voice-clone' | 'video-renewal' | 'subtitle-erase' | 'video-enhancement' | 'kickart';
+
+export type ShareParseResult = {
+    candidates: Array<{
+        raw: string;
+        platformId: string;
+        confidence: 'high' | 'medium' | 'low';
+        label: string;
+    }>;
+};
+
+export type ShareImportJob = Job & {
+    [key: string]: unknown;
 };
 
 export type GetHealthData = {
@@ -1185,7 +1200,7 @@ export type ListJobsData = {
     body?: never;
     path?: never;
     query?: {
-        moduleId?: ModuleId;
+        moduleId?: JobModuleId;
     };
     url: '/api/jobs';
 };
@@ -1893,3 +1908,85 @@ export type DownloadArtifactResponses = {
 };
 
 export type DownloadArtifactResponse = DownloadArtifactResponses[keyof DownloadArtifactResponses];
+
+export type ParseShareContentData = {
+    body: {
+        text: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/imports/share-content/parse';
+};
+
+export type ParseShareContentResponses = {
+    /**
+     * Parsed candidates
+     */
+    200: ShareParseResult;
+};
+
+export type ParseShareContentResponse = ParseShareContentResponses[keyof ParseShareContentResponses];
+
+export type CreateShareImportData = {
+    body: {
+        candidate: {
+            raw: string;
+            platformId: string;
+            confidence: 'high' | 'medium' | 'low';
+            label: string;
+        };
+        folderId: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/imports/share-content';
+};
+
+export type CreateShareImportErrors = {
+    /**
+     * Invalid candidate or folder
+     */
+    400: ApiErrorResponse;
+    /**
+     * Platform not supported for download
+     */
+    422: ApiErrorResponse;
+};
+
+export type CreateShareImportError = CreateShareImportErrors[keyof CreateShareImportErrors];
+
+export type CreateShareImportResponses = {
+    /**
+     * Import job created
+     */
+    202: ShareImportJob;
+};
+
+export type CreateShareImportResponse = CreateShareImportResponses[keyof CreateShareImportResponses];
+
+export type GetShareImportData = {
+    body?: never;
+    path: {
+        jobId: string;
+    };
+    query?: never;
+    url: '/api/imports/share-content/{jobId}';
+};
+
+export type GetShareImportErrors = {
+    /**
+     * Not found
+     */
+    404: ApiErrorResponse;
+};
+
+export type GetShareImportError = GetShareImportErrors[keyof GetShareImportErrors];
+
+export type GetShareImportResponses = {
+    /**
+     * Import job
+     */
+    200: ShareImportJob;
+};
+
+export type GetShareImportResponse = GetShareImportResponses[keyof GetShareImportResponses];

@@ -13,5 +13,15 @@ export function openDatabase(path: string) {
   client.run("PRAGMA foreign_keys=ON");
   const db = drizzle({ client, schema });
   migrate(db, { migrationsFolder: resolve(import.meta.dir, "../../drizzle") });
+
+  // Forward repair: ensure default_asset_folder_id exists for databases
+  // created before this column was added to the initial migration.
+  const cols = client.query("PRAGMA table_info(user_preferences)").all() as Array<{ name: string }>;
+  if (!cols.some((c) => c.name === "default_asset_folder_id")) {
+    client.run(
+      "ALTER TABLE user_preferences ADD COLUMN default_asset_folder_id TEXT REFERENCES asset_folders(id)",
+    );
+  }
+
   return { client, db };
 }
