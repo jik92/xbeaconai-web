@@ -1,22 +1,24 @@
-# 曜作 AI 创作工作台
+# 烽火 AI 创作工作台
 
-本地优先的 AI 创作应用：React Web、Hono OpenAPI、SQLite 任务存储、BullMQ/Redis 异步队列、独立 Worker、SSE 进度，以及自动生成的 TypeScript SDK。
+React Web、Hono API、SQLite、BullMQ/Redis 和独立 Worker 组成的本地优先 AI 创作应用。
 
-## 已实现
+> 本文件是项目知识库入口。开始任何开发任务时先读本页，再按任务类型进入 `docs/`；不要一次性读取全部文档。
 
-- 创作工作流：爆款二创、一键成片、口播脚本
-- AI 工具箱：AI 创作、视频分割、素材理解、视频混剪、音色克隆、视频修复、字幕擦除、画质增强、爆款裂变
-- 图片、视频、音频与多素材真实上传
-- SQLite 任务持久化、进程恢复、取消、重试、幂等提交和部分成功
-- SQLite 多账号、JWT 登录、注册、个人资料、密码和用户资源隔离
-- 偏好设置、通知中心与本地 Mock 充值订单/余额完整链路
-- 真实模型、FFmpeg 本地处理与显式 Mock 的逐阶段来源标记
-- 可播放/查看/下载的结果文件
-- OpenAPI 文档及 Hey API 生成的 TypeScript、Zod、TanStack Query SDK
-- Seedance 2.0、Mini、Fast 三模型目录与显式选择；Wan 已从新任务路径移除
-- 火山引擎 TOS 私有素材中转、流式分片上传、签名读取和终态清理
+## 按任务路由知识
 
-## 本地开发
+| 你要做什么 | 先读 | 按需继续读 |
+| --- | --- | --- |
+| 了解项目或启动开发环境 | [docs/project/overview.md](docs/project/overview.md) | [本地开发](docs/project/getting-started.md)、[架构](docs/project/architecture.md) |
+| 新增或改造功能 | [docs/features/README.md](docs/features/README.md) | [功能地图](docs/project/feature-map.md)、相关 `docs/plans/`、目标 Feature/Job 文档 |
+| 改 API、数据、上传或鉴权 | [架构](docs/project/architecture.md) | 相关 Store/API 源码、功能文档 |
+| 新增、维护或排查异步 Job | [Worker 索引](docs/worker/README.md) | [Job 索引](docs/worker/jobs/README.md) 中对应 Handler 文档 |
+| 修复 Bug | [docs/bugs/README.md](docs/bugs/README.md) | 受影响功能、Worker/API 文档和已有 Bug 档案 |
+| 音色克隆 | [音色克隆专题](docs/voice-clone-development.md) | [voice-clone Job](docs/worker/jobs/voice-clone.md) |
+| 查阶段性设计或实施决策 | [docs/plans/](docs/plans/) | 与当前代码核对，长期事实以 `docs/project/` 为准 |
+
+完整文档导航在 [docs/README.md](docs/README.md)。
+
+## 最小启动与验证
 
 ```bash
 bun install
@@ -25,79 +27,14 @@ make run-server
 make run-worker
 ```
 
-也可以使用项目统一命令：
+也可使用 `make run-dev`。Web：`http://127.0.0.1:5173`；API/OpenAPI：`http://127.0.0.1:8787`、`/openapi.json`。
 
-```bash
-make run-dev
-make run-server
-make run-worker
-make lint
-make test
-make ci
-```
+常用验证：`make ci`、`bun run typecheck`、`bun run build`、`bun run e2e`。配置项以 `.env.example` 为准；不要提交或回显密钥。
 
-`make ci` 会执行 Biome 格式/静态检查和单元测试；它不运行需要外部密钥、
-TOS 或 FFmpeg 的专项能力测试。完整验证中的类型检查和生产构建仍可单独运行。
+## 不可跨越的边界
 
-访问 `http://127.0.0.1:5173`。API 与 OpenAPI 默认位于 `http://127.0.0.1:8787`。
+- `web/` 只负责 UI 和 API SDK 调用；`server/` 只处理 HTTP、鉴权、持久化和任务投递；`worker/` 执行异步业务并回写 SQLite。
+- 任务消息仅使用 `shared/jobs/queue-contract.ts`，持久化状态以 SQLite 为准；不要以进程内 Promise、Map 或 Server 后台任务替代 BullMQ。
+- 每个专用 Job 都是 `worker/jobs/job-*.ts` 中的独立 Handler；其阶段/输出定义在 `worker/jobs/definitions/<module>.ts`。新增或修改 Job 必须更新对应的 Worker 文档。
+- `web/api/generated/`、`openapi/openapi.json` 和 `drizzle/meta/` 是生成物，不能手改。
 
-Redis 默认连接 `redis://127.0.0.1:6379`，可通过 `.env` 中的 `REDIS_URL`、
-`REDIS_QUEUE_NAME` 和 `WORKER_CONCURRENCY` 调整。`run-server` 负责启动 Web/API 并投递任务，
-`run-worker` 独立消费任务、执行任务并回写同一个 SQLite 数据库。`run-dev` 会同时启动三者。
-Worker 的入口和任务执行代码位于根目录 `worker/`，与 `server/` 分开维护；两边只共享
-`shared/jobs/queue-contract.ts` 中的 BullMQ 消息契约。
-
-也可以分别运行：
-
-```bash
-bun run dev:api
-bun run dev:worker
-bun run dev
-```
-
-## 生产方式启动
-
-```bash
-bun run build
-cp .env.example .env
-# 编辑 .env，至少设置一个随机且足够长的 JWT_SECRET
-bun run start
-# 另开进程
-bun run worker
-```
-
-访问 `http://127.0.0.1:8787`。服务默认只绑定回环地址，不对公网暴露。
-
-JWT 保存在浏览器 `localStorage` 中；请勿在页面中注入不受信任的脚本。生产启动会拒绝缺失 `JWT_SECRET` 的配置。充值功能明确为本地 Mock，不会产生真实扣款。
-
-## SDK 与能力实测
-
-```bash
-bun run test:models
-bun run test:tos
-bun run test:ffmpeg
-bun run api:spec
-bun run api:generate
-```
-
-模型和 FFmpeg 只有在本机能力报告通过后才会进入真实/本地执行计划。Seedance 视频任务不会在失败后切换模型、回退 Wan 或静默 Mock；测试替身只在 `FORCE_MOCK=true` 的端到端环境启用。
-
-Seedance 多模态参考还要求 `.env` 中配置 `TOS_ACCESS_KEY_ID`、`TOS_SECRET_ACCESS_KEY`、`TOS_REGION`、`TOS_ENDPOINT` 和私有 `TOS_BUCKET`。运行 `bun run test:tos` 会真实验证上传、Head、签名读取、未签名拒绝、删除和中断清理；任何一项失败都不能视为生产就绪。
-
-生成物：
-
-- OpenAPI：`openapi/openapi.json`
-- TypeScript SDK：`web/api/generated/`
-- 本机测试证据：`artifacts/api-tests/`（不提交 Git）
-- 能力门禁：`.data/capabilities.json`、`.data/ffmpeg-capabilities.json`（不提交 Git）
-
-## 完整验证
-
-```bash
-bun run typecheck
-bun test tests/unit
-bun run build
-bun run e2e
-```
-
-当前真实接口和 Mock 边界见 `docs/api-capability-report.md`。
