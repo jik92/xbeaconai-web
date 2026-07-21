@@ -85,6 +85,19 @@
   gap: 9px;
   color: #292524;
 }
+.utility-job-status {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.utility-job-status small {
+  overflow: hidden;
+  color: #b42318;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .utility-job-head {
   min-height: 42px;
   color: #777169;

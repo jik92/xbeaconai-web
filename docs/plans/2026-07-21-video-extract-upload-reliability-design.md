@@ -6,8 +6,8 @@
 
 ## 方案
 
-- 视频提取保存素材时改用 TOS `putObjectFromFile` 单对象上传，保留私有 ACL、AES256 服务端加密和进度回调。
-- 在共享 TOS 工具中提供明确的单对象上传模式，仅由视频提取启用，避免无意改变其他任务的 multipart 行为。
+- TOS SDK 的 `putObjectFromFile` 在 Bun 的 `node:http` 兼容层中上传超过约 1MB 的请求体会超时，因此只让 SDK 创建 AES256 multipart、生成分片预签名 URL、完成合并和执行对象校验。
+- 每个分片由系统 `curl` 上传，避开 SDK 的 Axios/Bun HTTP 传输路径；该模式仅由视频提取启用，不改变其他任务。
 - 上传进度只在整数百分比发生变化时回写任务，减少同步 SQLite 写入频率。
 - 失败任务页面展示后端保存的真实错误消息，同时保留统一失败状态。
 - 真实验证必须覆盖：BullMQ 入队、Worker 消费、下载、ffprobe、TOS 上传、素材记录创建和任务成功回写。

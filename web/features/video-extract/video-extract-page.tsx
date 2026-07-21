@@ -52,7 +52,10 @@ export function VideoExtractPage() {
               <Download size={16} />
               {job.title}
             </span>
-            <span>{job.stage}</span>
+            <span className="utility-job-status">
+              <span>{job.stage}</span>
+              {job.error?.message && <small title={job.error.message}>{job.error.message}</small>}
+            </span>
             <span>{job.progress}%</span>
             <time>{new Date(job.createdAt).toLocaleString()}</time>
           </div>

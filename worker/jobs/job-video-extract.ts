@@ -179,13 +179,16 @@ export const videoExtractJob: WorkerJobHandler = {
       const assetId = crypto.randomUUID();
       const storageKey = `${folder.storagePrefix}generated/${job.id}/${safeName}`;
       context.change(job.id, { stage: "正在保存到素材库", progress: 78 });
-      await ossutils.putLibraryFile({
+      let lastUploadPercent = -1;
+      await ossutils.putLibraryFileViaCurl({
         filePath: outputPath,
         key: storageKey,
         mimeType: "video/mp4",
         sizeBytes: file.size,
         onProgress: (percent) => {
           const uploadPercent = Math.max(0, Math.min(100, Math.round(percent * 100)));
+          if (uploadPercent === lastUploadPercent) return;
+          lastUploadPercent = uploadPercent;
           context.change(job.id, {
             stage: `正在保存到素材库 ${uploadPercent}%`,
             progress: Math.min(99, Math.round(78 + percent * 21)),
