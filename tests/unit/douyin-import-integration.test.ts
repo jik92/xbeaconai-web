@@ -14,13 +14,29 @@ const tempDirs: string[] = [];
 
 function cleanup() {
   for (const db of databases) {
-    try { rmSync(db, { force: true }); } catch { /* ok */ }
-    try { rmSync(`${db}-wal`, { force: true }); } catch { /* ok */ }
-    try { rmSync(`${db}-shm`, { force: true }); } catch { /* ok */ }
+    try {
+      rmSync(db, { force: true });
+    } catch {
+      /* ok */
+    }
+    try {
+      rmSync(`${db}-wal`, { force: true });
+    } catch {
+      /* ok */
+    }
+    try {
+      rmSync(`${db}-shm`, { force: true });
+    } catch {
+      /* ok */
+    }
   }
   databases.length = 0;
   for (const dir of tempDirs) {
-    try { rmSync(dir, { recursive: true, force: true }); } catch { /* ok */ }
+    try {
+      rmSync(dir, { recursive: true, force: true });
+    } catch {
+      /* ok */
+    }
   }
   tempDirs.length = 0;
 }
@@ -42,11 +58,7 @@ function makeStoreAndAccounts(): { store: SqliteJobStore; accounts: AccountStore
   return { store, accounts };
 }
 
-function makeJob(
-  ownerUserId: string,
-  folderId: string,
-  overrides: Partial<JobRecord> = {},
-): JobRecord {
+function makeJob(ownerUserId: string, folderId: string, overrides: Partial<JobRecord> = {}): JobRecord {
   const ts = new Date().toISOString();
   return {
     id: crypto.randomUUID(),
@@ -132,10 +144,7 @@ describe("douyin import integration", () => {
     const job = makeJob(userId, folderId);
     store.create(job);
 
-    await douyinVideoImportJob.execute(
-      job,
-      makeContext(store, accounts, mockDownload(2048)),
-    );
+    await douyinVideoImportJob.execute(job, makeContext(store, accounts, mockDownload(2048)));
 
     const updated = store.get(job.id);
     expect(updated?.status).toBe("succeeded");
@@ -177,10 +186,7 @@ describe("douyin import integration", () => {
       throw new Error("Simulated download failure");
     };
 
-    await douyinVideoImportJob.execute(
-      job,
-      makeContext(store, accounts, failingDownload),
-    );
+    await douyinVideoImportJob.execute(job, makeContext(store, accounts, failingDownload));
 
     const updated = store.get(job.id);
     expect(updated?.status).toBe("failed");
@@ -205,10 +211,7 @@ describe("douyin import integration", () => {
       return { filePath, tempDir: dir, mimeType: "video/mp4", byteSize: 4096 };
     };
 
-    await douyinVideoImportJob.execute(
-      job,
-      makeContext(store, accounts, trackingDownload),
-    );
+    await douyinVideoImportJob.execute(job, makeContext(store, accounts, trackingDownload));
 
     const updated = store.get(job.id);
     expect(updated?.status).toBe("succeeded");
@@ -234,9 +237,7 @@ describe("douyin import integration", () => {
 
     // The handler should throw because the folder doesn't belong to the job owner
     // (folder ownership check happens before the try/catch, so the error propagates)
-    await expect(
-      douyinVideoImportJob.execute(job, makeContext(store, accounts)),
-    ).rejects.toThrow("文件夹");
+    await expect(douyinVideoImportJob.execute(job, makeContext(store, accounts))).rejects.toThrow("文件夹");
   });
 
   test("idempotent: same URL + same folder → single job", () => {

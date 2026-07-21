@@ -54,7 +54,11 @@ describe("cleanupDownloadDir", () => {
   const created: string[] = [];
   afterEach(() => {
     for (const dir of created) {
-      try { cleanupDownloadDir(dir); } catch { /* already cleaned */ }
+      try {
+        cleanupDownloadDir(dir);
+      } catch {
+        /* already cleaned */
+      }
     }
   });
 
@@ -97,8 +101,7 @@ describe("cleanupDownloadDir", () => {
 
 describe("downloadDouyinVideo failure cleanup", () => {
   test("cleans up temp directory on invalid URL without leaving artifacts", async () => {
-    const before = readdirSync(tmpdir())
-      .filter((d) => d.startsWith("dy-import-")).length;
+    const before = readdirSync(tmpdir()).filter((d) => d.startsWith("dy-import-")).length;
 
     // URL validation happens before playwright import — should fail fast
     try {
@@ -108,8 +111,7 @@ describe("downloadDouyinVideo failure cleanup", () => {
       expect((err as DouyinDownloadError).reason).toBe("invalid_url");
     }
 
-    const after = readdirSync(tmpdir())
-      .filter((d) => d.startsWith("dy-import-")).length;
+    const after = readdirSync(tmpdir()).filter((d) => d.startsWith("dy-import-")).length;
     expect(after).toBe(before);
   });
 
@@ -117,8 +119,7 @@ describe("downloadDouyinVideo failure cleanup", () => {
     // This test verifies that even when playwright is installed but
     // the download ultimately fails, the temp dir is cleaned up.
     // Use a very short timeout so browser operations fail quickly.
-    const before = readdirSync(tmpdir())
-      .filter((d) => d.startsWith("dy-import-")).length;
+    const before = readdirSync(tmpdir()).filter((d) => d.startsWith("dy-import-")).length;
 
     try {
       await downloadDouyinVideo("https://v.douyin.com/test123/", 500);
@@ -129,8 +130,7 @@ describe("downloadDouyinVideo failure cleanup", () => {
       expect(["config_error", "download_failed"]).toContain(de.reason);
     }
 
-    const after = readdirSync(tmpdir())
-      .filter((d) => d.startsWith("dy-import-")).length;
+    const after = readdirSync(tmpdir()).filter((d) => d.startsWith("dy-import-")).length;
     // Temp dir must be cleaned up regardless of failure reason
     expect(after).toBe(before);
   });

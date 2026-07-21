@@ -28,9 +28,21 @@ afterAll(() => {
   realQueue.enqueue = originalEnqueue;
   realAccounts.close();
   realStore.close();
-  try { rmSync(testDataDir, { recursive: true, force: true }); } catch { /* ok */ }
-  try { rmSync(`${testDataDir}-wal`, { force: true }); } catch { /* ok */ }
-  try { rmSync(`${testDataDir}-shm`, { force: true }); } catch { /* ok */ }
+  try {
+    rmSync(testDataDir, { recursive: true, force: true });
+  } catch {
+    /* ok */
+  }
+  try {
+    rmSync(`${testDataDir}-wal`, { force: true });
+  } catch {
+    /* ok */
+  }
+  try {
+    rmSync(`${testDataDir}-shm`, { force: true });
+  } catch {
+    /* ok */
+  }
 });
 
 describe("douyin API integration (isolated DB)", () => {

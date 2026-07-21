@@ -108,11 +108,7 @@ export const douyinVideoImportJob: WorkerJobHandler = {
         }
         const hasVideo = probe.streams.some((s) => s.codec_type === "video");
         if (!hasVideo) {
-          throw new DouyinDownloadError(
-            "下载的文件不包含视频流，可能不是有效视频",
-            false,
-            "download_failed",
-          );
+          throw new DouyinDownloadError("下载的文件不包含视频流，可能不是有效视频", false, "download_failed");
         }
       }
 

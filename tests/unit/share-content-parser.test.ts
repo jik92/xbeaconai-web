@@ -89,8 +89,7 @@ describe("ShareContentParser", () => {
 
   describe("multi-platform", () => {
     test("extracts multiple candidates from mixed text", () => {
-      const text =
-        "抖音: https://v.douyin.com/abc/ 快手: https://v.kuaishou.com/def YouTube: https://youtu.be/ghi";
+      const text = "抖音: https://v.douyin.com/abc/ 快手: https://v.kuaishou.com/def YouTube: https://youtu.be/ghi";
       const result = parser.parse(text);
       const platforms = new Set(result.map((c) => c.platformId));
       expect(platforms.has("douyin")).toBe(true);
@@ -103,9 +102,7 @@ describe("ShareContentParser", () => {
       const result = parser.parse(text);
       for (let i = 1; i < result.length; i++) {
         const order = { high: 0, medium: 1, low: 2 };
-        expect(
-          order[result[i - 1].confidence] <= order[result[i].confidence],
-        ).toBe(true);
+        expect(order[result[i - 1].confidence] <= order[result[i].confidence]).toBe(true);
       }
     });
   });

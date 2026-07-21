@@ -9,9 +9,21 @@ const tempPaths: string[] = [];
 
 afterEach(() => {
   for (const p of tempPaths.splice(0)) {
-    try { rmSync(p, { force: true }); } catch { /* ok */ }
-    try { rmSync(`${p}-wal`, { force: true }); } catch { /* ok */ }
-    try { rmSync(`${p}-shm`, { force: true }); } catch { /* ok */ }
+    try {
+      rmSync(p, { force: true });
+    } catch {
+      /* ok */
+    }
+    try {
+      rmSync(`${p}-wal`, { force: true });
+    } catch {
+      /* ok */
+    }
+    try {
+      rmSync(`${p}-shm`, { force: true });
+    } catch {
+      /* ok */
+    }
   }
 });
 
@@ -73,7 +85,10 @@ describe("database migration", () => {
     // Insert test data
     const userId = crypto.randomUUID();
     const now = new Date().toISOString();
-    client.run("INSERT INTO users (id, email, password_hash, display_name, avatar_text, created_at, updated_at) VALUES (?, 'test@example.com', 'hash', 'Test', 'T', ?, ?)", [userId, now, now]);
+    client.run(
+      "INSERT INTO users (id, email, password_hash, display_name, avatar_text, created_at, updated_at) VALUES (?, 'test@example.com', 'hash', 'Test', 'T', ?, ?)",
+      [userId, now, now],
+    );
     client.run("INSERT INTO user_preferences (user_id, updated_at) VALUES (?, ?)", [userId, now]);
 
     // Verify column does NOT exist before repair
@@ -91,7 +106,9 @@ describe("database migration", () => {
     expect(afterCols.has("default_asset_folder_id")).toBe(true);
 
     // Verify existing data is intact
-    const row = conn.client.query("SELECT user_id, theme, default_ratio FROM user_preferences WHERE user_id = ?").get(userId) as Record<string, unknown>;
+    const row = conn.client
+      .query("SELECT user_id, theme, default_ratio FROM user_preferences WHERE user_id = ?")
+      .get(userId) as Record<string, unknown>;
     expect(row.user_id).toBe(userId);
     expect(row.theme).toBe("system");
     expect(row.default_ratio).toBe("9:16");
