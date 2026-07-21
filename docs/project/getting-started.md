@@ -38,10 +38,12 @@ make run-worker
 
 模型、TOS、FFmpeg、语音专项命令可能消耗配额或依赖本机环境，非普通改动的默认验证。
 
+Playwright 覆盖 `1440x900` Desktop 与 `1024x768` Tablet。修改路由、任务状态、关键表单或共享布局时应运行相关 E2E；外部能力未运行时，交付中说明原因。
+
 ## 本地数据
 
 - SQLite 默认在 `.data/yaozuo.sqlite`；用 `YAOZUO_DATA_DIR` 或 `YAOZUO_DATABASE_URL` 隔离数据。
 - 上传暂存与本地结果为 `.data/uploads/`、`.data/results/`。
 - Redis 队列默认 `yaozuo-jobs`，并发由 `WORKER_CONCURRENCY` 设置。
 - 任务持续排队时优先检查 Redis 与 Worker；生产启动失败时检查 `JWT_SECRET`。
-
+- Server 与 Worker 并发访问同一个 SQLite；测试应使用独立数据目录，不能复用生产数据库。

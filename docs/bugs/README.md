@@ -8,7 +8,8 @@
 | --- | --- | --- | --- | --- | --- |
 | — | 暂无登记问题 | — | — | — | — |
 
-状态为 `open`、`investigating`、`fixing`、`fixed`、`verified`、`wont-fix` 或 `duplicate`。严重度：`P0` 系统/安全事故，`P1` 核心流程不可用，`P2` 有限范围异常，`P3` 轻微体验问题。
+状态为 `open`、`investigating`、`fixing`、`fixed`、`verified`、`wont-fix` 或 `duplicate`。严重度：`P0` 系统不可用或安全事故，`P1` 核心流程不可用且无可接受绕过，`P2` 有限范围异常，`P3` 轻微体验问题。
 
 复制 `_template.md` 创建 `BUG-0001-short-name.md`。修复前记录现象、环境、复现与证据；修复后补充根因、改动、验证、回归和防复发措施，并更新本索引。
 
+若宿主或项目规则已绑定 ACP，可关联独立任务记录；Bug 文档保留问题与方案，不重复保存执行事件和原始证据。
