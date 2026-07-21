@@ -2,6 +2,7 @@ import {
   AudioLines,
   BadgeCheck,
   Clapperboard,
+  Download,
   Eraser,
   FileText,
   Film,
@@ -11,6 +12,7 @@ import {
   Scissors,
   Shuffle,
   Sparkles,
+  Video,
   Wrench,
 } from "lucide-react";
 import type { ModuleId } from "@/entities/types";
@@ -63,7 +65,7 @@ export interface ModuleConfig {
   id: ModuleId;
   path: string;
   label: string;
-  group: "创作工作流" | "AI 工具箱";
+  group: "创作工作流" | "AI 工具箱" | "实用工具";
   icon: LucideIcon;
   eyebrow: string;
   description: string;
@@ -78,6 +80,38 @@ export interface ModuleConfig {
 
 const module = (config: ModuleConfig) => config;
 export const modules: ModuleConfig[] = [
+  module({
+    id: "video-extract",
+    path: "/utilities/video-extract",
+    label: "视频提取",
+    group: "实用工具",
+    icon: Download,
+    eyebrow: "公开视频保存",
+    description: "从视频直链或公开分享页提取视频，并保存到指定素材文件夹。",
+    steps: ["填写地址", "后台下载", "保存素材"],
+    fields: [],
+    action: "新建提取任务",
+    cost: 0,
+    duration: "取决于源站与文件大小",
+    result: { kind: "finished-video", label: "提取视频", actions: ["预览", "下载"] },
+    tips: ["仅支持公开且有权下载的内容"],
+  }),
+  module({
+    id: "video-editor",
+    path: "/utilities/video-editor",
+    label: "视频剪辑",
+    group: "实用工具",
+    icon: Video,
+    eyebrow: "Remotion 单轨编辑器",
+    description: "添加素材，完成切分、合并、删除和导出。",
+    steps: ["添加视频", "编辑时间线", "导出成片"],
+    fields: [],
+    action: "打开编辑器",
+    cost: 0,
+    duration: "取决于成片时长",
+    result: { kind: "finished-video", label: "剪辑视频", actions: ["预览", "下载"] },
+    tips: ["导出任务可在后台继续运行"],
+  }),
   module({
     id: "video-remix",
     path: "/aigc/video-remix",

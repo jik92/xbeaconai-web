@@ -1,12 +1,14 @@
 import type { ModuleId } from "@/entities/types";
 
 export type CreationWorkflowId = "video-remix" | "video-create" | "ad-script";
-export type AiToolboxId = Exclude<ModuleId, CreationWorkflowId>;
+export type UtilityId = "video-extract" | "video-editor";
+export type AiToolboxId = Exclude<ModuleId, CreationWorkflowId | UtilityId>;
 export type AssetFeatureId = "materials" | "portraits" | "products" | "voices";
 
 export interface MenuFeatureConfig {
   readonly creationWorkflow: Readonly<Record<CreationWorkflowId, boolean>>;
   readonly aiToolbox: Readonly<Record<AiToolboxId, boolean>>;
+  readonly utilities: Readonly<Record<UtilityId, boolean>>;
   readonly assets: Readonly<Record<AssetFeatureId, boolean>>;
 }
 
@@ -38,6 +40,10 @@ export const APP_CONFIG = {
       "video-enhancement": true,
       kickart: false,
     },
+    utilities: {
+      "video-extract": true,
+      "video-editor": true,
+    },
     assets: {
       materials: true,
       portraits: true,
@@ -60,10 +66,13 @@ const MODULE_GROUP = {
   "subtitle-erase": "aiToolbox",
   "video-enhancement": "aiToolbox",
   kickart: "aiToolbox",
-} as const satisfies Record<ModuleId, "creationWorkflow" | "aiToolbox">;
+  "video-extract": "utilities",
+  "video-editor": "utilities",
+} as const satisfies Record<ModuleId, "creationWorkflow" | "aiToolbox" | "utilities">;
 
 export function isModuleOpen(moduleId: ModuleId, config: PublicAppConfig = APP_CONFIG): boolean {
   const group = MODULE_GROUP[moduleId];
+  if (group === "utilities") return config.menuFeatures.utilities[moduleId as UtilityId];
   return group === "creationWorkflow"
     ? config.menuFeatures.creationWorkflow[moduleId as CreationWorkflowId]
     : config.menuFeatures.aiToolbox[moduleId as AiToolboxId];

@@ -70,6 +70,8 @@ describe("worker job registry", () => {
         "video-renewal",
         "subtitle-erase",
         "video-enhancement",
+        "video-extract",
+        "video-editor",
         "kickart",
       ].sort(),
     );

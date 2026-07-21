@@ -8,6 +8,8 @@ import { AssetLibrary } from "@/features/asset-library/asset-library";
 import { MediaUnderstandPage } from "@/features/media-understand/media-understand-page";
 import { PortraitLibrary } from "@/features/portrait-library/portrait-library";
 import { VideoCreatePage } from "@/features/video-create/video-create-page";
+import { VideoEditorPage } from "@/features/video-editor/video-editor-page";
+import { VideoExtractPage } from "@/features/video-extract/video-extract-page";
 import { RemixProject } from "@/features/video-remix/remix-project";
 import { isAssetOpen, isModuleOpen } from "./config";
 import { homeDestination, modules } from "./routes";
@@ -36,6 +38,10 @@ const moduleRoutes = modules.map((config) =>
         <AiGeneratePage />
       ) : config.id === "media-understand" ? (
         <MediaUnderstandPage />
+      ) : config.id === "video-extract" ? (
+        <VideoExtractPage />
+      ) : config.id === "video-editor" ? (
+        <VideoEditorPage />
       ) : (
         <ModulePage config={config} />
       ),

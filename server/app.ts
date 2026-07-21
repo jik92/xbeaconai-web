@@ -67,6 +67,8 @@ const moduleIds = [
   "video-renewal",
   "subtitle-erase",
   "video-enhancement",
+  "video-extract",
+  "video-editor",
   "kickart",
 ] as const;
 const ModuleSchema = z.enum(moduleIds).openapi("ModuleId");
@@ -2865,7 +2867,12 @@ app.openapi(createJobRoute, async (c) => {
         422,
       );
   }
-  if (moduleId === "video-cut" || (moduleId === "video-mashup" && jobValues.mergeMode === "video-cut-clips")) {
+  if (
+    moduleId === "video-cut" ||
+    moduleId === "video-extract" ||
+    moduleId === "video-editor" ||
+    (moduleId === "video-mashup" && jobValues.mergeMode === "video-cut-clips")
+  ) {
     const outputFolderId = jobValues.outputFolderId || accounts.getDefaultAssetFolderId(ownerUserId);
     if (!accounts.getAssetFolder(ownerUserId, outputFolderId))
       return c.json(
@@ -2881,6 +2888,24 @@ app.openapi(createJobRoute, async (c) => {
       );
     jobValues.outputFolderId = outputFolderId;
     jobValues.saveLocation = outputFolderId;
+  }
+  if (moduleId === "video-extract") {
+    try {
+      const url = new URL(jobValues.url ?? "");
+      if (!new Set(["http:", "https:"]).has(url.protocol)) throw new Error();
+    } catch {
+      return c.json(
+        {
+          error: {
+            code: "INVALID_VIDEO_URL",
+            message: "请输入有效的 HTTP 或 HTTPS 视频地址",
+            retryable: false,
+            requestId: crypto.randomUUID(),
+          },
+        },
+        422,
+      );
+    }
   }
   const needsVideoModel = moduleId === "video-remix" || (moduleId === "ai-generate" && body.values.type === "视频");
   let creationQuote = 0;

@@ -5,6 +5,8 @@ import { subtitleEraseJob, videoEnhancementJob } from "./job-mediakit-video";
 import { videoClipMergeJob } from "./job-video-clip-merge";
 import { videoCreateJob } from "./job-video-create";
 import { videoCutJob } from "./job-video-cut";
+import { videoEditorJob } from "./job-video-editor";
+import { videoExtractJob } from "./job-video-extract";
 import { videoRemixAnalysisJob } from "./job-video-remix-analysis";
 import { voiceCloneJob } from "./job-voice-clone";
 import type { WorkerJobHandler } from "./types";
@@ -15,6 +17,8 @@ export const jobHandlers: readonly WorkerJobHandler[] = [
   videoRemixAnalysisJob,
   videoClipMergeJob,
   videoCutJob,
+  videoExtractJob,
+  videoEditorJob,
   voiceCloneJob,
   subtitleEraseJob,
   videoEnhancementJob,

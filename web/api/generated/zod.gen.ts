@@ -77,6 +77,8 @@ export const zModuleId = z.enum([
     'video-renewal',
     'subtitle-erase',
     'video-enhancement',
+    'video-extract',
+    'video-editor',
     'kickart'
 ]);
 

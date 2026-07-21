@@ -49,7 +49,7 @@ export class OssUtils {
       endpoint: env.tos.endpoint,
       bucket: env.tos.bucket,
       secure: true,
-      requestTimeout: 120_000,
+      requestTimeout: 10 * 60_000,
       connectionTimeout: 15_000,
       maxRetryCount: 2,
     });
@@ -83,7 +83,13 @@ export class OssUtils {
     });
   }
 
-  async putLibraryFile(input: { filePath: string; key: string; mimeType: string; sizeBytes: number }) {
+  async putLibraryFile(input: {
+    filePath: string;
+    key: string;
+    mimeType: string;
+    sizeBytes: number;
+    onProgress?: (percent: number) => void;
+  }) {
     if (!this.configured) return;
     const release = await uploadGate.acquire(input.sizeBytes);
     try {
@@ -96,6 +102,7 @@ export class OssUtils {
         acl: TosClient.ACLType.ACLPrivate,
         contentType: input.mimeType,
         serverSideEncryption: "AES256",
+        progress: (percent) => input.onProgress?.(percent),
       });
     } finally {
       release();

@@ -36,8 +36,8 @@ import {
   toggleSidebarMenuItem,
 } from "./sidebar-menu-preferences";
 
-const SIDEBAR_MENU_STORAGE_KEY = "yaozuo:sidebar-menu:v1";
-const SIDEBAR_GROUPS = ["创作工作流", "AI 工具箱", "资产"] as const;
+const SIDEBAR_MENU_STORAGE_KEY = "yaozuo:sidebar-menu:v2";
+const SIDEBAR_GROUPS = ["创作工作流", "AI 工具箱", "实用工具", "资产"] as const;
 type SidebarGroup = (typeof SIDEBAR_GROUPS)[number];
 
 interface SidebarMenuItem {
@@ -62,6 +62,9 @@ const sidebarMenuItems: Record<SidebarGroup, SidebarMenuItem[]> = {
     .map((item) => ({ ...item, id: `module:${item.id}`, available: isModuleOpen(item.id) })),
   "AI 工具箱": modules
     .filter((item) => item.group === "AI 工具箱")
+    .map((item) => ({ ...item, id: `module:${item.id}`, available: isModuleOpen(item.id) })),
+  实用工具: modules
+    .filter((item) => item.group === "实用工具")
     .map((item) => ({ ...item, id: `module:${item.id}`, available: isModuleOpen(item.id) })),
   资产: ASSET_MENU_ITEMS.map((item) => ({
     ...item,
