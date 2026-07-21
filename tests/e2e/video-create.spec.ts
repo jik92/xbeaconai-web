@@ -45,6 +45,17 @@ test("edits the complete parameter panels and opens recoverable history", async 
   await page.getByRole("button", { name: /高级设置/ }).click();
   await page.getByRole("button", { name: "场景展示", exact: true }).click();
   await expect(page.getByText("视频模型")).toBeVisible();
+  const configScroll = page.locator(".vc-config-scroll");
+  const metrics = await configScroll.evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+  }));
+  expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight);
+  await configScroll.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
+  await expect.poll(() => configScroll.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  await expect(page.getByText("NEW PROJECT")).toBeInViewport();
+  await expect(page.getByRole("button", { name: /生成脚本/ })).toBeInViewport();
+  await expect(page.locator(".vc-advanced-field strong")).toBeInViewport();
   await page.getByRole("button", { name: /生成记录/ }).click();
   await expect(page.getByRole("heading", { name: "生成记录" })).toBeVisible();
   await expect(page.getByText("暂无生成记录")).toBeVisible();

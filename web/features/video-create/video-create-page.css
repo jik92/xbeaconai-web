@@ -7,7 +7,7 @@
   grid-template-columns: 390px minmax(0, 1fr);
   width: 100%;
   height: calc(100vh - 56px);
-  min-height: 680px;
+  min-height: 0;
   overflow: hidden;
   background: #f7f9fc;
   color: var(--vc-text);
@@ -23,8 +23,11 @@
 }
 .vc-config-panel {
   display: flex;
+  height: 100%;
   min-width: 0;
+  min-height: 0;
   flex-direction: column;
+  overflow: hidden;
   background: #f8faff;
   border-right: 1px solid var(--vc-line);
 }
@@ -60,7 +63,11 @@
 .vc-config-scroll {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
   padding: 18px 18px 30px;
 }
 .vc-field {
@@ -1048,6 +1055,13 @@ label.vc-field > span,
   .vc-config-panel,
   .vc-output-panel {
     min-height: calc(100vh - 56px);
+  }
+  .vc-config-panel {
+    height: auto;
+    overflow: visible;
+  }
+  .vc-config-scroll {
+    overflow: visible;
   }
   .vc-output-panel {
     border-top: 8px solid #eef2f7;
