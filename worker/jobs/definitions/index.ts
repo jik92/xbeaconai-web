@@ -1,4 +1,4 @@
-import type { ModuleId } from "../../../web/entities/types";
+import type { JobModuleId } from "../../../server/types";
 import { adScriptDefinition } from "./ad-script";
 import { aiGenerateDefinition } from "./ai-generate";
 import { kickartDefinition } from "./kickart";
@@ -32,6 +32,6 @@ const definitions = [
   kickartDefinition,
 ];
 
-export const jobDefinitions = Object.fromEntries(
+export const jobDefinitions: Partial<Record<JobModuleId, JobDefinition>> = Object.fromEntries(
   definitions.map((definition) => [definition.moduleId, definition]),
-) as Record<ModuleId, JobDefinition>;
+);

@@ -1,7 +1,6 @@
 import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import { index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
-import type { ModuleId } from "../../web/entities/types";
-import type { JobRecord, JobResult, JobStatus, StageProvenance } from "../types";
+import type { JobModuleId, JobRecord, JobResult, JobStatus, StageProvenance } from "../types";
 
 export const users = sqliteTable(
   "users",
@@ -193,7 +192,7 @@ export const jobs = sqliteTable(
   {
     id: text("id").primaryKey(),
     ownerUserId: text("owner_user_id"),
-    moduleId: text("module_id").$type<ModuleId>().notNull(),
+    moduleId: text("module_id").$type<JobModuleId>().notNull(),
     title: text("title").notNull(),
     status: text("status").$type<JobStatus>().notNull(),
     progress: integer("progress").notNull(),

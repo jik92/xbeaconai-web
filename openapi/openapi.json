@@ -289,7 +289,7 @@
             "type": "string"
           },
           "moduleId": {
-            "$ref": "#/components/schemas/ModuleId"
+            "$ref": "#/components/schemas/JobModuleId"
           },
           "title": {
             "type": "string"
@@ -651,6 +651,33 @@
           "jobSchemaVersion",
           "createdAt",
           "updatedAt"
+        ]
+      },
+      "JobModuleId": {
+        "type": "string",
+        "enum": [
+          "video-remix",
+          "video-create",
+          "ad-script",
+          "ai-generate",
+          "video-cut",
+          "media-understand",
+          "video-mashup",
+          "voice-clone",
+          "video-renewal",
+          "subtitle-erase",
+          "video-enhancement",
+          "kickart",
+          "douyin-video-import",
+          "share-content-import"
+        ]
+      },
+      "SeedanceModelId": {
+        "type": "string",
+        "enum": [
+          "doubao-seedance-2-0-260128",
+          "doubao-seedance-2-0-mini-260615",
+          "doubao-seedance-2-0-fast-260128"
         ]
       },
       "AdScriptProject": {
@@ -2034,6 +2061,73 @@
           "segmentCount",
           "requirements",
           "scriptStyle"
+        ]
+      },
+      "ModuleId": {
+        "type": "string",
+        "enum": [
+          "video-remix",
+          "video-create",
+          "ad-script",
+          "ai-generate",
+          "video-cut",
+          "media-understand",
+          "video-mashup",
+          "voice-clone",
+          "video-renewal",
+          "subtitle-erase",
+          "video-enhancement",
+          "kickart"
+        ]
+      },
+      "ShareParseResult": {
+        "type": "object",
+        "properties": {
+          "candidates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "raw": {
+                  "type": "string"
+                },
+                "platformId": {
+                  "type": "string"
+                },
+                "confidence": {
+                  "type": "string",
+                  "enum": [
+                    "high",
+                    "medium",
+                    "low"
+                  ]
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "raw",
+                "platformId",
+                "confidence",
+                "label"
+              ]
+            }
+          }
+        },
+        "required": [
+          "candidates"
+        ]
+      },
+      "ShareImportJob": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Job"
+          },
+          {
+            "type": "object",
+            "properties": {}
+          }
         ]
       }
     },
@@ -4548,7 +4642,7 @@
         "parameters": [
           {
             "schema": {
-              "$ref": "#/components/schemas/ModuleId"
+              "$ref": "#/components/schemas/JobModuleId"
             },
             "required": false,
             "name": "moduleId",
@@ -5883,6 +5977,166 @@
               "text/plain": {
                 "schema": {
                   "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/imports/share-content/parse": {
+      "post": {
+        "operationId": "parseShareContent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  }
+                },
+                "required": [
+                  "text"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Parsed candidates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareParseResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/imports/share-content": {
+      "post": {
+        "operationId": "createShareImport",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "candidate": {
+                    "type": "object",
+                    "properties": {
+                      "raw": {
+                        "type": "string"
+                      },
+                      "platformId": {
+                        "type": "string"
+                      },
+                      "confidence": {
+                        "type": "string",
+                        "enum": [
+                          "high",
+                          "medium",
+                          "low"
+                        ]
+                      },
+                      "label": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "raw",
+                      "platformId",
+                      "confidence",
+                      "label"
+                    ]
+                  },
+                  "folderId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "candidate",
+                  "folderId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Import job created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareImportJob"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid candidate or folder",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Platform not supported for download",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/imports/share-content/{jobId}": {
+      "get": {
+        "operationId": "getShareImport",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "jobId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Import job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareImportJob"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
             }

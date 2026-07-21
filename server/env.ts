@@ -27,6 +27,14 @@ export const env = {
   redisUrl: process.env.REDIS_URL ?? "redis://127.0.0.1:6379",
   redisQueueName: process.env.REDIS_QUEUE_NAME ?? "yaozuo-jobs",
   workerConcurrency: Math.max(1, Number(process.env.WORKER_CONCURRENCY ?? 2)),
+  // Local debugging only: set DOUYIN_BROWSER_HEADLESS=false to observe the
+  // browser, and optionally pause before the downloader proceeds.
+  douyinBrowserHeadless: process.env.DOUYIN_BROWSER_HEADLESS !== "false",
+  douyinBrowserDebugPauseMs: Math.min(300_000, Math.max(0, Number(process.env.DOUYIN_BROWSER_DEBUG_PAUSE_MS ?? 0))),
+  douyinLoginGuidanceWaitMs: Math.min(
+    120_000,
+    Math.max(0, Number(process.env.DOUYIN_LOGIN_GUIDANCE_WAIT_MS ?? 30_000)),
+  ),
   openaiBaseUrl: APP_CONFIG.providerDefaults.openai.baseUrl,
   videoAnalysisModel: APP_CONFIG.providerDefaults.openai.videoAnalysisModel,
   volcSpeech: APP_CONFIG.providerDefaults.volcSpeech,

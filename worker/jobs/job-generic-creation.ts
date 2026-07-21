@@ -6,7 +6,6 @@ import { isSeedanceModelId, type SeedanceModelId } from "../../server/models/vid
 import { aihubmix } from "../../server/providers/aihubmix";
 import type { JobRecord, JobResult, StageProvenance } from "../../server/types";
 import { APP_CONFIG } from "../../web/app/config";
-import type { ModuleId } from "../../web/entities/types";
 import { jobDefinitions } from "./definitions";
 import { SeedanceFlowError, SeedanceVideoJob } from "./job-seedance-video";
 import type { WorkerJobHandler } from "./types";
@@ -53,9 +52,9 @@ function overallMode(provenance: StageProvenance[], artifacts: ArtifactDraft[]):
   return modes.size === 1 ? [...modes][0] : "mixed";
 }
 
-export const stageMap = Object.fromEntries(
+export const stageMap: Record<string, Array<[string, string]>> = Object.fromEntries(
   Object.entries(jobDefinitions).map(([moduleId, definition]) => [moduleId, definition.stages]),
-) as Record<ModuleId, Array<[string, string]>>;
+);
 
 const textCapabilities = new Set([
   "text-generate",
@@ -80,7 +79,7 @@ for (const file of ["capabilities.json", "ffmpeg-capabilities.json"])
   }
 
 export function buildExecutionPlan(
-  moduleId: ModuleId,
+  moduleId: string,
   values: Record<string, string>,
   videoModel?: SeedanceModelId,
 ): StageProvenance[] {
@@ -175,6 +174,7 @@ export const genericCreationJob: WorkerJobHandler = {
       return;
     }
     const definition = jobDefinitions[job.moduleId];
+    if (!definition) throw new Error(`没有 ${job.moduleId} 的任务定义`);
     const stages = definition.stages;
     const plan = job.executionPlan.length
       ? job.executionPlan

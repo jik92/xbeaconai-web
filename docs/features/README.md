@@ -6,7 +6,7 @@
 
 | ID | 功能 | 状态 | 文档 | 最后更新 |
 | --- | --- | --- | --- | --- |
-| — | 暂无登记功能 | — | — | — |
+| FEAT-0001 | 抖音公开视频链接导入 | approved | [功能档案](FEAT-0001-douyin-video-import.md) | 2026-07-21 |
 
 状态：`draft`（梳理中）、`review`（等待评审）、`approved`（可开发）、`in-progress`、`done`、`deprecated`。状态变更时不重命名或移动文档。
 

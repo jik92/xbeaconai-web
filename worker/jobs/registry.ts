@@ -1,5 +1,6 @@
 import type { JobRecord } from "../../server/types";
 import { adScriptJob } from "./job-ad-script";
+import { douyinVideoImportJob } from "./job-douyin-video-import";
 import { genericCreationJob } from "./job-generic-creation";
 import { subtitleEraseJob, videoEnhancementJob } from "./job-mediakit-video";
 import { videoClipMergeJob } from "./job-video-clip-merge";
@@ -13,6 +14,7 @@ import { voiceCloneJob } from "./job-voice-clone";
 import type { WorkerJobHandler } from "./types";
 
 export const jobHandlers: readonly WorkerJobHandler[] = [
+  douyinVideoImportJob,
   adScriptJob,
   videoCreateJob,
   videoRemixAnalysisJob,

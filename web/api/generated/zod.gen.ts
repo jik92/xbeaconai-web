@@ -93,9 +93,13 @@ export const zModuleId = z.enum([
     'video-renewal',
     'subtitle-erase',
     'video-enhancement',
+    'kickart',
+    'douyin-video-import',
+    'share-content-import'
     'video-extract',
     'video-editor',
     'kickart'
+
 ]);
 
 export const zSeedanceModelId = z.enum([
@@ -106,7 +110,7 @@ export const zSeedanceModelId = z.enum([
 
 export const zJob = z.object({
     id: z.string(),
-    moduleId: zModuleId,
+    moduleId: zJobModuleId,
     title: z.string(),
     status: z.enum([
         'queued',
@@ -662,6 +666,36 @@ export const zVideoCreateProject = z.object({
     canCompose: z.boolean()
 });
 
+export const zModuleId = z.enum([
+    'video-remix',
+    'video-create',
+    'ad-script',
+    'ai-generate',
+    'video-cut',
+    'media-understand',
+    'video-mashup',
+    'voice-clone',
+    'video-renewal',
+    'subtitle-erase',
+    'video-enhancement',
+    'kickart'
+]);
+
+export const zShareParseResult = z.object({
+    candidates: z.array(z.object({
+        raw: z.string(),
+        platformId: z.string(),
+        confidence: z.enum([
+            'high',
+            'medium',
+            'low'
+        ]),
+        label: z.string()
+    }))
+});
+
+export const zShareImportJob = zJob.and(z.record(z.string(), z.unknown()));
+
 /**
  * Service health
  */
@@ -1178,7 +1212,7 @@ export const zListAdminJobsResponse = z.object({
 });
 
 export const zListJobsQuery = z.object({
-    moduleId: zModuleId.optional()
+    moduleId: zJobModuleId.optional()
 });
 
 /**
@@ -1449,3 +1483,40 @@ export const zDownloadArtifactPath = z.object({
  * Artifact binary
  */
 export const zDownloadArtifactResponse = z.string();
+
+export const zParseShareContentBody = z.object({
+    text: z.string().min(1).max(4096)
+});
+
+/**
+ * Parsed candidates
+ */
+export const zParseShareContentResponse = zShareParseResult;
+
+export const zCreateShareImportBody = z.object({
+    candidate: z.object({
+        raw: z.string(),
+        platformId: z.string(),
+        confidence: z.enum([
+            'high',
+            'medium',
+            'low'
+        ]),
+        label: z.string()
+    }),
+    folderId: z.uuid()
+});
+
+/**
+ * Import job created
+ */
+export const zCreateShareImportResponse = zShareImportJob;
+
+export const zGetShareImportPath = z.object({
+    jobId: z.uuid()
+});
+
+/**
+ * Import job
+ */
+export const zGetShareImportResponse = zShareImportJob;

@@ -8,6 +8,8 @@ import {
   FileAudio,
   Files,
   Image as ImageIcon,
+  Link,
+  Loader2,
   Package,
   Play,
   Plus,
@@ -19,18 +21,22 @@ import {
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  createShareImport,
   deleteLibraryAsset,
   deleteLibraryProduct,
   fetchAssetFolders,
   fetchLibraryAssets,
   fetchProducts,
+  fetchShareImport,
+  parseShareContent,
   saveAssetMetadata,
   uploadLibraryAsset,
   uploadProduct,
 } from "@/api/api-client";
+import type { ShareCandidate } from "@/api/api-client";
 import { AuthenticatedMedia } from "@/components/domain/authenticated-media";
 import { DataTable } from "@/components/ui/data-table";
-import type { LibraryAsset, LibraryProduct } from "@/entities/types";
+import type { AssetFolder, LibraryAsset, LibraryProduct } from "@/entities/types";
 import { AssetFolderSpace } from "./asset-folder-space";
 import { fitMediaPreviewSize } from "./media-preview-size";
 import "./asset-library.css";
@@ -494,6 +500,16 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
   const [selectedFolderId, setSelectedFolderId] = useState(requestedFolderId);
   const [loadedMetadata, setLoadedMetadata] = useState<Record<string, MediaMetadata>>({});
   const metadataSaving = useRef(new Set<string>());
+  // Share content import state
+  const [shareImportOpen, setShareImportOpen] = useState(false);
+  const [shareImportText, setShareImportText] = useState("");
+  const [shareCandidates, setShareCandidates] = useState<ShareCandidate[]>([]);
+  const [shareSelectedCandidate, setShareSelectedCandidate] = useState<ShareCandidate | null>(null);
+  const [shareImportFolderId, setShareImportFolderId] = useState("");
+  const [shareImportJobId, setShareImportJobId] = useState<string | null>(null);
+  const [shareImportStatus, setShareImportStatus] = useState<string>("");
+  const [shareImportError, setShareImportError] = useState<string>("");
+  const sharePollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   const { data: folders = [], isLoading: foldersLoading } = useQuery({
     queryKey: ["asset-folders"],
     queryFn: fetchAssetFolders,
@@ -613,6 +629,7 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
           title={kind === "voice" ? "音色库" : "素材库"}
           uploadLabel={kind === "voice" ? "上传音色" : "上传素材"}
           onUpload={() => setUploadOpen(true)}
+          douyinImport={kind === "media" ? { onOpen: () => setShareImportOpen(true) } : undefined}
         />
         {!!requestedAssetIds.size && (
           <div className="asset-import-notice">
@@ -744,6 +761,100 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
           </aside>
         </div>
       )}
+      {/* Share content import dialog */}
+      {shareImportOpen && (
+        <div className="asset-modal-layer" role="presentation" onMouseDown={() => setShareImportOpen(false)}>
+          <aside
+            className="asset-upload-modal"
+            role="dialog"
+            aria-modal="true"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <ModalHeader
+              eyebrow="ASSET / IMPORT"
+              title="从分享内容导入"
+              onClose={() => {
+                setShareImportOpen(false);
+                if (sharePollRef.current) clearInterval(sharePollRef.current);
+              }}
+            />
+            <ShareImportForm
+              folders={folders}
+              text={shareImportText}
+              candidates={shareCandidates}
+              selectedCandidate={shareSelectedCandidate}
+              folderId={shareImportFolderId}
+              jobId={shareImportJobId}
+              importStatus={shareImportStatus}
+              importError={shareImportError}
+              onTextChange={setShareImportText}
+              onParse={async () => {
+                setShareImportError("");
+                setShareCandidates([]);
+                setShareSelectedCandidate(null);
+                try {
+                  const result = await parseShareContent(shareImportText);
+                  setShareCandidates(result);
+                  if (result.length === 0) setShareImportError("未识别到支持的分享链接");
+                } catch (err) {
+                  setShareImportError(err instanceof Error ? err.message : "解析失败");
+                }
+              }}
+              onCandidateSelect={setShareSelectedCandidate}
+              onFolderIdChange={setShareImportFolderId}
+              onSubmit={async () => {
+                if (!shareSelectedCandidate) return;
+                setShareImportError("");
+                setShareImportStatus("提交中…");
+                try {
+                  const job = await createShareImport(shareSelectedCandidate, shareImportFolderId);
+                  setShareImportJobId(job.id);
+                  setShareImportStatus("排队中");
+                  if (sharePollRef.current) clearInterval(sharePollRef.current);
+                  sharePollRef.current = setInterval(async () => {
+                    try {
+                      const updated = await fetchShareImport(job.id);
+                      setShareImportStatus(updated.stage || updated.status);
+                      if (["succeeded", "partially_succeeded"].includes(updated.status)) {
+                        if (sharePollRef.current) clearInterval(sharePollRef.current);
+                        void queryClient.invalidateQueries({ queryKey: ["asset-library", kind] });
+                        setTimeout(() => {
+                          setShareImportOpen(false);
+                          setShareImportText("");
+                          setShareCandidates([]);
+                          setShareSelectedCandidate(null);
+                          setShareImportJobId(null);
+                          setShareImportStatus("");
+                          setShareImportError("");
+                        }, 1500);
+                      } else if (["failed", "cancelled"].includes(updated.status)) {
+                        if (sharePollRef.current) clearInterval(sharePollRef.current);
+                        setShareImportError(updated.error?.message ?? "导入失败");
+                        setShareImportStatus(updated.status);
+                      }
+                    } catch {
+                      // Polling error — ignore
+                    }
+                  }, 2000);
+                } catch (err) {
+                  setShareImportError(err instanceof Error ? err.message : "创建导入任务失败");
+                  setShareImportStatus("");
+                }
+              }}
+              onCancel={() => {
+                setShareImportOpen(false);
+                if (sharePollRef.current) clearInterval(sharePollRef.current);
+                setShareImportText("");
+                setShareCandidates([]);
+                setShareSelectedCandidate(null);
+                setShareImportJobId(null);
+                setShareImportStatus("");
+                setShareImportError("");
+              }}
+            />
+          </aside>
+        </div>
+      )}
       {kind === "voice" && selected && (
         <div className="asset-modal-layer" role="presentation" onMouseDown={() => setSelected(null)}>
           <aside
@@ -793,12 +904,14 @@ function LibraryToolbar({
   title,
   uploadLabel,
   onUpload,
+  douyinImport,
 }: {
   query: string;
   setQuery: (value: string) => void;
   title: string;
   uploadLabel: string;
   onUpload: () => void;
+  douyinImport?: { onOpen: () => void };
 }) {
   return (
     <section className="asset-library-toolbar">
@@ -810,9 +923,16 @@ function LibraryToolbar({
           placeholder={`搜索${title}名称或描述…`}
         />
       </label>
-      <button className="primary" onClick={onUpload}>
-        <Upload /> {uploadLabel}
-      </button>
+      <span className="asset-library-toolbar-actions">
+        {douyinImport && (
+          <button onClick={douyinImport.onOpen}>
+            <Link /> 从分享内容导入
+          </button>
+        )}
+        <button className="primary" onClick={onUpload}>
+          <Upload /> {uploadLabel}
+        </button>
+      </span>
     </section>
   );
 }
@@ -881,6 +1001,148 @@ function ModalFooter({
         {pending ? "上传中…" : "确认上传"}
       </button>
     </footer>
+  );
+}
+
+const PLATFORM_LABELS: Record<string, string> = {
+  douyin: "抖音",
+  kuaishou: "快手",
+  youtube: "YouTube",
+  x: "X (Twitter)",
+};
+
+function ShareImportForm({
+  folders,
+  text,
+  candidates,
+  selectedCandidate,
+  folderId,
+  jobId,
+  importStatus,
+  importError,
+  onTextChange,
+  onParse,
+  onCandidateSelect,
+  onFolderIdChange,
+  onSubmit,
+  onCancel,
+}: {
+  folders: AssetFolder[];
+  text: string;
+  candidates: ShareCandidate[];
+  selectedCandidate: ShareCandidate | null;
+  folderId: string;
+  jobId: string | null;
+  importStatus: string;
+  importError: string;
+  onTextChange: (value: string) => void;
+  onParse: () => void;
+  onCandidateSelect: (candidate: ShareCandidate) => void;
+  onFolderIdChange: (value: string) => void;
+  onSubmit: () => void;
+  onCancel: () => void;
+}) {
+  const isPending =
+    !!importStatus && !["succeeded", "partially_succeeded", "failed", "cancelled"].includes(importStatus);
+  const isSuccess = importStatus === "succeeded" || importStatus === "partially_succeeded";
+  const isFailed = importStatus === "failed" || importStatus === "cancelled";
+  const showCandidateStep = !jobId && candidates.length > 0;
+  const canSubmit = selectedCandidate !== null && folderId.length > 0 && !isPending && !jobId;
+
+  return (
+    <>
+      {!jobId && !showCandidateStep && (
+        <>
+          <label>
+            粘贴分享内容或链接 <em>*</em>
+            <textarea
+              value={text}
+              maxLength={4096}
+              rows={4}
+              onChange={(event) => onTextChange(event.target.value)}
+              placeholder="粘贴包含抖音、快手、YouTube、X 等平台的分享链接或复制内容…"
+            />
+            <small>支持整段复制文案，自动识别平台和提取链接</small>
+          </label>
+          <footer className="asset-modal-footer">
+            <button onClick={onCancel}>取消</button>
+            <button className="primary" disabled={text.trim().length === 0} onClick={onParse}>
+              识别链接
+            </button>
+          </footer>
+        </>
+      )}
+      {showCandidateStep && (
+        <>
+          <label>
+            识别的分享内容
+            <div className="share-candidates-list">
+              {candidates.map((candidate, index) => (
+                <button
+                  key={`${candidate.platformId}-${index}`}
+                  className={`share-candidate-item ${selectedCandidate?.raw === candidate.raw ? "selected" : ""}`}
+                  onClick={() => onCandidateSelect(candidate)}
+                >
+                  <span className="share-platform-badge">
+                    {PLATFORM_LABELS[candidate.platformId] ?? candidate.platformId}
+                  </span>
+                  <span className="share-candidate-label">{candidate.label}</span>
+                  <span className="share-confidence">
+                    {candidate.confidence === "high"
+                      ? "高置信"
+                      : candidate.confidence === "medium"
+                        ? "中置信"
+                        : "低置信"}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {candidates.length > 1 && <small>检测到多个候选链接，请选择要导入的内容</small>}
+          </label>
+          <label>
+            保存到文件夹 <em>*</em>
+            <select value={folderId} onChange={(event) => onFolderIdChange(event.target.value)}>
+              <option value="" disabled>
+                请选择文件夹
+              </option>
+              {folders.map((folder) => (
+                <option key={folder.id} value={folder.id}>
+                  {folder.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <footer className="asset-modal-footer">
+            <button
+              onClick={() => {
+                onTextChange("");
+                onCandidateSelect(null!);
+              }}
+            >
+              重新输入
+            </button>
+            <button className="primary" disabled={!canSubmit} onClick={onSubmit}>
+              {isPending ? "提交中…" : "开始导入"}
+            </button>
+          </footer>
+        </>
+      )}
+      {importStatus && (
+        <div className={`douyin-import-status ${isSuccess ? "success" : isFailed ? "error" : "pending"}`}>
+          {isPending && <Loader2 className="spin" />}
+          {isSuccess && <Check />}
+          {isFailed && <X />}
+          <b>{importStatus}</b>
+          {importError && <p>{importError}</p>}
+        </div>
+      )}
+      {importError && !importStatus && <p className="asset-upload-error">{importError}</p>}
+      {(jobId || importStatus) && (
+        <footer className="asset-modal-footer">
+          <button onClick={onCancel}>{jobId && !isPending ? "关闭" : "取消"}</button>
+        </footer>
+      )}
+    </>
   );
 }
 

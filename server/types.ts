@@ -1,6 +1,10 @@
 import type { ModuleId } from "../web/entities/types";
 import type { SeedanceModelId } from "./models/video-models";
 
+/** Background job types not tied to navigation modules. */
+export type BackgroundJobType = "douyin-video-import" | "share-content-import";
+export type JobModuleId = ModuleId | BackgroundJobType;
+
 export type JobStatus = "queued" | "processing" | "succeeded" | "partially_succeeded" | "failed" | "cancelled";
 export type ExecutionMode = "real" | "local" | "mock";
 export type OverallExecutionMode = ExecutionMode | "mixed";
@@ -36,7 +40,7 @@ export interface JobResult {
 export interface JobRecord {
   id: string;
   ownerUserId: string;
-  moduleId: ModuleId;
+  moduleId: JobModuleId;
   title: string;
   status: JobStatus;
   progress: number;
