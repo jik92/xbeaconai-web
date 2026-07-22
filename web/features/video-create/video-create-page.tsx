@@ -43,6 +43,7 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { fetchPortraits } from "@/features/portrait-library/portrait-data";
 import { PortraitPickerDialog } from "@/features/portrait-library/portrait-picker-dialog";
 import { cn } from "@/lib/utils";
+import { videoCreateActionAvailability } from "./video-create-actions";
 
 const scenes = ["商城转化", "短视频带货", "引流直播间", "直播带货", "内容种草", "品牌曝光", "本地到店", "线索收集"];
 const durationOptions = [15, 30, 60, 180];
@@ -107,7 +108,7 @@ const defaultInput: VideoCreateInput = {
   productName: "",
   sellingPoints: [],
   durationSec: 15,
-  segmentCount: 1,
+  segmentCount: 3,
   speechRate: "medium",
   requirements: "",
   scriptStyle: "自然种草",
@@ -342,6 +343,9 @@ export function VideoCreatePage() {
   const hasRunningShot = project?.shots.some((shot) => shot.status === "queued" || shot.status === "generating");
   const projectId = project?.project.id;
   const sellingPoints = input.sellingPoints ?? [];
+  const hasScript = Boolean(project?.sections.length);
+  const hasStoryboard = Boolean(project?.shots.length);
+  const actionAvailability = videoCreateActionAvailability({ hasScript, hasStoryboard });
   const polling =
     Boolean(active && ["analyzing", "script_generating", "storyboard_generating", "composing"].includes(active)) ||
     hasRunningShot;
@@ -859,15 +863,15 @@ export function VideoCreatePage() {
         <footer className="shrink-0 border-t border-line bg-surface p-3">
           <Button
             className="h-10 w-full rounded-full"
-            disabled={Boolean(busy) || !input.productAssetIds.length}
-            onClick={() => action(project?.sections.length ? "storyboard" : "script")}
+            disabled={Boolean(busy) || polling || !input.productAssetIds.length || actionAvailability.scriptLocked}
+            onClick={() => action("script")}
           >
-            {busy || ["script_generating", "storyboard_generating"].includes(active ?? "") ? (
+            {busy === "script" || active === "script_generating" ? (
               <LoaderCircle className="animate-spin" />
             ) : (
               <WandSparkles />
             )}
-            {project?.sections.length ? "生成分镜" : "生成脚本"}
+            {actionAvailability.scriptLabel}
           </Button>
         </footer>
       </aside>
@@ -950,13 +954,18 @@ export function VideoCreatePage() {
                   <Copy />
                   复制脚本
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => action("script")}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={actionAvailability.scriptLocked || Boolean(busy) || polling}
+                  onClick={() => action("script")}
+                >
                   <RefreshCw />
                   重新生成
                 </Button>
               </div>
             </div>
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3 pb-20">
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
               {project.sections.map((section) => {
                 const version = section.currentVersion;
                 const value = drafts[section.id] ?? version?.text ?? "";
@@ -974,7 +983,7 @@ export function VideoCreatePage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          disabled={!version || Boolean(busy)}
+                          disabled={!version || actionAvailability.scriptLocked || Boolean(busy) || polling}
                           onClick={() =>
                             execute(`regen-${section.id}`, async () => {
                               if (!version) return;
@@ -996,14 +1005,16 @@ export function VideoCreatePage() {
                       </div>
                     </header>
                     <textarea
-                      className="min-h-24 w-full resize-y bg-transparent p-3 text-sm leading-relaxed text-body outline-none"
+                      className="min-h-24 w-full resize-y bg-transparent p-3 text-sm leading-relaxed text-body outline-none disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-muted"
                       value={value}
+                      disabled={actionAvailability.scriptLocked}
                       onChange={(event) => setDrafts((current) => ({ ...current, [section.id]: event.target.value }))}
                     />
                     {dirty && (
                       <footer className="flex justify-end border-t border-line px-3 py-2">
                         <Button
                           size="sm"
+                          disabled={actionAvailability.scriptLocked || Boolean(busy) || polling}
                           onClick={() =>
                             execute(`save-${section.id}`, async () => {
                               if (!version) return;
@@ -1032,10 +1043,20 @@ export function VideoCreatePage() {
                 );
               })}
             </div>
-            <footer className="absolute bottom-4 right-4 z-10">
-              <Button className="rounded-full" onClick={() => action("storyboard")}>
-                <WandSparkles />
-                下一步 · 生成分镜
+            <footer className="flex h-14 shrink-0 items-center justify-end border-t border-line bg-surface px-3">
+              <Button
+                className="rounded-full"
+                disabled={actionAvailability.storyboardLocked || Boolean(busy) || polling}
+                onClick={() => action("storyboard")}
+              >
+                {busy === "storyboard" || active === "storyboard_generating" ? (
+                  <LoaderCircle className="animate-spin" />
+                ) : actionAvailability.storyboardLocked ? (
+                  <Check />
+                ) : (
+                  <WandSparkles />
+                )}
+                {actionAvailability.storyboardLabel}
               </Button>
             </footer>
           </section>
