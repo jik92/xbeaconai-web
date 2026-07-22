@@ -1928,6 +1928,238 @@ export type ListJobsResponses = {
 
 export type ListJobsResponse = ListJobsResponses[keyof ListJobsResponses];
 
+export type ListVideoRemixProjectsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        query?: string;
+        stage?: 'upload' | 'analysis' | 'prompt' | 'storyboard' | 'compose' | 'completed' | 'failed';
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/api/video-remix/projects';
+};
+
+export type ListVideoRemixProjectsResponses = {
+    /**
+     * Video remix projects
+     */
+    200: {
+        projects: Array<{
+            id: string;
+            title: string;
+            productName: string;
+            currentStage: 'upload' | 'analysis' | 'prompt' | 'storyboard' | 'compose' | 'completed' | 'failed';
+            status: 'queued' | 'processing' | 'succeeded' | 'partially_succeeded' | 'failed' | 'cancelled';
+            sourceCount: number;
+            generatedCount: number;
+            createdBy: string;
+            createdAt: string;
+            updatedAt: string;
+        }>;
+        total: number;
+        page: number;
+        pageSize: number;
+    };
+};
+
+export type ListVideoRemixProjectsResponse = ListVideoRemixProjectsResponses[keyof ListVideoRemixProjectsResponses];
+
+export type GetVideoRemixProjectData = {
+    body?: never;
+    path: {
+        projectId: string;
+    };
+    query?: never;
+    url: '/api/video-remix/projects/{projectId}';
+};
+
+export type GetVideoRemixProjectErrors = {
+    /**
+     * Project not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Project cannot be restored
+     */
+    409: ApiErrorResponse;
+};
+
+export type GetVideoRemixProjectError = GetVideoRemixProjectErrors[keyof GetVideoRemixProjectErrors];
+
+export type GetVideoRemixProjectResponses = {
+    /**
+     * Video remix project
+     */
+    200: {
+        project: {
+            id: string;
+            title: string;
+            productName: string;
+            currentStage: 'upload' | 'analysis' | 'prompt' | 'storyboard' | 'compose' | 'completed' | 'failed';
+            status: 'queued' | 'processing' | 'succeeded' | 'partially_succeeded' | 'failed' | 'cancelled';
+            sourceCount: number;
+            generatedCount: number;
+            createdBy: string;
+            createdAt: string;
+            updatedAt: string;
+        };
+        rootJob: Job;
+        childJobs: Array<Job>;
+        projectRequest: {
+            projectName: string;
+            mode?: 'product' | 'talking';
+            product: {
+                id: number | string | unknown;
+                productName: string;
+                productImages: Array<{
+                    id?: number | string | unknown;
+                    filename: string;
+                    objectKey: string;
+                    fileMd5?: string;
+                    fileUrl: string;
+                    coverUrl: string;
+                    fileType: 'IMAGE' | 'VIDEO' | 'AUDIO';
+                    metaId?: string;
+                    assetId?: string;
+                    duration?: number;
+                    durationSec?: number;
+                    arkVideoUrl?: string;
+                    aiDescription?: string;
+                    reasoningEffort?: 'low' | 'medium' | 'high';
+                }>;
+                productFormMetaList?: Array<unknown>;
+                productFormDesc?: string;
+            };
+            demand?: string;
+            rawMaterialFiles: Array<{
+                id?: number | string | unknown;
+                filename: string;
+                objectKey: string;
+                fileMd5?: string;
+                fileUrl: string;
+                coverUrl: string;
+                fileType: 'IMAGE' | 'VIDEO' | 'AUDIO';
+                metaId?: string;
+                assetId?: string;
+                duration?: number;
+                durationSec?: number;
+                arkVideoUrl?: string;
+                aiDescription?: string;
+                reasoningEffort?: 'low' | 'medium' | 'high';
+            }>;
+            voiceAsset?: {
+                id?: number | string | unknown;
+                filename: string;
+                objectKey: string;
+                fileMd5?: string;
+                fileUrl: string;
+                coverUrl: string;
+                fileType: 'IMAGE' | 'VIDEO' | 'AUDIO';
+                metaId?: string;
+                assetId?: string;
+                duration?: number;
+                durationSec?: number;
+                arkVideoUrl?: string;
+                aiDescription?: string;
+                reasoningEffort?: 'low' | 'medium' | 'high';
+            };
+            portraitAssets?: Array<{
+                id?: number | string | unknown;
+                assetName: string;
+                fileInfo: Array<{
+                    fileUrl: string;
+                    coverUrl: string;
+                    fileType: 'IMAGE';
+                    assetId?: string;
+                }>;
+                description?: string;
+                gender?: string;
+                age?: number;
+                occupation?: string;
+            }>;
+        };
+        workspace: {
+            stage: number;
+            promptStates: {
+                [key: string]: {
+                    prompt: string;
+                    versions: Array<{
+                        id: string;
+                        label: string;
+                        prompt: string;
+                    }>;
+                    activeVersionId: string;
+                };
+            };
+            selectedShotAssets: {
+                [key: string]: string;
+            };
+            composeOrder: Array<string>;
+            composePreviewId: string | '';
+        };
+        missingAssetIds: Array<string>;
+    };
+};
+
+export type GetVideoRemixProjectResponse = GetVideoRemixProjectResponses[keyof GetVideoRemixProjectResponses];
+
+export type UpdateVideoRemixProjectData = {
+    body: {
+        title?: string;
+        workspace?: {
+            stage: number;
+            promptStates: {
+                [key: string]: {
+                    prompt: string;
+                    versions: Array<{
+                        id: string;
+                        label: string;
+                        prompt: string;
+                    }>;
+                    activeVersionId: string;
+                };
+            };
+            selectedShotAssets: {
+                [key: string]: string;
+            };
+            composeOrder: Array<string>;
+            composePreviewId: string | '';
+        };
+    };
+    path: {
+        projectId: string;
+    };
+    query?: never;
+    url: '/api/video-remix/projects/{projectId}';
+};
+
+export type UpdateVideoRemixProjectErrors = {
+    /**
+     * Project not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Project is not ready
+     */
+    409: ApiErrorResponse;
+    /**
+     * Invalid project state
+     */
+    422: ApiErrorResponse;
+};
+
+export type UpdateVideoRemixProjectError = UpdateVideoRemixProjectErrors[keyof UpdateVideoRemixProjectErrors];
+
+export type UpdateVideoRemixProjectResponses = {
+    /**
+     * Updated video remix project
+     */
+    200: Job;
+};
+
+export type UpdateVideoRemixProjectResponse = UpdateVideoRemixProjectResponses[keyof UpdateVideoRemixProjectResponses];
+
 export type CreateVideoRemixPromptToolJobData = {
     body: {
         sourceJobId: string;

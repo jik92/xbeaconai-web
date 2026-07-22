@@ -1479,6 +1479,263 @@ export const zListJobsResponse = z.object({
     jobs: z.array(zJob)
 });
 
+export const zListVideoRemixProjectsQuery = z.object({
+    query: z.string().max(100).optional(),
+    stage: z.enum([
+        'upload',
+        'analysis',
+        'prompt',
+        'storyboard',
+        'compose',
+        'completed',
+        'failed'
+    ]).optional(),
+    page: z.int().gte(1).optional().default(1),
+    pageSize: z.int().gte(1).lte(50).optional().default(10)
+});
+
+/**
+ * Video remix projects
+ */
+export const zListVideoRemixProjectsResponse = z.object({
+    projects: z.array(z.object({
+        id: z.uuid(),
+        title: z.string(),
+        productName: z.string(),
+        currentStage: z.enum([
+            'upload',
+            'analysis',
+            'prompt',
+            'storyboard',
+            'compose',
+            'completed',
+            'failed'
+        ]),
+        status: z.enum([
+            'queued',
+            'processing',
+            'succeeded',
+            'partially_succeeded',
+            'failed',
+            'cancelled'
+        ]),
+        sourceCount: z.int().gte(0),
+        generatedCount: z.int().gte(0),
+        createdBy: z.string(),
+        createdAt: z.string(),
+        updatedAt: z.string()
+    })),
+    total: z.int().gte(0),
+    page: z.int().gte(1),
+    pageSize: z.int().gte(1)
+});
+
+export const zGetVideoRemixProjectPath = z.object({
+    projectId: z.uuid()
+});
+
+/**
+ * Video remix project
+ */
+export const zGetVideoRemixProjectResponse = z.object({
+    project: z.object({
+        id: z.uuid(),
+        title: z.string(),
+        productName: z.string(),
+        currentStage: z.enum([
+            'upload',
+            'analysis',
+            'prompt',
+            'storyboard',
+            'compose',
+            'completed',
+            'failed'
+        ]),
+        status: z.enum([
+            'queued',
+            'processing',
+            'succeeded',
+            'partially_succeeded',
+            'failed',
+            'cancelled'
+        ]),
+        sourceCount: z.int().gte(0),
+        generatedCount: z.int().gte(0),
+        createdBy: z.string(),
+        createdAt: z.string(),
+        updatedAt: z.string()
+    }),
+    rootJob: zJob,
+    childJobs: z.array(zJob),
+    projectRequest: z.object({
+        projectName: z.string().min(1).max(80),
+        mode: z.enum(['product', 'talking']).optional().default('product'),
+        product: z.object({
+            id: z.union([
+                z.number(),
+                z.string(),
+                z.unknown()
+            ]),
+            productName: z.string().min(1).max(200),
+            productImages: z.array(z.object({
+                id: z.union([
+                    z.number(),
+                    z.string(),
+                    z.unknown()
+                ]).optional(),
+                filename: z.string().min(1).max(200),
+                objectKey: z.string().min(1),
+                fileMd5: z.string().optional(),
+                fileUrl: z.string().min(1),
+                coverUrl: z.string().min(1),
+                fileType: z.enum([
+                    'IMAGE',
+                    'VIDEO',
+                    'AUDIO'
+                ]),
+                metaId: z.string().optional(),
+                assetId: z.string().optional(),
+                duration: z.number().gte(0).optional(),
+                durationSec: z.number().gte(0).optional(),
+                arkVideoUrl: z.string().optional(),
+                aiDescription: z.string().optional(),
+                reasoningEffort: z.enum([
+                    'low',
+                    'medium',
+                    'high'
+                ]).optional()
+            })).min(1).max(20),
+            productFormMetaList: z.array(z.unknown()).optional(),
+            productFormDesc: z.string().optional()
+        }),
+        demand: z.string().max(2000).optional().default(''),
+        rawMaterialFiles: z.array(z.object({
+            id: z.union([
+                z.number(),
+                z.string(),
+                z.unknown()
+            ]).optional(),
+            filename: z.string().min(1).max(200),
+            objectKey: z.string().min(1),
+            fileMd5: z.string().optional(),
+            fileUrl: z.string().min(1),
+            coverUrl: z.string().min(1),
+            fileType: z.enum([
+                'IMAGE',
+                'VIDEO',
+                'AUDIO'
+            ]),
+            metaId: z.string().optional(),
+            assetId: z.string().optional(),
+            duration: z.number().gte(0).optional(),
+            durationSec: z.number().gte(0).optional(),
+            arkVideoUrl: z.string().optional(),
+            aiDescription: z.string().optional(),
+            reasoningEffort: z.enum([
+                'low',
+                'medium',
+                'high'
+            ]).optional()
+        })).min(1).max(20),
+        voiceAsset: z.object({
+            id: z.union([
+                z.number(),
+                z.string(),
+                z.unknown()
+            ]).optional(),
+            filename: z.string().min(1).max(200),
+            objectKey: z.string().min(1),
+            fileMd5: z.string().optional(),
+            fileUrl: z.string().min(1),
+            coverUrl: z.string().min(1),
+            fileType: z.enum([
+                'IMAGE',
+                'VIDEO',
+                'AUDIO'
+            ]),
+            metaId: z.string().optional(),
+            assetId: z.string().optional(),
+            duration: z.number().gte(0).optional(),
+            durationSec: z.number().gte(0).optional(),
+            arkVideoUrl: z.string().optional(),
+            aiDescription: z.string().optional(),
+            reasoningEffort: z.enum([
+                'low',
+                'medium',
+                'high'
+            ]).optional()
+        }).optional(),
+        portraitAssets: z.array(z.object({
+            id: z.union([
+                z.number(),
+                z.string(),
+                z.unknown()
+            ]).optional(),
+            assetName: z.string().min(1).max(100),
+            fileInfo: z.array(z.object({
+                fileUrl: z.url(),
+                coverUrl: z.url(),
+                fileType: z.enum(['IMAGE']),
+                assetId: z.string().optional()
+            })),
+            description: z.string().max(1000).optional().default(''),
+            gender: z.string().max(20).optional().default(''),
+            age: z.int().gte(0).lte(150).optional(),
+            occupation: z.string().max(100).optional().default('')
+        })).max(10).optional().default([])
+    }),
+    workspace: z.object({
+        stage: z.int().gte(0).lte(4),
+        promptStates: z.record(z.string(), z.object({
+            prompt: z.string().max(30000),
+            versions: z.array(z.object({
+                id: z.string().min(1).max(120),
+                label: z.string().min(1).max(40),
+                prompt: z.string().max(30000)
+            })).max(100),
+            activeVersionId: z.string().max(120)
+        })),
+        selectedShotAssets: z.record(z.string(), z.uuid()),
+        composeOrder: z.array(z.uuid()).max(20),
+        composePreviewId: z.union([
+            z.uuid(),
+            z.enum([''])
+        ])
+    }),
+    missingAssetIds: z.array(z.uuid())
+});
+
+export const zUpdateVideoRemixProjectBody = z.object({
+    title: z.string().min(1).max(80).optional(),
+    workspace: z.object({
+        stage: z.int().gte(0).lte(4),
+        promptStates: z.record(z.string(), z.object({
+            prompt: z.string().max(30000),
+            versions: z.array(z.object({
+                id: z.string().min(1).max(120),
+                label: z.string().min(1).max(40),
+                prompt: z.string().max(30000)
+            })).max(100),
+            activeVersionId: z.string().max(120)
+        })),
+        selectedShotAssets: z.record(z.string(), z.uuid()),
+        composeOrder: z.array(z.uuid()).max(20),
+        composePreviewId: z.union([
+            z.uuid(),
+            z.enum([''])
+        ])
+    }).optional()
+});
+
+export const zUpdateVideoRemixProjectPath = z.object({
+    projectId: z.uuid()
+});
+
+/**
+ * Updated video remix project
+ */
+export const zUpdateVideoRemixProjectResponse = zJob;
+
 export const zCreateVideoRemixPromptToolJobBody = z.object({
     sourceJobId: z.uuid(),
     sourceAssetId: z.uuid(),

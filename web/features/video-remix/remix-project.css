@@ -1531,7 +1531,8 @@
   width: 22px;
   height: 22px;
 }
-.history-filters > button {
+.history-filters > button,
+.history-filters > select {
   height: 54px;
   min-width: 202px;
   padding: 0 18px;
@@ -1542,6 +1543,10 @@
   justify-content: space-between;
   color: #a5abb4;
   @apply text-base;
+}
+.history-filters > select {
+  appearance: auto;
+  background: #fff;
 }
 .history-filters .history-search {
   min-width: 108px;
@@ -1559,6 +1564,9 @@
   display: grid;
   grid-template-columns: 34% 18% 14% 16% 18%;
   align-items: center;
+}
+.history-row.current {
+  background: #f8fbff;
 }
 .history-head {
   height: 74px;
@@ -1591,11 +1599,24 @@
   margin-top: 10px;
   color: #969da8;
 }
+.history-row b button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
 .history-row b svg {
   width: 18px;
   vertical-align: middle;
   margin-left: 8px;
   color: #9ca5b1;
+}
+.history-title-input {
+  width: 100%;
+  height: 36px;
+  padding: 0 9px;
+  border: 1px solid var(--remix-blue);
+  border-radius: 7px;
+  outline: 0;
 }
 .history-row i {
   font-style: normal;
@@ -1603,13 +1624,23 @@
   padding: 8px 12px;
   white-space: nowrap;
 }
-.history-row i.orange {
+.history-row i.storyboard,
+.history-row i.compose {
   color: #f08b24;
   background: #fff5e7;
 }
-.history-row i.blue {
+.history-row i.prompt,
+.history-row i.analysis {
   color: #397ee9;
   background: #edf6ff;
+}
+.history-row i.completed {
+  color: #39852e;
+  background: #effbea;
+}
+.history-row i.failed {
+  color: #c94848;
+  background: #fff0f0;
 }
 .history-time {
   white-space: pre-line;
@@ -1618,6 +1649,25 @@
 .history-row > span:last-child button {
   color: var(--remix-blue);
   @apply text-base;
+}
+.history-row > span:last-child button:disabled {
+  opacity: 0.55;
+}
+.history-error {
+  width: calc(100% - 56px);
+  margin: 0 28px 12px;
+  padding: 10px 12px;
+  color: #b44343;
+  background: #fff4f4;
+  border-radius: 8px;
+  text-align: left;
+}
+.history-empty {
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  color: #929aa7;
+  border-bottom: 1px solid #e5e7eb;
 }
 .history-drawer > footer {
   display: flex;

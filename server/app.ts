@@ -6,6 +6,7 @@ import type { MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
 import { parseVideoMashupConfig, type VideoMashupConfig } from "../shared/video-mashup/config";
+import { parseRemixWorkspace, remixProjectStages } from "../shared/video-remix/project-records";
 import {
   defaultRemixPromptToolConfig,
   remixCheckTypes,
@@ -17,7 +18,7 @@ import {
   remixRepairRules,
   remixVoiceModes,
 } from "../shared/video-remix/prompt-tools";
-import { parseRemixSources, remixMaxSources } from "../shared/video-remix/workflow";
+import { parseRemixAnalysisEntries, parseRemixSources, remixMaxSources } from "../shared/video-remix/workflow";
 import { APP_CONFIG, isModuleOpen } from "../web/app/config";
 import type { ModuleId } from "../web/entities/types";
 import {
@@ -89,6 +90,7 @@ import {
   videoCreateBatchEligibleShots,
   videoCreateJobValues,
 } from "./video-create/video-create-store";
+import { groupRemixChildren, summarizeRemixProject } from "./video-remix/project-records";
 import { validateVoiceTaskValues } from "./voice/validate-voice-task";
 
 const moduleIds = [
@@ -451,6 +453,7 @@ app.use("/api/*", async (c, next) => {
 function providerGuard(moduleId: ModuleId): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
     if (["GET", "HEAD", "OPTIONS"].includes(c.req.method)) return next();
+    if (moduleId === "video-remix" && c.req.path.startsWith("/api/video-remix/projects/")) return next();
     const availability = moduleFeatureAvailability(moduleId);
     if (availability.enabled) return next();
     return c.json(
@@ -2620,6 +2623,7 @@ const remixFileSchema = z.object({
 });
 const remixProjectRequestSchema = z.object({
   projectName: z.string().trim().min(1).max(80),
+  mode: z.enum(["product", "talking"]).default("product"),
   product: z.object({
     id: z.union([z.number(), z.string()]).nullable(),
     productName: z.string().min(1).max(200),
@@ -2629,6 +2633,7 @@ const remixProjectRequestSchema = z.object({
   }),
   demand: z.string().max(2_000).default(""),
   rawMaterialFiles: z.array(remixFileSchema).min(1).max(20),
+  voiceAsset: remixFileSchema.nullable().optional(),
   portraitAssets: z
     .array(
       z.object({
@@ -2698,6 +2703,296 @@ const RemixComposeRequestSchema = z.object({
     .min(2)
     .max(remixMaxSources),
 });
+const RemixPromptVersionSchema = z.object({
+  id: z.string().min(1).max(120),
+  label: z.string().min(1).max(40),
+  prompt: z.string().max(30_000),
+});
+const RemixSourcePromptStateSchema = z.object({
+  prompt: z.string().max(30_000),
+  versions: z.array(RemixPromptVersionSchema).max(100),
+  activeVersionId: z.string().max(120),
+});
+const RemixWorkspaceStateSchema = z.object({
+  stage: z.number().int().min(0).max(4),
+  promptStates: z.record(z.string().uuid(), RemixSourcePromptStateSchema),
+  selectedShotAssets: z.record(z.string().uuid(), z.string().uuid()),
+  composeOrder: z.array(z.string().uuid()).max(remixMaxSources),
+  composePreviewId: z.union([z.string().uuid(), z.literal("")]),
+});
+const RemixProjectSummarySchema = z.object({
+  id: z.string().uuid(),
+  title: z.string(),
+  productName: z.string(),
+  currentStage: z.enum(remixProjectStages),
+  status: JobStatusSchema,
+  sourceCount: z.number().int().nonnegative(),
+  generatedCount: z.number().int().nonnegative(),
+  createdBy: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+const RemixProjectUpdateSchema = z.object({
+  title: z.string().trim().min(1).max(80).optional(),
+  workspace: RemixWorkspaceStateSchema.optional(),
+});
+
+function remixProjectDetail(ownerUserId: string, root: JobRecord) {
+  let rawProjectRequest: unknown = null;
+  try {
+    rawProjectRequest = JSON.parse(root.values.projectRequest || "null");
+  } catch {
+    rawProjectRequest = null;
+  }
+  const projectRequest = remixProjectRequestSchema.safeParse(rawProjectRequest);
+  if (!projectRequest.success) return undefined;
+  const children = store.listChildren(ownerUserId, root.id, "video-remix");
+  const sources = parseRemixSources(root.values.sources);
+  const sourceIds = sources.map((source) => source.assetId);
+  const analysisEntries = parseRemixAnalysisEntries(root.values.analysisEntries);
+  const workspace = parseRemixWorkspace(root.values.workspaceState, sourceIds, analysisEntries);
+  const successfulShotJobs = children.filter(
+    (job) => job.values.workflowPhase === "shot-generation" && job.status === "succeeded",
+  );
+  for (const sourceId of sourceIds) {
+    const selectedId = workspace.selectedShotAssets[sourceId] ?? sourceId;
+    if (selectedId === sourceId) continue;
+    const valid = successfulShotJobs.some(
+      (job) =>
+        job.values.sourceAssetId === sourceId &&
+        job.result?.artifacts.some((artifact) => artifact.id === selectedId && artifact.mimeType.startsWith("video/")),
+    );
+    if (!valid) workspace.selectedShotAssets[sourceId] = sourceId;
+  }
+  const referencedAssetIds = new Set([
+    ...sourceIds,
+    ...projectRequest.data.product.productImages.map((image) => image.metaId).filter((id): id is string => Boolean(id)),
+    ...(projectRequest.data.voiceAsset?.objectKey ? [projectRequest.data.voiceAsset.objectKey] : []),
+    ...Object.values(workspace.selectedShotAssets),
+  ]);
+  const missingAssetIds = [...referencedAssetIds].filter((assetId) => !accounts.getOwnedAsset(ownerUserId, assetId));
+  const createdBy = accounts.getUser(ownerUserId)?.displayName || "当前用户";
+  return {
+    project: summarizeRemixProject(root, children, createdBy),
+    rootJob: root,
+    childJobs: children,
+    projectRequest: projectRequest.data,
+    workspace,
+    missingAssetIds,
+  };
+}
+
+const listRemixProjectsRoute = createRoute({
+  method: "get",
+  path: "/api/video-remix/projects",
+  operationId: "listVideoRemixProjects",
+  request: {
+    query: z.object({
+      query: z.string().trim().max(100).optional(),
+      stage: z.enum(remixProjectStages).optional(),
+      page: z.coerce.number().int().min(1).default(1),
+      pageSize: z.coerce.number().int().min(1).max(50).default(10),
+    }),
+  },
+  responses: {
+    200: {
+      description: "Video remix projects",
+      content: {
+        "application/json": {
+          schema: z.object({
+            projects: z.array(RemixProjectSummarySchema),
+            total: z.number().int().nonnegative(),
+            page: z.number().int().min(1),
+            pageSize: z.number().int().min(1),
+          }),
+        },
+      },
+    },
+  },
+});
+app.openapi(listRemixProjectsRoute, (c) => {
+  const ownerUserId = c.get("userId");
+  const input = c.req.valid("query");
+  const roots = store.listRemixProjectRoots(ownerUserId);
+  const groupedChildren = groupRemixChildren(
+    store.listChildrenForParents(
+      ownerUserId,
+      roots.map((root) => root.id),
+    ),
+  );
+  const createdBy = accounts.getUser(ownerUserId)?.displayName || "当前用户";
+  const keyword = input.query?.toLocaleLowerCase() ?? "";
+  const summaries = roots
+    .map((root) => summarizeRemixProject(root, groupedChildren.get(root.id) ?? [], createdBy))
+    .filter(
+      (project) =>
+        (!keyword || `${project.title}\n${project.productName}`.toLocaleLowerCase().includes(keyword)) &&
+        (!input.stage || project.currentStage === input.stage),
+    )
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  const offset = (input.page - 1) * input.pageSize;
+  return c.json(
+    {
+      projects: summaries.slice(offset, offset + input.pageSize),
+      total: summaries.length,
+      page: input.page,
+      pageSize: input.pageSize,
+    },
+    200,
+  );
+});
+
+const RemixProjectDetailSchema = z.object({
+  project: RemixProjectSummarySchema,
+  rootJob: JobSchema,
+  childJobs: z.array(JobSchema),
+  projectRequest: remixProjectRequestSchema,
+  workspace: RemixWorkspaceStateSchema,
+  missingAssetIds: z.array(z.string().uuid()),
+});
+const getRemixProjectRoute = createRoute({
+  method: "get",
+  path: "/api/video-remix/projects/{projectId}",
+  operationId: "getVideoRemixProject",
+  request: { params: z.object({ projectId: z.string().uuid() }) },
+  responses: {
+    200: { description: "Video remix project", content: { "application/json": { schema: RemixProjectDetailSchema } } },
+    404: { description: "Project not found", content: { "application/json": { schema: ErrorSchema } } },
+    409: { description: "Project cannot be restored", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(getRemixProjectRoute, (c) => {
+  const ownerUserId = c.get("userId");
+  const root = store.getOwned(c.req.valid("param").projectId, ownerUserId);
+  if (root?.moduleId !== "video-remix" || root.parentJobId || root.values.workflowPhase !== "analysis")
+    return c.json(
+      {
+        error: {
+          code: "REMIX_PROJECT_NOT_FOUND",
+          message: "项目不存在",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      404,
+    );
+  const detail = remixProjectDetail(ownerUserId, root);
+  if (!detail)
+    return c.json(
+      {
+        error: {
+          code: "REMIX_PROJECT_STATE_INVALID",
+          message: "项目初始数据不完整，无法继续创作",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      409,
+    );
+  return c.json(detail, 200);
+});
+
+const updateRemixProjectRoute = createRoute({
+  method: "patch",
+  path: "/api/video-remix/projects/{projectId}",
+  operationId: "updateVideoRemixProject",
+  request: {
+    params: z.object({ projectId: z.string().uuid() }),
+    body: { required: true, content: { "application/json": { schema: RemixProjectUpdateSchema } } },
+  },
+  responses: {
+    200: { description: "Updated video remix project", content: { "application/json": { schema: JobSchema } } },
+    404: { description: "Project not found", content: { "application/json": { schema: ErrorSchema } } },
+    409: { description: "Project is not ready", content: { "application/json": { schema: ErrorSchema } } },
+    422: { description: "Invalid project state", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(updateRemixProjectRoute, (c) => {
+  const ownerUserId = c.get("userId");
+  const root = store.getOwned(c.req.valid("param").projectId, ownerUserId);
+  const requestId = crypto.randomUUID();
+  if (root?.moduleId !== "video-remix" || root.parentJobId || root.values.workflowPhase !== "analysis")
+    return c.json(
+      { error: { code: "REMIX_PROJECT_NOT_FOUND", message: "项目不存在", retryable: false, requestId } },
+      404,
+    );
+  const body = c.req.valid("json");
+  if (body.title === undefined && body.workspace === undefined)
+    return c.json(
+      { error: { code: "EMPTY_PROJECT_UPDATE", message: "没有可保存的项目修改", retryable: false, requestId } },
+      422,
+    );
+  if (body.workspace && root.status !== "succeeded" && root.status !== "partially_succeeded")
+    return c.json(
+      {
+        error: {
+          code: "REMIX_PROJECT_NOT_READY",
+          message: "项目解析完成后才能保存创作状态",
+          retryable: true,
+          requestId,
+        },
+      },
+      409,
+    );
+  if (body.workspace) {
+    const sourceIds = parseRemixSources(root.values.sources).map((source) => source.assetId);
+    const sourceSet = new Set(sourceIds);
+    const selectedEntries = Object.entries(body.workspace.selectedShotAssets);
+    const validOrder =
+      body.workspace.composeOrder.length === sourceIds.length &&
+      new Set(body.workspace.composeOrder).size === sourceIds.length &&
+      body.workspace.composeOrder.every((sourceId) => sourceSet.has(sourceId));
+    if (
+      selectedEntries.length !== sourceIds.length ||
+      selectedEntries.some(([sourceId]) => !sourceSet.has(sourceId)) ||
+      Object.keys(body.workspace.promptStates).some((sourceId) => !sourceSet.has(sourceId)) ||
+      !validOrder ||
+      (body.workspace.composePreviewId && !sourceSet.has(body.workspace.composePreviewId))
+    )
+      return c.json(
+        {
+          error: {
+            code: "INVALID_REMIX_WORKSPACE",
+            message: "项目工作区与原始分镜不一致",
+            retryable: false,
+            requestId,
+          },
+        },
+        422,
+      );
+    const shotJobs = store
+      .listChildren(ownerUserId, root.id, "video-remix")
+      .filter((job) => job.values.workflowPhase === "shot-generation" && job.status === "succeeded");
+    const invalidSelection = selectedEntries.find(([sourceId, selectedId]) => {
+      if (selectedId === sourceId) return false;
+      return !shotJobs.some(
+        (job) =>
+          job.values.sourceAssetId === sourceId &&
+          job.result?.artifacts.some(
+            (artifact) => artifact.id === selectedId && artifact.mimeType.startsWith("video/"),
+          ),
+      );
+    });
+    if (invalidSelection)
+      return c.json(
+        {
+          error: {
+            code: "INVALID_REMIX_SELECTION",
+            message: "选择的生成视频不属于对应原分镜",
+            retryable: false,
+            requestId,
+          },
+        },
+        422,
+      );
+  }
+  const updated = store.update(root.id, {
+    title: body.title ?? root.title,
+    values: body.workspace ? { ...root.values, workspaceState: JSON.stringify(body.workspace) } : root.values,
+  });
+  if (!updated) throw new Error("REMIX_PROJECT_UPDATE_FAILED");
+  return c.json(updated, 200);
+});
 
 app.post("/api/video-remix/project/generate", async (c) => {
   const requestId = crypto.randomUUID();
@@ -2715,7 +3010,10 @@ app.post("/api/video-remix/project/generate", async (c) => {
   const ownerUserId = c.get("userId");
   const productAssetIds = parsed.data.product.productImages.map((file) => file.metaId).filter(Boolean) as string[];
   const videoAssetIds = parsed.data.rawMaterialFiles.map((file) => file.objectKey);
-  const assets = [...productAssetIds, ...videoAssetIds].map((id) => accounts.getOwnedAsset(ownerUserId, id));
+  const voiceAssetId = parsed.data.voiceAsset?.objectKey;
+  const assets = [...productAssetIds, ...videoAssetIds, ...(voiceAssetId ? [voiceAssetId] : [])].map((id) =>
+    accounts.getOwnedAsset(ownerUserId, id),
+  );
   if (!productAssetIds.length || assets.some((asset) => !asset))
     return c.json(
       { error: { code: "ASSET_NOT_AVAILABLE", message: "引用的商品或视频素材不存在", retryable: false, requestId } },
@@ -2730,13 +3028,23 @@ app.post("/api/video-remix/project/generate", async (c) => {
       { error: { code: "INVALID_PRODUCT_ASSET", message: "商品素材必须是商品库图片", retryable: false, requestId } },
       422,
     );
-  if (assets.slice(productAssetIds.length).some((asset) => !asset?.mimeType.startsWith("video/")))
+  if (
+    assets
+      .slice(productAssetIds.length, productAssetIds.length + videoAssetIds.length)
+      .some((asset) => !asset?.mimeType.startsWith("video/"))
+  )
     return c.json(
       { error: { code: "INVALID_VIDEO_ASSET", message: "分镜素材必须全部为视频", retryable: false, requestId } },
       422,
     );
+  const voiceAsset = voiceAssetId ? assets.at(-1) : undefined;
+  if (voiceAssetId && !voiceAsset?.mimeType.startsWith("audio/"))
+    return c.json(
+      { error: { code: "INVALID_VOICE_ASSET", message: "音色素材必须是当前账号的音频", retryable: false, requestId } },
+      422,
+    );
   const productAsset = assets[0];
-  const videoAssets = assets.slice(productAssetIds.length);
+  const videoAssets = assets.slice(productAssetIds.length, productAssetIds.length + videoAssetIds.length);
   if (!productAsset || videoAssets.some((asset) => !asset))
     return c.json(
       { error: { code: "ASSET_NOT_AVAILABLE", message: "引用的商品或视频素材不存在", retryable: false, requestId } },
@@ -2754,6 +3062,7 @@ app.post("/api/video-remix/project/generate", async (c) => {
     description: parsed.data.demand,
     prompt: parsed.data.demand,
     portrait: parsed.data.portraitAssets[0]?.assetName ?? "",
+    voiceAssetId: voiceAssetId ?? "",
     projectRequest: JSON.stringify(parsed.data),
   };
   const idempotencyKey = c.req.header("Idempotency-Key")?.trim().slice(0, 128);

@@ -25,6 +25,7 @@ import {
   getModels,
   getProviderFeatures,
   getVideoCreateProject,
+  getVideoRemixProject,
   grantAdminUserCredits,
   importAdminEnvKey,
   listAdminCredentials,
@@ -32,6 +33,7 @@ import {
   listAdminUsers,
   listJobs,
   listVideoCreateProjects,
+  listVideoRemixProjects,
   listVideoRemixShotGenerationJobs,
   parseAdScriptSource,
   regenerateVideoCreateSection,
@@ -47,15 +49,18 @@ import {
   updateAllVideoCreateShotSettings,
   updateVideoCreateProject,
   updateVideoCreateShotSettings,
+  updateVideoRemixProject,
 } from "./generated/sdk.gen";
 import type {
   AdScriptInput,
   AdScriptProject,
   GetProviderFeaturesResponse,
+  GetVideoRemixProjectResponse,
   Job,
   ListAdminCredentialsResponse,
   ListAdminJobsResponse,
   ListAdminUsersResponse,
+  ListVideoRemixProjectsResponse,
   ModuleId,
   ProviderCredentialName,
   RunAdminCredentialDoctorResponse,
@@ -71,6 +76,8 @@ export type AdminUser = ListAdminUsersResponse["users"][number];
 export type AdminCredentialDoctorResult = RunAdminCredentialDoctorResponse["results"][number];
 export type ProviderFeatures = GetProviderFeaturesResponse;
 export type AdminStopAllJobsResult = StopAllAdminJobsResponse;
+export type RemixProjectSummary = ListVideoRemixProjectsResponse["projects"][number];
+export type RemixProjectDetail = GetVideoRemixProjectResponse;
 
 const configure = () =>
   client.setConfig({
@@ -543,6 +550,7 @@ interface RemixMaterialFile {
 }
 export interface RemixProjectRequest {
   projectName: string;
+  mode?: "product" | "talking";
   product: {
     id: number | string | null;
     productName: string;
@@ -552,6 +560,7 @@ export interface RemixProjectRequest {
   };
   demand: string;
   rawMaterialFiles: RemixMaterialFile[];
+  voiceAsset?: RemixMaterialFile | null;
   portraitAssets: Array<{
     id?: number | string | null;
     assetName: string;
@@ -577,6 +586,40 @@ export async function generateRemixProject(input: RemixProjectRequest, idempoten
   if (!response.ok)
     throw new Error(data && "error" in data ? data.error?.message || "视频解析提交失败" : "视频解析提交失败");
   if (!data || !("status" in data)) throw new Error("视频解析响应无效");
+  return data;
+}
+export async function fetchRemixProjects(input: {
+  query?: string;
+  stage?: RemixProjectSummary["currentStage"];
+  page: number;
+  pageSize: number;
+}) {
+  configure();
+  const { data } = await listVideoRemixProjects({ query: input, headers: authHeaders(), throwOnError: true });
+  if (!data) throw new Error("项目记录加载失败");
+  return data;
+}
+export async function fetchRemixProject(projectId: string) {
+  configure();
+  const { data } = await getVideoRemixProject({ path: { projectId }, headers: authHeaders(), throwOnError: true });
+  if (!data) throw new Error("项目详情加载失败");
+  return data;
+}
+export async function saveRemixProject(
+  projectId: string,
+  input: {
+    title?: string;
+    workspace?: RemixProjectDetail["workspace"];
+  },
+) {
+  configure();
+  const { data } = await updateVideoRemixProject({
+    path: { projectId },
+    body: input,
+    headers: authHeaders(),
+    throwOnError: true,
+  });
+  if (!data) throw new Error("项目保存失败");
   return data;
 }
 export async function composeRemixVideos(

@@ -5798,6 +5798,992 @@
         }
       }
     },
+    "/api/video-remix/projects": {
+      "get": {
+        "operationId": "listVideoRemixProjects",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "required": false,
+            "name": "query",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "upload",
+                "analysis",
+                "prompt",
+                "storyboard",
+                "compose",
+                "completed",
+                "failed"
+              ]
+            },
+            "required": false,
+            "name": "stage",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10
+            },
+            "required": false,
+            "name": "pageSize",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Video remix projects",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "projects": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "productName": {
+                            "type": "string"
+                          },
+                          "currentStage": {
+                            "type": "string",
+                            "enum": [
+                              "upload",
+                              "analysis",
+                              "prompt",
+                              "storyboard",
+                              "compose",
+                              "completed",
+                              "failed"
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "queued",
+                              "processing",
+                              "succeeded",
+                              "partially_succeeded",
+                              "failed",
+                              "cancelled"
+                            ]
+                          },
+                          "sourceCount": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "generatedCount": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "createdBy": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string"
+                          },
+                          "updatedAt": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "productName",
+                          "currentStage",
+                          "status",
+                          "sourceCount",
+                          "generatedCount",
+                          "createdBy",
+                          "createdAt",
+                          "updatedAt"
+                        ]
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "page": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "pageSize": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  },
+                  "required": [
+                    "projects",
+                    "total",
+                    "page",
+                    "pageSize"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/video-remix/projects/{projectId}": {
+      "get": {
+        "operationId": "getVideoRemixProject",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Video remix project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "project": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "productName": {
+                          "type": "string"
+                        },
+                        "currentStage": {
+                          "type": "string",
+                          "enum": [
+                            "upload",
+                            "analysis",
+                            "prompt",
+                            "storyboard",
+                            "compose",
+                            "completed",
+                            "failed"
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "queued",
+                            "processing",
+                            "succeeded",
+                            "partially_succeeded",
+                            "failed",
+                            "cancelled"
+                          ]
+                        },
+                        "sourceCount": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "generatedCount": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "createdBy": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "title",
+                        "productName",
+                        "currentStage",
+                        "status",
+                        "sourceCount",
+                        "generatedCount",
+                        "createdBy",
+                        "createdAt",
+                        "updatedAt"
+                      ]
+                    },
+                    "rootJob": {
+                      "$ref": "#/components/schemas/Job"
+                    },
+                    "childJobs": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Job"
+                      }
+                    },
+                    "projectRequest": {
+                      "type": "object",
+                      "properties": {
+                        "projectName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "product",
+                            "talking"
+                          ],
+                          "default": "product"
+                        },
+                        "product": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "nullable": true
+                                }
+                              ]
+                            },
+                            "productName": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 200
+                            },
+                            "productImages": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "nullable": true
+                                      }
+                                    ]
+                                  },
+                                  "filename": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 200
+                                  },
+                                  "objectKey": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "fileMd5": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "fileUrl": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "coverUrl": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "fileType": {
+                                    "type": "string",
+                                    "enum": [
+                                      "IMAGE",
+                                      "VIDEO",
+                                      "AUDIO"
+                                    ]
+                                  },
+                                  "metaId": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "assetId": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "duration": {
+                                    "type": "number",
+                                    "nullable": true,
+                                    "minimum": 0
+                                  },
+                                  "durationSec": {
+                                    "type": "number",
+                                    "nullable": true,
+                                    "minimum": 0
+                                  },
+                                  "arkVideoUrl": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "aiDescription": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "reasoningEffort": {
+                                    "type": "string",
+                                    "enum": [
+                                      "low",
+                                      "medium",
+                                      "high"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "filename",
+                                  "objectKey",
+                                  "fileUrl",
+                                  "coverUrl",
+                                  "fileType"
+                                ]
+                              },
+                              "minItems": 1,
+                              "maxItems": 20
+                            },
+                            "productFormMetaList": {
+                              "type": "array",
+                              "nullable": true,
+                              "items": {
+                                "nullable": true
+                              }
+                            },
+                            "productFormDesc": {
+                              "type": "string",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "productName",
+                            "productImages"
+                          ]
+                        },
+                        "demand": {
+                          "type": "string",
+                          "maxLength": 2000,
+                          "default": ""
+                        },
+                        "rawMaterialFiles": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "nullable": true
+                                  }
+                                ]
+                              },
+                              "filename": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 200
+                              },
+                              "objectKey": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "fileMd5": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "fileUrl": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "coverUrl": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "fileType": {
+                                "type": "string",
+                                "enum": [
+                                  "IMAGE",
+                                  "VIDEO",
+                                  "AUDIO"
+                                ]
+                              },
+                              "metaId": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "assetId": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "duration": {
+                                "type": "number",
+                                "nullable": true,
+                                "minimum": 0
+                              },
+                              "durationSec": {
+                                "type": "number",
+                                "nullable": true,
+                                "minimum": 0
+                              },
+                              "arkVideoUrl": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "aiDescription": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "reasoningEffort": {
+                                "type": "string",
+                                "enum": [
+                                  "low",
+                                  "medium",
+                                  "high"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "filename",
+                              "objectKey",
+                              "fileUrl",
+                              "coverUrl",
+                              "fileType"
+                            ]
+                          },
+                          "minItems": 1,
+                          "maxItems": 20
+                        },
+                        "voiceAsset": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "id": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "nullable": true
+                                }
+                              ]
+                            },
+                            "filename": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 200
+                            },
+                            "objectKey": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "fileMd5": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "fileUrl": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "coverUrl": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "fileType": {
+                              "type": "string",
+                              "enum": [
+                                "IMAGE",
+                                "VIDEO",
+                                "AUDIO"
+                              ]
+                            },
+                            "metaId": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "assetId": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "duration": {
+                              "type": "number",
+                              "nullable": true,
+                              "minimum": 0
+                            },
+                            "durationSec": {
+                              "type": "number",
+                              "nullable": true,
+                              "minimum": 0
+                            },
+                            "arkVideoUrl": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "aiDescription": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "reasoningEffort": {
+                              "type": "string",
+                              "enum": [
+                                "low",
+                                "medium",
+                                "high"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "filename",
+                            "objectKey",
+                            "fileUrl",
+                            "coverUrl",
+                            "fileType"
+                          ]
+                        },
+                        "portraitAssets": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "nullable": true
+                                  }
+                                ]
+                              },
+                              "assetName": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100
+                              },
+                              "fileInfo": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "fileUrl": {
+                                      "type": "string",
+                                      "format": "uri"
+                                    },
+                                    "coverUrl": {
+                                      "type": "string",
+                                      "format": "uri"
+                                    },
+                                    "fileType": {
+                                      "type": "string",
+                                      "enum": [
+                                        "IMAGE"
+                                      ]
+                                    },
+                                    "assetId": {
+                                      "type": "string",
+                                      "nullable": true
+                                    }
+                                  },
+                                  "required": [
+                                    "fileUrl",
+                                    "coverUrl",
+                                    "fileType"
+                                  ]
+                                }
+                              },
+                              "description": {
+                                "type": "string",
+                                "maxLength": 1000,
+                                "default": ""
+                              },
+                              "gender": {
+                                "type": "string",
+                                "maxLength": 20,
+                                "default": ""
+                              },
+                              "age": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0,
+                                "maximum": 150
+                              },
+                              "occupation": {
+                                "type": "string",
+                                "maxLength": 100,
+                                "default": ""
+                              }
+                            },
+                            "required": [
+                              "assetName",
+                              "fileInfo"
+                            ]
+                          },
+                          "maxItems": 10,
+                          "default": []
+                        }
+                      },
+                      "required": [
+                        "projectName",
+                        "product",
+                        "rawMaterialFiles"
+                      ]
+                    },
+                    "workspace": {
+                      "type": "object",
+                      "properties": {
+                        "stage": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 4
+                        },
+                        "promptStates": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "prompt": {
+                                "type": "string",
+                                "maxLength": 30000
+                              },
+                              "versions": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 120
+                                    },
+                                    "label": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 40
+                                    },
+                                    "prompt": {
+                                      "type": "string",
+                                      "maxLength": 30000
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "label",
+                                    "prompt"
+                                  ]
+                                },
+                                "maxItems": 100
+                              },
+                              "activeVersionId": {
+                                "type": "string",
+                                "maxLength": 120
+                              }
+                            },
+                            "required": [
+                              "prompt",
+                              "versions",
+                              "activeVersionId"
+                            ]
+                          }
+                        },
+                        "selectedShotAssets": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "composeOrder": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "maxItems": 20
+                        },
+                        "composePreviewId": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                ""
+                              ]
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "stage",
+                        "promptStates",
+                        "selectedShotAssets",
+                        "composeOrder",
+                        "composePreviewId"
+                      ]
+                    },
+                    "missingAssetIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "format": "uuid"
+                      }
+                    }
+                  },
+                  "required": [
+                    "project",
+                    "rootJob",
+                    "childJobs",
+                    "projectRequest",
+                    "workspace",
+                    "missingAssetIds"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Project cannot be restored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateVideoRemixProject",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "workspace": {
+                    "type": "object",
+                    "properties": {
+                      "stage": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 4
+                      },
+                      "promptStates": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "object",
+                          "properties": {
+                            "prompt": {
+                              "type": "string",
+                              "maxLength": 30000
+                            },
+                            "versions": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 120
+                                  },
+                                  "label": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 40
+                                  },
+                                  "prompt": {
+                                    "type": "string",
+                                    "maxLength": 30000
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "label",
+                                  "prompt"
+                                ]
+                              },
+                              "maxItems": 100
+                            },
+                            "activeVersionId": {
+                              "type": "string",
+                              "maxLength": 120
+                            }
+                          },
+                          "required": [
+                            "prompt",
+                            "versions",
+                            "activeVersionId"
+                          ]
+                        }
+                      },
+                      "selectedShotAssets": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "composeOrder": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "maxItems": 20
+                      },
+                      "composePreviewId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              ""
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "stage",
+                      "promptStates",
+                      "selectedShotAssets",
+                      "composeOrder",
+                      "composePreviewId"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated video remix project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Project is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid project state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/video-remix/prompt-tools": {
       "post": {
         "operationId": "createVideoRemixPromptToolJob",

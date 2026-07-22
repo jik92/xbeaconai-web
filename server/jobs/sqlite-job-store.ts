@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray, like, lte, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNull, like, lte, type SQL } from "drizzle-orm";
 import type { ModuleId } from "../../web/entities/types";
 import { type AppDatabase, openDatabase } from "../db/database";
 import { creditCharges, jobs, objectCleanup, users } from "../db/schema";
@@ -217,6 +217,28 @@ export class SqliteJobStore {
       .map((row) => this.fromRow(row));
   }
 
+  listRemixProjectRoots(ownerUserId: string): JobRecord[] {
+    return this.db
+      .select()
+      .from(jobs)
+      .where(and(eq(jobs.ownerUserId, ownerUserId), eq(jobs.moduleId, "video-remix"), isNull(jobs.parentJobId)))
+      .orderBy(desc(jobs.createdAt))
+      .all()
+      .map((row) => this.fromRow(row))
+      .filter((job) => job.values.workflowPhase === "analysis");
+  }
+
+  listChildrenForParents(ownerUserId: string, parentJobIds: string[]): JobRecord[] {
+    if (!parentJobIds.length) return [];
+    return this.db
+      .select()
+      .from(jobs)
+      .where(and(eq(jobs.ownerUserId, ownerUserId), inArray(jobs.parentJobId, parentJobIds)))
+      .orderBy(desc(jobs.createdAt))
+      .all()
+      .map((row) => this.fromRow(row));
+  }
+
   listAll(input: {
     page: number;
     pageSize: number;
@@ -266,6 +288,7 @@ export class SqliteJobStore {
     this.db
       .update(jobs)
       .set({
+        title: next.title,
         status: next.status,
         progress: next.progress,
         stage: next.stage,

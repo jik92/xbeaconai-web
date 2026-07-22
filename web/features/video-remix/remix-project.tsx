@@ -1,9 +1,8 @@
 // biome-ignore-all lint/a11y/useButtonType: This full-screen workbench contains no forms.
 // biome-ignore-all lint/a11y/noStaticElementInteractions: Modal backdrops dismiss their dialogs.
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Check,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CircleCheck,
@@ -23,7 +22,7 @@ import {
   Video,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   composeRemixVideos,
   downloadAuthenticated,
@@ -31,9 +30,14 @@ import {
   fetchJob,
   fetchLibraryAssets,
   fetchProducts,
+  fetchRemixProject,
+  fetchRemixProjects,
   fetchRemixShotJobs,
   generateRemixProject,
   generateRemixShot,
+  type RemixProjectDetail,
+  type RemixProjectSummary,
+  saveRemixProject,
 } from "@/api/api-client";
 import type { Job, SeedanceModelId } from "@/api/generated/types.gen";
 import { AttachmentPicker, type AttachmentSelection } from "@/components/domain/attachment-picker";
@@ -53,7 +57,6 @@ import { PromptToolModal } from "./prompt-tool-modal";
 import "./remix-project.css";
 
 const stages = ["上传配置", "AI 解析", "提示词校对", "分镜校对", "合并成片"];
-const demoProduct = "古叔的着 巴拿马草帽男夏季大头围新款船夫帽休闲复古平顶草编帽_07171549";
 const fallbackPortrait =
   "https://omni-agent.tos-cn-beijing.volces.com/resource/virtual-person/asset-20260224201926-kq66z.png";
 
@@ -547,40 +550,81 @@ function PortraitPickerModal({
   );
 }
 
-function ProjectHistoryDrawer({ open, job, onClose }: { open: boolean; job: Job | null; onClose: () => void }) {
-  const rows = useMemo(
-    () => [
-      {
-        name: demoProduct,
-        product: demoProduct,
-        progress: "分镜校对 1 / 1",
-        tone: "orange",
-        time: "2026-07-17\n17:00:12",
-      },
-      {
-        name: "潮流男士胸包百搭休闲男士腰包时尚…",
-        product: "潮流男士胸包百搭休闲男士腰包时尚",
-        progress: "分镜校对 2 / 3",
-        tone: "orange",
-        time: "2026-07-17\n14:37:22",
-      },
-      {
-        name: "夏季新款高腰窄版直筒女裤垂顺显瘦透…",
-        product: "夏季新款高腰窄版直筒女裤垂顺显瘦透…",
-        progress: "提示词校对",
-        tone: "blue",
-        time: "2026-07-16\n17:06:30",
-      },
-      {
-        name: "夏季新款高腰窄版直筒女裤垂顺显瘦透…",
-        product: "夏季新款高腰窄版直筒女裤垂顺显瘦透…",
-        progress: "分镜校对 1 / 1",
-        tone: "orange",
-        time: "2026-07-16\n17:06:25",
-      },
-    ],
-    [],
-  );
+const remixProjectStageLabels: Record<RemixProjectSummary["currentStage"], string> = {
+  upload: "上传配置",
+  analysis: "AI 解析",
+  prompt: "提示词校对",
+  storyboard: "分镜校对",
+  compose: "合并成片",
+  completed: "已完成",
+  failed: "失败",
+};
+
+function ProjectHistoryDrawer({
+  open,
+  currentProjectId,
+  onClose,
+  onContinue,
+  onRenamed,
+}: {
+  open: boolean;
+  currentProjectId?: string;
+  onClose: () => void;
+  onContinue: (project: RemixProjectDetail) => void | Promise<void>;
+  onRenamed: (projectId: string, title: string) => void;
+}) {
+  const queryClient = useQueryClient();
+  const [query, setQuery] = useState("");
+  const [appliedQuery, setAppliedQuery] = useState("");
+  const [stageFilter, setStageFilter] = useState<"" | RemixProjectSummary["currentStage"]>("");
+  const [appliedStage, setAppliedStage] = useState<"" | RemixProjectSummary["currentStage"]>("");
+  const [page, setPage] = useState(1);
+  const [editingId, setEditingId] = useState("");
+  const [editingTitle, setEditingTitle] = useState("");
+  const [busyId, setBusyId] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const history = useQuery({
+    queryKey: ["video-remix-projects", appliedQuery, appliedStage, page],
+    queryFn: () =>
+      fetchRemixProjects({
+        query: appliedQuery || undefined,
+        stage: appliedStage || undefined,
+        page,
+        pageSize: 8,
+      }),
+    enabled: open,
+  });
+  const totalPages = Math.max(1, Math.ceil((history.data?.total ?? 0) / (history.data?.pageSize ?? 8)));
+  const renameProject = async (project: RemixProjectSummary) => {
+    const title = editingTitle.trim();
+    if (!title || title === project.title) {
+      setEditingId("");
+      return;
+    }
+    setBusyId(project.id);
+    setErrorMessage("");
+    try {
+      await saveRemixProject(project.id, { title });
+      onRenamed(project.id, title);
+      setEditingId("");
+      await queryClient.invalidateQueries({ queryKey: ["video-remix-projects"] });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "项目重命名失败");
+    } finally {
+      setBusyId("");
+    }
+  };
+  const continueProject = async (projectId: string) => {
+    setBusyId(projectId);
+    setErrorMessage("");
+    try {
+      await onContinue(await fetchRemixProject(projectId));
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "项目恢复失败");
+    } finally {
+      setBusyId("");
+    }
+  };
   if (!open) return null;
   return (
     <div className="history-layer" role="presentation" onMouseDown={onClose}>
@@ -599,14 +643,37 @@ function ProjectHistoryDrawer({ open, job, onClose }: { open: boolean; job: Job 
         </header>
         <div className="history-filters">
           <label>
-            <input placeholder="搜索项目名称" />
+            <input value={query} placeholder="搜索项目名称" onChange={(event) => setQuery(event.target.value)} />
             <Search />
           </label>
-          <button>
-            项目进度 <ChevronDown />
+          <select
+            aria-label="项目进度"
+            value={stageFilter}
+            onChange={(event) => setStageFilter(event.target.value as typeof stageFilter)}
+          >
+            <option value="">全部进度</option>
+            {Object.entries(remixProjectStageLabels).map(([value, label]) => (
+              <option value={value} key={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <button
+            className="history-search"
+            onClick={() => {
+              setAppliedQuery(query.trim());
+              setAppliedStage(stageFilter);
+              setPage(1);
+            }}
+          >
+            查询
           </button>
-          <button className="history-search">查询</button>
         </div>
+        {(errorMessage || history.error) && (
+          <button className="history-error" onClick={() => void history.refetch()}>
+            {errorMessage || (history.error instanceof Error ? history.error.message : "项目记录加载失败")}，点击重试
+          </button>
+        )}
         <div className="history-table">
           <div className="history-head">
             <span>项目名称</span>
@@ -615,32 +682,68 @@ function ProjectHistoryDrawer({ open, job, onClose }: { open: boolean; job: Job 
             <span>更新时间</span>
             <span>操作</span>
           </div>
-          {rows.map((row, index) => (
-            <div className="history-row" key={row.time}>
+          {history.data?.projects.map((project) => (
+            <div className={`history-row ${project.id === currentProjectId ? "current" : ""}`} key={project.id}>
               <span>
-                <b>
-                  {index === 0 && job?.title ? job.title : row.name} <Pencil />
-                </b>
-                <small>产品：{row.product}</small>
+                {editingId === project.id ? (
+                  <input
+                    className="history-title-input"
+                    value={editingTitle}
+                    maxLength={80}
+                    disabled={busyId === project.id}
+                    onChange={(event) => setEditingTitle(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") void renameProject(project);
+                      if (event.key === "Escape") setEditingId("");
+                    }}
+                  />
+                ) : (
+                  <b>
+                    {project.title}
+                    <button
+                      aria-label={`重命名 ${project.title}`}
+                      onClick={() => {
+                        setEditingId(project.id);
+                        setEditingTitle(project.title);
+                      }}
+                    >
+                      <Pencil />
+                    </button>
+                  </b>
+                )}
+                <small>产品：{project.productName}</small>
               </span>
               <span>
-                <i className={row.tone}>{row.progress}</i>
+                <i className={project.currentStage}>
+                  {remixProjectStageLabels[project.currentStage]}
+                  {project.currentStage === "storyboard" && ` ${project.generatedCount} / ${project.sourceCount}`}
+                </i>
               </span>
-              <span>尧子康</span>
-              <span className="history-time">{row.time}</span>
+              <span>{project.createdBy}</span>
+              <span className="history-time">{new Date(project.updatedAt).toLocaleString()}</span>
               <span>
-                <button>继续创作</button>
+                {editingId === project.id ? (
+                  <button disabled={busyId === project.id} onClick={() => void renameProject(project)}>
+                    保存
+                  </button>
+                ) : (
+                  <button disabled={busyId === project.id} onClick={() => void continueProject(project.id)}>
+                    {busyId === project.id ? "加载中" : "继续创作"}
+                  </button>
+                )}
               </span>
             </div>
           ))}
+          {history.isLoading && <div className="history-empty">正在加载项目记录…</div>}
+          {!history.isLoading && !history.data?.projects.length && <div className="history-empty">暂无项目记录</div>}
         </div>
         <footer>
-          <span>共 4 条</span>
-          <button disabled>
+          <span>共 {history.data?.total ?? 0} 条</span>
+          <button disabled={page <= 1 || history.isFetching} onClick={() => setPage((value) => value - 1)}>
             <ChevronLeft />
           </button>
-          <b>1</b>
-          <button disabled>
+          <b>{page}</b>
+          <button disabled={page >= totalPages || history.isFetching} onClick={() => setPage((value) => value + 1)}>
             <ChevronRight />
           </button>
         </footer>
@@ -650,6 +753,8 @@ function ProjectHistoryDrawer({ open, job, onClose }: { open: boolean; job: Job 
 }
 
 export function RemixProject() {
+  const queryClient = useQueryClient();
+  const lastSavedWorkspace = useRef("");
   const [stage, setStage] = useState(0);
   const [parsed, setParsed] = useState(false);
   const [parsing, setParsing] = useState(false);
@@ -794,6 +899,31 @@ export function RemixProject() {
     });
   }, [shotJobs, shotSelectionTouched, sources]);
 
+  useEffect(() => {
+    if (!job?.id || !parsed || !sources.length) return;
+    const sourceIds = sources.map((source) => source.id);
+    if (!sourceIds.every((sourceId) => selectedShotAssets[sourceId])) return;
+    const workspace: RemixProjectDetail["workspace"] = {
+      stage,
+      promptStates,
+      selectedShotAssets: Object.fromEntries(sourceIds.map((sourceId) => [sourceId, selectedShotAssets[sourceId]])),
+      composeOrder,
+      composePreviewId,
+    };
+    const serialized = JSON.stringify(workspace);
+    if (serialized === lastSavedWorkspace.current) return;
+    const timer = window.setTimeout(() => {
+      void saveRemixProject(job.id, { workspace })
+        .then((updated) => {
+          lastSavedWorkspace.current = serialized;
+          setJob((current) => (current?.id === updated.id ? updated : current));
+          void queryClient.invalidateQueries({ queryKey: ["video-remix-projects"] });
+        })
+        .catch((error) => setNotice(error instanceof Error ? error.message : "项目进度保存失败"));
+    }, 600);
+    return () => window.clearTimeout(timer);
+  }, [composeOrder, composePreviewId, job?.id, parsed, promptStates, queryClient, selectedShotAssets, sources, stage]);
+
   const patchPromptState = useCallback((assetId: string, update: (current: SourcePromptState) => SourcePromptState) => {
     if (!assetId) return;
     setPromptStates((current) => {
@@ -901,6 +1031,7 @@ export function RemixProject() {
         projectName:
           projectName.trim() ||
           `爆款二创 · ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
+        mode,
         product: {
           id: selectedProduct.id,
           productName: selectedProduct.name,
@@ -936,6 +1067,16 @@ export function RemixProject() {
             reasoningEffort: "high",
           };
         }),
+        voiceAsset: selectedVoice
+          ? {
+              filename: selectedVoice.originalName,
+              objectKey: selectedVoice.id,
+              fileUrl: selectedVoice.url,
+              coverUrl: selectedVoice.url,
+              fileType: "AUDIO",
+              durationSec: selectedVoice.durationSec ?? null,
+            }
+          : null,
         portraitAssets: selectedPortrait
           ? [
               {
@@ -994,7 +1135,109 @@ export function RemixProject() {
     setJob(null);
     setComposeJob(null);
     setNotice("");
+    lastSavedWorkspace.current = "";
   };
+  const restoreProject = useCallback(
+    (detail: RemixProjectDetail) => {
+      const request = detail.projectRequest;
+      const restoredSources: AttachmentSelection[] = request.rawMaterialFiles.map((file) => ({
+        id: file.objectKey,
+        name: file.filename,
+        mimeType: "video/mp4",
+        url: `/api/assets/${file.objectKey}/content`,
+        source: "library",
+      }));
+      const productImages: LibraryAsset[] = request.product.productImages.flatMap((image) => {
+        if (!image.metaId) return [];
+        return [
+          {
+            id: image.metaId,
+            name: image.filename,
+            originalName: image.filename,
+            mimeType: "image/jpeg",
+            size: 0,
+            kind: "product" as const,
+            description: image.aiDescription,
+            url: `/api/assets/${image.metaId}/content`,
+            createdAt: detail.rootJob.createdAt,
+          },
+        ];
+      });
+      const productId =
+        typeof request.product.id === "string" || typeof request.product.id === "number"
+          ? String(request.product.id)
+          : detail.rootJob.values.product?.split(":")[1] || detail.rootJob.id;
+      setSelectedProduct({
+        id: productId,
+        name: request.product.productName,
+        description: request.product.productFormDesc,
+        sharingScope: "private",
+        images: productImages,
+        createdAt: detail.rootJob.createdAt,
+      });
+      const portrait = request.portraitAssets?.[0];
+      const portraitFile = portrait?.fileInfo[0];
+      setSelectedPortrait(
+        portrait && portraitFile
+          ? {
+              name: portrait.assetName,
+              profession: portrait.occupation || "",
+              source_url: portraitFile.fileUrl,
+              index: Number(portrait.id) || 0,
+              description: portrait.description,
+              gender: portrait.gender,
+              age: portrait.age,
+            }
+          : null,
+      );
+      const voice = request.voiceAsset;
+      setSelectedVoice(
+        voice
+          ? {
+              id: voice.objectKey,
+              name: voice.filename,
+              originalName: voice.filename,
+              mimeType: "audio/mpeg",
+              size: 0,
+              durationSec: voice.durationSec,
+              kind: "voice",
+              url: `/api/assets/${voice.objectKey}/content`,
+              createdAt: detail.rootJob.createdAt,
+            }
+          : null,
+      );
+      const rootReady = detail.rootJob.status === "succeeded" || detail.rootJob.status === "partially_succeeded";
+      const shotHistory = detail.childJobs.filter((child) => child.values.workflowPhase === "shot-generation");
+      const latestCompose = detail.childJobs.find((child) => child.values.workflowPhase === "compose") ?? null;
+      lastSavedWorkspace.current = JSON.stringify(detail.workspace);
+      queryClient.setQueryData(["video-remix-shot-jobs", detail.rootJob.id], shotHistory);
+      setMode(request.mode ?? "product");
+      setProjectName(detail.project.title);
+      setDescription(request.demand ?? "");
+      setSources(restoredSources);
+      setJob(detail.rootJob);
+      setParsed(rootReady);
+      setParsing(detail.rootJob.status === "queued" || detail.rootJob.status === "processing");
+      setStage(rootReady ? detail.workspace.stage : 1);
+      setPromptStates(detail.workspace.promptStates);
+      setSelectedShotAssets(detail.workspace.selectedShotAssets);
+      setShotSelectionTouched(Object.fromEntries(restoredSources.map((source) => [source.id, true])));
+      setComposeOrder(detail.workspace.composeOrder);
+      setComposePreviewId(detail.workspace.composePreviewId);
+      setActiveSourceId(detail.workspace.composePreviewId || restoredSources[0]?.id || "");
+      setComposeJob(latestCompose);
+      setShotDrafts({});
+      setEditing(false);
+      setPromptTool(null);
+      setHistoryOpen(false);
+      setNotice(
+        detail.missingAssetIds.length
+          ? `项目已恢复，但有 ${detail.missingAssetIds.length} 个素材已不存在`
+          : "项目已恢复",
+      );
+    },
+    [queryClient],
+  );
   const applyPromptTool = useCallback(
     (tool: RemixPromptTool, rewrittenPrompt: string, summary: string, findings: string[]) => {
       const nextVersionId = `${tool}-${Date.now()}`;
@@ -1148,10 +1391,41 @@ export function RemixProject() {
       setNotice(error instanceof Error ? error.message : "合并任务提交失败");
     }
   };
+  const currentWorkspace = (): RemixProjectDetail["workspace"] | undefined => {
+    if (!job?.id || !parsed || !sources.length) return undefined;
+    const sourceIds = sources.map((source) => source.id);
+    if (!sourceIds.every((sourceId) => selectedShotAssets[sourceId])) return undefined;
+    return {
+      stage,
+      promptStates,
+      selectedShotAssets: Object.fromEntries(sourceIds.map((sourceId) => [sourceId, selectedShotAssets[sourceId]])),
+      composeOrder,
+      composePreviewId,
+    };
+  };
+  const saveCurrentProject = async () => {
+    const workspace = currentWorkspace();
+    if (!job?.id || !workspace) return;
+    await saveRemixProject(job.id, { workspace });
+    lastSavedWorkspace.current = JSON.stringify(workspace);
+  };
+  const startNewProject = async () => {
+    try {
+      await saveCurrentProject();
+      reset();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "当前项目保存失败");
+    }
+  };
 
   return (
     <div className="remix-project">
-      <WorkflowHeader stage={stage} onStage={setStage} onHistory={() => setHistoryOpen(true)} onReset={reset} />
+      <WorkflowHeader
+        stage={stage}
+        onStage={setStage}
+        onHistory={() => setHistoryOpen(true)}
+        onReset={() => void startNewProject()}
+      />
       <div className="remix-body">
         <ConfigSidebar
           mode={mode}
@@ -1695,7 +1969,20 @@ export function RemixProject() {
           {parsing ? "解析中" : job ? "已提交解析" : "视频解析"}
         </button>
       )}
-      <ProjectHistoryDrawer open={historyOpen} job={job} onClose={() => setHistoryOpen(false)} />
+      <ProjectHistoryDrawer
+        open={historyOpen}
+        currentProjectId={job?.id}
+        onClose={() => setHistoryOpen(false)}
+        onContinue={async (detail) => {
+          await saveCurrentProject();
+          restoreProject(detail.rootJob.id === job?.id ? await fetchRemixProject(detail.rootJob.id) : detail);
+        }}
+        onRenamed={(projectId, title) => {
+          if (job?.id !== projectId) return;
+          setProjectName(title);
+          setJob((current) => (current ? { ...current, title } : current));
+        }}
+      />
       <PromptToolModal
         tool={promptTool}
         sourceJobId={job?.id}
