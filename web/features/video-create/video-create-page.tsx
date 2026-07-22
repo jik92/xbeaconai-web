@@ -36,7 +36,11 @@ import {
 import type { VideoCreateInput, VideoCreateProject } from "@/api/generated/types.gen";
 import { AttachmentPicker, type AttachmentSelection } from "@/components/domain/attachment-picker";
 import { AuthenticatedMedia } from "@/components/domain/authenticated-media";
-import "./video-create-page.css";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
+import { cn } from "@/lib/utils";
 
 const scenes = ["商城转化", "短视频带货", "引流直播间", "直播带货", "内容种草", "品牌曝光", "本地到店", "线索收集"];
 const durationOptions = [15, 30, 60, 180];
@@ -153,19 +157,24 @@ function ChoiceGroup({
   onToggle: (option: string) => void;
 }) {
   return (
-    <div className="vc-choice-group">
-      <strong>{label}</strong>
-      <div className="vc-choice-list">
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <div className="flex flex-wrap gap-2">
         {options.map((option) => (
-          <button
-            className={selected.includes(option) ? "active" : ""}
+          <Button
+            className={cn(
+              "h-8 rounded-full px-3 font-normal",
+              selected.includes(option) && "border-primary bg-primary text-white hover:bg-primary/90",
+            )}
+            variant="outline"
+            size="sm"
             aria-pressed={selected.includes(option)}
             key={option}
             onClick={() => onToggle(option)}
           >
             {selected.includes(option) && <Check />}
             {option}
-          </button>
+          </Button>
         ))}
       </div>
     </div>
@@ -186,16 +195,21 @@ function ParameterPanel({
   children: ReactNode;
 }) {
   return (
-    <section className={`vc-parameter-panel ${open ? "open" : ""}`}>
-      <button className="vc-collapse" aria-expanded={open} onClick={onToggle}>
-        <span>
-          <b>{title}</b>
-          {count > 0 && <i>{count}</i>}
-          <small>{count ? "已选" : "可选"}</small>
+    <section className="overflow-hidden rounded-lg border border-line bg-surface">
+      <Button
+        className="h-10 w-full justify-between rounded-none px-3 hover:bg-surface-muted"
+        variant="ghost"
+        aria-expanded={open}
+        onClick={onToggle}
+      >
+        <span className="flex items-center gap-2">
+          <span>{title}</span>
+          {count > 0 && <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-white">{count}</span>}
+          <span className="text-xs font-normal text-muted">{count ? "已选" : "可选"}</span>
         </span>
-        <ChevronDown className={open ? "open" : ""} />
-      </button>
-      {open && <div className="vc-parameter-content">{children}</div>}
+        <ChevronDown className={cn("transition-transform", open && "rotate-180")} />
+      </Button>
+      {open && <div className="grid gap-4 border-t border-line p-3">{children}</div>}
     </section>
   );
 }
@@ -215,14 +229,21 @@ function ProductImages({
     (id) => assets.find((asset) => asset.id === id) ?? { id, name: "商品图片", mimeType: "image/png" },
   );
   return (
-    <div className="vc-image-grid">
+    <div className="flex flex-wrap gap-2">
       {visible.map((asset) => (
-        <div className="vc-image-card" key={asset.id}>
+        <div
+          className="relative h-20 w-16 overflow-hidden rounded-lg border border-line bg-surface-muted [&_img]:h-full [&_img]:w-full [&_img]:object-cover"
+          key={asset.id}
+        >
           <AuthenticatedMedia url={`/api/assets/${asset.id}/content`} mimeType={asset.mimeType} alt={asset.name} />
-          <button aria-label="移除商品图片" onClick={() => onRemove(asset.id)}>
+          <Button
+            className="absolute right-1 top-1 size-6 rounded-full bg-ink/75 p-0 text-white hover:bg-ink"
+            size="icon"
+            aria-label="移除商品图片"
+            onClick={() => onRemove(asset.id)}
+          >
             <X />
-          </button>
-          <span>待解析</span>
+          </Button>
         </div>
       ))}
       {ids.length < 6 && (
@@ -231,10 +252,14 @@ function ProductImages({
           multiple
           onSelect={onAdd}
           trigger={(open) => (
-            <button className="vc-add-image" onClick={open}>
+            <Button
+              className="h-20 w-16 flex-col rounded-lg border-dashed px-0 text-muted"
+              variant="outline"
+              onClick={open}
+            >
               <Plus />
               添加
-            </button>
+            </Button>
           )}
         />
       )}
@@ -255,24 +280,44 @@ function HistoryDrawer({
 }) {
   if (!open) return null;
   return (
-    <div className="vc-history-layer" role="presentation" onMouseDown={onClose}>
-      <aside className="vc-history" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
-        <header className="vc-history-head">
-          <h2 className="text-ink">生成记录</h2>
-          <button aria-label="关闭生成记录" onClick={onClose}>
+    <div className="fixed inset-0 z-50 bg-ink/20" role="presentation" onMouseDown={onClose}>
+      <aside
+        className="absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-line bg-surface shadow-sm"
+        role="dialog"
+        aria-modal="true"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <header className="flex h-[52px] shrink-0 items-center justify-between border-b border-line px-4">
+          <h2 className="text-base font-medium text-ink">生成记录</h2>
+          <Button variant="ghost" size="icon" aria-label="关闭生成记录" onClick={onClose}>
             <X />
-          </button>
+          </Button>
         </header>
-        <div className="vc-history-list">
+        <div className="flex-1 space-y-2 overflow-y-auto p-3">
           {projects.map((item) => (
-            <button key={item.project.id} onClick={() => onSelect(item)}>
-              <span className={`vc-history-status ${item.project.status}`}>{statusLabels[item.project.status]}</span>
-              <b>{item.project.title}</b>
-              <small>{item.project.input.productName || "尚未填写产品名称"}</small>
-              <time>{new Date(item.project.updatedAt).toLocaleString()}</time>
-            </button>
+            <Button
+              className="h-auto w-full justify-start rounded-lg p-3 text-left"
+              variant="outline"
+              key={item.project.id}
+              onClick={() => onSelect(item)}
+            >
+              <span className="min-w-0 flex-1 space-y-1">
+                <span className="flex items-center gap-2">
+                  <span className="rounded-full bg-surface-strong px-2 py-0.5 text-xs text-body">
+                    {statusLabels[item.project.status]}
+                  </span>
+                  <span className="truncate font-medium text-ink">{item.project.title}</span>
+                </span>
+                <span className="block truncate text-xs font-normal text-muted">
+                  {item.project.input.productName || "尚未填写产品名称"}
+                </span>
+              </span>
+              <time className="text-xs font-normal text-muted">
+                {new Date(item.project.updatedAt).toLocaleString()}
+              </time>
+            </Button>
           ))}
-          {!projects.length && <p>暂无生成记录</p>}
+          {!projects.length && <p className="py-10 text-center text-sm text-muted">暂无生成记录</p>}
         </div>
       </aside>
     </div>
@@ -414,21 +459,28 @@ export function VideoCreatePage() {
     ) ?? 0;
 
   return (
-    <div className="video-create-page">
-      <aside className="vc-config-panel">
-        <header className="vc-config-head">
-          <div>
-            <span>NEW PROJECT</span>
-            <h1>新建项目</h1>
-          </div>
-          <button onClick={reset}>
+    <div
+      className="grid h-[calc(100vh-56px)] min-h-0 grid-cols-[360px_minmax(0,1fr)] overflow-hidden bg-surface text-sm text-body max-[1100px]:grid-cols-[320px_minmax(0,1fr)] max-[760px]:block max-[760px]:h-auto max-[760px]:overflow-auto"
+      data-testid="video-create-page"
+    >
+      <aside
+        className="flex min-h-0 min-w-0 flex-col overflow-hidden border-r border-line bg-surface max-[760px]:min-h-[calc(100vh-56px)] max-[760px]:overflow-visible"
+        data-testid="video-create-config-panel"
+      >
+        <header className="flex h-[52px] shrink-0 items-center justify-between border-b border-line px-3">
+          <h1 className="text-lg font-medium text-ink">新建项目</h1>
+          <Button variant="ghost" size="sm" onClick={reset}>
             <Plus /> 新建
-          </button>
+          </Button>
         </header>
-        <div className="vc-config-scroll">
-          <section className="vc-field">
-            <div className="vc-field-label">
-              产品图片 <small>（AI 智能分析）</small>
+        <div
+          className="flex-1 space-y-4 overflow-y-auto p-3 max-[760px]:overflow-visible"
+          data-testid="video-create-config-scroll"
+        >
+          <section className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>产品图片</Label>
+              <span className="text-xs text-muted">最多 6 张</span>
             </div>
             <ProductImages
               assets={productAssets}
@@ -450,78 +502,97 @@ export function VideoCreatePage() {
                 )
               }
             />
-            <button
-              className="vc-ai-fill"
+            <Button
+              className="w-full"
+              variant="outline"
+              size="sm"
               disabled={!input.productAssetIds.length || Boolean(busy)}
               onClick={() => action("analyze")}
             >
               {busy === "analyze" || active === "analyzing" ? <LoaderCircle className="animate-spin" /> : <Sparkles />}
-              AI 填充参数（推荐先点我）
-            </button>
+              AI 填充参数
+            </Button>
           </section>
 
-          <section className="vc-field">
-            <div className="vc-field-label">
-              人像图片 <small>（可选）</small>
+          <section className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>人像图片</Label>
+              <span className="text-xs text-muted">可选</span>
             </div>
             {input.portraitAssetId ? (
-              <div className="vc-selected-asset">
+              <div className="flex items-center gap-2 rounded-lg border border-line p-2 [&_img]:h-12 [&_img]:w-9 [&_img]:rounded-md [&_img]:object-cover">
                 <AuthenticatedMedia
                   url={`/api/assets/${input.portraitAssetId}/content`}
                   mimeType="image/png"
                   alt="已选人像"
                 />
-                <button onClick={() => mutateInput("portraitAssetId", undefined)}>移除</button>
+                <span className="flex-1 text-xs text-muted">已选择人像</span>
+                <Button variant="ghost" size="sm" onClick={() => mutateInput("portraitAssetId", undefined)}>
+                  移除
+                </Button>
               </div>
             ) : (
               <AttachmentPicker
                 accept="image/*"
                 onSelect={([asset]) => asset && mutateInput("portraitAssetId", asset.id)}
                 trigger={(open) => (
-                  <button className="vc-inline-add" onClick={open}>
-                    未添加人像 <span>+ 添加</span>
-                  </button>
+                  <Button className="w-full justify-between" variant="outline" size="sm" onClick={open}>
+                    未添加人像 <span>添加</span>
+                  </Button>
                 )}
               />
             )}
           </section>
 
-          <section className="vc-field">
-            <div className="vc-field-label">广告场景</div>
-            <div className="vc-chip-grid">
+          <section className="space-y-2">
+            <Label>广告场景</Label>
+            <div className="flex flex-wrap gap-2">
               {scenes.map((scene) => (
-                <button
-                  className={input.scene === scene ? "active" : ""}
+                <Button
+                  className={cn(
+                    "h-8 rounded-full px-3 font-normal",
+                    input.scene === scene && "border-primary bg-primary text-white hover:bg-primary/90",
+                  )}
+                  variant="outline"
+                  size="sm"
                   key={scene}
                   onClick={() => mutateInput("scene", scene)}
                 >
                   {scene}
-                </button>
+                </Button>
               ))}
             </div>
           </section>
 
-          <label className="vc-field">
-            <span>
-              产品名称 <em>*</em>
-            </span>
-            <input
+          <div className="space-y-2">
+            <Label htmlFor="video-create-product-name">
+              产品名称 <span className="text-error">*</span>
+            </Label>
+            <Input
+              id="video-create-product-name"
               value={input.productName}
               maxLength={60}
               placeholder="输入产品名称"
               onChange={(event) => mutateInput("productName", event.target.value)}
             />
-          </label>
+          </div>
 
-          <section className="vc-field">
-            <div className="vc-field-label">
-              核心卖点 <small>（最多 8 条）</small>
+          <section className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>核心卖点</Label>
+              <span className="text-xs text-muted">最多 8 条</span>
             </div>
-            <div className="vc-selling-points">
+            <div className="flex flex-wrap gap-2">
               {sellingPoints.map((point, index) => (
-                <span key={point}>
+                <span
+                  className="inline-flex h-8 items-center gap-1 rounded-full bg-surface-strong px-3 text-xs text-ink"
+                  key={point}
+                >
                   {point}
-                  <button
+                  <Button
+                    className="size-5 rounded-full p-0"
+                    variant="ghost"
+                    size="icon"
                     aria-label="删除卖点"
                     onClick={() =>
                       mutateInput(
@@ -531,10 +602,11 @@ export function VideoCreatePage() {
                     }
                   >
                     <X />
-                  </button>
+                  </Button>
                 </span>
               ))}
-              <input
+              <Input
+                className="min-w-40 flex-1"
                 placeholder="输入卖点回车添加"
                 onKeyDown={(event) => {
                   if (event.key !== "Enter") return;
@@ -547,12 +619,16 @@ export function VideoCreatePage() {
             </div>
           </section>
 
-          <section className="vc-field">
-            <div className="vc-field-label">视频时长</div>
-            <div className="vc-duration-grid">
+          <section className="space-y-2">
+            <Label>视频时长</Label>
+            <div className="grid grid-cols-4 gap-2">
               {durationOptions.map((seconds) => (
-                <button
-                  className={input.durationSec === seconds ? "active" : ""}
+                <Button
+                  className={cn(
+                    input.durationSec === seconds && "border-primary bg-primary text-white hover:bg-primary/90",
+                  )}
+                  variant="outline"
+                  size="sm"
                   key={seconds}
                   onClick={() => {
                     mutateInput("durationSec", seconds);
@@ -560,33 +636,51 @@ export function VideoCreatePage() {
                   }}
                 >
                   {seconds < 60 ? `${seconds}s` : `${seconds / 60}min`}
-                </button>
+                </Button>
               ))}
             </div>
           </section>
 
-          <section className="vc-field vc-inline-controls">
-            <div className="vc-field-label">分镜段数</div>
-            <div>
-              <button onClick={() => mutateInput("segmentCount", Math.max(1, input.segmentCount - 1))}>−</button>
-              <b>{input.segmentCount}</b>
-              <button onClick={() => mutateInput("segmentCount", Math.min(12, input.segmentCount + 1))}>＋</button>
-              <small>段（单段 ≤15s）</small>
+          <section className="space-y-2">
+            <Label>分镜段数</Label>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => mutateInput("segmentCount", Math.max(1, input.segmentCount - 1))}
+              >
+                −
+              </Button>
+              <span className="w-8 text-center font-medium text-ink">{input.segmentCount}</span>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => mutateInput("segmentCount", Math.min(12, input.segmentCount + 1))}
+              >
+                ＋
+              </Button>
+              <span className="text-xs text-muted">段，单段不超过 15 秒</span>
             </div>
           </section>
 
-          <section className="vc-field">
-            <div className="vc-field-label">配音语速</div>
-            <div className="vc-speed-grid">
+          <section className="space-y-2">
+            <Label>配音语速</Label>
+            <div className="grid grid-cols-3 gap-2">
               {(["slow", "medium", "fast"] as const).map((speed) => (
-                <button
-                  className={input.speechRate === speed ? "active" : ""}
+                <Button
+                  className={cn(
+                    "h-auto flex-col gap-0.5 py-2",
+                    input.speechRate === speed && "border-primary bg-primary text-white hover:bg-primary/90",
+                  )}
+                  variant="outline"
                   key={speed}
                   onClick={() => mutateInput("speechRate", speed)}
                 >
-                  <b>{speed === "slow" ? "慢" : speed === "medium" ? "中" : "快"}</b>
-                  <small>{speed === "slow" ? "3字/s" : speed === "medium" ? "4字/s" : "5字/s"}</small>
-                </button>
+                  <span>{speed === "slow" ? "慢" : speed === "medium" ? "中" : "快"}</span>
+                  <span className={cn("text-xs font-normal text-muted", input.speechRate === speed && "text-white/75")}>
+                    {speed === "slow" ? "3字/s" : speed === "medium" ? "4字/s" : "5字/s"}
+                  </span>
+                </Button>
               ))}
             </div>
           </section>
@@ -609,22 +703,26 @@ export function VideoCreatePage() {
               selected={input.targetAudiences ?? []}
               onToggle={(option) => toggleOption("targetAudiences", option)}
             />
-            <label className="vc-text-option">
-              <strong>用户痛点</strong>
+            <div className="space-y-2">
+              <Label htmlFor="video-create-pain-points">用户痛点</Label>
               <textarea
+                id="video-create-pain-points"
+                className="min-h-20 w-full resize-y rounded-md border border-line bg-transparent px-3 py-2 text-sm text-ink outline-none placeholder:text-muted focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
                 value={input.audiencePainPoints}
                 onChange={(event) => mutateInput("audiencePainPoints", event.target.value)}
                 placeholder="例：夏天防晒产品总是厚重泛白"
               />
-            </label>
-            <label className="vc-text-option">
-              <strong>产品利益点</strong>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="video-create-benefits">产品利益点</Label>
               <textarea
+                id="video-create-benefits"
+                className="min-h-20 w-full resize-y rounded-md border border-line bg-transparent px-3 py-2 text-sm text-ink outline-none placeholder:text-muted focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
                 value={input.productBenefits}
                 onChange={(event) => mutateInput("productBenefits", event.target.value)}
                 placeholder="例：零感轻薄，一抹即化"
               />
-            </label>
+            </div>
           </ParameterPanel>
 
           <ParameterPanel
@@ -695,62 +793,68 @@ export function VideoCreatePage() {
               selected={input.templates ?? []}
               onToggle={(option) => toggleOption("templates", option)}
             />
-            <label className="vc-text-option">
-              <strong>敏感词</strong>
-              <input
+            <div className="space-y-2">
+              <Label htmlFor="video-create-sensitive-words">敏感词</Label>
+              <Input
+                id="video-create-sensitive-words"
                 value={input.sensitiveWords}
                 onChange={(event) => mutateInput("sensitiveWords", event.target.value)}
                 placeholder="用空格分隔，如：最佳 极致"
               />
-            </label>
-            <label className="vc-text-option">
-              <strong>自定义要求</strong>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="video-create-custom-requirements">自定义要求</Label>
               <textarea
+                id="video-create-custom-requirements"
+                className="min-h-20 w-full resize-y rounded-md border border-line bg-transparent px-3 py-2 text-sm text-ink outline-none placeholder:text-muted focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
                 value={input.customRequirements}
                 onChange={(event) => mutateInput("customRequirements", event.target.value)}
                 placeholder="补充品牌语气、禁用表达或其他要求"
               />
-            </label>
-            <div className="vc-advanced-grid">
-              <label>
-                视频模型
-                <select
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="video-create-model">视频模型</Label>
+                <NativeSelect
+                  id="video-create-model"
                   value={input.videoModel}
                   onChange={(event) => mutateInput("videoModel", event.target.value as VideoCreateInput["videoModel"])}
                 >
                   <option value="doubao-seedance-2-0-fast-260128">Seedance 2.0 Fast</option>
                   <option value="doubao-seedance-2-0-mini-260615">Seedance 2.0 Mini</option>
                   <option value="doubao-seedance-2-0-260128">Seedance 2.0 Standard</option>
-                </select>
-              </label>
-              <label>
-                画面比例
-                <select
+                </NativeSelect>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="video-create-ratio">画面比例</Label>
+                <NativeSelect
+                  id="video-create-ratio"
                   value={input.ratio}
                   onChange={(event) => mutateInput("ratio", event.target.value as VideoCreateInput["ratio"])}
                 >
                   <option>9:16</option>
                   <option>16:9</option>
                   <option>1:1</option>
-                </select>
-              </label>
+                </NativeSelect>
+              </div>
             </div>
-            <div className="vc-advanced-field">
-              <strong>配音音色</strong>
+            <div className="space-y-2" data-testid="video-create-voice-field">
+              <Label>配音音色</Label>
               <AttachmentPicker
                 accept="audio/*"
                 onSelect={([asset]) => asset && mutateInput("voiceAssetId", asset.id)}
                 trigger={(open) => (
-                  <button className="vc-select-asset" onClick={open}>
+                  <Button className="w-full justify-start" variant="outline" size="sm" onClick={open}>
                     {input.voiceAssetId ? "已选择我的音色" : "默认推荐音色（点击更换）"}
-                  </button>
+                  </Button>
                 )}
               />
             </div>
           </ParameterPanel>
         </div>
-        <footer className="vc-primary-footer">
-          <button
+        <footer className="shrink-0 border-t border-line bg-surface p-3">
+          <Button
+            className="h-10 w-full rounded-full"
             disabled={Boolean(busy) || !input.productAssetIds.length}
             onClick={() => action(project?.sections.length ? "storyboard" : "script")}
           >
@@ -760,61 +864,77 @@ export function VideoCreatePage() {
               <WandSparkles />
             )}
             {project?.sections.length ? "生成分镜" : "生成脚本"}
-          </button>
+          </Button>
         </footer>
       </aside>
 
-      <main className="vc-output-panel">
-        <header className="vc-output-head">
-          <nav>
-            <button className={tab === "script" ? "active" : ""} onClick={() => setTab("script")}>
-              脚本 <i>{project?.sections.length ?? 0}</i>
-            </button>
-            <button className={tab === "storyboard" ? "active" : ""} onClick={() => setTab("storyboard")}>
-              分镜 <i>{project?.shots.length ?? 0}</i>
-            </button>
+      <main
+        className="relative flex min-h-0 min-w-0 flex-col overflow-hidden bg-surface max-[760px]:min-h-[calc(100vh-56px)] max-[760px]:border-t-8 max-[760px]:border-surface-muted"
+        data-testid="video-create-output-panel"
+      >
+        <header className="flex h-[52px] shrink-0 items-center justify-between border-b border-line px-3">
+          <nav className="flex h-full items-center gap-1">
+            <Button
+              className={cn("h-8 rounded-full", tab === "script" && "bg-primary text-white hover:bg-primary/90")}
+              variant="ghost"
+              size="sm"
+              onClick={() => setTab("script")}
+            >
+              脚本 <span className="rounded-full bg-current/10 px-1.5 text-xs">{project?.sections.length ?? 0}</span>
+            </Button>
+            <Button
+              className={cn("h-8 rounded-full", tab === "storyboard" && "bg-primary text-white hover:bg-primary/90")}
+              variant="ghost"
+              size="sm"
+              onClick={() => setTab("storyboard")}
+            >
+              分镜 <span className="rounded-full bg-current/10 px-1.5 text-xs">{project?.shots.length ?? 0}</span>
+            </Button>
           </nav>
-          <button className="vc-history-button" onClick={() => setHistoryOpen(true)}>
+          <Button variant="outline" size="sm" onClick={() => setHistoryOpen(true)}>
             <History /> 生成记录
-          </button>
+          </Button>
         </header>
         {(notice || project?.project.error?.message) && (
-          <button className="vc-notice" onClick={() => setNotice("")}>
+          <Button
+            className="absolute left-1/2 top-16 z-10 h-auto max-w-[calc(100%-24px)] -translate-x-1/2 whitespace-normal border-error/25 bg-surface px-3 py-2 text-left text-error shadow-sm"
+            variant="outline"
+            onClick={() => setNotice("")}
+          >
             <AlertTriangle />
-            {notice || project?.project.error?.message}
+            <span className="flex-1">{notice || project?.project.error?.message}</span>
             <X />
-          </button>
+          </Button>
         )}
 
         {!project?.sections.length && !["script_generating", "analyzing"].includes(active ?? "") && (
-          <div className="vc-empty">
-            <Film />
-            <b>产出物将在这里呈现</b>
-            <p>
-              先在左侧添加商品图片并填写参数
-              <br />
-              生成脚本后可逐段审核，再继续制作分镜。
-            </p>
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center text-muted">
+            <span className="grid size-12 place-items-center rounded-full bg-surface-muted">
+              <Film className="size-5" />
+            </span>
+            <b className="font-medium text-body-strong">产出物将在这里呈现</b>
           </div>
         )}
         {["script_generating", "analyzing", "storyboard_generating", "composing"].includes(active ?? "") && (
-          <div className="vc-generating">
-            <span>
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center text-muted">
+            <span className="grid size-12 place-items-center rounded-full bg-surface-muted text-ink">
               <LoaderCircle className="animate-spin" />
             </span>
-            <h2>{statusLabels[active ?? ""]}</h2>
-            <p>任务在 Worker 中执行，关闭页面后也会继续。</p>
+            <h2 className="text-base font-medium text-ink">{statusLabels[active ?? ""]}</h2>
+            <p className="text-xs">任务在 Worker 中执行，关闭页面后也会继续。</p>
           </div>
         )}
 
         {tab === "script" && project?.sections.length ? (
-          <section className="vc-script-output">
-            <div className="vc-script-toolbar">
-              <span>
+          <section className="flex min-h-0 flex-1 flex-col">
+            <div className="flex h-12 shrink-0 items-center justify-between border-b border-line bg-canvas-soft px-3">
+              <span className="text-xs text-muted">
                 共 <b>{totalCharacters}</b> 字 · 约 <b>{totalDuration}s</b>
               </span>
-              <div>
-                <button
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() =>
                     void navigator.clipboard.writeText(
                       project.sections
@@ -825,27 +945,31 @@ export function VideoCreatePage() {
                 >
                   <Copy />
                   复制脚本
-                </button>
-                <button onClick={() => action("script")}>
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => action("script")}>
                   <RefreshCw />
                   重新生成
-                </button>
+                </Button>
               </div>
             </div>
-            <div className="vc-script-list">
-              {project.sections.map((section, index) => {
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3 pb-20">
+              {project.sections.map((section) => {
                 const version = section.currentVersion;
                 const value = drafts[section.id] ?? version?.text ?? "";
                 const dirty = value !== (version?.text ?? "");
                 return (
-                  <article className={`tone-${index % 3}`} key={section.id}>
-                    <header>
-                      <span>{section.label}</span>
-                      <div>
-                        <i>
+                  <article className="overflow-hidden rounded-xl border border-line bg-surface" key={section.id}>
+                    <header className="flex min-h-10 items-center justify-between border-b border-line bg-canvas-soft px-3 py-2">
+                      <span className="rounded-full bg-surface-strong px-2.5 py-1 text-xs font-medium text-ink">
+                        {section.label}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted">
                           {estimateDuration(value, input.speechRate)}s · {[...value].length}字
-                        </i>
-                        <button
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           disabled={!version || Boolean(busy)}
                           onClick={() =>
                             execute(`regen-${section.id}`, async () => {
@@ -863,17 +987,19 @@ export function VideoCreatePage() {
                         >
                           <RefreshCw />
                           换一版
-                        </button>
-                        <Pencil />
+                        </Button>
+                        <Pencil className="size-4 text-muted" />
                       </div>
                     </header>
                     <textarea
+                      className="min-h-24 w-full resize-y bg-transparent p-3 text-sm leading-relaxed text-body outline-none"
                       value={value}
                       onChange={(event) => setDrafts((current) => ({ ...current, [section.id]: event.target.value }))}
                     />
                     {dirty && (
-                      <footer>
-                        <button
+                      <footer className="flex justify-end border-t border-line px-3 py-2">
+                        <Button
+                          size="sm"
                           onClick={() =>
                             execute(`save-${section.id}`, async () => {
                               if (!version) return;
@@ -895,56 +1021,67 @@ export function VideoCreatePage() {
                         >
                           <Check />
                           保存修改
-                        </button>
+                        </Button>
                       </footer>
                     )}
                   </article>
                 );
               })}
             </div>
-            <footer className="vc-next-footer">
-              <button onClick={() => action("storyboard")}>
+            <footer className="absolute bottom-4 right-4 z-10">
+              <Button className="rounded-full" onClick={() => action("storyboard")}>
                 <WandSparkles />
                 下一步 · 生成分镜
-              </button>
+              </Button>
             </footer>
           </section>
         ) : null}
 
         {tab === "storyboard" && project?.shots.length ? (
-          <section className="vc-storyboard-output">
-            <div className="vc-storyboard-toolbar">
-              <div>
-                <b>分镜编辑</b>
-                <span>{project.shots.length} 个段落</span>
+          <section className="flex min-h-0 flex-1 flex-col">
+            <div className="flex h-12 shrink-0 items-center justify-between border-b border-line bg-canvas-soft px-3">
+              <div className="flex items-center gap-2">
+                <b className="font-medium text-ink">分镜编辑</b>
+                <span className="rounded-full bg-surface-strong px-2 py-0.5 text-xs text-muted">
+                  {project.shots.length} 个段落
+                </span>
               </div>
-              <div className="vc-priority">
-                <button
-                  className={input.priority === "speech" ? "active" : ""}
+              <div className="flex rounded-full border border-line bg-surface p-0.5">
+                <Button
+                  className={cn(
+                    "h-7 rounded-full border-0 px-3",
+                    input.priority === "speech" && "bg-primary text-white",
+                  )}
+                  variant="ghost"
+                  size="sm"
                   onClick={() => mutateInput("priority", "speech")}
                 >
                   口播优先
-                </button>
-                <button
-                  className={input.priority === "visual" ? "active" : ""}
+                </Button>
+                <Button
+                  className={cn(
+                    "h-7 rounded-full border-0 px-3",
+                    input.priority === "visual" && "bg-primary text-white",
+                  )}
+                  variant="ghost"
+                  size="sm"
                   onClick={() => mutateInput("priority", "visual")}
                 >
                   画面优先
-                </button>
+                </Button>
               </div>
             </div>
             {project.project.finalArtifactId && (
-              <div className="vc-final-result">
+              <div className="m-3 grid grid-cols-[112px_1fr] gap-4 rounded-xl border border-line bg-canvas-soft p-3 [&_img]:h-36 [&_img]:w-28 [&_img]:rounded-lg [&_img]:object-cover [&_video]:h-36 [&_video]:w-28 [&_video]:rounded-lg [&_video]:object-cover">
                 <AuthenticatedMedia
                   url={`/api/artifacts/${project.project.finalArtifactId}`}
                   mimeType="video/mp4"
                   alt="最终成片"
                 />
-                <div>
-                  <span>FINAL VIDEO</span>
-                  <h2>完整成片已生成</h2>
-                  <p>脚本、分镜视频与设置均已保存在生成记录中。</p>
-                  <button
+                <div className="flex min-w-0 flex-col items-start justify-center gap-2">
+                  <h2 className="text-base font-medium text-ink">完整成片已生成</h2>
+                  <Button
+                    size="sm"
                     onClick={() =>
                       void downloadAuthenticated(
                         `/api/artifacts/${project.project.finalArtifactId}`,
@@ -953,12 +1090,12 @@ export function VideoCreatePage() {
                     }
                   >
                     <Download /> 下载成片
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
-            <div className="vc-shot-table">
-              <div className="vc-shot-head">
+            <div className="min-h-0 flex-1 overflow-auto pb-16">
+              <div className="grid h-10 min-w-[820px] grid-cols-[40px_minmax(220px,1fr)_minmax(220px,1fr)_96px_96px] items-center border-b border-line bg-canvas-soft text-xs font-medium text-muted">
                 <span>#</span>
                 <span>分镜段落</span>
                 <span>素材</span>
@@ -969,30 +1106,40 @@ export function VideoCreatePage() {
                 const section = project.sections.find((item) => item.id === shot.scriptSectionId);
                 const generating = shot.status === "queued" || shot.status === "generating";
                 return (
-                  <article key={shot.id}>
-                    <span>{String(shot.ordinal).padStart(2, "0")}</span>
-                    <div className="vc-shot-copy">
-                      <i>
-                        段落
-                        <br />
+                  <article
+                    className="grid min-h-56 min-w-[820px] grid-cols-[40px_minmax(220px,1fr)_minmax(220px,1fr)_96px_96px] border-b border-line"
+                    key={shot.id}
+                  >
+                    <span className="border-r border-line p-3 text-xs text-muted">
+                      {String(shot.ordinal).padStart(2, "0")}
+                    </span>
+                    <div className="space-y-2 border-r border-line p-3">
+                      <span className="inline-flex rounded-full bg-surface-strong px-2 py-1 text-xs text-muted">
                         {shot.durationSec}s
-                      </i>
-                      <p>{section?.currentVersion?.text}</p>
-                      <small>0–{shot.durationSec}s · 1 镜</small>
+                      </span>
+                      <p className="leading-relaxed text-body">{section?.currentVersion?.text}</p>
+                      <small className="text-xs text-muted">0–{shot.durationSec}s · 1 镜</small>
                     </div>
-                    <div className="vc-shot-media">
+                    <div className="border-r border-line p-3">
                       {shot.videoAssetId ? (
-                        <AuthenticatedMedia
-                          url={
-                            shot.status === "replaced"
-                              ? `/api/assets/${shot.videoAssetId}/content`
-                              : `/api/artifacts/${shot.videoAssetId}`
-                          }
-                          mimeType="video/mp4"
-                          alt={`分镜 ${shot.ordinal}`}
-                        />
+                        <div className="h-36 w-24 overflow-hidden rounded-lg bg-surface-muted [&_img]:h-full [&_img]:w-full [&_img]:object-cover [&_video]:h-full [&_video]:w-full [&_video]:object-cover">
+                          <AuthenticatedMedia
+                            url={
+                              shot.status === "replaced"
+                                ? `/api/assets/${shot.videoAssetId}/content`
+                                : `/api/artifacts/${shot.videoAssetId}`
+                            }
+                            mimeType="video/mp4"
+                            alt={`分镜 ${shot.ordinal}`}
+                          />
+                        </div>
                       ) : (
-                        <div className={`vc-shot-placeholder ${shot.status}`}>
+                        <div
+                          className={cn(
+                            "flex h-36 w-24 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-line bg-surface-muted text-xs text-muted",
+                            shot.status === "failed" && "border-error/40 bg-error/5 text-error",
+                          )}
+                        >
                           {generating ? (
                             <LoaderCircle className="animate-spin" />
                           ) : shot.status === "failed" ? (
@@ -1008,10 +1155,10 @@ export function VideoCreatePage() {
                           )}
                         </div>
                       )}
-                      <div>
-                        <button
+                      <div className="mt-2 flex gap-2">
+                        <Button
+                          size="sm"
                           disabled={generating || Boolean(busy)}
-                          className="primary"
                           onClick={() =>
                             execute(`shot-${shot.id}`, async () => {
                               await generateVideoCreateShotVideo(project.project.id, shot.id);
@@ -1023,7 +1170,7 @@ export function VideoCreatePage() {
                         >
                           {generating ? <LoaderCircle className="animate-spin" /> : <Video />}
                           {shot.status === "failed" ? "重新生成" : shot.videoAssetId ? "再生成" : "AI生成视频"}
-                        </button>
+                        </Button>
                         <AttachmentPicker
                           accept="video/*"
                           onSelect={([asset]) =>
@@ -1034,17 +1181,19 @@ export function VideoCreatePage() {
                             })
                           }
                           trigger={(open) => (
-                            <button aria-label="上传替代视频" onClick={open}>
+                            <Button variant="outline" size="icon" aria-label="上传替代视频" onClick={open}>
                               <Upload />
-                            </button>
+                            </Button>
                           )}
                         />
                       </div>
-                      {shot.error && <small className="vc-shot-error">{shot.error.message}</small>}
+                      {shot.error && <small className="mt-2 block text-xs text-error">{shot.error.message}</small>}
                     </div>
-                    <span>
-                      <button
-                        className={`vc-shot-toggle ${shot.audioEnabled ? "active" : ""}`}
+                    <span className="border-r border-line p-3">
+                      <Button
+                        className={cn("w-full px-2", shot.audioEnabled && "bg-primary text-white")}
+                        variant="outline"
+                        size="sm"
                         onClick={() =>
                           execute(`audio-${shot.id}`, async () => {
                             const next = await updateVideoCreateShotOptions(project.project.id, shot.id, {
@@ -1055,12 +1204,14 @@ export function VideoCreatePage() {
                           })
                         }
                       >
-                        <i /> {shot.audioEnabled ? "已开启" : "已关闭"}
-                      </button>
+                        {shot.audioEnabled ? "已开启" : "已关闭"}
+                      </Button>
                     </span>
-                    <span>
-                      <button
-                        className={`vc-shot-toggle ${shot.subtitleEnabled ? "active" : ""}`}
+                    <span className="p-3">
+                      <Button
+                        className={cn("w-full px-2", shot.subtitleEnabled && "bg-primary text-white")}
+                        variant="outline"
+                        size="sm"
                         onClick={() =>
                           execute(`subtitle-${shot.id}`, async () => {
                             const next = await updateVideoCreateShotOptions(project.project.id, shot.id, {
@@ -1071,23 +1222,27 @@ export function VideoCreatePage() {
                           })
                         }
                       >
-                        <i /> {shot.subtitleEnabled ? "已开启" : "已关闭"}
-                      </button>
+                        {shot.subtitleEnabled ? "已开启" : "已关闭"}
+                      </Button>
                     </span>
                   </article>
                 );
               })}
             </div>
-            <footer className="vc-compose-footer">
-              <span>
+            <footer className="absolute inset-x-0 bottom-0 flex h-14 items-center justify-end gap-3 border-t border-line bg-surface px-3">
+              <span className="text-xs text-muted">
                 {project.canCompose
                   ? "全部分镜已就绪"
                   : `还有 ${project.shots.filter((shot) => !["succeeded", "replaced"].includes(shot.status)).length} 个分镜未就绪`}
               </span>
-              <button disabled={!project.canCompose || Boolean(busy)} onClick={() => action("compose")}>
+              <Button
+                className="rounded-full"
+                disabled={!project.canCompose || Boolean(busy)}
+                onClick={() => action("compose")}
+              >
                 <Film />
                 合并视频
-              </button>
+              </Button>
             </footer>
           </section>
         ) : null}

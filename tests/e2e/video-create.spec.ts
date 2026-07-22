@@ -15,14 +15,14 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("opens the dedicated two-column video create workbench", async ({ page }) => {
-  await expect(page.locator(".video-create-page")).toBeVisible();
+  await expect(page.getByTestId("video-create-page")).toBeVisible();
   await expect(page.getByRole("heading", { name: "新建项目" })).toBeVisible();
   await expect(page.getByRole("button", { name: /AI 填充参数/ })).toBeDisabled();
   await expect(page.getByRole("button", { name: /脚本/ }).first()).toBeVisible();
   await expect(page.getByRole("button", { name: /分镜/ }).first()).toBeVisible();
   await expect(page.getByText("产出物将在这里呈现")).toBeVisible();
-  await expect(page.locator(".vc-config-panel")).toBeInViewport();
-  await expect(page.locator(".vc-output-panel")).toBeInViewport();
+  await expect(page.getByTestId("video-create-config-panel")).toBeInViewport();
+  await expect(page.getByTestId("video-create-output-panel")).toBeInViewport();
 });
 
 test("edits the complete parameter panels and opens recoverable history", async ({ page }) => {
@@ -41,7 +41,7 @@ test("edits the complete parameter panels and opens recoverable history", async 
   await page.getByRole("button", { name: /高级设置/ }).click();
   await page.getByRole("button", { name: "场景展示", exact: true }).click();
   await expect(page.getByText("视频模型")).toBeVisible();
-  const configScroll = page.locator(".vc-config-scroll");
+  const configScroll = page.getByTestId("video-create-config-scroll");
   const metrics = await configScroll.evaluate((element) => ({
     clientHeight: element.clientHeight,
     scrollHeight: element.scrollHeight,
@@ -49,9 +49,9 @@ test("edits the complete parameter panels and opens recoverable history", async 
   expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight);
   await configScroll.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
   await expect.poll(() => configScroll.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
-  await expect(page.getByText("NEW PROJECT")).toBeInViewport();
+  await expect(page.getByRole("heading", { name: "新建项目" })).toBeInViewport();
   await expect(page.getByRole("button", { name: /生成脚本/ })).toBeInViewport();
-  await expect(page.locator(".vc-advanced-field strong")).toBeInViewport();
+  await expect(page.getByTestId("video-create-voice-field")).toBeInViewport();
   await page.getByRole("button", { name: /生成记录/ }).click();
   await expect(page.getByRole("heading", { name: "生成记录" })).toBeVisible();
   await expect(page.getByText("暂无生成记录")).toBeVisible();
