@@ -371,7 +371,7 @@ export const zAdScriptProject = z.object({
 
 export const zVideoCreateInput = z.object({
     productAssetIds: z.array(z.uuid()).min(1).max(6),
-    portraitAssetId: z.uuid().optional(),
+    portraitId: z.int().gte(1).optional(),
     scene: z.string().min(1).max(40),
     productName: z.string().max(60).optional().default(''),
     sellingPoints: z.array(z.string().min(1).max(80)).max(8).optional().default([]),
@@ -493,6 +493,11 @@ export const zVideoCreateRecommendation = z.object({
     scene: z.string().min(1).max(40),
     durationSec: z.int().gte(15).lte(180),
     segmentCount: z.int().gte(1).lte(12),
+    speechRate: z.enum([
+        'slow',
+        'medium',
+        'fast'
+    ]).optional().default('medium'),
     requirements: z.string().max(1000),
     scriptStyle: z.string().min(1).max(100),
     marketingGoals: z.array(z.enum([

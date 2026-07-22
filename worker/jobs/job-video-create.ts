@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import { env } from "../../server/env";
 import { concatVideos, generateSampleVideo, probeMedia } from "../../server/media/ffmpeg";
 import { isSeedanceModelId } from "../../server/models/video-models";
+import { getPortraitById } from "../../server/portraits/catalog";
 import type { JobRecord, StageProvenance } from "../../server/types";
 import {
   analyzeVideoCreateProduct,
@@ -9,6 +10,7 @@ import {
   generateVideoCreateStoryboard,
   regenerateVideoCreateSection,
 } from "../../server/video-create/model";
+import { VIDEO_CREATE_ANALYSIS_MODEL } from "../../server/video-create/types";
 import { videoCreateError } from "../../server/video-create/video-create-store";
 import { SeedanceVideoJob } from "./job-seedance-video";
 import type { JobHandlerContext, WorkerJobHandler } from "./types";
@@ -82,19 +84,22 @@ export const videoCreateJob: WorkerJobHandler = {
     const aggregate = projects.get(projectId);
     if (!aggregate || aggregate.project.ownerUserId !== job.ownerUserId)
       throw new Error("VIDEO_CREATE_PROJECT_NOT_FOUND");
-    const mode = job.values.__mockVideo === "true" ? "mock" : operation === "compose" ? "local" : "real";
+    const usesMockVideo = operation === "shot" && (job.values.__mockVideo === "true" || env.mockGenerateVideoApi);
+    const mode = usesMockVideo ? "mock" : operation === "compose" ? "local" : "real";
     const implementation =
       mode === "mock"
-        ? "video-create-test-mock"
+        ? env.mockGenerateVideoApi && job.values.__mockVideo !== "true"
+          ? "ffmpeg-seedance-mock"
+          : "video-create-test-mock"
         : mode === "local"
           ? "ffmpeg-concat"
           : operation === "analyze"
-            ? "gemini-image-analysis"
+            ? "aihubmix-gpt-image-analysis"
             : operation === "shot"
               ? "aihubmix-video"
               : "aihubmix-text";
     const model =
-      operation === "analyze" ? env.videoAnalysisModel : operation === "shot" ? job.videoModel : "deepseek-v4-pro";
+      operation === "analyze" ? VIDEO_CREATE_ANALYSIS_MODEL : operation === "shot" ? job.videoModel : "deepseek-v4-pro";
     const currentStage = stage(job, operation, mode, implementation, model);
     context.change(job.id, {
       status: "processing",
@@ -122,8 +127,11 @@ export const videoCreateJob: WorkerJobHandler = {
         );
         if (assets.some((asset) => !asset?.mimeType.startsWith("image/")))
           throw new Error("PRODUCT_IMAGE_NOT_AVAILABLE");
+        const portrait = getPortraitById(aggregate.project.input.portraitId);
+        if (aggregate.project.input.portraitId && !portrait) throw new Error("PORTRAIT_NOT_AVAILABLE");
         const recommendation = await analyzeVideoCreateProduct(
           assets.filter((asset): asset is NonNullable<typeof asset> => Boolean(asset)),
+          portrait,
         );
         projects.setRecommendation(projectId, recommendation);
       } else if (operation === "script") {
@@ -157,7 +165,11 @@ export const videoCreateJob: WorkerJobHandler = {
         else {
           if (!job.videoModel || !isSeedanceModelId(job.videoModel)) throw new Error("VIDEO_MODEL_REQUIRED");
           const response = await new SeedanceVideoJob(context).execute(job, job.videoModel);
-          artifact = await saveVideoArtifact(job, context, response.bytes, undefined, "real");
+          currentStage.executionMode = response.executionMode;
+          currentStage.implementation = response.implementation;
+          currentStage.provider = response.executionMode === "real" ? "aihubmix" : undefined;
+          currentStage.model = response.executionMode === "real" ? job.videoModel : undefined;
+          artifact = await saveVideoArtifact(job, context, response.bytes, undefined, response.executionMode);
         }
         projects.updateShot(shot.id, { status: "succeeded", videoAssetId: artifact.id, error: null });
         projects.setProject(projectId, { status: "storyboard_review", error: null });

@@ -1,9 +1,12 @@
-import { resolve } from "node:path";
+import { isAbsolute, relative, resolve } from "node:path";
 import type { MediaAsset } from "../accounts/account-store";
 import { generateStructured, parseAdScriptModelJson } from "../ad-script/model";
 import { env } from "../env";
-import { analyzeImagesWithGemini } from "../providers/gemini-video-analysis";
+import type { PortraitCatalogEntry } from "../portraits/catalog";
+import { aihubmix } from "../providers/aihubmix";
+import { ossutils } from "../storage/ossutils";
 import {
+  VIDEO_CREATE_ANALYSIS_MODEL,
   type VideoCreateGeneratedScript,
   VideoCreateGeneratedScriptSchema,
   type VideoCreateGeneratedStoryboard,
@@ -76,16 +79,41 @@ export function normalizeVideoCreateRecommendation(value: unknown): VideoCreateR
   return VideoCreateRecommendationSchema.parse(normalized);
 }
 
-export async function analyzeVideoCreateProduct(assets: MediaAsset[]): Promise<VideoCreateRecommendation> {
-  const images = assets.map((asset) => ({
-    path: resolve(env.dataDir, "uploads", asset.storageKey),
-    mimeType: asset.mimeType,
-  }));
-  const result = await analyzeImagesWithGemini({
+async function responseImage(url: string, missingCode: string) {
+  const response = await fetch(url, { signal: AbortSignal.timeout(60_000) });
+  if (!response.ok) throw new Error(`${missingCode}:${response.status}`);
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (!bytes.byteLength) throw new Error(missingCode);
+  if (bytes.byteLength > 10 * 1024 * 1024) throw new Error("IMAGE_ANALYSIS_IMAGE_TOO_LARGE");
+  return { bytes, mimeType: response.headers.get("content-type")?.split(";", 1)[0] || "image/png" };
+}
+
+async function productImage(asset: MediaAsset) {
+  const uploadRoot = resolve(env.dataDir, "uploads");
+  const path = resolve(uploadRoot, asset.storageKey);
+  const relativePath = relative(uploadRoot, path);
+  if (!relativePath || relativePath.startsWith("..") || isAbsolute(relativePath))
+    throw new Error("INVALID_PRODUCT_IMAGE_PATH");
+  const file = Bun.file(path);
+  if (await file.exists()) return { bytes: new Uint8Array(await file.arrayBuffer()), mimeType: asset.mimeType };
+  if (!ossutils.configured) throw new Error("PRODUCT_REFERENCE_FILE_NOT_FOUND");
+  return responseImage(ossutils.createSignedReadUrl(asset.storageKey), "PRODUCT_REFERENCE_DOWNLOAD_FAILED");
+}
+
+export async function analyzeVideoCreateProduct(
+  assets: MediaAsset[],
+  portrait?: PortraitCatalogEntry,
+): Promise<VideoCreateRecommendation> {
+  const images = await Promise.all([
+    ...assets.map(productImage),
+    ...(portrait ? [responseImage(portrait.source_url, "PORTRAIT_REFERENCE_DOWNLOAD_FAILED")] : []),
+  ]);
+  const result = await aihubmix.analyzeImages({
     images,
-    prompt: `你是中文短视频广告策划。分析商品图片，只基于可见事实给出创作建议。严格返回 JSON：
-{"productName":"","sellingPoints":[],"scene":"内容种草","durationSec":15,"segmentCount":3,"requirements":"","scriptStyle":"自然种草","marketingGoals":[],"targetAudiences":[],"audiencePainPoints":"","productBenefits":"","presenterRoles":[],"presenterGenders":[],"contentStyles":[],"openingStyles":[],"closingGuides":[],"scriptTopics":[],"materialTopics":[],"marketingMethods":[],"templates":[],"sensitiveWords":"","customRequirements":""}
-sellingPoints 最多 8 条；durationSec 为 15、30、60、180 之一；segmentCount 为 1-12。多选字段只能使用下列值：
+    model: VIDEO_CREATE_ANALYSIS_MODEL,
+    prompt: `你是中文短视频广告策划。前 ${assets.length} 张是同一商品的商品图片${portrait ? "，最后 1 张是已选出镜人像" : ""}。综合分析图片，只基于可见事实给出可直接生成口播脚本的完整参数。严格返回 JSON：
+{"productName":"","sellingPoints":[],"scene":"内容种草","durationSec":15,"segmentCount":1,"speechRate":"medium","requirements":"","scriptStyle":"自然种草","marketingGoals":[],"targetAudiences":[],"audiencePainPoints":"","productBenefits":"","presenterRoles":[],"presenterGenders":[],"contentStyles":[],"openingStyles":[],"closingGuides":[],"scriptTopics":[],"materialTopics":[],"marketingMethods":[],"templates":[],"sensitiveWords":"","customRequirements":""}
+sellingPoints 最多 8 条；scene 只能为商城转化/短视频带货/引流直播间/直播带货/内容种草/品牌曝光/本地到店/线索收集之一；durationSec 为 15、30、60、180 之一；segmentCount 为 1-12；speechRate 只能为 slow/medium/fast。多选字段只能使用下列值：
 marketingGoals=电商转化/品牌曝光/App下载/门店到店/直播引流；targetAudiences=18-24岁女性/25-35岁女性/18-24岁男性/25-35岁男性/宝妈/学生/职场白领/中老年/全年龄段；presenterRoles=好物推荐员/普通用户/行业专家/品牌官方；presenterGenders=不区分/男声/女声；contentStyles=种草/专业测评/情绪共鸣/悬念叙事/故事/数据说话；openingStyles=自动匹配/痛点直击/数字冲击/福利诱惑/问句互动/品牌声量/随机；closingGuides=硬引导购买/软种草/互动提问；scriptTopics=直播带货/产品功能讲解/痛点解决/对比测评/情感共鸣/节日营销；materialTopics=产品外观/使用体验/价格优势/品质保障/售后服务/用户口碑/生活方式/成分功效/限时优惠；marketingMethods=场景展示/痛点解决/竞品对比/用户证言/专家背书/限时促销；templates=常规/节日营销/明星同款/爆款复制。无法从图片判断时返回空数组或空字符串，不要使用绝对化承诺。`,
   });
   return normalizeVideoCreateRecommendation(parseAdScriptModelJson(result.text));

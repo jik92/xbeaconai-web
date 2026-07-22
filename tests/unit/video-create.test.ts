@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { env } from "../../server/env";
 import { SqliteJobStore } from "../../server/jobs/sqlite-job-store";
+import { getPortraitById } from "../../server/portraits/catalog";
+import { buildGptImageAnalysisRequest } from "../../server/providers/aihubmix";
 import type { JobRecord } from "../../server/types";
 import { normalizeVideoCreateRecommendation } from "../../server/video-create/model";
 import type { VideoCreateInput } from "../../server/video-create/types";
@@ -17,7 +19,9 @@ import { createTestAccountStore, registerTestAccount } from "./account-test-help
 
 const databases: string[] = [];
 const generatedFiles: string[] = [];
+const originalMockGenerateVideoApi = env.mockGenerateVideoApi;
 afterEach(() => {
+  env.mockGenerateVideoApi = originalMockGenerateVideoApi;
   for (const path of databases.splice(0)) {
     rmSync(path, { force: true });
     rmSync(`${path}-wal`, { force: true });
@@ -65,6 +69,7 @@ describe("video create domain", () => {
       scene: "内容种草",
       durationSec: 15,
       segmentCount: 2,
+      speechRate: "medium",
       requirements: "",
       scriptStyle: "自然种草",
       marketingGoals: ["销售转化", "未知目标"],
@@ -86,6 +91,92 @@ describe("video create domain", () => {
     expect(recommendation.targetAudiences).toEqual(["职场白领"]);
     expect(recommendation.presenterRoles).toEqual(["好物推荐员"]);
     expect(recommendation.marketingMethods).toEqual(["场景展示"]);
+  });
+
+  test("resolves only portraits from the controlled catalog", () => {
+    expect(getPortraitById(1)).toMatchObject({ index: 1, source_url: expect.stringMatching(/^https:\/\//) });
+    expect(getPortraitById(999_999)).toBeUndefined();
+  });
+
+  test("builds a GPT multimodal request with every selected image", () => {
+    const request = buildGptImageAnalysisRequest({
+      model: "gpt-5.4-mini",
+      prompt: "分析商品和人像",
+      images: [
+        { bytes: new Uint8Array([1, 2, 3]), mimeType: "image/png" },
+        { bytes: new Uint8Array([4, 5]), mimeType: "image/jpeg" },
+      ],
+    });
+    expect(request.model).toBe("gpt-5.4-mini");
+    expect(request.response_format).toEqual({ type: "json_object" });
+    expect(request.messages[0]?.content[0]).toEqual({ type: "text", text: "分析商品和人像" });
+    expect(request.messages[0]?.content.slice(1)).toEqual([
+      { type: "image_url", image_url: { url: "data:image/png;base64,AQID" } },
+      { type: "image_url", image_url: { url: "data:image/jpeg;base64,BAU=" } },
+    ]);
+  });
+
+  test("AI recommendation overwrites every script parameter and preserves resource choices", async () => {
+    const path = join(tmpdir(), `video-create-overwrite-${crypto.randomUUID()}.sqlite`);
+    databases.push(path);
+    const accounts = createTestAccountStore(path);
+    const owner = await registerTestAccount(accounts, {
+      phone: "13800000012",
+      password: "Password123",
+      displayName: "AI 覆盖用户",
+    });
+    const store = new VideoCreateStore(path);
+    const projectId = crypto.randomUUID();
+    store.createDraft({
+      id: projectId,
+      ownerUserId: owner.user.id,
+      title: "全量覆盖",
+      projectInput: { ...input, portraitId: 1, voiceAssetId: "00000000-0000-4000-8000-000000000002" },
+    });
+    const updated = store.setRecommendation(projectId, {
+      productName: "AI 产品名",
+      sellingPoints: ["AI 卖点"],
+      scene: "品牌曝光",
+      durationSec: 30,
+      segmentCount: 2,
+      speechRate: "fast",
+      requirements: "AI 要求",
+      scriptStyle: "AI 风格",
+      marketingGoals: ["品牌曝光"],
+      targetAudiences: ["全年龄段"],
+      audiencePainPoints: "AI 痛点",
+      productBenefits: "AI 利益点",
+      presenterRoles: ["品牌官方"],
+      presenterGenders: ["男声"],
+      contentStyles: ["数据说话"],
+      openingStyles: ["数字冲击"],
+      closingGuides: ["互动提问"],
+      scriptTopics: ["产品功能讲解"],
+      materialTopics: ["产品外观"],
+      marketingMethods: ["专家背书"],
+      templates: ["常规"],
+      sensitiveWords: "绝对化表达",
+      customRequirements: "AI 自定义要求",
+    });
+    expect(updated?.project.input).toMatchObject({
+      productAssetIds: input.productAssetIds,
+      portraitId: 1,
+      voiceAssetId: "00000000-0000-4000-8000-000000000002",
+      videoModel: input.videoModel,
+      ratio: input.ratio,
+      subtitles: input.subtitles,
+      priority: input.priority,
+      productName: "AI 产品名",
+      sellingPoints: ["AI 卖点"],
+      scene: "品牌曝光",
+      durationSec: 30,
+      speechRate: "fast",
+      requirements: "AI 要求",
+      sensitiveWords: "绝对化表达",
+      customRequirements: "AI 自定义要求",
+    });
+    store.close();
+    accounts.close();
   });
 
   test("isolates owners, versions scripts and gates composition", async () => {
@@ -177,7 +268,8 @@ describe("video create domain", () => {
     accounts.close();
   });
 
-  test("marks automated video generation as explicit mock without calling Seedance", async () => {
+  test("uses the environment-controlled FFmpeg mock for Seedance shots", async () => {
+    env.mockGenerateVideoApi = true;
     const path = join(tmpdir(), `video-create-mock-${crypto.randomUUID()}.sqlite`);
     databases.push(path);
     const accounts = createTestAccountStore(path);
@@ -208,7 +300,8 @@ describe("video create domain", () => {
       progress: 0,
       stage: "排队中",
       overallExecutionMode: "mock",
-      values: { operation: "shot", projectId, shotId: shot.id, __mockVideo: "true" },
+      values: { operation: "shot", projectId, shotId: shot.id, durationSec: "5", ratio: "9:16" },
+      videoModel: "doubao-seedance-2-0-fast-260128",
       executionPlan: [],
       provenance: [],
       cancelRequested: false,
@@ -224,6 +317,10 @@ describe("video create domain", () => {
     await processor.process(job.id);
     expect(jobs.get(job.id)?.status).toBe("succeeded");
     expect(jobs.get(job.id)?.overallExecutionMode).toBe("mock");
+    expect(jobs.get(job.id)?.provenance[0]?.implementation).toBe("ffmpeg-seedance-mock");
+    expect(jobs.get(job.id)?.result?.artifacts[0]?.executionMode).toBe("mock");
+    expect(jobs.get(job.id)?.providerTaskId).toBeUndefined();
+    expect(jobs.get(job.id)?.stagingKeys).toEqual([]);
     expect(projects.get(projectId)?.shots[0].status).toBe("succeeded");
     expect(projects.get(projectId)?.canCompose).toBe(true);
 

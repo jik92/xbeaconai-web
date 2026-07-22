@@ -1,8 +1,10 @@
 import { existsSync } from "node:fs";
+import { unlink } from "node:fs/promises";
 import { extname, relative, resolve } from "node:path";
 import { env } from "../../server/env";
-import { probeMedia } from "../../server/media/ffmpeg";
+import { generateNumberedMockVideo, type MockVideoRatio, probeMedia } from "../../server/media/ffmpeg";
 import type { SeedanceModelId, SeedanceReferenceKind } from "../../server/models/video-models";
+import { getPortraitById } from "../../server/portraits/catalog";
 import { aihubmix } from "../../server/providers/aihubmix";
 import { ossutils } from "../../server/storage/ossutils";
 import type { JobRecord } from "../../server/types";
@@ -28,6 +30,29 @@ function referenceKind(mimeType: string): SeedanceReferenceKind | undefined {
   return undefined;
 }
 
+export function seedanceVideoSettings(values: Record<string, string>) {
+  const requestedDuration = Number(values.durationSec ?? values.duration ?? 5);
+  const duration = Math.min(15, Math.max(4, Math.round(Number.isFinite(requestedDuration) ? requestedDuration : 5))) as
+    | 4
+    | 5
+    | 6
+    | 7
+    | 8
+    | 9
+    | 10
+    | 11
+    | 12
+    | 13
+    | 14
+    | 15;
+  const ratio: MockVideoRatio = values.ratio?.startsWith("9:16")
+    ? "9:16"
+    : values.ratio?.startsWith("1:1")
+      ? "1:1"
+      : "16:9";
+  return { duration, ratio };
+}
+
 async function sha256File(path: string) {
   const hasher = new Bun.CryptoHasher("sha256");
   for await (const chunk of Bun.file(path).stream()) hasher.update(chunk);
@@ -40,8 +65,9 @@ export class SeedanceVideoJob {
   private async prepareReferences(job: JobRecord) {
     const { accounts, store } = this.context;
     if (!accounts) throw new SeedanceFlowError("ACCOUNT_STORE_UNAVAILABLE", "素材所有权服务不可用", false);
-    if (!ossutils.configured) throw new SeedanceFlowError("TOS_NOT_CONFIGURED", "TOS 素材中转未配置", false);
     const ids = assetIdsFromValues(job.values);
+    if (ids.length && !ossutils.configured)
+      throw new SeedanceFlowError("TOS_NOT_CONFIGURED", "TOS 素材中转未配置", false);
     const uploadRoot = resolve(env.dataDir, "uploads");
     const counts = new Map<SeedanceReferenceKind, number>();
     let totalBytes = 0;
@@ -90,6 +116,13 @@ export class SeedanceVideoJob {
       throw new SeedanceFlowError("REFERENCES_TOO_LARGE", "参考素材总量超过限制", false);
 
     const references: Array<{ kind: SeedanceReferenceKind; url: string }> = [];
+    if (job.values.portraitId) {
+      const portrait = getPortraitById(Number(job.values.portraitId));
+      if (!portrait) throw new SeedanceFlowError("PORTRAIT_NOT_AVAILABLE", "所选人像不存在", false);
+      if ((counts.get("image") ?? 0) > 0)
+        throw new SeedanceFlowError("TOO_MANY_REFERENCES", "每类最多上传一个图片参考", false);
+      references.push({ kind: "image", url: portrait.source_url });
+    }
     for (const item of prepared) {
       if (store.get(job.id)?.cancelRequested) throw new SeedanceFlowError("JOB_CANCELLED", "任务已取消", false);
       const uploaded = await ossutils.putStagedFile({
@@ -125,6 +158,26 @@ export class SeedanceVideoJob {
   }
 
   async execute(job: JobRecord, model: SeedanceModelId) {
+    if (env.mockGenerateVideoApi && !job.providerTaskId && !job.providerStatus) {
+      if (this.context.store.get(job.id)?.cancelRequested)
+        throw new SeedanceFlowError("JOB_CANCELLED", "任务已取消", false);
+      const settings = seedanceVideoSettings(job.values);
+      const output = resolve(env.dataDir, "results", `.seedance-mock-${job.id}-${crypto.randomUUID()}.mp4`);
+      try {
+        await generateNumberedMockVideo({ output, durationSec: settings.duration, ratio: settings.ratio });
+        await probeMedia(output);
+        if (this.context.store.get(job.id)?.cancelRequested)
+          throw new SeedanceFlowError("JOB_CANCELLED", "任务已取消", false);
+        return {
+          bytes: new Uint8Array(await Bun.file(output).arrayBuffer()),
+          mimeType: "video/mp4",
+          executionMode: "mock" as const,
+          implementation: "ffmpeg-seedance-mock" as const,
+        };
+      } finally {
+        await unlink(output).catch(() => undefined);
+      }
+    }
     let taskId = job.providerTaskId;
     let terminalConfirmed = false;
     let reconciliationReason: "cancel" | "timeout" | undefined;
@@ -141,20 +194,7 @@ export class SeedanceVideoJob {
       }
       this.context.change(job.id, { providerStatus: "submitting" });
       try {
-        const requestedDuration = Number(job.values.durationSec ?? job.values.duration ?? 5);
-        const duration = Math.min(15, Math.max(4, Math.round(requestedDuration))) as
-          | 4
-          | 5
-          | 6
-          | 7
-          | 8
-          | 9
-          | 10
-          | 11
-          | 12
-          | 13
-          | 14
-          | 15;
+        const settings = seedanceVideoSettings(job.values);
         const created = await aihubmix.createSeedanceVideo({
           model,
           prompt:
@@ -163,8 +203,8 @@ export class SeedanceVideoJob {
             job.values.description ||
             "A polished product video in a clean bright studio, stable camera",
           resolution: "720p",
-          ratio: job.values.ratio?.startsWith("9:16") ? "9:16" : job.values.ratio?.startsWith("1:1") ? "1:1" : "16:9",
-          duration,
+          ratio: settings.ratio,
+          duration: settings.duration,
           generateAudio: job.values.generateAudio !== "false",
           watermark: false,
           references,
@@ -242,7 +282,11 @@ export class SeedanceVideoJob {
           if (reconciliationReason === "cancel") throw new SeedanceFlowError("JOB_CANCELLED", "任务已取消", false);
           if (reconciliationReason === "timeout")
             throw new SeedanceFlowError("UPSTREAM_COMPLETED_AFTER_TIMEOUT", "上游在本地超时后完成，结果已丢弃", true);
-          return await aihubmix.downloadVideo(taskId);
+          return {
+            ...(await aihubmix.downloadVideo(taskId)),
+            executionMode: "real" as const,
+            implementation: "aihubmix-video" as const,
+          };
         }
         if (["failed", "cancelled", "expired"].includes(task.status)) {
           terminalConfirmed = true;

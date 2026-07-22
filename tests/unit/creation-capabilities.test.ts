@@ -11,6 +11,12 @@ if (!imageModel || !enabledVideoModel || !disabledVideoModel) {
 }
 
 describe("creation capabilities", () => {
+  test("reports enabled Seedance models as Mock when local video generation is selected", () => {
+    const mockModels = creationCapabilities(() => true, "mock").filter((model) => model.kind === "video");
+    expect(mockModels.length).toBeGreaterThan(0);
+    expect(mockModels.every((model) => model.enabled && model.executionMode === "mock")).toBeTrue();
+  });
+
   test("publishes one default mock image model and only enabled real video models", () => {
     const imageModels = models.filter((model) => model.kind === "image");
     const videoModels = models.filter((model) => model.kind === "video");

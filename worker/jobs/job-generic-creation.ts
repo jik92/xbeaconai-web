@@ -99,6 +99,17 @@ export function buildExecutionPlan(
     if (localSdkId && verifiedSdkIds.has(localSdkId)) {
       executionMode = "local";
       implementation = "ffmpeg-local";
+    } else if (env.mockGenerateVideoApi && videoModel && capability === "video-generate") {
+      executionMode = "mock";
+      implementation = "ffmpeg-seedance-mock";
+    } else if (
+      env.mockGenerateVideoApi &&
+      videoModel &&
+      capability === "multimodal-generate" &&
+      values.type === "视频"
+    ) {
+      executionMode = "mock";
+      implementation = "ffmpeg-seedance-mock";
     } else if (
       !env.forceMock &&
       aihubmix.configured &&
@@ -273,19 +284,23 @@ export const genericCreationJob: WorkerJobHandler = {
             url: `/api/artifacts/${name}`,
             executionMode: "real",
           });
-        } else if (stage.executionMode === "real" && stage.implementation === "aihubmix-video") {
-          if (!isSeedanceModelId(stage.model))
-            throw new SeedanceFlowError("INVALID_VIDEO_MODEL", "视频模型无效", false);
-          const response = await new SeedanceVideoJob(context).execute(job, stage.model);
+        } else if (stage.implementation === "aihubmix-video" || stage.implementation === "ffmpeg-seedance-mock") {
+          const videoModel = stage.implementation === "ffmpeg-seedance-mock" ? job.videoModel : stage.model;
+          if (!isSeedanceModelId(videoModel)) throw new SeedanceFlowError("INVALID_VIDEO_MODEL", "视频模型无效", false);
+          const response = await new SeedanceVideoJob(context).execute(job, videoModel);
           const name = `${id}-${capability}.mp4`;
           await Bun.write(resolve(env.dataDir, "results", name), response.bytes);
           await probeMedia(resolve(env.dataDir, "results", name));
+          stage.executionMode = response.executionMode;
+          stage.implementation = response.implementation;
+          stage.provider = response.executionMode === "real" ? "aihubmix" : undefined;
+          stage.model = response.executionMode === "real" ? videoModel : undefined;
           produced.push({
             id: crypto.randomUUID(),
             name,
             mimeType: "video/mp4",
             url: `/api/artifacts/${name}`,
-            executionMode: "real",
+            executionMode: response.executionMode,
           });
         } else await wait(stage.executionMode === "mock" ? 350 : 120);
       } catch (error) {
@@ -293,7 +308,11 @@ export const genericCreationJob: WorkerJobHandler = {
           context.change(id, { status: "cancelled", stage: "已取消", error: undefined });
           return;
         }
-        if (stage.implementation === "aihubmix-video" || !env.allowMockFallback) {
+        if (
+          stage.implementation === "aihubmix-video" ||
+          stage.implementation === "ffmpeg-seedance-mock" ||
+          !env.allowMockFallback
+        ) {
           context.change(id, {
             status: "failed",
             stage: `${label}失败`,

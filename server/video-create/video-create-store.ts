@@ -151,7 +151,16 @@ export class VideoCreateStore {
       ...recommendation,
       segmentCount: Math.max(recommendation.segmentCount, Math.ceil(recommendation.durationSec / 15)),
     };
-    const input = { ...aggregate.project.input, ...normalized };
+    const input: VideoCreateInput = {
+      productAssetIds: aggregate.project.input.productAssetIds,
+      portraitId: aggregate.project.input.portraitId,
+      voiceAssetId: aggregate.project.input.voiceAssetId,
+      videoModel: aggregate.project.input.videoModel,
+      ratio: aggregate.project.input.ratio,
+      subtitles: aggregate.project.input.subtitles,
+      priority: aggregate.project.input.priority,
+      ...normalized,
+    };
     this.db
       .update(videoCreateProjects)
       .set({

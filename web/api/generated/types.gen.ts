@@ -335,7 +335,7 @@ export type VideoCreateProject = {
 
 export type VideoCreateInput = {
     productAssetIds: Array<string>;
-    portraitAssetId?: string;
+    portraitId?: number;
     scene: string;
     productName?: string;
     sellingPoints?: Array<string>;
@@ -372,6 +372,7 @@ export type VideoCreateRecommendation = {
     scene: string;
     durationSec: number;
     segmentCount: number;
+    speechRate?: 'slow' | 'medium' | 'fast';
     requirements: string;
     scriptStyle: string;
     marketingGoals?: Array<'电商转化' | '品牌曝光' | 'App下载' | '门店到店' | '直播引流'>;

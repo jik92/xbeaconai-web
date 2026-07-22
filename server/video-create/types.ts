@@ -82,7 +82,7 @@ export const VideoCreateShotStatusSchema = z.enum([
 export const VideoCreateInputSchema = z
   .object({
     productAssetIds: z.array(z.string().uuid()).min(1).max(6),
-    portraitAssetId: z.string().uuid().optional(),
+    portraitId: z.number().int().min(1).optional(),
     scene: z.string().trim().min(1).max(40),
     productName: z.string().trim().max(60).default(""),
     sellingPoints: z.array(z.string().trim().min(1).max(80)).max(8).default([]),
@@ -121,6 +121,7 @@ export const VideoCreateRecommendationSchema = z
     scene: z.string().trim().min(1).max(40),
     durationSec: z.number().int().min(15).max(180),
     segmentCount: z.number().int().min(1).max(12),
+    speechRate: z.enum(["slow", "medium", "fast"]).default("medium"),
     requirements: z.string().trim().max(1_000),
     scriptStyle: z.string().trim().min(1).max(100),
     marketingGoals: selectableArray(videoCreateMarketingGoals),
@@ -174,3 +175,4 @@ export type VideoCreateGeneratedScript = z.infer<typeof VideoCreateGeneratedScri
 export type VideoCreateGeneratedStoryboard = z.infer<typeof VideoCreateGeneratedStoryboardSchema>;
 
 export const VIDEO_CREATE_TEXT_MODEL = "deepseek-v4-pro";
+export const VIDEO_CREATE_ANALYSIS_MODEL = "gpt-5.4-mini";

@@ -42,6 +42,122 @@ export async function generateSampleVideo(output: string) {
   return output;
 }
 
+export type MockVideoRatio = "16:9" | "9:16" | "1:1";
+
+export function mockVideoDimensions(ratio: MockVideoRatio) {
+  if (ratio === "9:16") return { width: 720, height: 1280 };
+  if (ratio === "1:1") return { width: 720, height: 720 };
+  return { width: 1280, height: 720 };
+}
+
+export function randomTwoDigitNumber() {
+  const [value = 0] = crypto.getRandomValues(new Uint32Array(1));
+  return 10 + (value % 90);
+}
+
+function numberedOverlay(number: number) {
+  const glyphs: Record<string, string[]> = {
+    "0": ["01110", "10001", "10011", "10101", "11001", "10001", "01110"],
+    "1": ["00100", "01100", "00100", "00100", "00100", "00100", "01110"],
+    "2": ["01110", "10001", "00001", "00010", "00100", "01000", "11111"],
+    "3": ["11110", "00001", "00001", "01110", "00001", "00001", "11110"],
+    "4": ["00010", "00110", "01010", "10010", "11111", "00010", "00010"],
+    "5": ["11111", "10000", "10000", "11110", "00001", "00001", "11110"],
+    "6": ["01110", "10000", "10000", "11110", "10001", "10001", "01110"],
+    "7": ["11111", "00001", "00010", "00100", "01000", "01000", "01000"],
+    "8": ["01110", "10001", "10001", "01110", "10001", "10001", "01110"],
+    "9": ["01110", "10001", "10001", "01111", "00001", "00001", "01110"],
+  };
+  const label = String(number);
+  const scale = 18;
+  const padding = 18;
+  const glyphWidth = 5 * scale;
+  const gap = scale;
+  const width = padding * 2 + label.length * glyphWidth + (label.length - 1) * gap;
+  const height = padding * 2 + 7 * scale;
+  const pixels: string[] = ["P3", `${width} ${height}`, "255"];
+  for (let y = 0; y < height; y += 1)
+    for (let x = 0; x < width; x += 1) {
+      const localX = x - padding;
+      const localY = y - padding;
+      const slotWidth = glyphWidth + gap;
+      const charIndex = Math.floor(localX / slotWidth);
+      const glyphX = Math.floor((localX % slotWidth) / scale);
+      const glyphY = Math.floor(localY / scale);
+      const on =
+        localX >= 0 &&
+        localY >= 0 &&
+        charIndex >= 0 &&
+        charIndex < label.length &&
+        glyphX >= 0 &&
+        glyphX < 5 &&
+        glyphY >= 0 &&
+        glyphY < 7 &&
+        glyphs[label[charIndex]]?.[glyphY]?.[glyphX] === "1";
+      pixels.push(on ? "255 255 255" : "0 0 0");
+    }
+  return `${pixels.join("\n")}\n`;
+}
+
+export async function generateNumberedMockVideo(input: {
+  output: string;
+  durationSec: number;
+  ratio: MockVideoRatio;
+  number?: number;
+}) {
+  if (!Number.isFinite(input.durationSec) || input.durationSec <= 0) throw new Error("MOCK_VIDEO_DURATION_INVALID");
+  const number = input.number ?? randomTwoDigitNumber();
+  if (!Number.isInteger(number) || number < 10 || number > 99) throw new Error("MOCK_VIDEO_NUMBER_INVALID");
+  await outputDir(input.output);
+  const overlay = `${input.output}.number.ppm`;
+  const { width, height } = mockVideoDimensions(input.ratio);
+  await Bun.write(overlay, numberedOverlay(number));
+  try {
+    await run("ffmpeg", [
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      `color=c=black:s=${width}x${height}:r=24:d=${input.durationSec}`,
+      "-loop",
+      "1",
+      "-framerate",
+      "24",
+      "-i",
+      overlay,
+      "-f",
+      "lavfi",
+      "-i",
+      "anullsrc=channel_layout=stereo:sample_rate=48000",
+      "-filter_complex",
+      "[0:v][1:v]overlay=(W-w)/2:(H-h)/2:shortest=1[v]",
+      "-map",
+      "[v]",
+      "-map",
+      "2:a:0",
+      "-t",
+      String(input.durationSec),
+      "-c:v",
+      "libx264",
+      "-preset",
+      "ultrafast",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "aac",
+      "-b:a",
+      "64k",
+      "-movflags",
+      "+faststart",
+      "-shortest",
+      input.output,
+    ]);
+  } finally {
+    await unlink(overlay).catch(() => undefined);
+  }
+  return { path: input.output, number };
+}
+
 export async function probeMedia(input: string) {
   const { stdout } = await run("ffprobe", ["-v", "error", "-show_streams", "-show_format", "-of", "json", input]);
   return JSON.parse(stdout) as {

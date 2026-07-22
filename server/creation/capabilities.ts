@@ -75,7 +75,10 @@ const imageModels: CreationModelCapability[] = [
   dimensions: imageDimensions,
 }));
 
-export function creationCapabilities(videoEnabled: (id: SeedanceModelId) => boolean): CreationModelCapability[] {
+export function creationCapabilities(
+  videoEnabled: (id: SeedanceModelId) => boolean,
+  videoExecutionMode: CreationExecutionMode = "real",
+): CreationModelCapability[] {
   const videos = videoModels.map(
     (model, index): CreationModelCapability => ({
       id: model.id,
@@ -85,7 +88,7 @@ export function creationCapabilities(videoEnabled: (id: SeedanceModelId) => bool
       badges: model.tags,
       enabled: videoEnabled(model.id),
       disabledReason: videoEnabled(model.id) ? undefined : "真实基线尚未验证",
-      executionMode: "real",
+      executionMode: videoExecutionMode,
       isDefault: index === 0,
       supportedRatios: ["adaptive", "1:1", "16:9", "4:3", "3:4", "9:16", "21:9"],
       supportedResolutions: ["480p", "720p"],

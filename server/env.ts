@@ -31,6 +31,7 @@ export const env = {
   databasePath: resolve(dataDir, "yaozuo.sqlite"),
   allowMockFallback: process.env.ALLOW_MOCK_FALLBACK !== "false",
   forceMock: process.env.FORCE_MOCK === "true",
+  mockGenerateVideoApi: process.env.MOCK_GENERATE_VIDEO_API === "true",
   blockAiOutbound: process.env.BLOCK_AI_OUTBOUND === "true",
   byokEncryptionKey: process.env.BYOK_ENCRYPTION_KEY ?? "",
   redisUrl: process.env.REDIS_URL ?? "redis://127.0.0.1:6379",

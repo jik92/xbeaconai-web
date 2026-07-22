@@ -49,6 +49,7 @@ import { BullJobQueue } from "./jobs/bull-job-queue";
 import { stopAllAdminJobs } from "./jobs/admin-job-control";
 import { InsufficientCreditsError, SqliteJobStore } from "./jobs/sqlite-job-store";
 import { seedanceModelIds, videoModels } from "./models/video-models";
+import { getPortraitById } from "./portraits/catalog";
 import { auditSdkRegistry } from "./sdk-registry";
 import { ossutils } from "./storage/ossutils";
 import { rollbackUploadedObjects, uploadFilesStrictly } from "./storage/strict-library-upload";
@@ -61,6 +62,7 @@ import {
 } from "./uploads/direct-upload";
 import { inlineUtf8ContentDisposition } from "./uploads/content-disposition";
 import {
+  VIDEO_CREATE_ANALYSIS_MODEL,
   VideoCreateInputSchema,
   VideoCreateProjectStatusSchema,
   VideoCreateRecommendationSchema,
@@ -364,7 +366,7 @@ function getVerifiedSdkIds(): Set<string> {
 }
 
 function videoModelEnabled(modelId: string) {
-  if (env.forceMock) return true;
+  if (env.forceMock || env.mockGenerateVideoApi) return true;
   const sdk = auditSdkRegistry().find((item) => item.model === modelId && item.capability === "video-generate");
   return Boolean(sdk && getVerifiedSdkIds().has(sdk.id));
 }
@@ -1279,7 +1281,9 @@ const creationCapabilitiesRoute = createRoute({
     },
   },
 });
-app.openapi(creationCapabilitiesRoute, (c) => c.json({ models: creationCapabilities(videoModelEnabled) }, 200));
+app.openapi(creationCapabilitiesRoute, (c) =>
+  c.json({ models: creationCapabilities(videoModelEnabled, env.mockGenerateVideoApi ? "mock" : "real") }, 200),
+);
 
 const libraryAssetResponse = (asset: MediaAsset) => ({
   id: asset.id,
@@ -3036,6 +3040,7 @@ function videoCreateJobRecord(input: {
   const timestamp = new Date().toISOString();
   const operation = input.values.operation;
   const local = operation === "compose";
+  const mockVideo = operation === "shot" && env.mockGenerateVideoApi;
   return {
     id: crypto.randomUUID(),
     ownerUserId: input.ownerUserId,
@@ -3044,25 +3049,28 @@ function videoCreateJobRecord(input: {
     status: "queued",
     progress: 0,
     stage: "排队中",
-    overallExecutionMode: local ? "local" : "real",
+    overallExecutionMode: mockVideo ? "mock" : local ? "local" : "real",
     values: input.values,
     videoModel: input.videoModel,
     executionPlan: [
       {
         id: `plan:0:${operation}`,
         capability: operation,
-        executionMode: local ? "local" : "real",
-        implementation: local
-          ? "ffmpeg-concat"
+        executionMode: mockVideo ? "mock" : local ? "local" : "real",
+        implementation: mockVideo
+          ? "ffmpeg-seedance-mock"
+          : local
+            ? "ffmpeg-concat"
+            : operation === "analyze"
+              ? "aihubmix-gpt-image-analysis"
+              : operation === "shot"
+                ? "aihubmix-video"
+                : "aihubmix-text",
+        provider: local || mockVideo ? undefined : "aihubmix",
+        model: mockVideo
+          ? undefined
           : operation === "analyze"
-            ? "gemini-image-analysis"
-            : operation === "shot"
-              ? "aihubmix-video"
-              : "aihubmix-text",
-        provider: local ? undefined : "aihubmix",
-        model:
-          operation === "analyze"
-            ? env.videoAnalysisModel
+            ? VIDEO_CREATE_ANALYSIS_MODEL
             : operation === "shot"
               ? input.videoModel
               : local
@@ -3085,11 +3093,7 @@ function videoCreateJobRecord(input: {
 function videoCreateAssetsAvailable(ownerUserId: string, input: z.infer<typeof VideoCreateInputSchema>) {
   const productAssets = input.productAssetIds.map((id) => accounts.getOwnedAsset(ownerUserId, id));
   if (productAssets.some((asset) => !asset?.mimeType.startsWith("image/"))) return false;
-  if (
-    input.portraitAssetId &&
-    !accounts.getOwnedAsset(ownerUserId, input.portraitAssetId)?.mimeType.startsWith("image/")
-  )
-    return false;
+  if (input.portraitId && !getPortraitById(input.portraitId)) return false;
   if (input.voiceAssetId && !accounts.getOwnedAsset(ownerUserId, input.voiceAssetId)?.mimeType.startsWith("audio/"))
     return false;
   return true;
@@ -3316,7 +3320,7 @@ async function enqueueVideoCreateOperation(input: {
   const aggregate = videoCreates.getOwned(input.projectId, input.ownerUserId);
   if (!aggregate) throw new VideoCreateStateError("一键成片项目不存在");
   const shot = input.shotId ? aggregate.shots.find((item) => item.id === input.shotId) : undefined;
-  const referenceId = aggregate.project.input.portraitAssetId ?? aggregate.project.input.productAssetIds[0];
+  const referenceId = aggregate.project.input.productAssetIds[0];
   const values = {
     ...videoCreateJobValues(input),
     ...(shot
@@ -3325,7 +3329,11 @@ async function enqueueVideoCreateOperation(input: {
           durationSec: String(shot.durationSec),
           ratio: aggregate.project.input.ratio,
           generateAudio: String(shot.audioEnabled),
-          reference: `asset:${referenceId}:reference`,
+          ...(aggregate.project.input.portraitId
+            ? { portraitId: String(aggregate.project.input.portraitId) }
+            : referenceId
+              ? { reference: `asset:${referenceId}:reference` }
+              : {}),
           ...(aggregate.project.input.voiceAssetId
             ? { voiceReference: `asset:${aggregate.project.input.voiceAssetId}:voice` }
             : {}),
@@ -3780,7 +3788,7 @@ app.openapi(createJobRoute, async (c) => {
   const needsVideoModel = moduleId === "video-remix" || (moduleId === "ai-generate" && body.values.type === "视频");
   let creationQuote = 0;
   if (moduleId === "ai-generate" && body.values.creationKind) {
-    const models = creationCapabilities(videoModelEnabled);
+    const models = creationCapabilities(videoModelEnabled, env.mockGenerateVideoApi ? "mock" : "real");
     const validationError = validateCreationValues(body.values, models);
     if (validationError)
       return c.json(

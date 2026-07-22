@@ -1529,9 +1529,9 @@
             "minItems": 1,
             "maxItems": 6
           },
-          "portraitAssetId": {
-            "type": "string",
-            "format": "uuid"
+          "portraitId": {
+            "type": "integer",
+            "minimum": 1
           },
           "scene": {
             "type": "string",
@@ -1849,6 +1849,15 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 12
+          },
+          "speechRate": {
+            "type": "string",
+            "enum": [
+              "slow",
+              "medium",
+              "fast"
+            ],
+            "default": "medium"
           },
           "requirements": {
             "type": "string",

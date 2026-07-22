@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { providerCredentials } from "../byok/credential-store";
 import { env } from "../env";
 import type { SeedanceModelId, SeedanceReferenceKind } from "../models/video-models";
@@ -31,6 +32,32 @@ export interface SeedanceVideoInput {
   generateAudio?: boolean;
   watermark?: boolean;
   references?: SeedanceReference[];
+}
+
+export interface GptImageAnalysisInput {
+  images: Array<{ bytes: Uint8Array; mimeType: string }>;
+  prompt: string;
+  model: string;
+  maxTokens?: number;
+}
+
+export function buildGptImageAnalysisContent(input: GptImageAnalysisInput) {
+  return [
+    { type: "text" as const, text: input.prompt },
+    ...input.images.map((image) => ({
+      type: "image_url" as const,
+      image_url: { url: `data:${image.mimeType};base64,${Buffer.from(image.bytes).toString("base64")}` },
+    })),
+  ];
+}
+
+export function buildGptImageAnalysisRequest(input: GptImageAnalysisInput) {
+  return {
+    model: input.model,
+    messages: [{ role: "user" as const, content: buildGptImageAnalysisContent(input) }],
+    response_format: { type: "json_object" as const },
+    max_completion_tokens: input.maxTokens ?? 4_096,
+  };
 }
 
 export class AihubmixClient {
@@ -131,6 +158,25 @@ export class AihubmixClient {
     const item = body.data?.[0];
     if (!item?.b64_json && !item?.url) throw new Error("AIHUBMIX_INVALID_IMAGE_RESULT");
     return item;
+  }
+
+  async analyzeImages(input: GptImageAnalysisInput) {
+    if (!input.images.length) throw new Error("IMAGE_ANALYSIS_REQUIRES_IMAGE");
+    if (input.images.reduce((total, image) => total + image.bytes.byteLength, 0) > 20 * 1024 * 1024)
+      throw new Error("IMAGE_ANALYSIS_INLINE_LIMIT_EXCEEDED");
+    const body = (await this.request("/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(180_000),
+      body: JSON.stringify(buildGptImageAnalysisRequest(input)),
+    }).then((response) => response.json())) as {
+      choices?: Array<{ message?: { content?: string } }>;
+      model?: string;
+      usage?: unknown;
+    };
+    const text = body.choices?.[0]?.message?.content?.trim();
+    if (!text) throw new Error("AIHUBMIX_INVALID_IMAGE_ANALYSIS_RESULT");
+    return { text, model: body.model ?? input.model, usage: body.usage };
   }
 
   async synthesizeSpeech(input: string, model = "tts-1", voice = "alloy") {

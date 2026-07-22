@@ -40,6 +40,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
+import { fetchPortraits } from "@/features/portrait-library/portrait-data";
+import { PortraitPickerDialog } from "@/features/portrait-library/portrait-picker-dialog";
 import { cn } from "@/lib/utils";
 
 const scenes = ["商城转化", "短视频带货", "引流直播间", "直播带货", "内容种草", "品牌曝光", "本地到店", "线索收集"];
@@ -332,6 +334,7 @@ export function VideoCreatePage() {
   const [tab, setTab] = useState<"script" | "storyboard">("script");
   const [openPanels, setOpenPanels] = useState({ requirements: false, style: false, advanced: false });
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [portraitPickerOpen, setPortraitPickerOpen] = useState(false);
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -347,6 +350,12 @@ export function VideoCreatePage() {
     queryFn: fetchVideoCreateProjects,
     refetchInterval: polling ? 3_000 : false,
   });
+  const { data: portraits = [], isLoading: portraitsLoading } = useQuery({
+    queryKey: ["portrait-library"],
+    queryFn: fetchPortraits,
+    staleTime: Infinity,
+  });
+  const selectedPortrait = portraits.find((portrait) => portrait.index === input.portraitId);
   const { data: refreshed } = useQuery({
     queryKey: ["video-create-project", projectId],
     queryFn: () => fetchVideoCreateProject(projectId ?? ""),
@@ -519,28 +528,23 @@ export function VideoCreatePage() {
               <Label>人像图片</Label>
               <span className="text-xs text-muted">可选</span>
             </div>
-            {input.portraitAssetId ? (
+            {selectedPortrait ? (
               <div className="flex items-center gap-2 rounded-lg border border-line p-2 [&_img]:h-12 [&_img]:w-9 [&_img]:rounded-md [&_img]:object-cover">
-                <AuthenticatedMedia
-                  url={`/api/assets/${input.portraitAssetId}/content`}
-                  mimeType="image/png"
-                  alt="已选人像"
-                />
-                <span className="flex-1 text-xs text-muted">已选择人像</span>
-                <Button variant="ghost" size="sm" onClick={() => mutateInput("portraitAssetId", undefined)}>
+                <img src={selectedPortrait.source_url} alt={selectedPortrait.name} />
+                <span className="min-w-0 flex-1 truncate text-xs text-muted">{selectedPortrait.name}</span>
+                <Button variant="ghost" size="sm" onClick={() => mutateInput("portraitId", undefined)}>
                   移除
                 </Button>
               </div>
             ) : (
-              <AttachmentPicker
-                accept="image/*"
-                onSelect={([asset]) => asset && mutateInput("portraitAssetId", asset.id)}
-                trigger={(open) => (
-                  <Button className="w-full justify-between" variant="outline" size="sm" onClick={open}>
-                    未添加人像 <span>添加</span>
-                  </Button>
-                )}
-              />
+              <Button
+                className="w-full justify-between"
+                variant="outline"
+                size="sm"
+                onClick={() => setPortraitPickerOpen(true)}
+              >
+                未添加人像 <span>添加</span>
+              </Button>
             )}
           </section>
 
@@ -1247,6 +1251,17 @@ export function VideoCreatePage() {
           </section>
         ) : null}
       </main>
+      <PortraitPickerDialog
+        open={portraitPickerOpen}
+        portraits={portraits}
+        loading={portraitsLoading}
+        selectedId={input.portraitId}
+        onClose={() => setPortraitPickerOpen(false)}
+        onSelect={(portrait) => {
+          mutateInput("portraitId", portrait.index);
+          setPortraitPickerOpen(false);
+        }}
+      />
       <HistoryDrawer
         open={historyOpen}
         projects={history}
