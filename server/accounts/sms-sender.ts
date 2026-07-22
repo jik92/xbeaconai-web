@@ -9,6 +9,16 @@ export interface SmsSender {
   send(message: SmsMessage): Promise<void>;
 }
 
+export class SmsProviderError extends Error {
+  constructor(
+    message: string,
+    readonly requestId?: string,
+  ) {
+    super(message);
+    this.name = "SmsProviderError";
+  }
+}
+
 export class ConsoleSmsSender implements SmsSender {
   async send(message: SmsMessage) {
     console.info("[SMS verification]", {

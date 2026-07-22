@@ -25,6 +25,7 @@ export interface PublicAppConfig {
       readonly pollTimeoutMs: number;
     };
     readonly tos: { readonly region: string; readonly endpoint: string; readonly bucket: string };
+    readonly volcSms: { readonly smsAccount: string; readonly sign: string; readonly templateId: string };
   };
   readonly menuFeatures: MenuFeatureConfig;
 }
@@ -52,6 +53,11 @@ export const APP_CONFIG = {
       region: "cn-beijing",
       endpoint: "tos-cn-beijing.volces.com",
       bucket: "xbeacon",
+    },
+    volcSms: {
+      smsAccount: "8c444a41",
+      sign: "杭州絮缕科技",
+      templateId: "SPT_09a29a26",
     },
   },
   menuFeatures: {

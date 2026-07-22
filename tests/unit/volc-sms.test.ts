@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { ConfiguredVolcSmsSender } from "../../server/accounts/configured-sms-sender";
+import { SmsProviderError } from "../../server/accounts/sms-sender";
 import { VolcSmsClient, VolcSmsError } from "../../server/accounts/volc-sms";
+import { APP_CONFIG } from "../../web/app/config";
 
 const config = {
   accessKeyId: "test-access-key",
@@ -59,5 +62,47 @@ describe("VolcSmsClient", () => {
     expect(error).toBeInstanceOf(VolcSmsError);
     expect(error).toMatchObject({ code: "RE:0005", message: "模板错误", requestId: "request-2" });
     expect(String(error)).not.toContain(config.secretAccessKey);
+  });
+});
+
+describe("ConfiguredVolcSmsSender", () => {
+  test("uses the shared production template for registration and password reset", async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    const sender = new ConfiguredVolcSmsSender(
+      (name) => (name === "TOS_ACCESS_KEY_ID" ? "test-access-key" : "test-secret-key"),
+      async (_input, init) => {
+        bodies.push(JSON.parse(String(init?.body)));
+        return Response.json({ Result: { MessageID: ["message-1"] } });
+      },
+    );
+
+    await sender.send({
+      phone: "13800000000",
+      code: "123456",
+      purpose: "register",
+      expiresAt: "2026-07-22T15:00:00.000Z",
+    });
+    await sender.send({
+      phone: "13800000001",
+      code: "654321",
+      purpose: "reset_password",
+      expiresAt: "2026-07-22T15:00:00.000Z",
+    });
+
+    expect(bodies.map((body) => body.TemplateID)).toEqual([
+      APP_CONFIG.providerDefaults.volcSms.templateId,
+      APP_CONFIG.providerDefaults.volcSms.templateId,
+    ]);
+    expect(APP_CONFIG.providerDefaults.volcSms.templateId).toBe("SPT_09a29a26");
+  });
+
+  test("fails clearly when the Volcengine access key is unavailable", async () => {
+    const sender = new ConfiguredVolcSmsSender(() => undefined);
+    const error = await sender
+      .send({ phone: "13800000000", code: "123456", purpose: "register", expiresAt: "2026-07-22T15:00:00.000Z" })
+      .catch((caught) => caught);
+
+    expect(error).toBeInstanceOf(SmsProviderError);
+    expect(error).toMatchObject({ message: "火山短信 Access Key 未配置" });
   });
 });

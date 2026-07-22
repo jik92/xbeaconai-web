@@ -2209,8 +2209,7 @@
                   },
                   "required": [
                     "expiresAt",
-                    "retryAfterSeconds",
-                    "verificationCode"
+                    "retryAfterSeconds"
                   ]
                 }
               }
@@ -2248,6 +2247,16 @@
           },
           "429": {
             "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SMS provider unavailable",
             "content": {
               "application/json": {
                 "schema": {

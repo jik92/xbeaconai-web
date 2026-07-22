@@ -167,8 +167,12 @@ export class AccountStore {
   private readonly client: ReturnType<typeof openDatabase>["client"];
   private readonly smsSender: SmsSender;
   private readonly generateSmsCode: () => string;
+  private readonly exposeSmsCode: boolean;
 
-  constructor(path = env.databasePath, options: { smsSender?: SmsSender; generateSmsCode?: () => string } = {}) {
+  constructor(
+    path = env.databasePath,
+    options: { smsSender?: SmsSender; generateSmsCode?: () => string; exposeSmsCode?: boolean } = {},
+  ) {
     const connection = openDatabase(path);
     this.client = connection.client;
     this.db = connection.db;
@@ -176,6 +180,7 @@ export class AccountStore {
     this.generateSmsCode =
       options.generateSmsCode ??
       (() => env.smsVerificationFixedCode || randomInt(0, 1_000_000).toString().padStart(6, "0"));
+    this.exposeSmsCode = options.exposeSmsCode ?? !env.isProduction;
     this.db
       .update(mediaAssets)
       .set({ displayName: mediaAssets.originalName })
@@ -218,7 +223,11 @@ export class AccountStore {
       this.db.delete(smsVerificationCodes).where(eq(smsVerificationCodes.id, id)).run();
       throw error;
     }
-    return { expiresAt, retryAfterSeconds: 60, verificationCode: code };
+    return {
+      expiresAt,
+      retryAfterSeconds: 60,
+      ...(this.exposeSmsCode ? { verificationCode: code } : {}),
+    };
   }
 
   sendRegistrationCode(phone: string) {

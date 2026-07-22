@@ -20,7 +20,7 @@ export interface VolcSmsResult {
   messageIds: string[];
 }
 
-type SmsFetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
+export type SmsFetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 interface VolcSmsResponse {
   ResponseMetadata?: {

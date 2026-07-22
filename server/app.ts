@@ -15,6 +15,8 @@ import {
   rechargePackages,
 } from "./accounts/account-store";
 import { authenticate, issueToken } from "./accounts/auth";
+import { createApplicationSmsSender } from "./accounts/configured-sms-sender";
+import { SmsProviderError } from "./accounts/sms-sender";
 import { AdScriptStore, AdScriptVersionConflictError } from "./ad-script/ad-script-store";
 import { checkAdScriptCompliance } from "./ad-script/compliance";
 import {
@@ -292,7 +294,7 @@ const DirectUploadInitSchema = z.object({
 });
 
 export const store = new SqliteJobStore();
-export const accounts = new AccountStore();
+export const accounts = new AccountStore(env.databasePath, { smsSender: createApplicationSmsSender() });
 export const adScripts = new AdScriptStore();
 export const videoCreates = new VideoCreateStore();
 export const queue = new BullJobQueue();
@@ -502,7 +504,7 @@ const sendSmsCodeRoute = createRoute({
           schema: z.object({
             expiresAt: z.string(),
             retryAfterSeconds: z.number().int().min(1),
-            verificationCode: VerificationCodeSchema,
+            verificationCode: VerificationCodeSchema.optional(),
           }),
         },
       },
@@ -511,6 +513,7 @@ const sendSmsCodeRoute = createRoute({
     404: { description: "Phone not registered", content: { "application/json": { schema: ErrorSchema } } },
     422: { description: "Invalid phone", content: { "application/json": { schema: ErrorSchema } } },
     429: { description: "Rate limited", content: { "application/json": { schema: ErrorSchema } } },
+    503: { description: "SMS provider unavailable", content: { "application/json": { schema: ErrorSchema } } },
   },
 });
 app.openapi(sendSmsCodeRoute, async (c) => {
@@ -543,6 +546,20 @@ app.openapi(sendSmsCodeRoute, async (c) => {
       if (error.status === 404) return c.json(body, 404);
       if (error.status === 429) return c.json(body, 429);
       return c.json(body, 422);
+    }
+    if (error instanceof SmsProviderError) {
+      console.error("SMS provider request failed", { message: error.message, providerRequestId: error.requestId });
+      return c.json(
+        {
+          error: {
+            code: "SMS_PROVIDER_ERROR",
+            message: "短信服务暂时不可用，请稍后重试",
+            retryable: true,
+            requestId: crypto.randomUUID(),
+          },
+        },
+        503,
+      );
     }
     throw error;
   }

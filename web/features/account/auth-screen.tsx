@@ -50,7 +50,7 @@ export function AuthScreen() {
       const purpose = view === "forgot" ? "reset_password" : "register";
       const result = await sendVerificationCode(phone, purpose);
       setCountdown(result.retryAfterSeconds);
-      setDisplayedVerificationCode(result.verificationCode);
+      setDisplayedVerificationCode(result.verificationCode ?? "");
       setNotice("验证码已发送");
     } catch (reason) {
       setError(apiErrorMessage(reason, "验证码发送失败"));
@@ -222,10 +222,14 @@ export function AuthScreen() {
               {error}
             </p>
           )}
-          {notice && <p className="form-notice">{notice}</p>}
-          {displayedVerificationCode && (
-            <p className="verification-code-display" role="status">
-              当前验证码：<strong>{displayedVerificationCode}</strong>
+          {notice && (
+            <p className="form-notice">
+              <span>{notice}</span>
+              {displayedVerificationCode && (
+                <span className="verification-code-inline" role="status">
+                  当前验证码：<strong>{displayedVerificationCode}</strong>
+                </span>
+              )}
             </p>
           )}
           <button type="submit" className="auth-submit" disabled={busy || (verificationView && sendingCode)}>

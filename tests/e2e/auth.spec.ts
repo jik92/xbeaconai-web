@@ -13,6 +13,7 @@ test("registers with only phone and SMS before setting a password", async ({ pag
 
   await page.getByLabel("手机号").fill(phone);
   await page.getByRole("button", { name: "获取验证码" }).click();
+  await expect(page.locator(".form-notice")).toHaveText(`验证码已发送当前验证码：${E2E_SMS_CODE}`);
   await expect(page.getByRole("status")).toHaveText(`当前验证码：${E2E_SMS_CODE}`);
   await page.getByLabel("短信验证码").fill(E2E_SMS_CODE);
   await page.getByRole("button", { name: "验证并注册" }).click();

@@ -59,6 +59,19 @@ describe("two-step phone authentication", () => {
     store.close();
   });
 
+  test("supports disabling verification-code exposure for production", async () => {
+    const path = join(tmpdir(), `phone-auth-${crypto.randomUUID()}.sqlite`);
+    databases.push(path);
+    const store = new AccountStore(path, {
+      smsSender: { send: async () => {} },
+      generateSmsCode: () => "246810",
+      exposeSmsCode: false,
+    });
+
+    expect((await store.sendRegistrationCode("13800000028")).verificationCode).toBeUndefined();
+    store.close();
+  });
+
   test("enforces code cooldown, expiry and failed-attempt invalidation", async () => {
     const { store } = fixture();
     await store.sendRegistrationCode("13800000022");

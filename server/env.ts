@@ -16,6 +16,7 @@ mkdirSync(resolve(dataDir, "uploads"), { recursive: true, mode: 0o700 });
 mkdirSync(resolve(dataDir, "results"), { recursive: true, mode: 0o700 });
 
 export const env = {
+  isProduction: process.env.NODE_ENV === "production",
   host: process.env.API_HOST ?? "127.0.0.1",
   port: apiPort,
   dataDir,

@@ -717,7 +717,7 @@ export const zSendSmsVerificationCodeBody = z.object({
 export const zSendSmsVerificationCodeResponse = z.object({
     expiresAt: z.string(),
     retryAfterSeconds: z.int().gte(1),
-    verificationCode: z.string().regex(/^\d{6}$/)
+    verificationCode: z.string().regex(/^\d{6}$/).optional()
 });
 
 export const zRegisterBody = z.object({

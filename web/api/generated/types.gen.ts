@@ -451,6 +451,10 @@ export type SendSmsVerificationCodeErrors = {
      * Rate limited
      */
     429: ApiErrorResponse;
+    /**
+     * SMS provider unavailable
+     */
+    503: ApiErrorResponse;
 };
 
 export type SendSmsVerificationCodeError = SendSmsVerificationCodeErrors[keyof SendSmsVerificationCodeErrors];
@@ -462,7 +466,7 @@ export type SendSmsVerificationCodeResponses = {
     200: {
         expiresAt: string;
         retryAfterSeconds: number;
-        verificationCode: string;
+        verificationCode?: string;
     };
 };
 
