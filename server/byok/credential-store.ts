@@ -15,6 +15,7 @@ export interface MaskedProviderCredential {
   name: ProviderCredentialName;
   provider: string;
   label: string;
+  secret: boolean;
   configured: boolean;
   maskedValue?: string;
   updatedAt?: string;

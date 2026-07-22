@@ -1127,6 +1127,7 @@ export const zListAdminCredentialsResponse = z.object({
         name: zProviderCredentialName,
         provider: z.string(),
         label: z.string(),
+        secret: z.boolean(),
         configured: z.boolean(),
         maskedValue: z.string().optional(),
         updatedAt: z.string().optional()
@@ -1144,6 +1145,7 @@ export const zDeleteAdminCredentialResponse = z.object({
     name: zProviderCredentialName,
     provider: z.string(),
     label: z.string(),
+    secret: z.boolean(),
     configured: z.boolean(),
     maskedValue: z.string().optional(),
     updatedAt: z.string().optional()
@@ -1164,6 +1166,7 @@ export const zUpdateAdminCredentialResponse = z.object({
     name: zProviderCredentialName,
     provider: z.string(),
     label: z.string(),
+    secret: z.boolean(),
     configured: z.boolean(),
     maskedValue: z.string().optional(),
     updatedAt: z.string().optional()
@@ -1180,6 +1183,24 @@ export const zImportAdminEnvKeyResponse = z.object({
     updated: z.array(zProviderCredentialName),
     skipped: z.array(zProviderCredentialName),
     ignored: z.array(z.string())
+});
+
+/**
+ * Provider credential doctor results
+ */
+export const zRunAdminCredentialDoctorResponse = z.object({
+    results: z.array(z.object({
+        provider: z.string(),
+        status: z.enum([
+            'available',
+            'missing',
+            'invalid',
+            'timeout'
+        ]),
+        message: z.string(),
+        latencyMs: z.int().gte(0),
+        checkedAt: z.string()
+    }))
 });
 
 export const zListAdminJobsQuery = z.object({
@@ -1207,6 +1228,16 @@ export const zListAdminJobsResponse = z.object({
     total: z.int(),
     page: z.int(),
     pageSize: z.int()
+});
+
+/**
+ * All queued jobs cancelled and active jobs requested to cancel
+ */
+export const zStopAllAdminJobsResponse = z.object({
+    matched: z.int().gte(0),
+    queuedCancelled: z.int().gte(0),
+    processingRequested: z.int().gte(0),
+    failed: z.int().gte(0)
 });
 
 export const zListJobsQuery = z.object({

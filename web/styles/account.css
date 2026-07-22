@@ -1,85 +1,3 @@
-.auth-page {
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  background:
-    radial-gradient(circle at 20% 10%, #dce8ff 0, transparent 34%),
-    radial-gradient(circle at 90% 90%, #eee8ff 0, transparent 32%), #f5f7fb;
-}
-.auth-card {
-  width: min(430px, 100%);
-  padding: 30px;
-  background: #fff;
-  border: 1px solid #dfe5ee;
-  border-radius: 16px;
-  box-shadow: 0 24px 70px #19335d18;
-}
-.auth-card header {
-  text-align: center;
-}
-.auth-brand {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-  @apply text-2xl;
-  @apply font-semibold;
-  @apply tracking-widest;
-}
-.auth-brand .brand-logo {
-  width: 48px;
-  border-radius: 6px;
-}
-.auth-card header p {
-  @apply text-xs;
-  color: #7a8495;
-  margin: 10px 0 22px;
-}
-.auth-tabs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  padding: 3px;
-  border-radius: 9px;
-  background: #f2f4f8;
-  margin-bottom: 18px;
-}
-.auth-tabs button {
-  height: 34px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: #7b8494;
-}
-.auth-tabs button.active {
-  background: white;
-  color: #246bfd;
-  @apply font-semibold;
-  box-shadow: 0 2px 8px #17203310;
-}
-.auth-flow-heading {
-  display: grid;
-  gap: 5px;
-  margin-bottom: 18px;
-}
-.auth-flow-heading button,
-.auth-text-action {
-  width: fit-content;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: #246bfd;
-  @apply text-2xs;
-}
-.auth-flow-heading b {
-  color: #263248;
-  @apply text-base;
-}
-.auth-flow-heading span {
-  color: #8a94a5;
-  @apply text-2xs;
-}
-.auth-card form > label,
 .panel-form > label {
   display: block;
   @apply text-xs;
@@ -87,7 +5,6 @@
   color: #445066;
   margin: 13px 0;
 }
-.auth-card input,
 .panel-form input,
 .panel-form select {
   display: block;
@@ -100,81 +17,6 @@
   background: white;
   color: #263248;
 }
-.password-field {
-  display: flex;
-  position: relative;
-}
-.verification-field {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 112px;
-  gap: 8px;
-}
-.verification-field button {
-  height: 42px;
-  margin-top: 7px;
-  border: 1px solid #cfd8e6;
-  border-radius: 8px;
-  background: #f7f9fc;
-  color: #246bfd;
-  @apply text-xs;
-  @apply font-semibold;
-}
-.verification-field button:disabled {
-  color: #9aa4b2;
-  cursor: not-allowed;
-}
-.password-field input {
-  padding-right: 42px;
-}
-.password-field button {
-  position: absolute;
-  right: 4px;
-  top: 11px;
-  width: 34px;
-  height: 34px;
-  border: 0;
-  background: transparent;
-  color: #8b95a5;
-}
-.password-field svg {
-  width: 17px;
-}
-.form-error {
-  @apply text-2xs;
-  color: #c83e51;
-  background: #fff0f2;
-  border-radius: 7px;
-  padding: 9px;
-  margin: 10px 0;
-}
-.form-notice {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  @apply text-2xs;
-  color: #24734a;
-  background: #edf9f2;
-  border-radius: 7px;
-  padding: 9px;
-  margin: 10px 0;
-}
-
-.verification-code-inline {
-  color: #24734a;
-  white-space: nowrap;
-}
-
-.verification-code-inline strong {
-  color: #165b38;
-  @apply text-sm;
-  @apply tracking-widest;
-}
-.auth-text-action {
-  display: block;
-  margin: -3px 0 13px auto;
-}
-.auth-submit,
 .panel-primary {
   width: 100%;
   height: 42px;
@@ -188,38 +30,8 @@
   justify-content: center;
   gap: 7px;
 }
-.auth-submit:disabled,
 .panel-primary:disabled {
   opacity: 0.65;
-}
-.auth-submit svg {
-  width: 18px;
-}
-.auth-card > small {
-  display: block;
-  text-align: center;
-  color: #a0a8b5;
-  @apply text-2xs;
-  margin-top: 16px;
-}
-.app-loading {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: #64738e;
-  @apply text-xs;
-}
-.app-loading .loading-logo {
-  width: 38px;
-  border-radius: 5px;
-}
-.spin {
-  animation: auth-spin 0.8s linear infinite;
-}
-@keyframes auth-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 .workspace-backdrop {
   position: fixed;
@@ -550,9 +362,6 @@
   color: #dce5f5;
 }
 @media (max-width: 700px) {
-  .auth-card {
-    padding: 22px;
-  }
   .workspace-body {
     padding: 16px;
   }

@@ -30,6 +30,7 @@ import {
   AdScriptVersionSourceSchema,
 } from "./ad-script/types";
 import { type ProviderCredentialName, providerCredentialNames, providerCredentials } from "./byok/credential-store";
+import { credentialDoctor } from "./byok/credential-doctor";
 import { maxEnvKeyBytes, parseEnvKey } from "./byok/env-key";
 import { creationCapabilities, quoteCreation, validateCreationValues } from "./creation/capabilities";
 import { env } from "./env";
@@ -38,6 +39,7 @@ import type { ShareCandidate } from "./imports/share-content";
 
 const shareParser = new ShareContentParser(platformAdapters);
 import { BullJobQueue } from "./jobs/bull-job-queue";
+import { stopAllAdminJobs } from "./jobs/admin-job-control";
 import { InsufficientCreditsError, SqliteJobStore } from "./jobs/sqlite-job-store";
 import { seedanceModelIds, videoModels } from "./models/video-models";
 import { auditSdkRegistry } from "./sdk-registry";
@@ -1950,6 +1952,7 @@ const AdminCredentialSchema = z.object({
   name: ProviderCredentialNameSchema,
   provider: z.string(),
   label: z.string(),
+  secret: z.boolean(),
   configured: z.boolean(),
   maskedValue: z.string().optional(),
   updatedAt: z.string().optional(),
@@ -1959,6 +1962,19 @@ const AdminEnvKeyImportSchema = z.object({
   updated: z.array(ProviderCredentialNameSchema),
   skipped: z.array(ProviderCredentialNameSchema),
   ignored: z.array(z.string()),
+});
+const CredentialDoctorResultSchema = z.object({
+  provider: z.string(),
+  status: z.enum(["available", "missing", "invalid", "timeout"]),
+  message: z.string(),
+  latencyMs: z.number().int().nonnegative(),
+  checkedAt: z.string(),
+});
+const StopAllAdminJobsResultSchema = z.object({
+  matched: z.number().int().nonnegative(),
+  queuedCancelled: z.number().int().nonnegative(),
+  processingRequested: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative(),
 });
 const adminCredentialsRoute = createRoute({
   method: "get",
@@ -2160,6 +2176,29 @@ app.openapi(importAdminEnvKeyRoute, async (c) => {
   }
 });
 
+const adminCredentialDoctorRoute = createRoute({
+  method: "post",
+  path: "/api/admin/credentials/doctor",
+  operationId: "runAdminCredentialDoctor",
+  responses: {
+    200: {
+      description: "Provider credential doctor results",
+      content: { "application/json": { schema: z.object({ results: z.array(CredentialDoctorResultSchema) }) } },
+    },
+    403: { description: "Admin required", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(adminCredentialDoctorRoute, async (c) => {
+  if (!adminUser(c.get("userId")))
+    return c.json(
+      {
+        error: { code: "ADMIN_REQUIRED", message: "仅管理员可访问", retryable: false, requestId: crypto.randomUUID() },
+      },
+      403,
+    );
+  return c.json({ results: await credentialDoctor.runAll() }, 200);
+});
+
 const listAdminJobsRoute = createRoute({
   method: "get",
   path: "/api/admin/jobs",
@@ -2199,6 +2238,38 @@ app.openapi(listAdminJobsRoute, (c) => {
       403,
     );
   return c.json(store.listAll(c.req.valid("query")), 200);
+});
+
+function cancelQueuedAdScript(job: JobRecord) {
+  if (job.moduleId !== "ad-script") return;
+  const aggregate = adScripts.getByJobId(job.id);
+  if (!aggregate) return;
+  adScripts.updateProject(aggregate.project.id, { status: "cancelled" });
+  for (const variant of aggregate.variants)
+    if (variant.status === "queued") adScripts.updateVariant(variant.id, { status: "cancelled" });
+}
+
+const stopAllAdminJobsRoute = createRoute({
+  method: "post",
+  path: "/api/admin/jobs/stop-all",
+  operationId: "stopAllAdminJobs",
+  responses: {
+    200: {
+      description: "All queued jobs cancelled and active jobs requested to cancel",
+      content: { "application/json": { schema: StopAllAdminJobsResultSchema } },
+    },
+    403: { description: "Admin required", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(stopAllAdminJobsRoute, async (c) => {
+  if (!adminUser(c.get("userId")))
+    return c.json(
+      {
+        error: { code: "ADMIN_REQUIRED", message: "仅管理员可访问", retryable: false, requestId: crypto.randomUUID() },
+      },
+      403,
+    );
+  return c.json(await stopAllAdminJobs(store, queue, cancelQueuedAdScript), 200);
 });
 
 const listRoute = createRoute({
@@ -3629,14 +3700,7 @@ app.openapi(cancelRoute, async (c) => {
     );
   if (job.status === "queued") {
     const cancelled = store.update(id, { status: "cancelled", cancelRequested: true, stage: "已取消" }) ?? job;
-    if (job.moduleId === "ad-script") {
-      const aggregate = adScripts.getByJobId(job.id);
-      if (aggregate) {
-        adScripts.updateProject(aggregate.project.id, { status: "cancelled" });
-        for (const variant of aggregate.variants)
-          if (variant.status === "queued") adScripts.updateVariant(variant.id, { status: "cancelled" });
-      }
-    }
+    cancelQueuedAdScript(job);
     await queue.remove(id).catch(() => undefined);
     return c.json(cancelled, 200);
   }

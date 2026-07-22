@@ -4167,6 +4167,9 @@
                           "label": {
                             "type": "string"
                           },
+                          "secret": {
+                            "type": "boolean"
+                          },
                           "configured": {
                             "type": "boolean"
                           },
@@ -4181,6 +4184,7 @@
                           "name",
                           "provider",
                           "label",
+                          "secret",
                           "configured"
                         ]
                       }
@@ -4266,6 +4270,9 @@
                     "label": {
                       "type": "string"
                     },
+                    "secret": {
+                      "type": "boolean"
+                    },
                     "configured": {
                       "type": "boolean"
                     },
@@ -4280,6 +4287,7 @@
                     "name",
                     "provider",
                     "label",
+                    "secret",
                     "configured"
                   ]
                 }
@@ -4337,6 +4345,9 @@
                     "label": {
                       "type": "string"
                     },
+                    "secret": {
+                      "type": "boolean"
+                    },
                     "configured": {
                       "type": "boolean"
                     },
@@ -4351,6 +4362,7 @@
                     "name",
                     "provider",
                     "label",
+                    "secret",
                     "configured"
                   ]
                 }
@@ -4491,6 +4503,75 @@
         }
       }
     },
+    "/api/admin/credentials/doctor": {
+      "post": {
+        "operationId": "runAdminCredentialDoctor",
+        "responses": {
+          "200": {
+            "description": "Provider credential doctor results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "provider": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "available",
+                              "missing",
+                              "invalid",
+                              "timeout"
+                            ]
+                          },
+                          "message": {
+                            "type": "string"
+                          },
+                          "latencyMs": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "checkedAt": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "provider",
+                          "status",
+                          "message",
+                          "latencyMs",
+                          "checkedAt"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "results"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/jobs": {
       "get": {
         "operationId": "listAdminJobs",
@@ -4594,6 +4675,57 @@
                     "total",
                     "page",
                     "pageSize"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/jobs/stop-all": {
+      "post": {
+        "operationId": "stopAllAdminJobs",
+        "responses": {
+          "200": {
+            "description": "All queued jobs cancelled and active jobs requested to cancel",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "matched": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "queuedCancelled": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "processingRequested": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "failed": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "matched",
+                    "queuedCancelled",
+                    "processingRequested",
+                    "failed"
                   ]
                 }
               }

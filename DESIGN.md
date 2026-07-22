@@ -361,6 +361,10 @@ The system uses **hairline + soft drop**. Cards float above the off-white canvas
 
 **`asset-page`** — Shared compact shell for materials, portraits, products, and voices. Use a full-content-height white `p-3` page, one compact search/action toolbar, an independently scrolling content region, and a small result count. Materials retain a two-column folder-and-table layout separated by one `border-line` vertical hairline; portraits and products retain preview grids; voices use horizontal `voice-row` items. Do not add page cards, subtitles, descriptions, or per-page toolbar styling.
 
+**`admin-page`** — Full-height white management workspace using a compact tab row, `h-8` shadcn controls, hairline group separators, and the shared `DataTable`. Credential fields group by Provider with one save action per group and a single global Doctor action. Queue controls keep refresh and destructive bulk stop in the same toolbar. Do not wrap the page or Provider groups in decorative cards.
+
+**`auth-screen`** — Centered compact authentication card on a white canvas. Login, registration, password reset, and password setup share one `h-[480px] max-w-sm` shadcn `Card` so the outer frame and field origin remain stable while switching flows. Use shadcn `Input`, `Button`, and `Label`; controls use `h-9`, tabs use the ghost variant, and hierarchy comes from one hairline header. Keep the card restrained with a white surface, hairline border, and `shadow-sm`; do not add gradients, oversized depth, subtitles, footer descriptions, or auth-specific CSS.
+
 ### Voice Library
 
 **`voice-row`** — Horizontal row in voice list. Background transparent, 1px hairline divider. Layout: 32px circular voice icon (`{component.voice-icon-circular}`) left, voice name + accent stack, optional preview button right.

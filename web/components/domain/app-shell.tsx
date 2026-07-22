@@ -137,9 +137,9 @@ export function AppShell() {
 
   if (status === "loading")
     return (
-      <main className="auth-page">
-        <div className="app-loading">
-          <BrandLogo className="loading-logo" />
+      <main className="grid min-h-screen place-items-center bg-white font-sans">
+        <div className="flex items-center gap-2 text-xs text-muted">
+          <BrandLogo className="w-9 rounded-md" />
           正在打开{APP_CONFIG.projectName}工作台…
         </div>
       </main>

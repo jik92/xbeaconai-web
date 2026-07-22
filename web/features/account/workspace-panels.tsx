@@ -397,7 +397,7 @@ function SecurityPanel() {
         确认新密码
         <input type="password" value={confirm} onChange={(event) => setConfirm(event.target.value)} required />
       </label>
-      {error && <p className="form-error">{error}</p>}
+      {error && <p className="rounded-md bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>}
       <button className="panel-primary" disabled={busy}>
         {busy ? "修改中…" : "修改密码"}
       </button>

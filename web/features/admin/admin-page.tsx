@@ -1,23 +1,38 @@
-// biome-ignore-all lint/a11y/useButtonType: Admin controls do not use native form submission.
-// biome-ignore-all lint/a11y/noStaticElementInteractions: The modal backdrop dismisses its dialog.
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { CheckCircle2, KeyRound, LoaderCircle, RefreshCw, ShieldCheck, Trash2, Upload, X } from "lucide-react";
+import {
+  CheckCircle2,
+  CircleAlert,
+  Clock3,
+  LoaderCircle,
+  RefreshCw,
+  ShieldCheck,
+  Stethoscope,
+  Trash2,
+  Upload,
+  X,
+} from "lucide-react";
 import { useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import {
   type AdminCredential,
+  type AdminCredentialDoctorResult,
   type AdminJob,
   fetchAdminCredentials,
   fetchAdminJobs,
   removeAdminCredential,
+  runAdminCredentialDoctor,
   saveAdminCredential,
+  stopAllAdminQueueJobs,
   uploadAdminEnvKey,
 } from "@/api/api-client";
 import type { ModuleId, ProviderCredentialName } from "@/api/generated/types.gen";
+import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
+import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
 import { apiErrorMessage, useAuth } from "@/features/account/auth-context";
-import "./admin-page.css";
 
 const statusLabels: Record<AdminJob["status"], string> = {
   queued: "排队中",
@@ -28,11 +43,51 @@ const statusLabels: Record<AdminJob["status"], string> = {
   cancelled: "已取消",
 };
 
-function CredentialsPanel({ importNotice, importFailed }: { importNotice?: string; importFailed?: boolean }) {
+const jobStatusStyles: Record<AdminJob["status"], string> = {
+  queued: "bg-surface-muted text-muted",
+  processing: "bg-surface-strong text-ink",
+  succeeded: "bg-success/10 text-success",
+  partially_succeeded: "bg-warning/10 text-warning",
+  failed: "bg-danger/10 text-danger",
+  cancelled: "bg-surface-muted text-muted",
+};
+
+const doctorLabels: Record<AdminCredentialDoctorResult["status"], string> = {
+  available: "可用",
+  missing: "缺少配置",
+  invalid: "不可用",
+  timeout: "超时",
+};
+
+const doctorStyles: Record<AdminCredentialDoctorResult["status"], string> = {
+  available: "text-success",
+  missing: "text-warning",
+  invalid: "text-danger",
+  timeout: "text-warning",
+};
+
+function DoctorStatus({ result }: { result?: AdminCredentialDoctorResult }) {
+  if (!result) return null;
+  const Icon = result.status === "available" ? CheckCircle2 : result.status === "timeout" ? Clock3 : CircleAlert;
+  return (
+    <span className={`inline-flex min-w-0 items-center gap-1 text-xs ${doctorStyles[result.status]}`}>
+      <Icon className="size-3.5 shrink-0" />
+      <b className="font-medium">{doctorLabels[result.status]}</b>
+      <span className="truncate text-muted">{result.message}</span>
+      <span className="shrink-0 text-muted">{result.latencyMs}ms</span>
+    </span>
+  );
+}
+
+function CredentialsPanel() {
   const queryClient = useQueryClient();
+  const fileInput = useRef<HTMLInputElement>(null);
   const [drafts, setDrafts] = useState<Partial<Record<ProviderCredentialName, string>>>({});
-  const [busy, setBusy] = useState("");
-  const [notice, setNotice] = useState("");
+  const [busyProvider, setBusyProvider] = useState("");
+  const [deleting, setDeleting] = useState<ProviderCredentialName>();
+  const [doctorBusy, setDoctorBusy] = useState(false);
+  const [doctorResults, setDoctorResults] = useState<AdminCredentialDoctorResult[]>([]);
+  const [uploading, setUploading] = useState(false);
   const { data = [], isLoading, error } = useQuery({ queryKey: ["admin-credentials"], queryFn: fetchAdminCredentials });
   const groups = useMemo(
     () =>
@@ -46,99 +101,166 @@ function CredentialsPanel({ importNotice, importFailed }: { importNotice?: strin
       ),
     [data],
   );
-  const run = async (name: ProviderCredentialName, task: () => Promise<void>) => {
-    setBusy(name);
-    setNotice("");
+
+  const saveGroup = async (provider: string, credentials: AdminCredential[]) => {
+    const changed = credentials.filter((credential) => drafts[credential.name]?.trim());
+    if (!changed.length) return;
+    setBusyProvider(provider);
     try {
-      await task();
+      await Promise.all(
+        changed.map((credential) => saveAdminCredential(credential.name, drafts[credential.name]?.trim() ?? "")),
+      );
+      setDrafts((current) => {
+        const next = { ...current };
+        for (const credential of changed) delete next[credential.name];
+        return next;
+      });
       await queryClient.invalidateQueries({ queryKey: ["admin-credentials"] });
+      setDoctorResults([]);
+      toast.success(`${provider} 密钥已保存`);
     } catch (reason) {
-      setNotice(reason instanceof Error ? reason.message : "操作失败");
+      toast.error(apiErrorMessage(reason, "密钥保存失败"));
     } finally {
-      setBusy("");
+      setBusyProvider("");
     }
   };
+
+  const remove = async (credential: AdminCredential) => {
+    if (!window.confirm(`确定删除 ${credential.name}？`)) return;
+    setDeleting(credential.name);
+    try {
+      await removeAdminCredential(credential.name);
+      await queryClient.invalidateQueries({ queryKey: ["admin-credentials"] });
+      setDoctorResults([]);
+      toast.success(`${credential.label} 已删除`);
+    } catch (reason) {
+      toast.error(apiErrorMessage(reason, "密钥删除失败"));
+    } finally {
+      setDeleting(undefined);
+    }
+  };
+
+  const doctor = async () => {
+    setDoctorBusy(true);
+    try {
+      const results = await runAdminCredentialDoctor();
+      setDoctorResults(results);
+      const available = results.filter((result) => result.status === "available").length;
+      toast.success(`检测完成：${available}/${results.length} 个 Provider 可用`);
+    } catch (reason) {
+      toast.error(apiErrorMessage(reason, "密钥检测失败"));
+    } finally {
+      setDoctorBusy(false);
+    }
+  };
+
+  const importFile = async (file?: File) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const result = await uploadAdminEnvKey(file);
+      await queryClient.invalidateQueries({ queryKey: ["admin-credentials"] });
+      setDoctorResults([]);
+      toast.success(`已更新 ${result.updated.length} 项，跳过 ${result.skipped.length} 项`);
+    } catch (reason) {
+      toast.error(apiErrorMessage(reason, ".env.key 导入失败"));
+    } finally {
+      setUploading(false);
+      if (fileInput.current) fileInput.current.value = "";
+    }
+  };
+
   if (isLoading)
     return (
-      <div className="admin-state">
-        <LoaderCircle className="spin" /> 正在读取加密凭证…
+      <div className="grid min-h-48 place-items-center text-xs text-muted">
+        <span className="inline-flex items-center gap-2">
+          <LoaderCircle className="size-4 animate-spin" /> 正在读取密钥
+        </span>
       </div>
     );
-  if (error) return <div className="admin-state error">{apiErrorMessage(error, "凭证读取失败")}</div>;
+  if (error)
+    return <div className="grid min-h-48 place-items-center text-xs text-danger">{apiErrorMessage(error)}</div>;
+
   return (
-    <div className="admin-credentials">
-      <div className="admin-security-note">
-        <ShieldCheck />
-        <b>AES-256-GCM 加密存储</b>
-        <span>不回填明文；留空不修改，上传仅覆盖 `.env.key` 中的非空白名单字段。</span>
+    <div className="min-h-0 flex-1 overflow-auto">
+      <div className="flex h-11 items-center justify-between gap-3 border-b border-line px-1">
+        <span className="inline-flex items-center gap-1.5 text-xs text-muted">
+          <ShieldCheck className="size-4 text-ink" /> AES-256-GCM 加密存储
+        </span>
+        <div className="flex items-center gap-2">
+          <input
+            ref={fileInput}
+            type="file"
+            accept=".env.key"
+            className="hidden"
+            aria-label="选择 .env.key 文件"
+            onChange={(event) => void importFile(event.target.files?.[0])}
+          />
+          <Button variant="outline" size="sm" disabled={uploading} onClick={() => fileInput.current?.click()}>
+            {uploading ? <LoaderCircle className="animate-spin" /> : <Upload />} 导入 .env.key
+          </Button>
+          <Button size="sm" disabled={doctorBusy} onClick={() => void doctor()}>
+            {doctorBusy ? <LoaderCircle className="animate-spin" /> : <Stethoscope />} 检测全部
+          </Button>
+        </div>
       </div>
-      {importNotice && <p className={`admin-notice${importFailed ? "" : " success"}`}>{importNotice}</p>}
-      {notice && <p className="admin-notice">{notice}</p>}
-      {groups.map(([provider, credentials]) => (
-        <section className="admin-credential-group" key={provider}>
-          <header>
-            <div>
-              <KeyRound />
-              <h2>{provider}</h2>
-            </div>
-            <small>
-              {credentials.filter((item) => item.configured).length}/{credentials.length} 已配置
-            </small>
-          </header>
-          {credentials.map((credential) => (
-            <div className="admin-credential-row" key={credential.name}>
-              <div className="admin-credential-meta">
-                <b>{credential.label}</b>
-                <code>{credential.name}</code>
-                <span className={credential.configured ? "configured" : "missing"}>
-                  {credential.configured ? (
-                    <>
-                      <CheckCircle2 /> 已配置 {credential.maskedValue}
-                    </>
-                  ) : (
-                    "未配置"
-                  )}
-                </span>
-                {credential.updatedAt && (
-                  <time>{new Date(credential.updatedAt).toLocaleString("zh-CN", { hour12: false })}</time>
-                )}
+      {groups.map(([provider, credentials]) => {
+        const result = doctorResults.find((item) => item.provider === provider);
+        const hasDraft = credentials.some((credential) => drafts[credential.name]?.trim());
+        return (
+          <section className="border-b border-line py-2 last:border-0" key={provider}>
+            <header className="flex min-h-8 items-center justify-between gap-3 px-2">
+              <div className="flex min-w-0 items-center gap-3">
+                <h2 className="shrink-0 text-sm font-medium text-ink">{provider}</h2>
+                <DoctorStatus result={result} />
               </div>
-              <input
-                type="password"
-                autoComplete="new-password"
-                value={drafts[credential.name] ?? ""}
-                placeholder={credential.configured ? "输入新值以覆盖" : "输入 Key"}
-                onChange={(event) => setDrafts((current) => ({ ...current, [credential.name]: event.target.value }))}
-              />
-              <button
-                className="primary"
-                disabled={!drafts[credential.name]?.trim() || Boolean(busy)}
-                onClick={() =>
-                  run(credential.name, async () => {
-                    await saveAdminCredential(credential.name, drafts[credential.name] ?? "");
-                    setDrafts((current) => ({ ...current, [credential.name]: "" }));
-                  })
-                }
+              <Button
+                size="sm"
+                disabled={!hasDraft || Boolean(busyProvider) || Boolean(deleting)}
+                onClick={() => void saveGroup(provider, credentials)}
               >
-                {busy === credential.name ? <LoaderCircle className="spin" /> : "保存"}
-              </button>
-              <button
-                className="danger"
-                aria-label={`删除 ${credential.label}`}
-                disabled={!credential.configured || Boolean(busy)}
-                onClick={() => {
-                  if (window.confirm(`确定删除 ${credential.name}？依赖它的新任务会失败。`))
-                    void run(credential.name, async () => {
-                      await removeAdminCredential(credential.name);
-                    });
-                }}
-              >
-                <Trash2 />
-              </button>
+                {busyProvider === provider && <LoaderCircle className="animate-spin" />} 保存
+              </Button>
+            </header>
+            <div className="mt-1 divide-y divide-line/60">
+              {credentials.map((credential) => (
+                <div
+                  className="grid min-h-11 grid-cols-[minmax(180px,1fr)_minmax(240px,1.4fr)_32px] items-center gap-2 px-2"
+                  key={credential.name}
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="truncate text-xs font-medium text-ink">{credential.label}</span>
+                    <code className="truncate text-2xs text-muted">{credential.name}</code>
+                    <span className={`shrink-0 text-2xs ${credential.configured ? "text-success" : "text-warning"}`}>
+                      {credential.configured ? credential.maskedValue : "未配置"}
+                    </span>
+                  </div>
+                  <Input
+                    type={credential.secret ? "password" : "text"}
+                    autoComplete="new-password"
+                    className="h-8 text-xs"
+                    value={drafts[credential.name] ?? ""}
+                    placeholder={credential.configured ? "输入新值以覆盖" : "输入 Key"}
+                    onChange={(event) =>
+                      setDrafts((current) => ({ ...current, [credential.name]: event.target.value }))
+                    }
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-8 text-danger hover:bg-danger/10 hover:text-danger"
+                    aria-label={`删除 ${credential.label}`}
+                    disabled={!credential.configured || Boolean(busyProvider) || Boolean(deleting)}
+                    onClick={() => void remove(credential)}
+                  >
+                    {deleting === credential.name ? <LoaderCircle className="animate-spin" /> : <Trash2 />}
+                  </Button>
+                </div>
+              ))}
             </div>
-          ))}
-        </section>
-      ))}
+          </section>
+        );
+      })}
     </div>
   );
 }
@@ -149,6 +271,7 @@ function JobsPanel() {
   const [status, setStatus] = useState("");
   const [phone, setPhone] = useState("");
   const [selected, setSelected] = useState<AdminJob>();
+  const [stopping, setStopping] = useState(false);
   const query = useQuery({
     queryKey: ["admin-jobs", page, moduleId, status, phone],
     queryFn: () =>
@@ -166,53 +289,72 @@ function JobsPanel() {
       {
         id: "id",
         header: "任务 ID",
-        size: 180,
+        size: 110,
         cell: ({ row }) => (
-          <button className="admin-job-link" onClick={() => setSelected(row.original)}>
+          <Button variant="ghost" size="sm" className="h-7 px-1 font-mono" onClick={() => setSelected(row.original)}>
             {row.original.id.slice(0, 8)}…
-          </button>
+          </Button>
         ),
       },
-      { accessorKey: "ownerPhone", header: "用户", size: 160 },
-      { accessorKey: "moduleId", header: "模块", size: 150 },
-      { accessorKey: "title", header: "标题", size: 220 },
+      { accessorKey: "ownerPhone", header: "用户", size: 120 },
+      { accessorKey: "moduleId", header: "模块", size: 120 },
+      { accessorKey: "title", header: "标题", size: 180 },
       {
         id: "status",
         header: "状态",
-        size: 120,
+        size: 90,
         cell: ({ row }) => (
-          <span className={`admin-job-status ${row.original.status}`}>{statusLabels[row.original.status]}</span>
+          <span className={`inline-flex rounded-full px-2 py-0.5 text-2xs ${jobStatusStyles[row.original.status]}`}>
+            {statusLabels[row.original.status]}
+          </span>
         ),
       },
-      { id: "progress", header: "进度", size: 100, cell: ({ row }) => `${row.original.progress}%` },
-      { accessorKey: "stage", header: "阶段", size: 180 },
-      { accessorKey: "overallExecutionMode", header: "模式", size: 100 },
+      { id: "progress", header: "进度", size: 70, cell: ({ row }) => `${row.original.progress}%` },
+      { accessorKey: "stage", header: "阶段", size: 150 },
+      { accessorKey: "overallExecutionMode", header: "模式", size: 70 },
       {
         id: "provider",
         header: "Provider",
-        size: 150,
+        size: 120,
         cell: ({ row }) => row.original.provenance.find((item) => item.provider)?.provider ?? "—",
       },
       {
         id: "createdAt",
         header: "创建时间",
-        size: 190,
+        size: 150,
         cell: ({ row }) => new Date(row.original.createdAt).toLocaleString("zh-CN", { hour12: false }),
       },
       {
         id: "updatedAt",
         header: "更新时间",
-        size: 190,
+        size: 150,
         cell: ({ row }) => new Date(row.original.updatedAt).toLocaleString("zh-CN", { hour12: false }),
       },
     ],
     [],
   );
   const totalPages = Math.max(1, Math.ceil((query.data?.total ?? 0) / 25));
+
+  const stopAll = async () => {
+    if (!window.confirm("确定停止当前所有排队中和执行中的任务？")) return;
+    setStopping(true);
+    try {
+      const result = await stopAllAdminQueueJobs();
+      await query.refetch();
+      toast.success(`已取消 ${result.queuedCancelled} 个排队任务，已请求停止 ${result.processingRequested} 个执行任务`);
+      if (result.failed) toast.warning(`${result.failed} 个 BullMQ 清理操作失败，数据库任务已停止`);
+    } catch (reason) {
+      toast.error(apiErrorMessage(reason, "停止所有任务失败"));
+    } finally {
+      setStopping(false);
+    }
+  };
+
   return (
-    <div className="admin-jobs">
-      <div className="admin-job-filters">
-        <input
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-11 items-center gap-2 border-b border-line px-1">
+        <Input
+          className="h-8 w-52 text-xs"
           placeholder="搜索用户手机号"
           value={phone}
           onChange={(event) => {
@@ -220,7 +362,8 @@ function JobsPanel() {
             setPhone(event.target.value.replace(/\D/g, "").slice(0, 11));
           }}
         />
-        <select
+        <NativeSelect
+          className="h-8 text-xs"
           value={moduleId}
           onChange={(event) => {
             setPage(1);
@@ -235,8 +378,9 @@ function JobsPanel() {
           <option value="voice-clone">声音克隆</option>
           <option value="subtitle-erase">字幕擦除</option>
           <option value="video-enhancement">视频增强</option>
-        </select>
-        <select
+        </NativeSelect>
+        <NativeSelect
+          className="h-8 text-xs"
           value={status}
           onChange={(event) => {
             setPage(1);
@@ -249,57 +393,87 @@ function JobsPanel() {
               {label}
             </option>
           ))}
-        </select>
-        <button onClick={() => void query.refetch()}>
-          <RefreshCw className={query.isFetching ? "spin" : ""} /> 刷新
-        </button>
-        <span>共 {query.data?.total ?? 0} 个任务</span>
+        </NativeSelect>
+        <Button variant="outline" size="sm" onClick={() => void query.refetch()}>
+          <RefreshCw className={query.isFetching ? "animate-spin" : ""} /> 刷新
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="text-danger hover:bg-danger/10 hover:text-danger"
+          disabled={stopping}
+          onClick={() => void stopAll()}
+        >
+          {stopping && <LoaderCircle className="animate-spin" />} 停止所有任务
+        </Button>
+        <span className="ml-auto text-xs text-muted">共 {query.data?.total ?? 0} 个任务</span>
       </div>
       <DataTable
-        className="admin-job-table"
         columns={columns}
         data={query.data?.jobs ?? []}
         getRowId={(job) => job.id}
         loading={query.isLoading}
         error={query.error}
         emptyMessage="暂无符合条件的任务"
-        height="calc(100% - 92px)"
+        height="calc(100% - 88px)"
       />
-      <footer className="admin-pagination">
-        <button disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>
+      <footer className="flex h-11 items-center justify-end gap-2 border-t border-line text-xs text-muted">
+        <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>
           上一页
-        </button>
+        </Button>
         <span>
           第 {page} / {totalPages} 页
         </span>
-        <button disabled={page >= totalPages} onClick={() => setPage((value) => value + 1)}>
+        <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((value) => value + 1)}>
           下一页
-        </button>
+        </Button>
       </footer>
       {selected && (
-        <div className="admin-detail-layer" role="presentation" onMouseDown={() => setSelected(undefined)}>
-          <aside role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
-            <header>
-              <h2 className="text-ink">任务详情</h2>
-              <button aria-label="关闭" onClick={() => setSelected(undefined)}>
+        <div
+          className="fixed inset-0 z-80 flex justify-end bg-black/35"
+          role="presentation"
+          onMouseDown={() => setSelected(undefined)}
+        >
+          <aside
+            className="h-full w-[min(480px,92vw)] overflow-auto bg-white p-4 shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            aria-label="任务详情"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header className="flex h-10 items-center justify-between border-b border-line">
+              <h2 className="text-base font-medium text-ink">任务详情</h2>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8"
+                aria-label="关闭"
+                onClick={() => setSelected(undefined)}
+              >
                 <X />
-              </button>
+              </Button>
             </header>
-            <dl>
-              <dt>任务 ID</dt>
-              <dd>{selected.id}</dd>
-              <dt>用户</dt>
-              <dd>{selected.ownerPhone}</dd>
-              <dt>阶段</dt>
-              <dd>{selected.stage}</dd>
-              <dt>Provider 状态</dt>
-              <dd>{selected.providerStatus ?? "—"}</dd>
-              <dt>Provider Task ID</dt>
-              <dd>{selected.providerTaskId ?? "—"}</dd>
-              <dt>错误</dt>
-              <dd>
-                <pre>{selected.error ? JSON.stringify(selected.error, null, 2) : "—"}</pre>
-              </dd>
+            <dl className="divide-y divide-line text-xs">
+              {[
+                ["任务 ID", selected.id],
+                ["用户", selected.ownerPhone],
+                ["阶段", selected.stage],
+                ["Provider 状态", selected.providerStatus ?? "—"],
+                ["Provider Task ID", selected.providerTaskId ?? "—"],
+              ].map(([label, value]) => (
+                <div className="grid grid-cols-[120px_1fr] gap-3 py-3" key={label}>
+                  <dt className="text-muted">{label}</dt>
+                  <dd className="min-w-0 break-all text-ink">{value}</dd>
+                </div>
+              ))}
+              <div className="grid grid-cols-[120px_1fr] gap-3 py-3">
+                <dt className="text-muted">错误</dt>
+                <dd>
+                  <pre className="whitespace-pre-wrap break-all text-2xs text-ink">
+                    {selected.error ? JSON.stringify(selected.error, null, 2) : "—"}
+                  </pre>
+                </dd>
+              </div>
             </dl>
           </aside>
         </div>
@@ -310,69 +484,31 @@ function JobsPanel() {
 
 export function AdminPage() {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
   const [tab, setTab] = useState<"credentials" | "jobs">("credentials");
-  const [uploading, setUploading] = useState(false);
-  const [importNotice, setImportNotice] = useState("");
-  const [importFailed, setImportFailed] = useState(false);
-  const fileInput = useRef<HTMLInputElement>(null);
   if (!user?.isAdmin) return <Navigate to="/" />;
-  const importFile = async (file?: File) => {
-    if (!file) return;
-    setUploading(true);
-    setImportNotice("");
-    setImportFailed(false);
-    try {
-      const result = await uploadAdminEnvKey(file);
-      await queryClient.invalidateQueries({ queryKey: ["admin-credentials"] });
-      const ignored = result.ignored.length ? `，忽略 ${result.ignored.length} 个非白名单字段` : "";
-      setImportNotice(`已更新 ${result.updated.length} 项，跳过 ${result.skipped.length} 项${ignored}`);
-    } catch (error) {
-      setImportFailed(true);
-      setImportNotice(apiErrorMessage(error, ".env.key 导入失败"));
-    } finally {
-      setUploading(false);
-      if (fileInput.current) fileInput.current.value = "";
-    }
-  };
   return (
-    <div className="admin-page">
-      <section className="admin-container">
-        <header className="admin-toolbar">
-          <nav>
-            <button
-              className={`admin-tab${tab === "credentials" ? " active" : ""}`}
-              onClick={() => setTab("credentials")}
-            >
-              密钥管理
-            </button>
-            <button className={`admin-tab${tab === "jobs" ? " active" : ""}`} onClick={() => setTab("jobs")}>
-              队列任务
-            </button>
-          </nav>
-          {tab === "credentials" && (
-            <div className="admin-upload">
-              <input
-                ref={fileInput}
-                type="file"
-                accept=".env.key"
-                aria-label="选择 .env.key 文件"
-                onChange={(event) => void importFile(event.target.files?.[0])}
-              />
-              <button disabled={uploading} onClick={() => fileInput.current?.click()}>
-                {uploading ? <LoaderCircle className="spin" /> : <Upload />} 导入 .env.key
-              </button>
-            </div>
-          )}
-        </header>
-        <main className={`admin-content ${tab}`}>
-          {tab === "credentials" ? (
-            <CredentialsPanel importNotice={importNotice} importFailed={importFailed} />
-          ) : (
-            <JobsPanel />
-          )}
-        </main>
-      </section>
+    <div className="flex h-[calc(100vh-56px)] min-h-0 flex-col bg-white p-3 text-ink">
+      <header className="flex h-10 shrink-0 items-center border-b border-line">
+        <nav className="flex items-center gap-1" aria-label="管理后台">
+          <Button
+            variant="ghost"
+            size="sm"
+            className={tab === "credentials" ? "bg-surface-muted text-ink" : "text-muted"}
+            onClick={() => setTab("credentials")}
+          >
+            密钥管理
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={tab === "jobs" ? "bg-surface-muted text-ink" : "text-muted"}
+            onClick={() => setTab("jobs")}
+          >
+            队列任务
+          </Button>
+        </nav>
+      </header>
+      {tab === "credentials" ? <CredentialsPanel /> : <JobsPanel />}
     </div>
   );
 }

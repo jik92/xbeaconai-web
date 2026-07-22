@@ -1371,6 +1371,7 @@ export type ListAdminCredentialsResponses = {
             name: ProviderCredentialName;
             provider: string;
             label: string;
+            secret: boolean;
             configured: boolean;
             maskedValue?: string;
             updatedAt?: string;
@@ -1410,6 +1411,7 @@ export type DeleteAdminCredentialResponses = {
         name: ProviderCredentialName;
         provider: string;
         label: string;
+        secret: boolean;
         configured: boolean;
         maskedValue?: string;
         updatedAt?: string;
@@ -1450,6 +1452,7 @@ export type UpdateAdminCredentialResponses = {
         name: ProviderCredentialName;
         provider: string;
         label: string;
+        secret: boolean;
         configured: boolean;
         maskedValue?: string;
         updatedAt?: string;
@@ -1505,6 +1508,39 @@ export type ImportAdminEnvKeyResponses = {
 
 export type ImportAdminEnvKeyResponse = ImportAdminEnvKeyResponses[keyof ImportAdminEnvKeyResponses];
 
+export type RunAdminCredentialDoctorData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/credentials/doctor';
+};
+
+export type RunAdminCredentialDoctorErrors = {
+    /**
+     * Admin required
+     */
+    403: ApiErrorResponse;
+};
+
+export type RunAdminCredentialDoctorError = RunAdminCredentialDoctorErrors[keyof RunAdminCredentialDoctorErrors];
+
+export type RunAdminCredentialDoctorResponses = {
+    /**
+     * Provider credential doctor results
+     */
+    200: {
+        results: Array<{
+            provider: string;
+            status: 'available' | 'missing' | 'invalid' | 'timeout';
+            message: string;
+            latencyMs: number;
+            checkedAt: string;
+        }>;
+    };
+};
+
+export type RunAdminCredentialDoctorResponse = RunAdminCredentialDoctorResponses[keyof RunAdminCredentialDoctorResponses];
+
 export type ListAdminJobsData = {
     body?: never;
     path?: never;
@@ -1542,6 +1578,36 @@ export type ListAdminJobsResponses = {
 };
 
 export type ListAdminJobsResponse = ListAdminJobsResponses[keyof ListAdminJobsResponses];
+
+export type StopAllAdminJobsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/jobs/stop-all';
+};
+
+export type StopAllAdminJobsErrors = {
+    /**
+     * Admin required
+     */
+    403: ApiErrorResponse;
+};
+
+export type StopAllAdminJobsError = StopAllAdminJobsErrors[keyof StopAllAdminJobsErrors];
+
+export type StopAllAdminJobsResponses = {
+    /**
+     * All queued jobs cancelled and active jobs requested to cancel
+     */
+    200: {
+        matched: number;
+        queuedCancelled: number;
+        processingRequested: number;
+        failed: number;
+    };
+};
+
+export type StopAllAdminJobsResponse = StopAllAdminJobsResponses[keyof StopAllAdminJobsResponses];
 
 export type ListJobsData = {
     body?: never;

@@ -27,9 +27,11 @@ import {
   regenerateVideoCreateSection,
   replaceVideoCreateShot,
   retryJob,
+  runAdminCredentialDoctor as runAdminCredentialDoctorRequest,
   runVideoCreateAction,
   saveAdScriptVersion,
   saveVideoCreateSection,
+  stopAllAdminJobs as stopAllAdminJobsRequest,
   updateAdminCredential,
   updateVideoCreateProject,
   updateVideoCreateShotSettings,
@@ -42,13 +44,17 @@ import type {
   ListAdminJobsResponse,
   ModuleId,
   ProviderCredentialName,
+  RunAdminCredentialDoctorResponse,
   SeedanceModelId,
+  StopAllAdminJobsResponse,
   VideoCreateInput,
   VideoCreateProject,
 } from "./generated/types.gen";
 
 export type AdminCredential = ListAdminCredentialsResponse["credentials"][number];
 export type AdminJob = ListAdminJobsResponse["jobs"][number];
+export type AdminCredentialDoctorResult = RunAdminCredentialDoctorResponse["results"][number];
+export type AdminStopAllJobsResult = StopAllAdminJobsResponse;
 
 const configure = () =>
   client.setConfig({
@@ -105,6 +111,13 @@ export async function uploadAdminEnvKey(file: File) {
   return data;
 }
 
+export async function runAdminCredentialDoctor() {
+  configure();
+  const { data } = await runAdminCredentialDoctorRequest({ headers: authHeaders(), throwOnError: true });
+  if (!data) throw new Error("密钥检测失败");
+  return data.results;
+}
+
 export async function fetchAdminJobs(query: {
   page: number;
   pageSize: number;
@@ -115,6 +128,13 @@ export async function fetchAdminJobs(query: {
   configure();
   const { data } = await listAdminJobs({ query, headers: authHeaders(), throwOnError: true });
   if (!data) throw new Error("队列任务加载失败");
+  return data;
+}
+
+export async function stopAllAdminQueueJobs() {
+  configure();
+  const { data } = await stopAllAdminJobsRequest({ headers: authHeaders(), throwOnError: true });
+  if (!data) throw new Error("停止任务失败");
   return data;
 }
 export async function fetchModels() {

@@ -32,4 +32,8 @@
   --color-ink: var(--ink);
   --color-muted: var(--muted);
   --color-primary: var(--primary);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-surface-strong: #f0efed;
 }
