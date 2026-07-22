@@ -3403,7 +3403,7 @@ td small {
   background: #11182773;
 }
 .attachment-picker-dialog {
-  width: min(940px, 100%);
+  width: min(820px, 100%);
   min-height: 560px;
   max-height: calc(100vh - 40px);
   overflow: hidden;
@@ -3412,6 +3412,10 @@ td small {
   border-radius: 12px;
   background: white;
   box-shadow: 0 24px 80px #10182840;
+  transition: width 180ms ease;
+}
+.attachment-picker-dialog.has-preview {
+  width: min(1120px, 100%);
 }
 .attachment-picker-dialog > header {
   min-height: 52px;
@@ -3471,6 +3475,7 @@ td small {
   display: flex;
 }
 .attachment-directory-layout {
+  position: relative;
   min-height: 0;
   width: 100%;
   display: grid;
@@ -3478,6 +3483,9 @@ td small {
   border: 1px solid #e1e6ed;
   border-radius: 9px;
   overflow: hidden;
+}
+.attachment-directory-layout.has-preview {
+  grid-template-columns: 190px minmax(0, 1fr) 280px;
 }
 .attachment-folder-tree {
   padding: 14px 10px;
@@ -3522,6 +3530,8 @@ td small {
   min-width: 0;
   padding: 14px;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 .attachment-breadcrumbs {
   min-height: 34px;
@@ -3566,19 +3576,13 @@ td small {
 }
 .attachment-grid {
   min-width: 0;
-  max-height: 300px;
+  min-height: 0;
+  flex: 1;
   overflow: auto;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   align-content: start;
-}
-.attachment-content-layout {
-  min-height: 0;
-  margin-top: 4px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 250px;
-  gap: 12px;
 }
 .attachment-grid > .attachment-folder-card {
   background: #fffdf7;
@@ -3656,10 +3660,9 @@ td small {
 }
 .attachment-preview-panel {
   min-width: 0;
-  height: 300px;
+  min-height: 0;
   overflow: hidden;
-  border: 1px solid #e0e5ec;
-  border-radius: 8px;
+  border-left: 1px solid #e0e5ec;
   display: flex;
   flex-direction: column;
   background: #f8fafc;
@@ -3674,6 +3677,12 @@ td small {
   gap: 8px;
   background: white;
 }
+.attachment-preview-panel > header > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
 .attachment-preview-panel > header b {
   color: #3c485d;
   @apply text-2xs;
@@ -3685,6 +3694,23 @@ td small {
   @apply text-2xs;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.attachment-preview-panel > header > button {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border: 0;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: #7d8796;
+}
+.attachment-preview-panel > header > button:hover {
+  background: #f0f2f5;
+}
+.attachment-preview-panel > header > button svg {
+  width: 15px;
 }
 .attachment-media-preview {
   min-height: 0;
@@ -3746,27 +3772,6 @@ td small {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
-.attachment-preview-empty {
-  min-height: 0;
-  flex: 1;
-  padding: 22px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  color: #929baa;
-  text-align: center;
-}
-.attachment-preview-empty svg {
-  width: 28px;
-  height: 28px;
-}
-.attachment-preview-empty span {
-  max-width: 170px;
-  @apply text-2xs;
-  @apply leading-normal;
-}
 .attachment-upload-panel {
   display: block;
   overflow: auto;
@@ -3801,6 +3806,22 @@ td small {
   cursor: not-allowed;
   opacity: 0.55;
 }
+@media (max-width: 900px) {
+  .attachment-picker-dialog.has-preview {
+    width: min(820px, 100%);
+  }
+  .attachment-directory-layout.has-preview {
+    grid-template-columns: 190px minmax(0, 1fr);
+  }
+  .attachment-preview-panel {
+    position: absolute;
+    inset: 0 0 0 auto;
+    z-index: 2;
+    width: min(300px, calc(100% - 190px));
+    border-left: 1px solid #e0e5ec;
+    box-shadow: -8px 0 24px #1018281a;
+  }
+}
 @media (max-width: 600px) {
   .attachment-picker-layer {
     padding: 0;
@@ -3814,14 +3835,11 @@ td small {
     max-height: 240px;
     grid-template-columns: 1fr;
   }
-  .attachment-content-layout {
-    grid-template-columns: 1fr;
-  }
   .attachment-folder-files {
     overflow: auto;
   }
   .attachment-preview-panel {
-    height: 240px;
+    width: 100%;
   }
   .attachment-directory-layout {
     grid-template-columns: 1fr;

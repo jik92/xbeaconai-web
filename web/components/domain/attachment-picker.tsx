@@ -125,8 +125,7 @@ export function AttachmentPicker({
         (!keyword || `${asset.name} ${asset.originalName} ${asset.description ?? ""}`.toLowerCase().includes(keyword)),
     );
   }, [accept, data, query]);
-  const previewAsset =
-    data.find((asset) => asset.id === previewId) ?? data.find((asset) => asset.id === selected.at(-1));
+  const previewAsset = data.find((asset) => asset.id === previewId);
   const close = () => {
     setOpen(false);
     setSelected([]);
@@ -213,7 +212,7 @@ export function AttachmentPicker({
       {open && (
         <div className="attachment-picker-layer" role="presentation" onMouseDown={close}>
           <section
-            className="attachment-picker-dialog"
+            className={`attachment-picker-dialog ${source === "library" && previewAsset ? "has-preview" : ""}`}
             role="dialog"
             aria-modal="true"
             aria-label="选择附件"
@@ -239,7 +238,7 @@ export function AttachmentPicker({
             </div>
             {source === "library" ? (
               <div className="attachment-library-panel">
-                <div className="attachment-directory-layout">
+                <div className={`attachment-directory-layout ${previewAsset ? "has-preview" : ""}`}>
                   <aside className="attachment-folder-tree">
                     <b>全部文件夹</b>
                     <nav>
@@ -280,104 +279,98 @@ export function AttachmentPicker({
                         </span>
                       ))}
                     </div>
-                    <div className="attachment-content-layout">
-                      <div className="attachment-grid">
-                        {!query.trim() &&
-                          childFolders.map((folder) => (
-                            <button
-                              type="button"
-                              key={folder.id}
-                              className="attachment-folder-card"
-                              onClick={() => {
-                                setFolderId(folder.id);
-                                setSelected([]);
-                                setPreviewId("");
-                              }}
-                            >
-                              <i>
-                                <Folder />
-                              </i>
-                              <span>
-                                <b>{folder.name}</b>
-                                <small>文件夹</small>
-                              </span>
-                              <ChevronRight />
-                            </button>
-                          ))}
-                        {filtered.map((asset) => {
-                          const active = selected.includes(asset.id);
-                          return (
-                            <button
-                              type="button"
-                              key={asset.id}
-                              className={active ? "active" : ""}
-                              onMouseEnter={() => setPreviewId(asset.id)}
-                              onFocus={() => setPreviewId(asset.id)}
-                              onClick={() => {
-                                setPreviewId(asset.id);
-                                setSelected((current) =>
-                                  active
-                                    ? current.filter((id) => id !== asset.id)
-                                    : multiple
-                                      ? [...current, asset.id]
-                                      : [asset.id],
-                                );
-                              }}
-                            >
-                              <i>
-                                <AssetIcon mimeType={asset.mimeType} />
-                              </i>
-                              <span>
-                                <b>{asset.name}</b>
-                                <small>{asset.mimeType}</small>
-                              </span>
-                              {active && <Check className="attachment-check" />}
-                            </button>
-                          );
-                        })}
-                        {(isLoading || foldersLoading) && <p>正在加载素材库…</p>}
-                        {!isLoading && !foldersLoading && !filtered.length && !childFolders.length && (
-                          <p>当前文件夹暂无符合格式的文件，可切换到本地上传。</p>
-                        )}
-                      </div>
-                      <aside className="attachment-preview-panel" aria-live="polite">
-                        <header>
-                          <b>内容预览</b>
-                          <small>{previewAsset ? previewAsset.mimeType : "选择或悬停素材"}</small>
-                        </header>
-                        {previewAsset ? (
-                          <>
-                            <div className={`attachment-media-preview preview-${previewAsset.mimeType.split("/")[0]}`}>
-                              <AuthenticatedMedia
-                                key={previewAsset.id}
-                                url={previewAsset.url}
-                                mimeType={previewAsset.mimeType}
-                                alt={previewAsset.name}
-                              />
-                            </div>
-                            <div className="attachment-preview-meta">
-                              <b title={previewAsset.name}>{previewAsset.name}</b>
-                              <span>
-                                {previewAsset.width && previewAsset.height
-                                  ? `${previewAsset.width} × ${previewAsset.height} · `
-                                  : ""}
-                                {formatDuration(previewAsset.durationSec)
-                                  ? `${formatDuration(previewAsset.durationSec)} · `
-                                  : ""}
-                                {formatBytes(previewAsset.size)}
-                              </span>
-                              {previewAsset.description && <p>{previewAsset.description}</p>}
-                            </div>
-                          </>
-                        ) : (
-                          <div className="attachment-preview-empty">
-                            <FileImage />
-                            <span>在左侧悬停或选择素材后，可在这里查看真实内容。</span>
-                          </div>
-                        )}
-                      </aside>
+                    <div className="attachment-grid">
+                      {!query.trim() &&
+                        childFolders.map((folder) => (
+                          <button
+                            type="button"
+                            key={folder.id}
+                            className="attachment-folder-card"
+                            onClick={() => {
+                              setFolderId(folder.id);
+                              setSelected([]);
+                              setPreviewId("");
+                            }}
+                          >
+                            <i>
+                              <Folder />
+                            </i>
+                            <span>
+                              <b>{folder.name}</b>
+                              <small>文件夹</small>
+                            </span>
+                            <ChevronRight />
+                          </button>
+                        ))}
+                      {filtered.map((asset) => {
+                        const active = selected.includes(asset.id);
+                        return (
+                          <button
+                            type="button"
+                            key={asset.id}
+                            className={active ? "active" : ""}
+                            onClick={() => {
+                              setPreviewId(asset.id);
+                              setSelected((current) =>
+                                active
+                                  ? current.filter((id) => id !== asset.id)
+                                  : multiple
+                                    ? [...current, asset.id]
+                                    : [asset.id],
+                              );
+                            }}
+                          >
+                            <i>
+                              <AssetIcon mimeType={asset.mimeType} />
+                            </i>
+                            <span>
+                              <b>{asset.name}</b>
+                              <small>{asset.mimeType}</small>
+                            </span>
+                            {active && <Check className="attachment-check" />}
+                          </button>
+                        );
+                      })}
+                      {(isLoading || foldersLoading) && <p>正在加载素材库…</p>}
+                      {!isLoading && !foldersLoading && !filtered.length && !childFolders.length && (
+                        <p>当前文件夹暂无符合格式的文件，可切换到本地上传。</p>
+                      )}
                     </div>
                   </section>
+                  {previewAsset && (
+                    <aside className="attachment-preview-panel" aria-live="polite">
+                      <header>
+                        <span>
+                          <b>内容预览</b>
+                          <small>{previewAsset.mimeType}</small>
+                        </span>
+                        <button type="button" aria-label="关闭文件预览" onClick={() => setPreviewId("")}>
+                          <X />
+                        </button>
+                      </header>
+                      <div className={`attachment-media-preview preview-${previewAsset.mimeType.split("/")[0]}`}>
+                        <AuthenticatedMedia
+                          key={previewAsset.id}
+                          url={previewAsset.url}
+                          mimeType={previewAsset.mimeType}
+                          alt={previewAsset.name}
+                        />
+                      </div>
+                      <div className="attachment-preview-meta">
+                        <b title={previewAsset.name}>{previewAsset.name}</b>
+                        <span>
+                          {previewAsset.width && previewAsset.height
+                            ? `${previewAsset.width} × ${previewAsset.height} · `
+                            : ""}
+                          {formatDuration(previewAsset.durationSec)
+                            ? `${formatDuration(previewAsset.durationSec)} · `
+                            : ""}
+                          {formatBytes(previewAsset.size)}
+                        </span>
+                        {previewAsset.description && <p>{previewAsset.description}</p>}
+                      </div>
+                    </aside>
+                  )}
                 </div>
               </div>
             ) : (
