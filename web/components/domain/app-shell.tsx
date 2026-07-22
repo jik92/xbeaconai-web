@@ -25,6 +25,7 @@ import { APP_CONFIG, isAssetOpen, isModuleOpen } from "@/app/config";
 import { modules } from "@/app/routes";
 import { useAuth } from "@/features/account/auth-context";
 import { AuthScreen } from "@/features/account/auth-screen";
+import { moduleProviderAvailability, useProviderFeatures } from "@/features/provider/provider-features";
 import { type WorkspacePanel, WorkspacePanelDrawer } from "@/features/account/workspace-panels";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "./brand-logo";
@@ -91,6 +92,11 @@ function loadSidebarMenuPreferences() {
 export function AppShell() {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const { status, user } = useAuth();
+  const providerFeatures = useProviderFeatures(status === "authenticated");
+  const runtimeAvailability = (item: SidebarMenuItem) => {
+    if (!item.id.startsWith("module:")) return undefined;
+    return moduleProviderAvailability(providerFeatures.data, item.id.slice(7) as (typeof modules)[number]["id"]);
+  };
   const [panel, setPanel] = useState<WorkspacePanel>(),
     [unread, setUnread] = useState(0),
     [sidebarCollapsed, setSidebarCollapsed] = useState(
@@ -105,9 +111,10 @@ export function AppShell() {
           .map((itemId) => sidebarMenuItems[group].find((item) => item.id === itemId))
           .filter((item): item is SidebarMenuItem => Boolean(item))
           .filter((item) => !isSidebarMenuItemHidden(menuPreferences, item.id, item.available))
+          .filter((item) => !item.id.startsWith("module:") || runtimeAvailability(item)?.enabled === true)
           .map((item) => ({ id: item.id, label: item.label, path: item.path, group })),
       ),
-    [menuPreferences],
+    [menuPreferences, providerFeatures.data],
   );
 
   useEffect(() => {
@@ -206,6 +213,8 @@ export function AppShell() {
                 <h3>{group}</h3>
                 {groupItems.map((item, index) => {
                   const hidden = isSidebarMenuItemHidden(menuPreferences, item.id, item.available);
+                  const providerAvailability = runtimeAvailability(item);
+                  const providerEnabled = !item.id.startsWith("module:") || providerAvailability?.enabled === true;
                   if (hidden && !menuEditing) return null;
                   if (menuEditing)
                     return (
@@ -267,7 +276,7 @@ export function AppShell() {
                         </div>
                       </fieldset>
                     );
-                  return item.available ? (
+                  return item.available && providerEnabled ? (
                     <Link
                       key={item.id}
                       to={item.path}
@@ -280,6 +289,19 @@ export function AppShell() {
                       {item.id === "module:video-remix" && <i>HOT</i>}
                       {item.badge && <i>{item.badge}</i>}
                     </Link>
+                  ) : item.available ? (
+                    <button
+                      type="button"
+                      key={item.id}
+                      className="sidebar-coming-soon"
+                      aria-label={`${item.label} 不可用`}
+                      aria-disabled="true"
+                      title={providerAvailability?.disabledReason ?? "Provider 尚未检测通过"}
+                    >
+                      <item.icon />
+                      <span>{item.label}</span>
+                      <i>不可用</i>
+                    </button>
                   ) : (
                     <button
                       type="button"

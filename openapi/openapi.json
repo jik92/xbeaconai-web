@@ -231,6 +231,15 @@
           "createdAt"
         ]
       },
+      "ProviderId": {
+        "type": "string",
+        "enum": [
+          "aihubmix",
+          "volc-speech",
+          "tos",
+          "mediakit"
+        ]
+      },
       "AssetKind": {
         "type": "string",
         "enum": [
@@ -3047,6 +3056,491 @@
         }
       }
     },
+    "/api/provider-features": {
+      "get": {
+        "operationId": "getProviderFeatures",
+        "responses": {
+          "200": {
+            "description": "Provider-gated feature availability",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "modules": {
+                      "type": "object",
+                      "properties": {
+                        "video-remix": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "requiredProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "unavailableProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "disabledReason": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "requiredProviders",
+                            "unavailableProviders"
+                          ]
+                        },
+                        "video-create": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "requiredProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "unavailableProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "disabledReason": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "requiredProviders",
+                            "unavailableProviders"
+                          ]
+                        },
+                        "ad-script": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "requiredProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "unavailableProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "disabledReason": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "requiredProviders",
+                            "unavailableProviders"
+                          ]
+                        },
+                        "ai-generate": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "requiredProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "unavailableProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "disabledReason": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "requiredProviders",
+                            "unavailableProviders"
+                          ]
+                        },
+                        "video-cut": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "requiredProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "unavailableProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "disabledReason": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "requiredProviders",
+                            "unavailableProviders"
+                          ]
+                        },
+                        "media-understand": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "requiredProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "unavailableProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "disabledReason": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "requiredProviders",
+                            "unavailableProviders"
+                          ]
+                        },
+                        "video-mashup": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "requiredProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "unavailableProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "disabledReason": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "requiredProviders",
+                            "unavailableProviders"
+                          ]
+                        },
+                        "voice-clone": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "requiredProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "unavailableProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "disabledReason": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "requiredProviders",
+                            "unavailableProviders"
+                          ]
+                        },
+                        "video-renewal": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "requiredProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "unavailableProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "disabledReason": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "requiredProviders",
+                            "unavailableProviders"
+                          ]
+                        },
+                        "subtitle-erase": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "requiredProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "unavailableProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "disabledReason": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "requiredProviders",
+                            "unavailableProviders"
+                          ]
+                        },
+                        "video-enhancement": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "requiredProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "unavailableProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "disabledReason": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "requiredProviders",
+                            "unavailableProviders"
+                          ]
+                        },
+                        "video-extract": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "requiredProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "unavailableProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "disabledReason": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "requiredProviders",
+                            "unavailableProviders"
+                          ]
+                        },
+                        "video-editor": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "requiredProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "unavailableProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "disabledReason": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "requiredProviders",
+                            "unavailableProviders"
+                          ]
+                        },
+                        "kickart": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "requiredProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "unavailableProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "disabledReason": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "requiredProviders",
+                            "unavailableProviders"
+                          ]
+                        }
+                      }
+                    },
+                    "operations": {
+                      "type": "object",
+                      "properties": {
+                        "assetUpload": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "requiredProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "unavailableProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "disabledReason": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "requiredProviders",
+                            "unavailableProviders"
+                          ]
+                        },
+                        "shareImport": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "requiredProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "unavailableProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "disabledReason": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "requiredProviders",
+                            "unavailableProviders"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "assetUpload",
+                        "shareImport"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "modules",
+                    "operations"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/models": {
       "get": {
         "operationId": "getModels",
@@ -4161,6 +4655,9 @@
                           "name": {
                             "$ref": "#/components/schemas/ProviderCredentialName"
                           },
+                          "providerId": {
+                            "$ref": "#/components/schemas/ProviderId"
+                          },
                           "provider": {
                             "type": "string"
                           },
@@ -4182,6 +4679,7 @@
                         },
                         "required": [
                           "name",
+                          "providerId",
                           "provider",
                           "label",
                           "secret",
@@ -4264,6 +4762,9 @@
                     "name": {
                       "$ref": "#/components/schemas/ProviderCredentialName"
                     },
+                    "providerId": {
+                      "$ref": "#/components/schemas/ProviderId"
+                    },
                     "provider": {
                       "type": "string"
                     },
@@ -4285,6 +4786,7 @@
                   },
                   "required": [
                     "name",
+                    "providerId",
                     "provider",
                     "label",
                     "secret",
@@ -4339,6 +4841,9 @@
                     "name": {
                       "$ref": "#/components/schemas/ProviderCredentialName"
                     },
+                    "providerId": {
+                      "$ref": "#/components/schemas/ProviderId"
+                    },
                     "provider": {
                       "type": "string"
                     },
@@ -4360,6 +4865,7 @@
                   },
                   "required": [
                     "name",
+                    "providerId",
                     "provider",
                     "label",
                     "secret",
@@ -4519,6 +5025,9 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "providerId": {
+                            "$ref": "#/components/schemas/ProviderId"
+                          },
                           "provider": {
                             "type": "string"
                           },
@@ -4543,6 +5052,78 @@
                           }
                         },
                         "required": [
+                          "providerId",
+                          "provider",
+                          "status",
+                          "message",
+                          "latencyMs",
+                          "checkedAt"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "results"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "getAdminCredentialDoctorResults",
+        "responses": {
+          "200": {
+            "description": "Persisted provider credential doctor results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "providerId": {
+                            "$ref": "#/components/schemas/ProviderId"
+                          },
+                          "provider": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "available",
+                              "missing",
+                              "invalid",
+                              "timeout"
+                            ]
+                          },
+                          "message": {
+                            "type": "string"
+                          },
+                          "latencyMs": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "checkedAt": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "providerId",
                           "provider",
                           "status",
                           "message",

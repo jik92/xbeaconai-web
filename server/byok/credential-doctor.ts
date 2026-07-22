@@ -1,11 +1,17 @@
 import TosClient from "@volcengine/tos-sdk";
 import { AihubmixClient } from "../providers/aihubmix";
 import { env } from "../env";
-import { type ProviderCredentialName, providerCredentials } from "./credential-store";
+import {
+  type ProviderCredentialName,
+  type ProviderId,
+  providerCredentials,
+  type StoredCredentialCheck,
+} from "./credential-store";
 
 export type CredentialDoctorStatus = "available" | "missing" | "invalid" | "timeout";
 
 export interface CredentialDoctorResult {
+  providerId: ProviderId;
   provider: string;
   status: CredentialDoctorStatus;
   message: string;
@@ -17,6 +23,7 @@ export type CredentialValues = Partial<Record<ProviderCredentialName, string>>;
 export type CredentialProbe = (values: CredentialValues, signal: AbortSignal) => Promise<string>;
 
 export interface CredentialDoctorProvider {
+  providerId: ProviderId;
   provider: string;
   credentials: ProviderCredentialName[];
   probe: CredentialProbe;
@@ -40,6 +47,7 @@ const safeJson = async (response: Response) => {
 
 const defaultProviders: CredentialDoctorProvider[] = [
   {
+    providerId: "aihubmix",
     provider: "AIHubMix",
     credentials: ["OPENAI_KEY"],
     probe: async (values, signal) => {
@@ -51,6 +59,7 @@ const defaultProviders: CredentialDoctorProvider[] = [
     },
   },
   {
+    providerId: "volc-speech",
     provider: "火山语音",
     credentials: ["VOLC_SPEECH_API_KEY_ID", "VOLC_SPEECH_API_KEY"],
     probe: async (values, signal) => {
@@ -82,6 +91,7 @@ const defaultProviders: CredentialDoctorProvider[] = [
     },
   },
   {
+    providerId: "tos",
     provider: "火山 TOS",
     credentials: ["TOS_ACCESS_KEY_ID", "TOS_SECRET_ACCESS_KEY"],
     probe: async (values) => {
@@ -107,6 +117,7 @@ const defaultProviders: CredentialDoctorProvider[] = [
     },
   },
   {
+    providerId: "mediakit",
     provider: "AI MediaKit",
     credentials: ["MEDIAKIT_API_KEY"],
     probe: async (values, signal) => {
@@ -134,10 +145,13 @@ export class CredentialDoctor {
       providerCredentials.get(name),
     private readonly providers: CredentialDoctorProvider[] = defaultProviders,
     private readonly timeoutMs = 10_000,
+    private readonly persistResults: (results: StoredCredentialCheck[]) => void = () => {},
   ) {}
 
   async runAll(): Promise<CredentialDoctorResult[]> {
-    return Promise.all(this.providers.map((provider) => this.check(provider)));
+    const results = await Promise.all(this.providers.map((provider) => this.check(provider)));
+    this.persistResults(results);
+    return results;
   }
 
   private async check(provider: CredentialDoctorProvider): Promise<CredentialDoctorResult> {
@@ -149,6 +163,7 @@ export class CredentialDoctor {
     const missing = provider.credentials.filter((name) => !values[name]);
     if (missing.length)
       return {
+        providerId: provider.providerId,
         provider: provider.provider,
         status: "missing",
         message: `缺少 ${missing.join("、")}`,
@@ -169,6 +184,7 @@ export class CredentialDoctor {
         }),
       ]);
       return {
+        providerId: provider.providerId,
         provider: provider.provider,
         status: "available",
         message,
@@ -179,6 +195,7 @@ export class CredentialDoctor {
       const timedOut =
         controller.signal.aborted || error instanceof DoctorTimeoutError || error instanceof DOMException;
       return {
+        providerId: provider.providerId,
         provider: provider.provider,
         status: timedOut ? "timeout" : "invalid",
         message: timedOut
@@ -195,4 +212,9 @@ export class CredentialDoctor {
   }
 }
 
-export const credentialDoctor = new CredentialDoctor();
+export const credentialDoctor = new CredentialDoctor(
+  (name) => providerCredentials.get(name),
+  defaultProviders,
+  10_000,
+  (results) => providerCredentials.saveChecks(results),
+);

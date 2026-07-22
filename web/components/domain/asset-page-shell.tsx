@@ -30,6 +30,8 @@ interface AssetPageToolbarProps {
   placeholder: string;
   actionLabel: string;
   onAction: () => void;
+  actionDisabled?: boolean;
+  actionTitle?: string;
   actionIcon?: ReactNode;
   secondaryActions?: ReactNode;
   className?: string;
@@ -41,6 +43,8 @@ export function AssetPageToolbar({
   placeholder,
   actionLabel,
   onAction,
+  actionDisabled,
+  actionTitle,
   actionIcon,
   secondaryActions,
   className,
@@ -57,7 +61,7 @@ export function AssetPageToolbar({
         />
       </div>
       {secondaryActions}
-      <Button size="sm" onClick={onAction}>
+      <Button size="sm" disabled={actionDisabled} title={actionTitle} onClick={onAction}>
         {actionIcon}
         {actionLabel}
       </Button>

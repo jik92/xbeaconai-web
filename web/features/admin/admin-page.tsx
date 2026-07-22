@@ -21,6 +21,7 @@ import {
   type AdminJob,
   type AdminUser,
   fetchAdminCredentials,
+  fetchAdminCredentialDoctorResults,
   fetchAdminJobs,
   fetchAdminUsers,
   grantCreditsToAdminUser,
@@ -105,9 +106,12 @@ function CredentialsPanel() {
   const [saving, setSaving] = useState<ProviderCredentialName>();
   const [deleting, setDeleting] = useState<ProviderCredentialName>();
   const [doctorBusy, setDoctorBusy] = useState(false);
-  const [doctorResults, setDoctorResults] = useState<AdminCredentialDoctorResult[]>([]);
   const [uploading, setUploading] = useState(false);
   const { data = [], isLoading, error } = useQuery({ queryKey: ["admin-credentials"], queryFn: fetchAdminCredentials });
+  const { data: doctorResults = [] } = useQuery({
+    queryKey: ["admin-credential-doctor-results"],
+    queryFn: fetchAdminCredentialDoctorResults,
+  });
 
   const saveCredential = async (credential: AdminCredential) => {
     const value = drafts[credential.name]?.trim();
@@ -121,7 +125,8 @@ function CredentialsPanel() {
         return next;
       });
       await queryClient.invalidateQueries({ queryKey: ["admin-credentials"] });
-      setDoctorResults([]);
+      await queryClient.invalidateQueries({ queryKey: ["admin-credential-doctor-results"] });
+      await queryClient.invalidateQueries({ queryKey: ["provider-features"] });
       toast.success(`${credential.label} 已保存`);
     } catch (reason) {
       toast.error(apiErrorMessage(reason, "密钥保存失败"));
@@ -136,7 +141,8 @@ function CredentialsPanel() {
     try {
       await removeAdminCredential(credential.name);
       await queryClient.invalidateQueries({ queryKey: ["admin-credentials"] });
-      setDoctorResults([]);
+      await queryClient.invalidateQueries({ queryKey: ["admin-credential-doctor-results"] });
+      await queryClient.invalidateQueries({ queryKey: ["provider-features"] });
       toast.success(`${credential.label} 已删除`);
     } catch (reason) {
       toast.error(apiErrorMessage(reason, "密钥删除失败"));
@@ -149,7 +155,8 @@ function CredentialsPanel() {
     setDoctorBusy(true);
     try {
       const results = await runAdminCredentialDoctor();
-      setDoctorResults(results);
+      queryClient.setQueryData(["admin-credential-doctor-results"], results);
+      await queryClient.invalidateQueries({ queryKey: ["provider-features"] });
       const available = results.filter((result) => result.status === "available").length;
       toast.success(`检测完成：${available}/${results.length} 个 Provider 可用`);
     } catch (reason) {
@@ -165,7 +172,8 @@ function CredentialsPanel() {
     try {
       const result = await uploadAdminEnvKey(file);
       await queryClient.invalidateQueries({ queryKey: ["admin-credentials"] });
-      setDoctorResults([]);
+      await queryClient.invalidateQueries({ queryKey: ["admin-credential-doctor-results"] });
+      await queryClient.invalidateQueries({ queryKey: ["provider-features"] });
       toast.success(`已更新 ${result.updated.length} 项，跳过 ${result.skipped.length} 项`);
     } catch (reason) {
       toast.error(apiErrorMessage(reason, ".env.key 导入失败"));
@@ -223,7 +231,7 @@ function CredentialsPanel() {
       header: "检测结果",
       size: 300,
       cell: ({ row }) => (
-        <DoctorStatus result={doctorResults.find((result) => result.provider === row.original.provider)} />
+        <DoctorStatus result={doctorResults.find((result) => result.providerId === row.original.providerId)} />
       ),
     },
     {

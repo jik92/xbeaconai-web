@@ -4,6 +4,7 @@ import { dirname, extname, isAbsolute, relative, resolve } from "node:path";
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
+import type { MiddlewareHandler } from "hono";
 import { parseVideoMashupConfig, type VideoMashupConfig } from "../shared/video-mashup/config";
 import { APP_CONFIG, isModuleOpen } from "../web/app/config";
 import type { ModuleId } from "../web/entities/types";
@@ -29,9 +30,15 @@ import {
   AdScriptVariantStatusSchema,
   AdScriptVersionSourceSchema,
 } from "./ad-script/types";
-import { type ProviderCredentialName, providerCredentialNames, providerCredentials } from "./byok/credential-store";
+import {
+  type ProviderCredentialName,
+  providerCredentialNames,
+  providerCredentials,
+  providerIds,
+} from "./byok/credential-store";
 import { credentialDoctor } from "./byok/credential-doctor";
 import { maxEnvKeyBytes, parseEnvKey } from "./byok/env-key";
+import { allProviderFeatureAvailability, moduleFeatureAvailability } from "./byok/provider-feature-gate";
 import { creationCapabilities, quoteCreation, validateCreationValues } from "./creation/capabilities";
 import { env } from "./env";
 import { platformAdapters, ShareContentParser } from "./imports/share-content";
@@ -89,6 +96,7 @@ const JobModuleSchema = z.enum(jobModuleIds).openapi("JobModuleId");
 const VideoModelIdSchema = z.enum(seedanceModelIds).openapi("SeedanceModelId");
 const JobStatusSchema = z.enum(["queued", "processing", "succeeded", "partially_succeeded", "failed", "cancelled"]);
 const ProviderCredentialNameSchema = z.enum(providerCredentialNames).openapi("ProviderCredentialName");
+const ProviderIdSchema = z.enum(providerIds).openapi("ProviderId");
 const StageSchema = z.object({
   id: z.string(),
   capability: z.string(),
@@ -309,6 +317,7 @@ const app = new OpenAPIHono<AppEnv>();
 const publicApiPaths = new Set([
   "/api/health",
   "/api/capabilities",
+  "/api/provider-features",
   "/api/models",
   "/api/creation/capabilities",
   "/api/auth/register",
@@ -412,6 +421,32 @@ app.use("/api/*", async (c, next) => {
   c.set("sessionId", identity.sessionId);
   await next();
 });
+
+function providerGuard(moduleId: ModuleId): MiddlewareHandler<AppEnv> {
+  return async (c, next) => {
+    if (["GET", "HEAD", "OPTIONS"].includes(c.req.method)) return next();
+    const availability = moduleFeatureAvailability(moduleId);
+    if (availability.enabled) return next();
+    return c.json(
+      {
+        error: {
+          code: "PROVIDER_NOT_VERIFIED",
+          message: availability.disabledReason ?? "相关 Provider 尚未检测通过",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      403,
+    );
+  };
+}
+
+app.use("/api/video-remix/*", providerGuard("video-remix"));
+app.use("/api/ad-script/*", providerGuard("ad-script"));
+app.use("/api/video-create/*", providerGuard("video-create"));
+app.use("/api/uploads", providerGuard("video-cut"));
+app.use("/api/uploads/direct*", providerGuard("video-cut"));
+app.use("/api/imports/share-content*", providerGuard("video-cut"));
 
 const healthRoute = createRoute({
   method: "get",
@@ -1108,6 +1143,35 @@ app.openapi(capabilitiesRoute, (c) => {
     }));
   return c.json({ capabilities }, 200);
 });
+
+const FeatureAvailabilitySchema = z.object({
+  enabled: z.boolean(),
+  requiredProviders: z.array(ProviderIdSchema),
+  unavailableProviders: z.array(ProviderIdSchema),
+  disabledReason: z.string().optional(),
+});
+const providerFeaturesRoute = createRoute({
+  method: "get",
+  path: "/api/provider-features",
+  operationId: "getProviderFeatures",
+  responses: {
+    200: {
+      description: "Provider-gated feature availability",
+      content: {
+        "application/json": {
+          schema: z.object({
+            modules: z.record(ModuleSchema, FeatureAvailabilitySchema),
+            operations: z.object({
+              assetUpload: FeatureAvailabilitySchema,
+              shareImport: FeatureAvailabilitySchema,
+            }),
+          }),
+        },
+      },
+    },
+  },
+});
+app.openapi(providerFeaturesRoute, (c) => c.json(allProviderFeatureAvailability(), 200));
 
 const modelsRoute = createRoute({
   method: "get",
@@ -1950,6 +2014,7 @@ app.openapi(assetContentRoute, async (c) => {
 
 const AdminCredentialSchema = z.object({
   name: ProviderCredentialNameSchema,
+  providerId: ProviderIdSchema,
   provider: z.string(),
   label: z.string(),
   secret: z.boolean(),
@@ -1964,6 +2029,7 @@ const AdminEnvKeyImportSchema = z.object({
   ignored: z.array(z.string()),
 });
 const CredentialDoctorResultSchema = z.object({
+  providerId: ProviderIdSchema,
   provider: z.string(),
   status: z.enum(["available", "missing", "invalid", "timeout"]),
   message: z.string(),
@@ -2210,6 +2276,29 @@ app.openapi(adminCredentialDoctorRoute, async (c) => {
       403,
     );
   return c.json({ results: await credentialDoctor.runAll() }, 200);
+});
+
+const adminCredentialDoctorResultsRoute = createRoute({
+  method: "get",
+  path: "/api/admin/credentials/doctor",
+  operationId: "getAdminCredentialDoctorResults",
+  responses: {
+    200: {
+      description: "Persisted provider credential doctor results",
+      content: { "application/json": { schema: z.object({ results: z.array(CredentialDoctorResultSchema) }) } },
+    },
+    403: { description: "Admin required", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(adminCredentialDoctorResultsRoute, (c) => {
+  if (!adminUser(c.get("userId")))
+    return c.json(
+      {
+        error: { code: "ADMIN_REQUIRED", message: "仅管理员可访问", retryable: false, requestId: crypto.randomUUID() },
+      },
+      403,
+    );
+  return c.json({ results: providerCredentials.listChecks() }, 200);
 });
 
 const listAdminUsersRoute = createRoute({
@@ -3507,6 +3596,19 @@ app.openapi(createJobRoute, async (c) => {
         error: {
           code: "FEATURE_NOT_OPEN",
           message: "该功能正在验收，暂未开放",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      403,
+    );
+  const availability = moduleFeatureAvailability(moduleId);
+  if (!availability.enabled)
+    return c.json(
+      {
+        error: {
+          code: "PROVIDER_NOT_VERIFIED",
+          message: availability.disabledReason ?? "相关 Provider 尚未检测通过",
           retryable: false,
           requestId: crypto.randomUUID(),
         },

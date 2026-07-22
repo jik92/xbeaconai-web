@@ -64,6 +64,13 @@ export const zRechargeOrder = z.object({
     createdAt: z.string()
 });
 
+export const zProviderId = z.enum([
+    'aihubmix',
+    'volc-speech',
+    'tos',
+    'mediakit'
+]);
+
 export const zAssetKind = z.enum([
     'media',
     'product',
@@ -880,6 +887,112 @@ export const zGetCapabilitiesResponse = z.object({
 });
 
 /**
+ * Provider-gated feature availability
+ */
+export const zGetProviderFeaturesResponse = z.object({
+    modules: z.object({
+        'video-remix': z.object({
+            enabled: z.boolean(),
+            requiredProviders: z.array(zProviderId),
+            unavailableProviders: z.array(zProviderId),
+            disabledReason: z.string().optional()
+        }).optional(),
+        'video-create': z.object({
+            enabled: z.boolean(),
+            requiredProviders: z.array(zProviderId),
+            unavailableProviders: z.array(zProviderId),
+            disabledReason: z.string().optional()
+        }).optional(),
+        'ad-script': z.object({
+            enabled: z.boolean(),
+            requiredProviders: z.array(zProviderId),
+            unavailableProviders: z.array(zProviderId),
+            disabledReason: z.string().optional()
+        }).optional(),
+        'ai-generate': z.object({
+            enabled: z.boolean(),
+            requiredProviders: z.array(zProviderId),
+            unavailableProviders: z.array(zProviderId),
+            disabledReason: z.string().optional()
+        }).optional(),
+        'video-cut': z.object({
+            enabled: z.boolean(),
+            requiredProviders: z.array(zProviderId),
+            unavailableProviders: z.array(zProviderId),
+            disabledReason: z.string().optional()
+        }).optional(),
+        'media-understand': z.object({
+            enabled: z.boolean(),
+            requiredProviders: z.array(zProviderId),
+            unavailableProviders: z.array(zProviderId),
+            disabledReason: z.string().optional()
+        }).optional(),
+        'video-mashup': z.object({
+            enabled: z.boolean(),
+            requiredProviders: z.array(zProviderId),
+            unavailableProviders: z.array(zProviderId),
+            disabledReason: z.string().optional()
+        }).optional(),
+        'voice-clone': z.object({
+            enabled: z.boolean(),
+            requiredProviders: z.array(zProviderId),
+            unavailableProviders: z.array(zProviderId),
+            disabledReason: z.string().optional()
+        }).optional(),
+        'video-renewal': z.object({
+            enabled: z.boolean(),
+            requiredProviders: z.array(zProviderId),
+            unavailableProviders: z.array(zProviderId),
+            disabledReason: z.string().optional()
+        }).optional(),
+        'subtitle-erase': z.object({
+            enabled: z.boolean(),
+            requiredProviders: z.array(zProviderId),
+            unavailableProviders: z.array(zProviderId),
+            disabledReason: z.string().optional()
+        }).optional(),
+        'video-enhancement': z.object({
+            enabled: z.boolean(),
+            requiredProviders: z.array(zProviderId),
+            unavailableProviders: z.array(zProviderId),
+            disabledReason: z.string().optional()
+        }).optional(),
+        'video-extract': z.object({
+            enabled: z.boolean(),
+            requiredProviders: z.array(zProviderId),
+            unavailableProviders: z.array(zProviderId),
+            disabledReason: z.string().optional()
+        }).optional(),
+        'video-editor': z.object({
+            enabled: z.boolean(),
+            requiredProviders: z.array(zProviderId),
+            unavailableProviders: z.array(zProviderId),
+            disabledReason: z.string().optional()
+        }).optional(),
+        kickart: z.object({
+            enabled: z.boolean(),
+            requiredProviders: z.array(zProviderId),
+            unavailableProviders: z.array(zProviderId),
+            disabledReason: z.string().optional()
+        }).optional()
+    }),
+    operations: z.object({
+        assetUpload: z.object({
+            enabled: z.boolean(),
+            requiredProviders: z.array(zProviderId),
+            unavailableProviders: z.array(zProviderId),
+            disabledReason: z.string().optional()
+        }),
+        shareImport: z.object({
+            enabled: z.boolean(),
+            requiredProviders: z.array(zProviderId),
+            unavailableProviders: z.array(zProviderId),
+            disabledReason: z.string().optional()
+        })
+    })
+});
+
+/**
  * Approved model catalog
  */
 export const zGetModelsResponse = z.object({
@@ -1125,6 +1238,7 @@ export const zGetAssetContentResponse = z.string();
 export const zListAdminCredentialsResponse = z.object({
     credentials: z.array(z.object({
         name: zProviderCredentialName,
+        providerId: zProviderId,
         provider: z.string(),
         label: z.string(),
         secret: z.boolean(),
@@ -1143,6 +1257,7 @@ export const zDeleteAdminCredentialPath = z.object({
  */
 export const zDeleteAdminCredentialResponse = z.object({
     name: zProviderCredentialName,
+    providerId: zProviderId,
     provider: z.string(),
     label: z.string(),
     secret: z.boolean(),
@@ -1164,6 +1279,7 @@ export const zUpdateAdminCredentialPath = z.object({
  */
 export const zUpdateAdminCredentialResponse = z.object({
     name: zProviderCredentialName,
+    providerId: zProviderId,
     provider: z.string(),
     label: z.string(),
     secret: z.boolean(),
@@ -1186,10 +1302,30 @@ export const zImportAdminEnvKeyResponse = z.object({
 });
 
 /**
+ * Persisted provider credential doctor results
+ */
+export const zGetAdminCredentialDoctorResultsResponse = z.object({
+    results: z.array(z.object({
+        providerId: zProviderId,
+        provider: z.string(),
+        status: z.enum([
+            'available',
+            'missing',
+            'invalid',
+            'timeout'
+        ]),
+        message: z.string(),
+        latencyMs: z.int().gte(0),
+        checkedAt: z.string()
+    }))
+});
+
+/**
  * Provider credential doctor results
  */
 export const zRunAdminCredentialDoctorResponse = z.object({
     results: z.array(z.object({
+        providerId: zProviderId,
         provider: z.string(),
         status: z.enum([
             'available',

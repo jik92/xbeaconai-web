@@ -61,6 +61,15 @@ export const providerCredentials = sqliteTable("provider_credentials", {
   updatedAt: text("updated_at").notNull(),
 });
 
+export const providerCredentialChecks = sqliteTable("provider_credential_checks", {
+  providerId: text("provider_id").primaryKey(),
+  provider: text("provider").notNull(),
+  status: text("status", { enum: ["available", "missing", "invalid", "timeout"] }).notNull(),
+  message: text("message").notNull(),
+  latencyMs: integer("latency_ms").notNull(),
+  checkedAt: text("checked_at").notNull(),
+});
+
 export const assetFolders = sqliteTable(
   "asset_folders",
   {

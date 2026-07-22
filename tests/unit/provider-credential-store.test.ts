@@ -58,6 +58,31 @@ describe("ProviderCredentialStore", () => {
     store.close();
   });
 
+  test("persists Doctor results and invalidates the affected Provider when credentials change", () => {
+    const path = temporaryDatabase("byok-doctor-state-");
+    const store = new ProviderCredentialStore(path, masterKey);
+    store.set("OPENAI_KEY", "first-openai-key");
+    store.saveChecks([
+      {
+        providerId: "aihubmix",
+        provider: "AIHubMix",
+        status: "available",
+        message: "鉴权通过",
+        latencyMs: 12,
+        checkedAt: "2026-07-23T00:00:00.000Z",
+      },
+    ]);
+    expect(store.isProviderVerified("aihubmix")).toBe(true);
+    store.close();
+
+    const reopened = new ProviderCredentialStore(path, masterKey);
+    expect(reopened.listChecks()).toMatchObject([{ providerId: "aihubmix", status: "available" }]);
+    reopened.set("OPENAI_KEY", "rotated-openai-key");
+    expect(reopened.listChecks()).toEqual([]);
+    expect(reopened.isProviderVerified("aihubmix")).toBe(false);
+    reopened.close();
+  });
+
   test("imports the legacy env keys without printing secret values", async () => {
     const path = temporaryDatabase("byok-import-");
     const directory = join(path, "..");

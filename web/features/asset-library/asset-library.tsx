@@ -35,6 +35,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { LibraryAsset, LibraryProduct } from "@/entities/types";
+import { useProviderFeatures } from "@/features/provider/provider-features";
 import { AssetFolderSpace } from "./asset-folder-space";
 import { fitMediaPreviewSize } from "./media-preview-size";
 import "./asset-library.css";
@@ -46,6 +47,9 @@ export function AssetLibrary({ kind }: { kind: LibraryKind }) {
 }
 
 function ProductLibrary() {
+  const providerFeatures = useProviderFeatures();
+  const uploadAvailability = providerFeatures.data?.operations.assetUpload;
+  const uploadDisabled = uploadAvailability?.enabled !== true;
   const requestedProductId = new URLSearchParams(window.location.search).get("productId");
   const requestedProductLocated = useRef(false);
   const queryClient = useQueryClient();
@@ -140,6 +144,8 @@ function ProductLibrary() {
             title="商品库"
             uploadLabel="创建商品"
             onUpload={() => setUploadOpen(true)}
+            uploadDisabled={uploadDisabled}
+            uploadTitle={uploadAvailability?.disabledReason}
           />
         }
       >
@@ -172,6 +178,7 @@ function ProductLibrary() {
             icon={<Package />}
             emptyText="还没有商品"
             onUpload={() => setUploadOpen(true)}
+            uploadDisabled={uploadDisabled}
           />
         </section>
       </AssetPageShell>
@@ -236,7 +243,7 @@ function ProductLibrary() {
           </Label>
         </div>
         <ModalFooter
-          disabled={!files.length || !name.trim() || upload.isPending}
+          disabled={uploadDisabled || !files.length || !name.trim() || upload.isPending}
           pending={upload.isPending}
           onCancel={() => setUploadOpen(false)}
           onConfirm={() => upload.mutate()}
@@ -499,6 +506,9 @@ function MediaAssetTable({
 }
 
 function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
+  const providerFeatures = useProviderFeatures();
+  const uploadAvailability = providerFeatures.data?.operations.assetUpload;
+  const uploadDisabled = uploadAvailability?.enabled !== true;
   const locationParams = new URLSearchParams(window.location.search);
   const requestedFolderId = kind === "media" ? (locationParams.get("folderId") ?? "") : "";
   const requestedAssetId = kind === "voice" ? (locationParams.get("assetId") ?? "") : "";
@@ -649,6 +659,8 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
             title={kind === "voice" ? "音色库" : "素材库"}
             uploadLabel={kind === "voice" ? "上传音色" : "上传素材"}
             onUpload={() => setUploadOpen(true)}
+            uploadDisabled={uploadDisabled}
+            uploadTitle={uploadAvailability?.disabledReason}
           />
         }
       >
@@ -700,6 +712,7 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
               icon={<AudioLines />}
               emptyText="还没有音色资产"
               onUpload={() => setUploadOpen(true)}
+              uploadDisabled={uploadDisabled}
             />
           </section>
         )}
@@ -761,7 +774,7 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
           </Label>
         </div>
         <ModalFooter
-          disabled={!file || upload.isPending}
+          disabled={uploadDisabled || !file || upload.isPending}
           pending={upload.isPending}
           onCancel={() => setUploadOpen(false)}
           onConfirm={() => upload.mutate()}
@@ -813,12 +826,16 @@ function LibraryToolbar({
   title,
   uploadLabel,
   onUpload,
+  uploadDisabled,
+  uploadTitle,
 }: {
   query: string;
   setQuery: (value: string) => void;
   title: string;
   uploadLabel: string;
   onUpload: () => void;
+  uploadDisabled?: boolean;
+  uploadTitle?: string;
 }) {
   return (
     <AssetPageToolbar
@@ -828,6 +845,8 @@ function LibraryToolbar({
       actionLabel={uploadLabel}
       actionIcon={<Upload />}
       onAction={onUpload}
+      actionDisabled={uploadDisabled}
+      actionTitle={uploadTitle}
     />
   );
 }
@@ -839,6 +858,7 @@ function LibraryState({
   icon,
   emptyText,
   onUpload,
+  uploadDisabled,
 }: {
   loading: boolean;
   error: unknown;
@@ -846,6 +866,7 @@ function LibraryState({
   icon: ReactNode;
   emptyText: string;
   onUpload: () => void;
+  uploadDisabled?: boolean;
 }) {
   if (!loading && !error && !empty) return null;
   return (
@@ -853,7 +874,7 @@ function LibraryState({
       {icon}
       <b>{loading ? "正在加载资产…" : error instanceof Error ? error.message : emptyText}</b>
       {!loading && !error && (
-        <Button size="sm" variant="outline" onClick={onUpload}>
+        <Button size="sm" variant="outline" disabled={uploadDisabled} onClick={onUpload}>
           <Plus /> 立即上传
         </Button>
       )}

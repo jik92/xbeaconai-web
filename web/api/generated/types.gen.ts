@@ -62,6 +62,8 @@ export type RechargeOrder = {
     createdAt: string;
 };
 
+export type ProviderId = 'aihubmix' | 'volc-speech' | 'tos' | 'mediakit';
+
 export type AssetKind = 'media' | 'product' | 'portrait' | 'voice';
 
 export type ProviderCredentialName = 'OPENAI_KEY' | 'VOLC_SPEECH_API_KEY_ID' | 'VOLC_SPEECH_API_KEY' | 'TOS_ACCESS_KEY_ID' | 'TOS_SECRET_ACCESS_KEY' | 'MEDIAKIT_API_KEY';
@@ -913,6 +915,123 @@ export type GetCapabilitiesResponses = {
 
 export type GetCapabilitiesResponse = GetCapabilitiesResponses[keyof GetCapabilitiesResponses];
 
+export type GetProviderFeaturesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/provider-features';
+};
+
+export type GetProviderFeaturesResponses = {
+    /**
+     * Provider-gated feature availability
+     */
+    200: {
+        modules: {
+            'video-remix'?: {
+                enabled: boolean;
+                requiredProviders: Array<ProviderId>;
+                unavailableProviders: Array<ProviderId>;
+                disabledReason?: string;
+            };
+            'video-create'?: {
+                enabled: boolean;
+                requiredProviders: Array<ProviderId>;
+                unavailableProviders: Array<ProviderId>;
+                disabledReason?: string;
+            };
+            'ad-script'?: {
+                enabled: boolean;
+                requiredProviders: Array<ProviderId>;
+                unavailableProviders: Array<ProviderId>;
+                disabledReason?: string;
+            };
+            'ai-generate'?: {
+                enabled: boolean;
+                requiredProviders: Array<ProviderId>;
+                unavailableProviders: Array<ProviderId>;
+                disabledReason?: string;
+            };
+            'video-cut'?: {
+                enabled: boolean;
+                requiredProviders: Array<ProviderId>;
+                unavailableProviders: Array<ProviderId>;
+                disabledReason?: string;
+            };
+            'media-understand'?: {
+                enabled: boolean;
+                requiredProviders: Array<ProviderId>;
+                unavailableProviders: Array<ProviderId>;
+                disabledReason?: string;
+            };
+            'video-mashup'?: {
+                enabled: boolean;
+                requiredProviders: Array<ProviderId>;
+                unavailableProviders: Array<ProviderId>;
+                disabledReason?: string;
+            };
+            'voice-clone'?: {
+                enabled: boolean;
+                requiredProviders: Array<ProviderId>;
+                unavailableProviders: Array<ProviderId>;
+                disabledReason?: string;
+            };
+            'video-renewal'?: {
+                enabled: boolean;
+                requiredProviders: Array<ProviderId>;
+                unavailableProviders: Array<ProviderId>;
+                disabledReason?: string;
+            };
+            'subtitle-erase'?: {
+                enabled: boolean;
+                requiredProviders: Array<ProviderId>;
+                unavailableProviders: Array<ProviderId>;
+                disabledReason?: string;
+            };
+            'video-enhancement'?: {
+                enabled: boolean;
+                requiredProviders: Array<ProviderId>;
+                unavailableProviders: Array<ProviderId>;
+                disabledReason?: string;
+            };
+            'video-extract'?: {
+                enabled: boolean;
+                requiredProviders: Array<ProviderId>;
+                unavailableProviders: Array<ProviderId>;
+                disabledReason?: string;
+            };
+            'video-editor'?: {
+                enabled: boolean;
+                requiredProviders: Array<ProviderId>;
+                unavailableProviders: Array<ProviderId>;
+                disabledReason?: string;
+            };
+            kickart?: {
+                enabled: boolean;
+                requiredProviders: Array<ProviderId>;
+                unavailableProviders: Array<ProviderId>;
+                disabledReason?: string;
+            };
+        };
+        operations: {
+            assetUpload: {
+                enabled: boolean;
+                requiredProviders: Array<ProviderId>;
+                unavailableProviders: Array<ProviderId>;
+                disabledReason?: string;
+            };
+            shareImport: {
+                enabled: boolean;
+                requiredProviders: Array<ProviderId>;
+                unavailableProviders: Array<ProviderId>;
+                disabledReason?: string;
+            };
+        };
+    };
+};
+
+export type GetProviderFeaturesResponse = GetProviderFeaturesResponses[keyof GetProviderFeaturesResponses];
+
 export type GetModelsData = {
     body?: never;
     path?: never;
@@ -1369,6 +1488,7 @@ export type ListAdminCredentialsResponses = {
     200: {
         credentials: Array<{
             name: ProviderCredentialName;
+            providerId: ProviderId;
             provider: string;
             label: string;
             secret: boolean;
@@ -1409,6 +1529,7 @@ export type DeleteAdminCredentialResponses = {
      */
     200: {
         name: ProviderCredentialName;
+        providerId: ProviderId;
         provider: string;
         label: string;
         secret: boolean;
@@ -1450,6 +1571,7 @@ export type UpdateAdminCredentialResponses = {
      */
     200: {
         name: ProviderCredentialName;
+        providerId: ProviderId;
         provider: string;
         label: string;
         secret: boolean;
@@ -1508,6 +1630,40 @@ export type ImportAdminEnvKeyResponses = {
 
 export type ImportAdminEnvKeyResponse = ImportAdminEnvKeyResponses[keyof ImportAdminEnvKeyResponses];
 
+export type GetAdminCredentialDoctorResultsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/credentials/doctor';
+};
+
+export type GetAdminCredentialDoctorResultsErrors = {
+    /**
+     * Admin required
+     */
+    403: ApiErrorResponse;
+};
+
+export type GetAdminCredentialDoctorResultsError = GetAdminCredentialDoctorResultsErrors[keyof GetAdminCredentialDoctorResultsErrors];
+
+export type GetAdminCredentialDoctorResultsResponses = {
+    /**
+     * Persisted provider credential doctor results
+     */
+    200: {
+        results: Array<{
+            providerId: ProviderId;
+            provider: string;
+            status: 'available' | 'missing' | 'invalid' | 'timeout';
+            message: string;
+            latencyMs: number;
+            checkedAt: string;
+        }>;
+    };
+};
+
+export type GetAdminCredentialDoctorResultsResponse = GetAdminCredentialDoctorResultsResponses[keyof GetAdminCredentialDoctorResultsResponses];
+
 export type RunAdminCredentialDoctorData = {
     body?: never;
     path?: never;
@@ -1530,6 +1686,7 @@ export type RunAdminCredentialDoctorResponses = {
      */
     200: {
         results: Array<{
+            providerId: ProviderId;
             provider: string;
             status: 'available' | 'missing' | 'invalid' | 'timeout';
             message: string;

@@ -1,18 +1,39 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { type AppDatabase, openDatabase } from "../db/database";
-import { providerCredentials as credentialTable } from "../db/schema";
+import { providerCredentialChecks as checkTable, providerCredentials as credentialTable } from "../db/schema";
 import { env } from "../env";
 import {
   type ProviderCredentialName,
+  type ProviderId,
   providerCredentialCatalog,
   providerCredentialNames,
+  providerIdForCredential,
+  providerIds,
 } from "./credential-definitions";
 
-export { type ProviderCredentialName, providerCredentialCatalog, providerCredentialNames };
+export {
+  type ProviderCredentialName,
+  type ProviderId,
+  providerCredentialCatalog,
+  providerCredentialNames,
+  providerIds,
+};
+
+export type CredentialCheckStatus = "available" | "missing" | "invalid" | "timeout";
+
+export interface StoredCredentialCheck {
+  providerId: ProviderId;
+  provider: string;
+  status: CredentialCheckStatus;
+  message: string;
+  latencyMs: number;
+  checkedAt: string;
+}
 
 export interface MaskedProviderCredential {
   name: ProviderCredentialName;
+  providerId: ProviderId;
   provider: string;
   label: string;
   secret: boolean;
@@ -89,6 +110,49 @@ export class ProviderCredentialStore {
     });
   }
 
+  listChecks(): StoredCredentialCheck[] {
+    const rows = new Map(
+      this.db
+        .select()
+        .from(checkTable)
+        .all()
+        .map((row) => [row.providerId, row]),
+    );
+    return providerIds.flatMap((providerId) => {
+      const row = rows.get(providerId);
+      return row ? [{ ...row, providerId: providerId as ProviderId }] : [];
+    });
+  }
+
+  saveChecks(checks: StoredCredentialCheck[]) {
+    this.db.transaction((tx) => {
+      for (const check of checks)
+        tx.insert(checkTable)
+          .values(check)
+          .onConflictDoUpdate({
+            target: checkTable.providerId,
+            set: {
+              provider: check.provider,
+              status: check.status,
+              message: check.message,
+              latencyMs: check.latencyMs,
+              checkedAt: check.checkedAt,
+            },
+          })
+          .run();
+    });
+  }
+
+  isProviderVerified(providerId: ProviderId) {
+    if (!this.available) return false;
+    return this.db.select().from(checkTable).where(eq(checkTable.providerId, providerId)).get()?.status === "available";
+  }
+
+  private invalidateChecks(tx: AppDatabase, names: ProviderCredentialName[]) {
+    const affected = [...new Set(names.map(providerIdForCredential))];
+    if (affected.length) tx.delete(checkTable).where(inArray(checkTable.providerId, affected)).run();
+  }
+
   set(name: ProviderCredentialName, value: string, updatedByUserId?: string) {
     this.setMany({ [name]: value }, updatedByUserId);
   }
@@ -117,12 +181,19 @@ export class ProviderCredentialStore {
           })
           .run();
       }
+      this.invalidateChecks(
+        tx as AppDatabase,
+        entries.map(([name]) => name),
+      );
     });
     return entries.map(([name]) => name);
   }
 
   delete(name: ProviderCredentialName) {
-    this.db.delete(credentialTable).where(eq(credentialTable.name, name)).run();
+    this.db.transaction((tx) => {
+      tx.delete(credentialTable).where(eq(credentialTable.name, name)).run();
+      this.invalidateChecks(tx as AppDatabase, [name]);
+    });
   }
 }
 

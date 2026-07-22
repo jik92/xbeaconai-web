@@ -8,6 +8,7 @@ import { AiGeneratePage } from "@/features/ai-generate/ai-generate-page";
 import { AssetLibrary } from "@/features/asset-library/asset-library";
 import { MediaUnderstandPage } from "@/features/media-understand/media-understand-page";
 import { PortraitLibrary } from "@/features/portrait-library/portrait-library";
+import { ProviderFeatureGate } from "@/features/provider/provider-feature-gate";
 import { VideoCreatePage } from "@/features/video-create/video-create-page";
 import { VideoEditorPage } from "@/features/video-editor/video-editor-page";
 import { VideoExtractPage } from "@/features/video-extract/video-extract-page";
@@ -23,32 +24,35 @@ const indexRoute = createRoute({
   component: () =>
     homeDestination.kind === "route" ? <Navigate to={homeDestination.path} /> : <ProjectComingSoonPage />,
 });
+function ModuleRouteContent({ config }: { config: (typeof modules)[number] }) {
+  if (!isModuleOpen(config.id)) return <ComingSoonPage config={config} />;
+  const content =
+    config.id === "video-remix" ? (
+      <RemixProject />
+    ) : config.id === "video-create" ? (
+      <VideoCreatePage />
+    ) : config.id === "ad-script" ? (
+      <AdScriptPage />
+    ) : config.id === "ai-generate" ? (
+      <AiGeneratePage />
+    ) : config.id === "media-understand" ? (
+      <MediaUnderstandPage />
+    ) : config.id === "video-extract" ? (
+      <VideoExtractPage />
+    ) : config.id === "video-editor" ? (
+      <VideoEditorPage />
+    ) : config.id === "video-mashup" ? (
+      <VideoMashupPage />
+    ) : (
+      <ModulePage config={config} />
+    );
+  return <ProviderFeatureGate moduleId={config.id}>{content}</ProviderFeatureGate>;
+}
 const moduleRoutes = modules.map((config) =>
   createRoute({
     getParentRoute: () => rootRoute,
     path: config.path,
-    component: () =>
-      !isModuleOpen(config.id) ? (
-        <ComingSoonPage config={config} />
-      ) : config.id === "video-remix" ? (
-        <RemixProject />
-      ) : config.id === "video-create" ? (
-        <VideoCreatePage />
-      ) : config.id === "ad-script" ? (
-        <AdScriptPage />
-      ) : config.id === "ai-generate" ? (
-        <AiGeneratePage />
-      ) : config.id === "media-understand" ? (
-        <MediaUnderstandPage />
-      ) : config.id === "video-extract" ? (
-        <VideoExtractPage />
-      ) : config.id === "video-editor" ? (
-        <VideoEditorPage />
-      ) : config.id === "video-mashup" ? (
-        <VideoMashupPage />
-      ) : (
-        <ModulePage config={config} />
-      ),
+    component: () => <ModuleRouteContent config={config} />,
   }),
 );
 const portraitRoute = createRoute({

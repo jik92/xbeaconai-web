@@ -18,6 +18,8 @@ import {
   getAdScriptProject,
   getJob,
   getModels,
+  getAdminCredentialDoctorResults,
+  getProviderFeatures,
   getVideoCreateProject,
   importAdminEnvKey,
   listAdminCredentials,
@@ -47,6 +49,7 @@ import type {
   ListAdminJobsResponse,
   ListAdminUsersResponse,
   ModuleId,
+  GetProviderFeaturesResponse,
   ProviderCredentialName,
   RunAdminCredentialDoctorResponse,
   SeedanceModelId,
@@ -59,6 +62,7 @@ export type AdminCredential = ListAdminCredentialsResponse["credentials"][number
 export type AdminJob = ListAdminJobsResponse["jobs"][number];
 export type AdminUser = ListAdminUsersResponse["users"][number];
 export type AdminCredentialDoctorResult = RunAdminCredentialDoctorResponse["results"][number];
+export type ProviderFeatures = GetProviderFeaturesResponse;
 export type AdminStopAllJobsResult = StopAllAdminJobsResponse;
 
 const configure = () =>
@@ -88,6 +92,19 @@ export async function fetchAdminCredentials() {
   configure();
   const { data } = await listAdminCredentials({ headers: authHeaders(), throwOnError: true });
   return data?.credentials ?? [];
+}
+
+export async function fetchProviderFeatures() {
+  configure();
+  const { data } = await getProviderFeatures({ headers: authHeaders(), throwOnError: true });
+  if (!data) throw new Error("Provider 状态加载失败");
+  return data;
+}
+
+export async function fetchAdminCredentialDoctorResults() {
+  configure();
+  const { data } = await getAdminCredentialDoctorResults({ headers: authHeaders(), throwOnError: true });
+  return data?.results ?? [];
 }
 
 export async function saveAdminCredential(name: ProviderCredentialName, value: string) {
