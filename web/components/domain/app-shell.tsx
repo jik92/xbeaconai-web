@@ -17,17 +17,18 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   RotateCcw,
-  Search,
   Settings2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { listNotifications } from "@/api/generated/sdk.gen";
 import { APP_CONFIG, isAssetOpen, isModuleOpen } from "@/app/config";
 import { modules } from "@/app/routes";
 import { useAuth } from "@/features/account/auth-context";
 import { AuthScreen } from "@/features/account/auth-screen";
 import { type WorkspacePanel, WorkspacePanelDrawer } from "@/features/account/workspace-panels";
+import { Button } from "@/components/ui/button";
 import { BrandLogo } from "./brand-logo";
+import { GlobalSearch } from "./global-search";
 import {
   createDefaultSidebarMenuPreferences,
   isSidebarMenuItemHidden,
@@ -97,6 +98,17 @@ export function AppShell() {
     ),
     [menuEditing, setMenuEditing] = useState(false),
     [menuPreferences, setMenuPreferences] = useState(loadSidebarMenuPreferences);
+  const searchPages = useMemo(
+    () =>
+      SIDEBAR_GROUPS.flatMap((group) =>
+        menuPreferences.order[group]
+          .map((itemId) => sidebarMenuItems[group].find((item) => item.id === itemId))
+          .filter((item): item is SidebarMenuItem => Boolean(item))
+          .filter((item) => !isSidebarMenuItemHidden(menuPreferences, item.id, item.available))
+          .map((item) => ({ id: item.id, label: item.label, path: item.path, group })),
+      ),
+    [menuPreferences],
+  );
 
   useEffect(() => {
     if (status !== "authenticated") setPanel(undefined);
@@ -143,31 +155,40 @@ export function AppShell() {
             <b>{APP_CONFIG.projectName}</b>
           </div>
         </div>
-        <div className="global-search">
-          <Search size={16} />
-          <input placeholder="搜索作品、任务或素材" />
-          <kbd>⌘ K</kbd>
-        </div>
+        <GlobalSearch pages={searchPages} />
         <div className="top-actions">
-          <button type="button" className="credits" onClick={() => setPanel("recharge")}>
+          <Button variant="ghost" size="sm" className="credits" onClick={() => setPanel("recharge")}>
             <Coins size={16} />
             <span>{user.credits.toLocaleString()}</span>
             <b>充值</b>
-          </button>
-          <button type="button" aria-label="帮助" onClick={() => setPanel("help")}>
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-[34px]"
+            aria-label="帮助"
+            onClick={() => setPanel("help")}
+          >
             <CircleHelp />
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             aria-label="通知"
-            className={unread ? "has-dot" : ""}
+            className={`size-[34px]${unread ? " has-dot" : ""}`}
             onClick={() => setPanel("notifications")}
           >
             <Bell />
-          </button>
-          <button type="button" className="avatar" aria-label="个人账号" onClick={() => setPanel("account")}>
-            {user.avatarText}
-          </button>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="account-trigger"
+            aria-label="个人账号"
+            onClick={() => setPanel("account")}
+          >
+            {user.displayName || user.phone}
+          </Button>
         </div>
       </header>
       <aside

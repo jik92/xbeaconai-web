@@ -18,7 +18,6 @@ export async function registerTestAccount(
   await store.setupPassword(challenge.setupToken, input.password);
   const user = store.updateProfile(challenge.userId, {
     displayName: input.displayName,
-    avatarText: input.displayName.slice(0, 2),
   });
   return { ...challenge, user };
 }

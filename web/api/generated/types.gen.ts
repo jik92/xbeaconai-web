@@ -30,7 +30,6 @@ export type UserSummary = {
     id: string;
     phone: string;
     displayName: string;
-    avatarText: string;
     credits: number;
     isAdmin: boolean;
 };
@@ -667,7 +666,6 @@ export type GetCurrentUserResponse = GetCurrentUserResponses[keyof GetCurrentUse
 export type UpdateProfileData = {
     body: {
         displayName: string;
-        avatarText: string;
     };
     path?: never;
     query?: never;

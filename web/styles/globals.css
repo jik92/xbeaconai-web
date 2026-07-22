@@ -7,7 +7,7 @@
   font-synthesis: none;
   --canvas: #f4f6f9;
   --surface: #ffffff;
-  --surface-muted: #f8fafc;
+  --surface-muted: #f1f5f9;
   --border: #e3e8ef;
   --ink: #172033;
   --muted: #6b7588;
@@ -529,6 +529,7 @@ select:focus-visible {
   color: #475166;
 }
 .global-search {
+  position: relative;
   margin-left: auto;
   margin-right: auto;
   width: min(390px, 32vw);
@@ -549,27 +550,13 @@ select:focus-visible {
   margin-left: 8px;
   @apply text-xs;
 }
-.global-search kbd {
-  @apply text-2xs;
-  border: 1px solid #d8dee8;
-  border-radius: 4px;
-  padding: 2px 5px;
-  background: white;
+.global-search-shortcut {
+  flex: none;
 }
 .top-actions {
   display: flex;
   align-items: center;
   gap: 6px;
-}
-.top-actions > button {
-  width: 34px;
-  height: 34px;
-  border: 0;
-  background: white;
-  color: #5f697b;
-  border-radius: 7px;
-  display: grid;
-  place-items: center;
 }
 .top-actions svg {
   width: 18px;
@@ -600,15 +587,11 @@ select:focus-visible {
   background: #ef4d63;
   border: 2px solid white;
 }
-.avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: #17213b;
-  color: white;
-  display: grid;
-  place-items: center;
-  @apply text-xs;
+.top-actions > .account-trigger {
+  width: auto;
+  max-width: 128px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   margin-left: 5px;
 }
 .sidebar {

@@ -72,6 +72,19 @@ describe("two-step phone authentication", () => {
     store.close();
   });
 
+  test("updates only the profile name and keeps legacy avatar data internal", async () => {
+    const { store } = fixture();
+    const challenge = await registerPending(store, "13800000029");
+
+    const user = store.updateProfile(challenge.userId, { displayName: "  新名字  " });
+    const stored = store.db.select().from(users).where(eq(users.id, challenge.userId)).get();
+
+    expect(user.displayName).toBe("新名字");
+    expect("avatarText" in user).toBe(false);
+    expect(stored?.avatarText).toBe("29");
+    store.close();
+  });
+
   test("enforces code cooldown, expiry and failed-attempt invalidation", async () => {
     const { store } = fixture();
     await store.sendRegistrationCode("13800000022");

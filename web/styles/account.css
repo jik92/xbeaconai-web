@@ -474,23 +474,10 @@
 }
 .account-hero {
   display: flex;
-  gap: 12px;
   padding: 16px;
   border-radius: 11px;
   background: linear-gradient(145deg, #eaf1ff, #f6f2ff);
   margin-bottom: 12px;
-}
-.account-hero > i,
-.avatar-editor {
-  width: 54px;
-  height: 54px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: #17213b;
-  color: white;
-  font-style: normal;
-  @apply font-semibold;
 }
 .account-hero b,
 .account-hero span,
@@ -548,10 +535,6 @@
   border-bottom: 0;
   margin-top: 18px;
 }
-.avatar-editor {
-  margin: 2px auto 18px;
-  @apply text-base;
-}
 .security-note {
   display: flex;
   align-items: center;
@@ -561,11 +544,6 @@
 }
 .security-note svg {
   width: 17px;
-}
-.top-actions .avatar {
-  border-radius: 50%;
-  background: #17213b;
-  color: white;
 }
 .merge-preview > span {
   @apply text-2xs;

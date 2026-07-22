@@ -327,6 +327,8 @@ The system uses **hairline + soft drop**. Cards float above the off-white canvas
 
 **`top-nav`** — Background `{colors.canvas}`, text `{colors.ink}`, height 64px. Layout: ElevenLabs wordmark left, primary horizontal menu (Creative / Agents / Video / Pricing / Enterprise / Docs), Sign In + "Try free" primary CTA right.
 
+**`global-search`** — Compact Header command search. The input and clickable shortcut button open one white result panel for visible pages, tasks, and assets. Use `text-xs` result names, `text-2xs` metadata, hairline section dividers, and restrained active-row background. Support `Command+K` / `Ctrl+K`, arrow keys, Enter, Escape, and outside-click dismissal. Do not surface navigation entries hidden by the current menu preference.
+
 ### Buttons
 
 **`button-primary`** — Near-black ink pill. Background `{colors.primary}`, text `{colors.on-primary}`, type `font-sans text-sm font-medium` (14px / 500), padding 10px × 20px, height 40px, rounded `{rounded.pill}`.
@@ -334,6 +336,8 @@ The system uses **hairline + soft drop**. Cards float above the off-white canvas
 **`button-primary-active`** — Press state. Background `{colors.primary-active}`.
 
 **`button-outline`** — Transparent pill with 1px ink border. Background transparent, text `{colors.ink}`, 1px `{colors.hairline-strong}` border.
+
+**`button-ghost`** — Header auxiliary actions use the shared shadcn `Button` ghost variant: transparent by default, compact, and surfaced only by restrained hover/focus feedback. Avoid parallel button-specific background, border, radius, or hover CSS.
 
 **`button-tertiary-text`** — Inline ink text link.
 

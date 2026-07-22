@@ -1,15 +1,4 @@
-import {
-  Bell,
-  Check,
-  ChevronRight,
-  CircleHelp,
-  CreditCard,
-  LockKeyhole,
-  LogOut,
-  Settings2,
-  UserRound,
-  X,
-} from "lucide-react";
+import { Bell, Check, ChevronRight, CircleHelp, CreditCard, LockKeyhole, LogOut, UserRound, X } from "lucide-react";
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -291,9 +280,8 @@ function AccountPanel({ open }: { open: (panel: WorkspacePanel) => void }) {
   return (
     <div className="account-summary">
       <div className="account-hero">
-        <i>{user?.avatarText}</i>
         <div>
-          <b>{user?.displayName}</b>
+          <b>{user?.displayName || user?.phone}</b>
           <span>{user?.phone}</span>
           <small>{user?.credits.toLocaleString()} 创作点</small>
         </div>
@@ -302,7 +290,6 @@ function AccountPanel({ open }: { open: (panel: WorkspacePanel) => void }) {
         <UserRound />
         <span>
           <b>个人资料</b>
-          <small>名称、头像文字与手机号</small>
         </span>
         <ChevronRight />
       </button>
@@ -325,13 +312,12 @@ function AccountPanel({ open }: { open: (panel: WorkspacePanel) => void }) {
 function ProfilePanel() {
   const { user, setUser } = useAuth();
   const [displayName, setDisplayName] = useState(user?.displayName ?? ""),
-    [avatarText, setAvatarText] = useState(user?.avatarText ?? ""),
     [busy, setBusy] = useState(false);
   async function submit(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
     try {
-      const { data } = await updateProfile({ body: { displayName, avatarText }, throwOnError: true });
+      const { data } = await updateProfile({ body: { displayName }, throwOnError: true });
       if (data) {
         setUser(data.user);
         toast.success("个人资料已更新");
@@ -344,19 +330,8 @@ function ProfilePanel() {
   }
   return (
     <form className="panel-form" onSubmit={submit}>
-      <div className="avatar-editor">{avatarText || "曜"}</div>
       <label>
-        头像文字
-        <input
-          value={avatarText}
-          onChange={(event) => setAvatarText(event.target.value.slice(0, 2))}
-          minLength={1}
-          maxLength={2}
-          required
-        />
-      </label>
-      <label>
-        显示名称
+        名字
         <input
           value={displayName}
           onChange={(event) => setDisplayName(event.target.value)}
@@ -364,10 +339,6 @@ function ProfilePanel() {
           maxLength={40}
           required
         />
-      </label>
-      <label>
-        登录手机号
-        <input type="tel" value={user?.phone ?? ""} disabled />
       </label>
       <button className="panel-primary" disabled={busy}>
         {busy ? "保存中…" : "保存个人资料"}

@@ -15,7 +15,7 @@ import {
   Upload,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   deleteLibraryAsset,
   deleteLibraryProduct,
@@ -46,6 +46,8 @@ export function AssetLibrary({ kind }: { kind: LibraryKind }) {
 }
 
 function ProductLibrary() {
+  const requestedProductId = new URLSearchParams(window.location.search).get("productId");
+  const requestedProductLocated = useRef(false);
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -57,6 +59,14 @@ function ProductLibrary() {
   const [uploadProgress, setUploadProgress] = useState(0);
 
   const { data = [], isLoading, error } = useQuery({ queryKey: ["product-library"], queryFn: fetchProducts });
+  useEffect(() => {
+    if (!requestedProductId || requestedProductLocated.current) return;
+    const product = data.find((item) => item.id === requestedProductId);
+    if (product) {
+      requestedProductLocated.current = true;
+      setSelected(product);
+    }
+  }, [data, requestedProductId]);
   const upload = useMutation({
     mutationFn: () => {
       if (!files.length) throw new Error("请至少选择一张商品图");
@@ -491,6 +501,7 @@ function MediaAssetTable({
 function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
   const locationParams = new URLSearchParams(window.location.search);
   const requestedFolderId = kind === "media" ? (locationParams.get("folderId") ?? "") : "";
+  const requestedAssetId = kind === "voice" ? (locationParams.get("assetId") ?? "") : "";
   const requestedAssetIds = new Set(
     kind === "media" ? (locationParams.get("assetIds") ?? "").split(",").filter(Boolean) : [],
   );
@@ -506,6 +517,7 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
   const [selectedFolderId, setSelectedFolderId] = useState(requestedFolderId);
   const [loadedMetadata, setLoadedMetadata] = useState<Record<string, MediaMetadata>>({});
   const metadataSaving = useRef(new Set<string>());
+  const requestedAssetLocated = useRef(false);
   const { data: folders = [], isLoading: foldersLoading } = useQuery({
     queryKey: ["asset-folders"],
     queryFn: fetchAssetFolders,
@@ -521,6 +533,14 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
   });
   const dataRef = useRef(data);
   dataRef.current = data;
+  useEffect(() => {
+    if (!requestedAssetId || requestedAssetLocated.current) return;
+    const asset = data.find((item) => item.id === requestedAssetId);
+    if (asset) {
+      requestedAssetLocated.current = true;
+      setSelected(asset);
+    }
+  }, [data, requestedAssetId]);
   const upload = useMutation({
     mutationFn: async () => {
       if (!file) throw new Error("请选择上传文件");

@@ -27,6 +27,7 @@
   --text-6xl--line-height: 4.25rem;
   --color-canvas: var(--canvas);
   --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
   --color-line: var(--border);
   --color-ink: var(--ink);
   --color-muted: var(--muted);

@@ -21,7 +21,6 @@ export const zUserSummary = z.object({
     id: z.uuid(),
     phone: z.string().regex(/^1[3-9]\d{9}$/),
     displayName: z.string(),
-    avatarText: z.string(),
     credits: z.int().gte(0),
     isAdmin: z.boolean()
 });
@@ -773,8 +772,7 @@ export const zGetCurrentUserResponse = z.object({
 });
 
 export const zUpdateProfileBody = z.object({
-    displayName: z.string().min(2).max(40),
-    avatarText: z.string().min(1).max(2)
+    displayName: z.string().min(2).max(40)
 });
 
 /**

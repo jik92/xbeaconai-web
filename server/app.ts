@@ -448,7 +448,6 @@ const UserSchema = z
     id: z.string().uuid(),
     phone: z.string().regex(/^1[3-9]\d{9}$/),
     displayName: z.string(),
-    avatarText: z.string(),
     credits: z.number().int().nonnegative(),
     isAdmin: z.boolean(),
   })
@@ -830,7 +829,6 @@ const profileRoute = createRoute({
         "application/json": {
           schema: z.object({
             displayName: z.string().trim().min(2).max(40),
-            avatarText: z.string().trim().min(1).max(2),
           }),
         },
       },

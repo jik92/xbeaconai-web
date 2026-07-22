@@ -98,9 +98,6 @@
           "displayName": {
             "type": "string"
           },
-          "avatarText": {
-            "type": "string"
-          },
           "credits": {
             "type": "integer",
             "minimum": 0
@@ -113,7 +110,6 @@
           "id",
           "phone",
           "displayName",
-          "avatarText",
           "credits",
           "isAdmin"
         ]
@@ -2615,16 +2611,10 @@
                     "type": "string",
                     "minLength": 2,
                     "maxLength": 40
-                  },
-                  "avatarText": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 2
                   }
                 },
                 "required": [
-                  "displayName",
-                  "avatarText"
+                  "displayName"
                 ]
               }
             }

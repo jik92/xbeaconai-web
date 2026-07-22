@@ -12,6 +12,7 @@ const getPortraitColumns = () =>
   window.innerWidth > 1600 ? 6 : window.innerWidth > 1250 ? 5 : window.innerWidth > 800 ? 4 : 2;
 
 export function PortraitLibrary() {
+  const requestedPortraitId = Number(new URLSearchParams(window.location.search).get("portraitId"));
   const { data = [], isLoading } = useQuery({
     queryKey: ["portrait-library"],
     queryFn: fetchPortraits,
@@ -24,6 +25,15 @@ export function PortraitLibrary() {
   const [selected, setSelected] = useState<Portrait | null>(null);
   const [columns, setColumns] = useState(getPortraitColumns);
   const viewport = useRef<HTMLDivElement>(null);
+  const requestedPortraitLocated = useRef(false);
+  useEffect(() => {
+    if (!requestedPortraitId || requestedPortraitLocated.current) return;
+    const portrait = data.find((item) => item.index === requestedPortraitId);
+    if (portrait) {
+      requestedPortraitLocated.current = true;
+      setSelected(portrait);
+    }
+  }, [data, requestedPortraitId]);
   useEffect(() => {
     const resize = () => setColumns(getPortraitColumns());
     window.addEventListener("resize", resize);

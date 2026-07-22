@@ -23,7 +23,6 @@ export interface UserSummary {
   id: string;
   phone: string;
   displayName: string;
-  avatarText: string;
   credits: number;
   isAdmin: boolean;
 }
@@ -132,7 +131,6 @@ const userSummary = (row: UserRow): UserSummary => ({
   id: row.id,
   phone: row.phone,
   displayName: row.displayName,
-  avatarText: row.avatarText,
   credits: row.credits,
   isAdmin: row.phone === env.adminPhone,
 });
@@ -499,12 +497,11 @@ export class AccountStore {
       .run();
   }
 
-  updateProfile(userId: string, input: { displayName: string; avatarText: string }) {
+  updateProfile(userId: string, input: { displayName: string }) {
     this.db
       .update(users)
       .set({
         displayName: input.displayName.trim(),
-        avatarText: input.avatarText.trim().slice(0, 2),
         updatedAt: now(),
       })
       .where(eq(users.id, userId))

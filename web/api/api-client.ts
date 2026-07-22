@@ -67,6 +67,12 @@ export async function fetchJobs(moduleId: ModuleId) {
   return data?.jobs ?? [];
 }
 
+export async function fetchAllJobs() {
+  configure();
+  const { data } = await listJobs({ headers: authHeaders(), throwOnError: true });
+  return data?.jobs ?? [];
+}
+
 export async function fetchAdminCredentials() {
   configure();
   const { data } = await listAdminCredentials({ headers: authHeaders(), throwOnError: true });
