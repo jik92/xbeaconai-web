@@ -1,0 +1,140 @@
+/* ── Unified dialog extras ──────────────────────────────────────────── */
+
+.unified-task-input {
+  width: 100%;
+  display: block;
+  margin-top: 7px;
+  padding: 9px 10px;
+  border: 1px solid #dce1e8;
+  border-radius: 7px;
+  font-family: inherit;
+  font-weight: 400;
+  font-size: 13px;
+  resize: vertical;
+}
+
+/* ── Candidate list (within unified dialog) ─────────────────────────── */
+
+.share-candidates-list {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.share-candidate-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 12px;
+  border: 1px solid #dce1e8;
+  border-radius: 7px;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+  font-size: 12px;
+}
+
+.share-candidate-item.selected {
+  border-color: #246bfd;
+  background: #eaf2ff;
+}
+
+.share-platform-badge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #eef1f5;
+  color: #4c5668;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.share-candidate-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #344056;
+}
+
+.share-confidence {
+  color: #929baa;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+/* ── Unified job list extras ────────────────────────────────────────── */
+
+.job-platform-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: #eef1f5;
+  color: #4c5668;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.utility-job-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.job-title-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.utility-job-result {
+  font-size: 12px;
+}
+
+.job-result-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #246bfd;
+  text-decoration: none;
+  font-size: 12px;
+}
+
+.job-result-link:hover {
+  text-decoration: underline;
+}
+
+.job-result-unsupported {
+  color: #929baa;
+  font-size: 11px;
+}
+
+.job-result-error {
+  color: #d9485c;
+  font-size: 11px;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.job-result-none {
+  color: #bcc3ce;
+}
+
+/* ── Spinner ────────────────────────────────────────────────────────── */
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

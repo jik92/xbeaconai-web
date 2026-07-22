@@ -53,15 +53,27 @@ describe("douyin API integration (isolated DB)", () => {
   let otherUserId: string;
   let otherFolderId: string;
 
-  function makePhone() { return `138${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`; }
+  function makePhone() {
+    return `138${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`;
+  }
   async function createUser(phone: string, displayName: string) {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
-    realStore.db.insert(users).values({
-      id, phone, passwordHash: await Bun.password.hash("ApiTest12345!@#$"),
-      displayName, avatarText: displayName.slice(0, 2), credits: 2480,
-      status: "active", passwordVersion: 1, createdAt: now, updatedAt: now,
-    }).run();
+    realStore.db
+      .insert(users)
+      .values({
+        id,
+        phone,
+        passwordHash: await Bun.password.hash("ApiTest12345!@#$"),
+        displayName,
+        avatarText: displayName.slice(0, 2),
+        credits: 2480,
+        status: "active",
+        passwordVersion: 1,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
     realStore.db.insert(userPreferences).values({ userId: id, updatedAt: now }).run();
     return { id, phone, displayName, avatarText: displayName.slice(0, 2), credits: 2480, isAdmin: false };
   }

@@ -132,11 +132,21 @@ describe("import logger integration", () => {
     userId = crypto.randomUUID();
     const phone = `138${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`;
     const now = new Date().toISOString();
-    store.db.insert(users).values({
-      id: userId, phone, passwordHash: await Bun.password.hash("LogTest12345!@#$"),
-      displayName: "Logger Test", avatarText: "L", credits: 2480,
-      status: "active", passwordVersion: 1, createdAt: now, updatedAt: now,
-    }).run();
+    store.db
+      .insert(users)
+      .values({
+        id: userId,
+        phone,
+        passwordHash: await Bun.password.hash("LogTest12345!@#$"),
+        displayName: "Logger Test",
+        avatarText: "L",
+        credits: 2480,
+        status: "active",
+        passwordVersion: 1,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
     store.db.insert(userPreferences).values({ userId, updatedAt: now }).run();
     accounts.ensureDefaultAssetFolder(userId);
     const f = accounts.getAssetFolder(userId, accounts.getDefaultAssetFolderId(userId));

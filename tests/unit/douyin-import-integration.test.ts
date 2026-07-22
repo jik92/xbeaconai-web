@@ -129,14 +129,28 @@ describe("douyin import integration", () => {
     userId = crypto.randomUUID();
     const phone = `138${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`;
     const now = new Date().toISOString();
-    store.db.insert(users).values({
-      id: userId, phone, passwordHash: await Bun.password.hash("Test1234!@#$"),
-      displayName: "Test User", avatarText: "T", credits: 2480,
-      status: "active", passwordVersion: 1, createdAt: now, updatedAt: now,
-    }).run();
-    store.db.insert(userPreferences).values({
-      userId, updatedAt: now,
-    }).run();
+    store.db
+      .insert(users)
+      .values({
+        id: userId,
+        phone,
+        passwordHash: await Bun.password.hash("Test1234!@#$"),
+        displayName: "Test User",
+        avatarText: "T",
+        credits: 2480,
+        status: "active",
+        passwordVersion: 1,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+    store.db
+      .insert(userPreferences)
+      .values({
+        userId,
+        updatedAt: now,
+      })
+      .run();
     // Ensure default folder
     accounts.ensureDefaultAssetFolder(userId);
     const defaultFolderId = accounts.getDefaultAssetFolderId(userId);
@@ -234,11 +248,21 @@ describe("douyin import integration", () => {
     const otherUserId = crypto.randomUUID();
     const otherPhone = `139${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`;
     const now = new Date().toISOString();
-    store.db.insert(users).values({
-      id: otherUserId, phone: otherPhone, passwordHash: await Bun.password.hash("OtherUser12345!@#"),
-      displayName: "Other", avatarText: "O", credits: 2480,
-      status: "active", passwordVersion: 1, createdAt: now, updatedAt: now,
-    }).run();
+    store.db
+      .insert(users)
+      .values({
+        id: otherUserId,
+        phone: otherPhone,
+        passwordHash: await Bun.password.hash("OtherUser12345!@#"),
+        displayName: "Other",
+        avatarText: "O",
+        credits: 2480,
+        status: "active",
+        passwordVersion: 1,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
     store.db.insert(userPreferences).values({ userId: otherUserId, updatedAt: now }).run();
     accounts.ensureDefaultAssetFolder(otherUserId);
     const otherFolderId = accounts.getDefaultAssetFolderId(otherUserId);
