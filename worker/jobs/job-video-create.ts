@@ -1,8 +1,17 @@
+import { unlink } from "node:fs/promises";
 import { resolve } from "node:path";
 import { env } from "../../server/env";
-import { concatVideos, generateSampleVideo, probeMedia } from "../../server/media/ffmpeg";
+import {
+  burnSubtitleFile,
+  composeMedia,
+  concatVideos,
+  generateSampleAudio,
+  generateSampleVideo,
+  probeMedia,
+} from "../../server/media/ffmpeg";
 import { isSeedanceModelId } from "../../server/models/video-models";
 import { getPortraitById } from "../../server/portraits/catalog";
+import { aihubmix } from "../../server/providers/aihubmix";
 import type { JobRecord, StageProvenance } from "../../server/types";
 import {
   analyzeVideoCreateProduct,
@@ -10,6 +19,7 @@ import {
   generateVideoCreateStoryboard,
   regenerateVideoCreateSection,
 } from "../../server/video-create/model";
+import type { VideoCreateSubtitleCue } from "../../server/video-create/types";
 import { VIDEO_CREATE_ANALYSIS_MODEL } from "../../server/video-create/types";
 import { videoCreateError } from "../../server/video-create/video-create-store";
 import { SeedanceVideoJob } from "./job-seedance-video";
@@ -71,6 +81,65 @@ async function saveVideoArtifact(
     createdAt: new Date().toISOString(),
   });
   return { id, name, mimeType: "video/mp4", executionMode } as const;
+}
+
+export function buildSubtitleCues(text: string, durationSec: number): VideoCreateSubtitleCue[] {
+  const phrases =
+    text
+      .split(/(?<=[，。！？；,.!?;])/u)
+      .map((item) => item.trim())
+      .filter(Boolean) || [];
+  const normalized = phrases.length ? phrases : [text.trim()].filter(Boolean);
+  const totalWeight = normalized.reduce((total, phrase) => total + Math.max([...phrase].length, 1), 0);
+  let cursor = 0;
+  return normalized.map((phrase, index) => {
+    const startSec = Number(cursor.toFixed(2));
+    cursor =
+      index === normalized.length - 1
+        ? durationSec
+        : cursor + durationSec * (Math.max([...phrase].length, 1) / totalWeight);
+    return { startSec, endSec: Number(Math.max(cursor, startSec + 0.01).toFixed(2)), text: phrase };
+  });
+}
+
+function srtTimestamp(seconds: number) {
+  const milliseconds = Math.max(0, Math.round(seconds * 1_000));
+  const hours = Math.floor(milliseconds / 3_600_000);
+  const minutes = Math.floor((milliseconds % 3_600_000) / 60_000);
+  const secs = Math.floor((milliseconds % 60_000) / 1_000);
+  const millis = milliseconds % 1_000;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")},${String(millis).padStart(3, "0")}`;
+}
+
+function cuesToSrt(cues: VideoCreateSubtitleCue[]) {
+  return cues
+    .map((cue, index) => `${index + 1}\n${srtTimestamp(cue.startSec)} --> ${srtTimestamp(cue.endSec)}\n${cue.text}\n`)
+    .join("\n");
+}
+
+async function saveShotAudio(job: JobRecord, context: JobHandlerContext, shotId: string, text: string, mock: boolean) {
+  if (!context.accounts) throw new Error("ACCOUNT_STORE_UNAVAILABLE");
+  const name = `${job.id}-${shotId}-voice.wav`;
+  const output = resolve(env.dataDir, "results", name);
+  const response = mock ? undefined : await aihubmix.synthesizeSpeech(text, "tts-1", "alloy");
+  if (response) await Bun.write(output, response.bytes);
+  else await generateSampleAudio(output);
+  const metadata = await probeMedia(output);
+  const durationSec = Number(
+    metadata.format.duration ?? metadata.streams.find((item) => item.codec_type === "audio")?.duration,
+  );
+  if (!Number.isFinite(durationSec) || durationSec <= 0) throw new Error("VIDEO_CREATE_AUDIO_DURATION_INVALID");
+  const id = crypto.randomUUID();
+  context.accounts.createArtifact({
+    id,
+    ownerUserId: job.ownerUserId,
+    jobId: job.id,
+    storageKey: name,
+    name,
+    mimeType: response?.mimeType.split(";")[0] || "audio/wav",
+    createdAt: new Date().toISOString(),
+  });
+  return { id, path: output, durationSec };
 }
 
 export const videoCreateJob: WorkerJobHandler = {
@@ -159,6 +228,20 @@ export const videoCreateJob: WorkerJobHandler = {
         const shot = aggregate.shots.find((item) => item.id === shotId);
         if (!shot) throw new Error("SHOT_NOT_FOUND");
         projects.updateShot(shot.id, { status: "generating", jobId: job.id, attempts: shot.attempts + 1, error: null });
+        const section = aggregate.sections.find((item) => item.id === shot.scriptSectionId);
+        const narration = section?.currentVersion?.text.trim();
+        if (!narration) throw new Error("SHOT_SCRIPT_NOT_AVAILABLE");
+        const mockAudio = job.values.__mockAudio === "true";
+        const audioStage = stage(
+          job,
+          "speech-synthesis",
+          mockAudio ? "mock" : "real",
+          mockAudio ? "video-create-test-mock-audio" : "aihubmix-audio",
+          "tts-1",
+        );
+        const audio = await saveShotAudio(job, context, shot.id, narration, mockAudio);
+        audioStage.completedAt = new Date().toISOString();
+        const subtitleCues = buildSubtitleCues(narration, audio.durationSec);
         let artifact: Awaited<ReturnType<typeof saveVideoArtifact>>;
         if (job.values.__mockVideo === "true")
           artifact = await saveVideoArtifact(job, context, undefined, undefined, "mock");
@@ -171,15 +254,22 @@ export const videoCreateJob: WorkerJobHandler = {
           currentStage.model = response.executionMode === "real" ? job.videoModel : undefined;
           artifact = await saveVideoArtifact(job, context, response.bytes, undefined, response.executionMode);
         }
-        projects.updateShot(shot.id, { status: "succeeded", videoAssetId: artifact.id, error: null });
+        projects.updateShot(shot.id, {
+          status: "succeeded",
+          videoAssetId: artifact.id,
+          audioArtifactId: audio.id,
+          subtitleCues,
+          error: null,
+        });
         projects.setProject(projectId, { status: "storyboard_review", error: null });
         currentStage.completedAt = new Date().toISOString();
         context.change(job.id, {
           status: "succeeded",
           stage: "已完成",
           progress: 100,
-          provenance: [currentStage],
-          result: artifactResult(job, artifact, [currentStage]),
+          provenance: [audioStage, currentStage],
+          overallExecutionMode: artifact.executionMode === audioStage.executionMode ? artifact.executionMode : "mixed",
+          result: artifactResult(job, artifact, [audioStage, currentStage]),
         });
         return;
       } else if (operation === "compose") {
@@ -197,10 +287,38 @@ export const videoCreateJob: WorkerJobHandler = {
             if (!replacement) throw new Error("SHOT_VIDEO_NOT_AVAILABLE");
             return resolve(env.dataDir, "uploads", replacement.storageKey);
           });
-          const output = resolve(env.dataDir, "results", `${job.id}-compose-source.mp4`);
-          if (inputs.length === 1) await Bun.write(output, Bun.file(inputs[0]));
-          else await concatVideos(inputs, output);
-          artifact = await saveVideoArtifact(job, context, undefined, output, "local");
+          const preparedInputs: string[] = [];
+          const temporaryFiles: string[] = [];
+          try {
+            for (const [index, shot] of aggregate.shots.entries()) {
+              let prepared = inputs[index];
+              if (!prepared) throw new Error("SHOT_VIDEO_NOT_AVAILABLE");
+              if (shot.audioEnabled && shot.audioArtifactId) {
+                const audio = context.accounts.getArtifact(job.ownerUserId, shot.audioArtifactId);
+                if (!audio) throw new Error("SHOT_AUDIO_NOT_AVAILABLE");
+                const audioOutput = resolve(env.dataDir, "results", `${job.id}-shot-${shot.ordinal}-audio.mp4`);
+                await composeMedia(prepared, resolve(env.dataDir, "results", audio.storage_key), audioOutput);
+                prepared = audioOutput;
+                temporaryFiles.push(audioOutput);
+              }
+              if (shot.subtitleEnabled && shot.subtitleCues.length) {
+                const subtitlePath = resolve(env.dataDir, "results", `${job.id}-shot-${shot.ordinal}.srt`);
+                const subtitleOutput = resolve(env.dataDir, "results", `${job.id}-shot-${shot.ordinal}-subtitle.mp4`);
+                await Bun.write(subtitlePath, cuesToSrt(shot.subtitleCues));
+                temporaryFiles.push(subtitlePath);
+                await burnSubtitleFile(prepared, subtitlePath, subtitleOutput);
+                prepared = subtitleOutput;
+                temporaryFiles.push(subtitleOutput);
+              }
+              preparedInputs.push(prepared);
+            }
+            const output = resolve(env.dataDir, "results", `${job.id}-compose-source.mp4`);
+            if (preparedInputs.length === 1) await Bun.write(output, Bun.file(preparedInputs[0]));
+            else await concatVideos(preparedInputs, output);
+            artifact = await saveVideoArtifact(job, context, undefined, output, "local");
+          } finally {
+            await Promise.all(temporaryFiles.map((file) => unlink(file).catch(() => undefined)));
+          }
         }
         projects.setProject(projectId, { status: "completed", finalArtifactId: artifact.id, error: null });
         currentStage.completedAt = new Date().toISOString();

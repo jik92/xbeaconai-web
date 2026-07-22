@@ -12,7 +12,7 @@ describe("video create action boundaries", () => {
       storyboardLocked: true,
     });
     expect(videoCreateActionAvailability({ hasScript: true, hasStoryboard: false })).toEqual({
-      scriptLabel: "重新生成脚本",
+      scriptLabel: "生成脚本",
       scriptLocked: false,
       storyboardLabel: "生成分镜",
       storyboardLocked: false,
@@ -21,7 +21,7 @@ describe("video create action boundaries", () => {
 
   test("locks script changes after storyboard generation", () => {
     expect(videoCreateActionAvailability({ hasScript: true, hasStoryboard: true })).toEqual({
-      scriptLabel: "重新生成脚本",
+      scriptLabel: "生成脚本",
       scriptLocked: true,
       storyboardLabel: "分镜已生成",
       storyboardLocked: true,
@@ -35,6 +35,7 @@ describe("video create action boundaries", () => {
     );
     expect(source).toContain('onClick={() => action("script")}');
     expect(source).toContain('onClick={() => action("storyboard")}');
+    expect(source.match(/action\("script"\)/g)).toHaveLength(1);
     expect(source).not.toContain('action(project?.sections.length ? "storyboard" : "script")');
   });
 
@@ -47,5 +48,25 @@ describe("video create action boundaries", () => {
     expect(pageSource).toContain("segmentCount: 3");
     expect(modelSource).toContain('"segmentCount":3');
     expect(modelSource).not.toContain('"segmentCount":1');
+  });
+
+  test("uses the shared shadcn Switch for every storyboard toggle", () => {
+    const source = readFileSync(
+      resolve(import.meta.dir, "../../web/features/video-create/video-create-page.tsx"),
+      "utf8",
+    );
+    expect(source).toContain('import { Switch } from "@/components/ui/switch"');
+    expect(source.match(/<Switch/g)).toHaveLength(4);
+    expect(source).not.toContain("ShotToggle");
+  });
+
+  test("opens batch shot generation from the material header with a shadcn Dialog", () => {
+    const source = readFileSync(
+      resolve(import.meta.dir, "../../web/features/video-create/video-create-page.tsx"),
+      "utf8",
+    );
+    expect(source).toContain("批量生成");
+    expect(source).toContain("<Dialog open={batchDialogOpen}");
+    expect(source).toContain("batchGenerateVideoCreateShotVideos");
   });
 });

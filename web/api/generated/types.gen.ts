@@ -318,6 +318,12 @@ export type VideoCreateProject = {
         status: 'pending' | 'queued' | 'generating' | 'succeeded' | 'failed' | 'replaced';
         jobId: string;
         videoAssetId: string;
+        audioArtifactId: string;
+        subtitleCues: Array<{
+            startSec: number;
+            endSec: number;
+            text: string;
+        }>;
         audioEnabled: boolean;
         subtitleEnabled: boolean;
         attempts: number;
@@ -2365,6 +2371,49 @@ export type GenerateVideoCreateShotResponses = {
 
 export type GenerateVideoCreateShotResponse = GenerateVideoCreateShotResponses[keyof GenerateVideoCreateShotResponses];
 
+export type BatchGenerateVideoCreateShotsData = {
+    body: {
+        videoModel: SeedanceModelId;
+        ratio: '9:16' | '16:9' | '1:1';
+        resolution: '480p' | '720p';
+        generateAudio: false;
+    };
+    path: {
+        projectId: string;
+    };
+    query?: never;
+    url: '/api/video-create/projects/{projectId}/shots/batch-generate';
+};
+
+export type BatchGenerateVideoCreateShotsErrors = {
+    /**
+     * Not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Nothing to generate
+     */
+    409: ApiErrorResponse;
+    /**
+     * Model unavailable
+     */
+    422: ApiErrorResponse;
+};
+
+export type BatchGenerateVideoCreateShotsError = BatchGenerateVideoCreateShotsErrors[keyof BatchGenerateVideoCreateShotsErrors];
+
+export type BatchGenerateVideoCreateShotsResponses = {
+    /**
+     * Accepted
+     */
+    202: {
+        jobs: Array<Job>;
+        submittedShotIds: Array<string>;
+    };
+};
+
+export type BatchGenerateVideoCreateShotsResponse = BatchGenerateVideoCreateShotsResponses[keyof BatchGenerateVideoCreateShotsResponses];
+
 export type ReplaceVideoCreateShotData = {
     body: {
         assetId: string;
@@ -2429,6 +2478,36 @@ export type UpdateVideoCreateShotSettingsResponses = {
 };
 
 export type UpdateVideoCreateShotSettingsResponse = UpdateVideoCreateShotSettingsResponses[keyof UpdateVideoCreateShotSettingsResponses];
+
+export type UpdateAllVideoCreateShotSettingsData = {
+    body: {
+        audioEnabled?: boolean;
+        subtitleEnabled?: boolean;
+    };
+    path: {
+        projectId: string;
+    };
+    query?: never;
+    url: '/api/video-create/projects/{projectId}/shots';
+};
+
+export type UpdateAllVideoCreateShotSettingsErrors = {
+    /**
+     * Not found
+     */
+    404: ApiErrorResponse;
+};
+
+export type UpdateAllVideoCreateShotSettingsError = UpdateAllVideoCreateShotSettingsErrors[keyof UpdateAllVideoCreateShotSettingsErrors];
+
+export type UpdateAllVideoCreateShotSettingsResponses = {
+    /**
+     * Updated
+     */
+    200: VideoCreateProject;
+};
+
+export type UpdateAllVideoCreateShotSettingsResponse = UpdateAllVideoCreateShotSettingsResponses[keyof UpdateAllVideoCreateShotSettingsResponses];
 
 export type CreateJobData = {
     body: {

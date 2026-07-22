@@ -16,6 +16,14 @@ async function outputDir(path: string) {
   await mkdir(dirname(path), { recursive: true });
 }
 
+let ffmpegFiltersPromise: Promise<string> | undefined;
+async function requireFfmpegFilter(filter: string) {
+  ffmpegFiltersPromise ??= run("ffmpeg", ["-hide_banner", "-filters"]).then(({ stdout }) => stdout);
+  const filters = await ffmpegFiltersPromise;
+  if (!new RegExp(`\\b${filter}\\b`).test(filters))
+    throw new Error(`FFMPEG_FILTER_UNAVAILABLE:${filter}:请安装启用 libass 的 FFmpeg`);
+}
+
 export async function generateSampleVideo(output: string) {
   await outputDir(output);
   await run("ffmpeg", [
@@ -42,9 +50,31 @@ export async function generateSampleVideo(output: string) {
   return output;
 }
 
+export async function generateSampleAudio(output: string, durationSec = 4) {
+  await outputDir(output);
+  await run("ffmpeg", [
+    "-y",
+    "-f",
+    "lavfi",
+    "-i",
+    "sine=frequency=440:sample_rate=48000",
+    "-t",
+    String(durationSec),
+    "-c:a",
+    "pcm_s16le",
+    output,
+  ]);
+  return output;
+}
+
 export type MockVideoRatio = "16:9" | "9:16" | "1:1";
 
-export function mockVideoDimensions(ratio: MockVideoRatio) {
+export function mockVideoDimensions(ratio: MockVideoRatio, resolution: "480p" | "720p" = "720p") {
+  if (resolution === "480p") {
+    if (ratio === "9:16") return { width: 480, height: 854 };
+    if (ratio === "1:1") return { width: 480, height: 480 };
+    return { width: 854, height: 480 };
+  }
   if (ratio === "9:16") return { width: 720, height: 1280 };
   if (ratio === "1:1") return { width: 720, height: 720 };
   return { width: 1280, height: 720 };
@@ -103,6 +133,7 @@ export async function generateNumberedMockVideo(input: {
   output: string;
   durationSec: number;
   ratio: MockVideoRatio;
+  resolution?: "480p" | "720p";
   number?: number;
 }) {
   if (!Number.isFinite(input.durationSec) || input.durationSec <= 0) throw new Error("MOCK_VIDEO_DURATION_INVALID");
@@ -110,7 +141,7 @@ export async function generateNumberedMockVideo(input: {
   if (!Number.isInteger(number) || number < 10 || number > 99) throw new Error("MOCK_VIDEO_NUMBER_INVALID");
   await outputDir(input.output);
   const overlay = `${input.output}.number.ppm`;
-  const { width, height } = mockVideoDimensions(input.ratio);
+  const { width, height } = mockVideoDimensions(input.ratio, input.resolution);
   await Bun.write(overlay, numberedOverlay(number));
   try {
     await run("ffmpeg", [
@@ -365,6 +396,29 @@ export async function composeMedia(video: string, audio: string, output: string)
     "-c:a",
     "aac",
     "-shortest",
+    output,
+  ]);
+  return output;
+}
+
+export async function burnSubtitleFile(input: string, subtitleFile: string, output: string) {
+  await requireFfmpegFilter("subtitles");
+  await outputDir(output);
+  const escapedSubtitleFile = subtitleFile.replaceAll("\\", "\\\\").replaceAll(":", "\\:").replaceAll("'", "\\'");
+  await run("ffmpeg", [
+    "-y",
+    "-i",
+    input,
+    "-vf",
+    `subtitles=filename='${escapedSubtitleFile}':force_style='FontName=Noto Sans CJK SC,FontSize=18,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=0,Alignment=2,MarginV=36'`,
+    "-c:v",
+    "libx264",
+    "-preset",
+    "veryfast",
+    "-c:a",
+    "copy",
+    "-movflags",
+    "+faststart",
     output,
   ]);
   return output;

@@ -3,13 +3,16 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
+  Captions,
   Check,
   ChevronDown,
   Copy,
   Download,
   Film,
+  FolderOpen,
   History,
   LoaderCircle,
+  Mic,
   Pencil,
   Plus,
   RefreshCw,
@@ -21,6 +24,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import {
+  batchGenerateVideoCreateShotVideos,
   createVideoCreate,
   downloadAuthenticated,
   fetchVideoCreateProject,
@@ -30,6 +34,7 @@ import {
   replaceVideoCreateShotVideo,
   runVideoCreateProjectAction,
   saveVideoCreateScriptSection,
+  updateAllVideoCreateShotOptions,
   updateVideoCreate,
   updateVideoCreateShotOptions,
 } from "@/api/api-client";
@@ -37,9 +42,11 @@ import type { VideoCreateInput, VideoCreateProject } from "@/api/generated/types
 import { AttachmentPicker, type AttachmentSelection } from "@/components/domain/attachment-picker";
 import { AuthenticatedMedia } from "@/components/domain/authenticated-media";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
+import { Switch } from "@/components/ui/switch";
 import { fetchPortraits } from "@/features/portrait-library/portrait-data";
 import { PortraitPickerDialog } from "@/features/portrait-library/portrait-picker-dialog";
 import { cn } from "@/lib/utils";
@@ -78,6 +85,31 @@ const materialTopics = [
 ];
 const marketingMethods = ["场景展示", "痛点解决", "竞品对比", "用户证言", "专家背书", "限时促销"];
 const templates = ["常规", "节日营销", "明星同款", "爆款复制"];
+const videoModelOptions: Array<{
+  id: NonNullable<VideoCreateInput["videoModel"]>;
+  name: string;
+  description: string;
+  tag: string;
+}> = [
+  {
+    id: "doubao-seedance-2-0-260128",
+    name: "Seedance 2.0",
+    description: "音视图文均可参考，强调参考一致性和视听稳定性",
+    tag: "多模态参考",
+  },
+  {
+    id: "doubao-seedance-2-0-mini-260615",
+    name: "Seedance 2.0 Mini",
+    description: "新一代高性价比视频生成模型",
+    tag: "模型上新",
+  },
+  {
+    id: "doubao-seedance-2-0-fast-260128",
+    name: "Seedance 2.0 Fast",
+    description: "生成速度更快，继承 Seedance 2.0 核心优势",
+    tag: "速度更快",
+  },
+];
 const statusLabels: Record<string, string> = {
   draft: "草稿",
   analyzing: "AI 分析中",
@@ -335,6 +367,12 @@ export function VideoCreatePage() {
   const [tab, setTab] = useState<"script" | "storyboard">("script");
   const [openPanels, setOpenPanels] = useState({ requirements: false, style: false, advanced: false });
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [batchDialogOpen, setBatchDialogOpen] = useState(false);
+  const [batchSettings, setBatchSettings] = useState<{
+    videoModel: NonNullable<VideoCreateInput["videoModel"]>;
+    ratio: NonNullable<VideoCreateInput["ratio"]>;
+    resolution: "480p" | "720p";
+  }>({ videoModel: "doubao-seedance-2-0-fast-260128", ratio: "9:16", resolution: "720p" });
   const [portraitPickerOpen, setPortraitPickerOpen] = useState(false);
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
@@ -345,6 +383,8 @@ export function VideoCreatePage() {
   const sellingPoints = input.sellingPoints ?? [];
   const hasScript = Boolean(project?.sections.length);
   const hasStoryboard = Boolean(project?.shots.length);
+  const batchEligibleShots =
+    project?.shots.filter((shot) => shot.status === "pending" || shot.status === "failed") ?? [];
   const actionAvailability = videoCreateActionAvailability({ hasScript, hasStoryboard });
   const polling =
     Boolean(active && ["analyzing", "script_generating", "storyboard_generating", "composing"].includes(active)) ||
@@ -860,20 +900,22 @@ export function VideoCreatePage() {
             </div>
           </ParameterPanel>
         </div>
-        <footer className="shrink-0 border-t border-line bg-surface p-3">
-          <Button
-            className="h-10 w-full rounded-full"
-            disabled={Boolean(busy) || polling || !input.productAssetIds.length || actionAvailability.scriptLocked}
-            onClick={() => action("script")}
-          >
-            {busy === "script" || active === "script_generating" ? (
-              <LoaderCircle className="animate-spin" />
-            ) : (
-              <WandSparkles />
-            )}
-            {actionAvailability.scriptLabel}
-          </Button>
-        </footer>
+        {!hasScript && (
+          <footer className="shrink-0 border-t border-line bg-surface p-3">
+            <Button
+              className="h-10 w-full rounded-full"
+              disabled={Boolean(busy) || polling || !input.productAssetIds.length}
+              onClick={() => action("script")}
+            >
+              {busy === "script" || active === "script_generating" ? (
+                <LoaderCircle className="animate-spin" />
+              ) : (
+                <WandSparkles />
+              )}
+              生成脚本
+            </Button>
+          </footer>
+        )}
       </aside>
 
       <main
@@ -953,15 +995,6 @@ export function VideoCreatePage() {
                 >
                   <Copy />
                   复制脚本
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={actionAvailability.scriptLocked || Boolean(busy) || polling}
-                  onClick={() => action("script")}
-                >
-                  <RefreshCw />
-                  重新生成
                 </Button>
               </div>
             </div>
@@ -1120,19 +1153,73 @@ export function VideoCreatePage() {
               </div>
             )}
             <div className="min-h-0 flex-1 overflow-auto pb-16">
-              <div className="grid h-10 min-w-[820px] grid-cols-[40px_minmax(220px,1fr)_minmax(220px,1fr)_96px_96px] items-center border-b border-line bg-canvas-soft text-xs font-medium text-muted">
+              <div className="grid h-10 min-w-[1120px] grid-cols-[40px_minmax(240px,1fr)_minmax(240px,1fr)_minmax(280px,1fr)_minmax(280px,1fr)] items-center border-b border-line bg-canvas-soft text-xs font-medium text-muted">
                 <span>#</span>
                 <span>分镜段落</span>
-                <span>素材</span>
-                <span>配音</span>
-                <span>字幕</span>
+                <span className="flex items-center justify-between gap-2 pr-3">
+                  素材
+                  <Button
+                    className="h-7 px-2"
+                    variant="outline"
+                    size="sm"
+                    disabled={!batchEligibleShots.length || Boolean(busy)}
+                    onClick={() => {
+                      setBatchSettings({
+                        videoModel: input.videoModel ?? "doubao-seedance-2-0-fast-260128",
+                        ratio: input.ratio ?? "9:16",
+                        resolution: "720p",
+                      });
+                      setBatchDialogOpen(true);
+                    }}
+                  >
+                    <WandSparkles /> 批量生成
+                  </Button>
+                </span>
+                <span className="flex items-center justify-between px-3">
+                  <span className="flex items-center gap-1.5">
+                    <Mic className="size-4" />
+                    配音
+                  </span>
+                  <Switch
+                    checked={project.shots.every((item) => item.audioEnabled)}
+                    aria-label="全部分镜配音"
+                    disabled={Boolean(busy)}
+                    onCheckedChange={(checked) =>
+                      void execute("audio-all", async () => {
+                        const next = await updateAllVideoCreateShotOptions(project.project.id, {
+                          audioEnabled: checked,
+                        });
+                        invalidate(next);
+                      })
+                    }
+                  />
+                </span>
+                <span className="flex items-center justify-between px-3">
+                  <span className="flex items-center gap-1.5">
+                    <Captions className="size-4" />
+                    字幕
+                  </span>
+                  <Switch
+                    checked={project.shots.every((item) => item.subtitleEnabled)}
+                    aria-label="全部分镜字幕"
+                    disabled={Boolean(busy)}
+                    onCheckedChange={(checked) =>
+                      void execute("subtitle-all", async () => {
+                        const next = await updateAllVideoCreateShotOptions(project.project.id, {
+                          subtitleEnabled: checked,
+                        });
+                        invalidate(next);
+                      })
+                    }
+                  />
+                </span>
               </div>
               {project.shots.map((shot) => {
                 const section = project.sections.find((item) => item.id === shot.scriptSectionId);
                 const generating = shot.status === "queued" || shot.status === "generating";
                 return (
                   <article
-                    className="grid min-h-56 min-w-[820px] grid-cols-[40px_minmax(220px,1fr)_minmax(220px,1fr)_96px_96px] border-b border-line"
+                    className="grid min-h-64 min-w-[1120px] grid-cols-[40px_minmax(240px,1fr)_minmax(240px,1fr)_minmax(280px,1fr)_minmax(280px,1fr)] border-b border-line"
                     key={shot.id}
                   >
                     <span className="border-r border-line p-3 text-xs text-muted">
@@ -1180,7 +1267,7 @@ export function VideoCreatePage() {
                           )}
                         </div>
                       )}
-                      <div className="mt-2 flex gap-2">
+                      <div className="mt-2 flex flex-wrap gap-2">
                         <Button
                           size="sm"
                           disabled={generating || Boolean(busy)}
@@ -1198,6 +1285,7 @@ export function VideoCreatePage() {
                         </Button>
                         <AttachmentPicker
                           accept="video/*"
+                          initialSource="library"
                           onSelect={([asset]) =>
                             asset &&
                             void execute(`replace-${shot.id}`, async () => {
@@ -1206,50 +1294,93 @@ export function VideoCreatePage() {
                             })
                           }
                           trigger={(open) => (
-                            <Button variant="outline" size="icon" aria-label="上传替代视频" onClick={open}>
-                              <Upload />
+                            <Button variant="outline" size="sm" onClick={open}>
+                              <FolderOpen /> 素材库
+                            </Button>
+                          )}
+                        />
+                        <AttachmentPicker
+                          accept="video/*"
+                          initialSource="upload"
+                          onSelect={([asset]) =>
+                            asset &&
+                            void execute(`upload-replace-${shot.id}`, async () => {
+                              const next = await replaceVideoCreateShotVideo(project.project.id, shot.id, asset.id);
+                              invalidate(next);
+                            })
+                          }
+                          trigger={(open) => (
+                            <Button variant="outline" size="sm" onClick={open}>
+                              <Upload /> 本地上传
                             </Button>
                           )}
                         />
                       </div>
                       {shot.error && <small className="mt-2 block text-xs text-error">{shot.error.message}</small>}
                     </div>
-                    <span className="border-r border-line p-3">
-                      <Button
-                        className={cn("w-full px-2", shot.audioEnabled && "bg-primary text-white")}
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          execute(`audio-${shot.id}`, async () => {
-                            const next = await updateVideoCreateShotOptions(project.project.id, shot.id, {
-                              audioEnabled: !shot.audioEnabled,
-                              subtitleEnabled: shot.subtitleEnabled,
-                            });
-                            invalidate(next);
-                          })
-                        }
-                      >
-                        {shot.audioEnabled ? "已开启" : "已关闭"}
-                      </Button>
-                    </span>
-                    <span className="p-3">
-                      <Button
-                        className={cn("w-full px-2", shot.subtitleEnabled && "bg-primary text-white")}
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          execute(`subtitle-${shot.id}`, async () => {
-                            const next = await updateVideoCreateShotOptions(project.project.id, shot.id, {
-                              audioEnabled: shot.audioEnabled,
-                              subtitleEnabled: !shot.subtitleEnabled,
-                            });
-                            invalidate(next);
-                          })
-                        }
-                      >
-                        {shot.subtitleEnabled ? "已开启" : "已关闭"}
-                      </Button>
-                    </span>
+                    <div className={cn("border-r border-line p-3", !shot.audioEnabled && "opacity-50")}>
+                      <div className="mb-3 flex items-start justify-between gap-3">
+                        <p className="leading-relaxed text-body">{section?.currentVersion?.text}</p>
+                        <Switch
+                          checked={shot.audioEnabled}
+                          aria-label={`分镜 ${shot.ordinal} 配音`}
+                          disabled={Boolean(busy)}
+                          onCheckedChange={(checked) =>
+                            void execute(`audio-${shot.id}`, async () => {
+                              const next = await updateVideoCreateShotOptions(project.project.id, shot.id, {
+                                audioEnabled: checked,
+                                subtitleEnabled: shot.subtitleEnabled,
+                              });
+                              invalidate(next);
+                            })
+                          }
+                        />
+                      </div>
+                      {shot.audioArtifactId ? (
+                        <div className="w-full [&_audio]:h-9 [&_audio]:w-full">
+                          <AuthenticatedMedia
+                            url={`/api/artifacts/${shot.audioArtifactId}`}
+                            mimeType="audio/wav"
+                            alt={`分镜 ${shot.ordinal} 配音`}
+                          />
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted">生成分镜视频后可试听配音</span>
+                      )}
+                    </div>
+                    <div className={cn("p-3", !shot.subtitleEnabled && "opacity-50")}>
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <span className="text-xs text-muted">{shot.subtitleCues.length} 条字幕</span>
+                        <Switch
+                          checked={shot.subtitleEnabled}
+                          aria-label={`分镜 ${shot.ordinal} 字幕`}
+                          disabled={Boolean(busy)}
+                          onCheckedChange={(checked) =>
+                            void execute(`subtitle-${shot.id}`, async () => {
+                              const next = await updateVideoCreateShotOptions(project.project.id, shot.id, {
+                                audioEnabled: shot.audioEnabled,
+                                subtitleEnabled: checked,
+                              });
+                              invalidate(next);
+                            })
+                          }
+                        />
+                      </div>
+                      {shot.subtitleCues.length ? (
+                        <div className="space-y-2">
+                          {shot.subtitleCues.map((cue) => (
+                            <div key={`${cue.startSec}-${cue.endSec}-${cue.text}`}>
+                              <div className="text-xs text-muted">
+                                {cue.startSec.toFixed(1)}s ～ {cue.endSec.toFixed(1)}s
+                              </div>
+                              <p className="mt-0.5 leading-relaxed text-body">{cue.text}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted">生成配音后自动生成字幕时间轴</span>
+                      )}
+                    </div>
                   </article>
                 );
               })}
@@ -1258,7 +1389,14 @@ export function VideoCreatePage() {
               <span className="text-xs text-muted">
                 {project.canCompose
                   ? "全部分镜已就绪"
-                  : `还有 ${project.shots.filter((shot) => !["succeeded", "replaced"].includes(shot.status)).length} 个分镜未就绪`}
+                  : `还有 ${
+                      project.shots.filter(
+                        (shot) =>
+                          !["succeeded", "replaced"].includes(shot.status) ||
+                          (shot.audioEnabled && !shot.audioArtifactId) ||
+                          (shot.subtitleEnabled && !shot.subtitleCues.length),
+                      ).length
+                    } 个分镜未就绪`}
               </span>
               <Button
                 className="rounded-full"
@@ -1272,6 +1410,124 @@ export function VideoCreatePage() {
           </section>
         ) : null}
       </main>
+      <Dialog open={batchDialogOpen} onOpenChange={setBatchDialogOpen}>
+        <DialogContent className="max-h-[calc(100vh-32px)] overflow-y-auto p-0">
+          <DialogHeader className="border-b border-line px-5 py-4">
+            <DialogTitle>AI 视频生成设置</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 px-5">
+            <div className="overflow-hidden rounded-xl border border-line">
+              {videoModelOptions.map((model) => {
+                const selected = batchSettings.videoModel === model.id;
+                return (
+                  <button
+                    type="button"
+                    className={cn(
+                      "flex w-full items-center justify-between gap-3 border-b border-line px-4 py-3 text-left last:border-b-0",
+                      selected ? "bg-surface-strong text-ink" : "bg-surface hover:bg-canvas-soft",
+                    )}
+                    key={model.id}
+                    onClick={() => setBatchSettings((current) => ({ ...current, videoModel: model.id }))}
+                  >
+                    <span className="min-w-0">
+                      <span className="flex items-center gap-2 font-medium">
+                        {model.name}
+                        <span className="rounded-full bg-surface-strong px-2 py-0.5 text-xs text-muted">
+                          {model.tag}
+                        </span>
+                      </span>
+                      <span className="mt-1 block text-xs text-muted">{model.description}</span>
+                    </span>
+                    {selected && <Check className="size-5 shrink-0" />}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-3 rounded-xl border border-line bg-canvas-soft px-4 py-3">
+              <span className="grid size-6 place-items-center rounded-md bg-primary text-white">
+                <Check className="size-4" />
+              </span>
+              <span>
+                <b className="font-medium text-ink">不生成声音</b>
+                <span className="ml-2 text-xs text-muted">后续使用分镜独立配音</span>
+              </span>
+            </div>
+            <div className="space-y-4 rounded-xl border border-line bg-canvas-soft p-4">
+              <div className="space-y-2">
+                <Label>画面比例</Label>
+                <div className="flex flex-wrap gap-2">
+                  {(["9:16", "16:9", "1:1"] as const).map((ratio) => (
+                    <Button
+                      className={cn(batchSettings.ratio === ratio && "bg-primary text-white")}
+                      variant="outline"
+                      size="sm"
+                      key={ratio}
+                      onClick={() => setBatchSettings((current) => ({ ...current, ratio }))}
+                    >
+                      {ratio}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>清晰度</Label>
+                <div className="flex gap-2">
+                  {(["480p", "720p"] as const).map((resolution) => (
+                    <Button
+                      className={cn(batchSettings.resolution === resolution && "bg-primary text-white")}
+                      variant="outline"
+                      size="sm"
+                      key={resolution}
+                      onClick={() => setBatchSettings((current) => ({ ...current, resolution }))}
+                    >
+                      {resolution.toUpperCase()}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>时长（秒）</Label>
+                <div className="rounded-md border border-line bg-surface px-3 py-2 text-xs text-muted">
+                  时长自动取每个分镜的实际时长，4～15 秒内取整
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="border-t border-line px-5 py-4">
+            <Button variant="outline" onClick={() => setBatchDialogOpen(false)}>
+              取消
+            </Button>
+            <Button
+              disabled={!project || !batchEligibleShots.length || Boolean(busy)}
+              onClick={() =>
+                project &&
+                void execute("batch-shots", async () => {
+                  const result = await batchGenerateVideoCreateShotVideos(project.project.id, {
+                    ...batchSettings,
+                    generateAudio: false,
+                  });
+                  const submitted = new Set(result.submittedShotIds);
+                  setProject((current) =>
+                    current
+                      ? {
+                          ...current,
+                          shots: current.shots.map((shot) =>
+                            submitted.has(shot.id) ? { ...shot, status: "queued" as const, error: undefined } : shot,
+                          ),
+                        }
+                      : current,
+                  );
+                  setBatchDialogOpen(false);
+                  void queryClient.invalidateQueries({ queryKey: ["video-create-project", project.project.id] });
+                })
+              }
+            >
+              {busy === "batch-shots" ? <LoaderCircle className="animate-spin" /> : <WandSparkles />}
+              确认生成（{batchEligibleShots.length} 个）
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <PortraitPickerDialog
         open={portraitPickerOpen}
         portraits={portraits}

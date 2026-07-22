@@ -4,6 +4,7 @@ import { randomUuid } from "@/lib/random-id";
 import { apiBaseUrl, apiUrl } from "./base-url";
 import { client } from "./generated/client.gen";
 import {
+  batchGenerateVideoCreateShots,
   cancelJob,
   createAdScriptAction,
   createAdScriptProject,
@@ -14,13 +15,13 @@ import {
   deleteProduct as deleteProductRequest,
   exportAdScriptVersion,
   generateVideoCreateShot,
-  grantAdminUserCredits,
+  getAdminCredentialDoctorResults,
   getAdScriptProject,
   getJob,
   getModels,
-  getAdminCredentialDoctorResults,
   getProviderFeatures,
   getVideoCreateProject,
+  grantAdminUserCredits,
   importAdminEnvKey,
   listAdminCredentials,
   listAdminJobs,
@@ -38,18 +39,19 @@ import {
   stopAllAdminJobs as stopAllAdminJobsRequest,
   updateAdminCredential,
   updateAdminUserStatus,
+  updateAllVideoCreateShotSettings,
   updateVideoCreateProject,
   updateVideoCreateShotSettings,
 } from "./generated/sdk.gen";
 import type {
   AdScriptInput,
   AdScriptProject,
+  GetProviderFeaturesResponse,
   Job,
   ListAdminCredentialsResponse,
   ListAdminJobsResponse,
   ListAdminUsersResponse,
   ModuleId,
-  GetProviderFeaturesResponse,
   ProviderCredentialName,
   RunAdminCredentialDoctorResponse,
   SeedanceModelId,
@@ -296,6 +298,26 @@ export async function generateVideoCreateShotVideo(projectId: string, shotId: st
   return data;
 }
 
+export async function batchGenerateVideoCreateShotVideos(
+  projectId: string,
+  options: {
+    videoModel: NonNullable<VideoCreateInput["videoModel"]>;
+    ratio: NonNullable<VideoCreateInput["ratio"]>;
+    resolution: "480p" | "720p";
+    generateAudio: false;
+  },
+) {
+  configure();
+  const { data } = await batchGenerateVideoCreateShots({
+    path: { projectId },
+    body: options,
+    headers: { ...authHeaders(), "Idempotency-Key": randomUuid() },
+    throwOnError: true,
+  });
+  if (!data) throw new Error("批量生成分镜任务提交失败");
+  return data;
+}
+
 export async function replaceVideoCreateShotVideo(projectId: string, shotId: string, assetId: string) {
   configure();
   const { data } = await replaceVideoCreateShot({
@@ -321,6 +343,21 @@ export async function updateVideoCreateShotOptions(
     throwOnError: true,
   });
   if (!data) throw new Error("分镜设置保存失败");
+  return data;
+}
+
+export async function updateAllVideoCreateShotOptions(
+  projectId: string,
+  options: { audioEnabled?: boolean; subtitleEnabled?: boolean },
+) {
+  configure();
+  const { data } = await updateAllVideoCreateShotSettings({
+    path: { projectId },
+    body: options,
+    headers: authHeaders(),
+    throwOnError: true,
+  });
+  if (!data) throw new Error("分镜批量设置保存失败");
   return data;
 }
 export async function parseExistingAdScript(sourceScript: string, idempotencyKey = randomUuid()) {

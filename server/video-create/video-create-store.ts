@@ -33,6 +33,10 @@ export interface VideoCreateAggregate {
 export class VideoCreateVersionConflictError extends Error {}
 export class VideoCreateStateError extends Error {}
 
+export function videoCreateBatchEligibleShots<T extends { status: VideoCreateShotStatus }>(shots: T[]) {
+  return shots.filter((shot) => shot.status === "pending" || shot.status === "failed");
+}
+
 export class VideoCreateStore {
   readonly db: AppDatabase;
   private readonly client: ReturnType<typeof openDatabase>["client"];
@@ -319,7 +323,16 @@ export class VideoCreateStore {
     patch: Partial<
       Pick<
         ShotRow,
-        "status" | "jobId" | "videoAssetId" | "attempts" | "error" | "prompt" | "audioEnabled" | "subtitleEnabled"
+        | "status"
+        | "jobId"
+        | "videoAssetId"
+        | "audioArtifactId"
+        | "subtitleCues"
+        | "attempts"
+        | "error"
+        | "prompt"
+        | "audioEnabled"
+        | "subtitleEnabled"
       >
     >,
   ) {
@@ -329,6 +342,15 @@ export class VideoCreateStore {
       .where(eq(videoCreateShots.id, shotId))
       .run();
     return this.db.select().from(videoCreateShots).where(eq(videoCreateShots.id, shotId)).get();
+  }
+
+  updateAllShotSettings(projectId: string, patch: Partial<Pick<ShotRow, "audioEnabled" | "subtitleEnabled">>) {
+    this.db
+      .update(videoCreateShots)
+      .set({ ...patch, updatedAt: new Date().toISOString() })
+      .where(eq(videoCreateShots.projectId, projectId))
+      .run();
+    return this.get(projectId);
   }
 
   getOwnedShot(projectId: string, shotId: string, ownerUserId: string) {
@@ -382,7 +404,13 @@ export class VideoCreateStore {
       sections: enriched,
       shots,
       canCompose:
-        Boolean(shots.length) && shots.every((shot) => shot.status === "succeeded" || shot.status === "replaced"),
+        Boolean(shots.length) &&
+        shots.every(
+          (shot) =>
+            (shot.status === "succeeded" || shot.status === "replaced") &&
+            (!shot.audioEnabled || Boolean(shot.audioArtifactId)) &&
+            (!shot.subtitleEnabled || shot.subtitleCues.length > 0),
+        ),
     };
   }
 }

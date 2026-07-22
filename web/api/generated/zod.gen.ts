@@ -677,6 +677,12 @@ export const zVideoCreateProject = z.object({
         ]),
         jobId: z.uuid(),
         videoAssetId: z.uuid(),
+        audioArtifactId: z.uuid(),
+        subtitleCues: z.array(z.object({
+            startSec: z.number().gte(0),
+            endSec: z.number().gte(0),
+            text: z.string()
+        })),
         audioEnabled: z.boolean(),
         subtitleEnabled: z.boolean(),
         attempts: z.int().gte(0),
@@ -1645,6 +1651,29 @@ export const zGenerateVideoCreateShotPath = z.object({
  */
 export const zGenerateVideoCreateShotResponse = zJob;
 
+export const zBatchGenerateVideoCreateShotsBody = z.object({
+    videoModel: zSeedanceModelId,
+    ratio: z.enum([
+        '9:16',
+        '16:9',
+        '1:1'
+    ]),
+    resolution: z.enum(['480p', '720p']),
+    generateAudio: z.literal(false)
+});
+
+export const zBatchGenerateVideoCreateShotsPath = z.object({
+    projectId: z.uuid()
+});
+
+/**
+ * Accepted
+ */
+export const zBatchGenerateVideoCreateShotsResponse = z.object({
+    jobs: z.array(zJob),
+    submittedShotIds: z.array(z.uuid())
+});
+
 export const zReplaceVideoCreateShotBody = z.object({
     assetId: z.uuid()
 });
@@ -1673,6 +1702,20 @@ export const zUpdateVideoCreateShotSettingsPath = z.object({
  * Updated
  */
 export const zUpdateVideoCreateShotSettingsResponse = zVideoCreateProject;
+
+export const zUpdateAllVideoCreateShotSettingsBody = z.object({
+    audioEnabled: z.boolean().optional(),
+    subtitleEnabled: z.boolean().optional()
+});
+
+export const zUpdateAllVideoCreateShotSettingsPath = z.object({
+    projectId: z.uuid()
+});
+
+/**
+ * Updated
+ */
+export const zUpdateAllVideoCreateShotSettingsResponse = zVideoCreateProject;
 
 export const zCreateJobBody = z.object({
     title: z.string().min(1).max(200),

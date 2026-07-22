@@ -467,6 +467,11 @@ export const videoCreateShots = sqliteTable(
     status: text("status").$type<import("../video-create/types").VideoCreateShotStatus>().notNull().default("pending"),
     jobId: text("job_id").references(() => jobs.id),
     videoAssetId: text("video_asset_id"),
+    audioArtifactId: text("audio_artifact_id"),
+    subtitleCues: text("subtitle_cues_json", { mode: "json" })
+      .$type<import("../video-create/types").VideoCreateSubtitleCue[]>()
+      .notNull()
+      .default([]),
     audioEnabled: integer("audio_enabled", { mode: "boolean" }).notNull().default(true),
     subtitleEnabled: integer("subtitle_enabled", { mode: "boolean" }).notNull().default(true),
     attempts: integer("attempts").notNull().default(0),

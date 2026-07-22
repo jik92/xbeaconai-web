@@ -2,9 +2,9 @@ import { mkdirSync, readFileSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { dirname, extname, isAbsolute, relative, resolve } from "node:path";
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
+import type { MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
-import type { MiddlewareHandler } from "hono";
 import { parseVideoMashupConfig, type VideoMashupConfig } from "../shared/video-mashup/config";
 import { APP_CONFIG, isModuleOpen } from "../web/app/config";
 import type { ModuleId } from "../web/entities/types";
@@ -30,23 +30,24 @@ import {
   AdScriptVariantStatusSchema,
   AdScriptVersionSourceSchema,
 } from "./ad-script/types";
+import { credentialDoctor } from "./byok/credential-doctor";
 import {
   type ProviderCredentialName,
   providerCredentialNames,
   providerCredentials,
   providerIds,
 } from "./byok/credential-store";
-import { credentialDoctor } from "./byok/credential-doctor";
 import { maxEnvKeyBytes, parseEnvKey } from "./byok/env-key";
 import { allProviderFeatureAvailability, moduleFeatureAvailability } from "./byok/provider-feature-gate";
 import { creationCapabilities, quoteCreation, validateCreationValues } from "./creation/capabilities";
 import { env } from "./env";
-import { platformAdapters, ShareContentParser } from "./imports/share-content";
 import type { ShareCandidate } from "./imports/share-content";
+import { platformAdapters, ShareContentParser } from "./imports/share-content";
 
 const shareParser = new ShareContentParser(platformAdapters);
-import { BullJobQueue } from "./jobs/bull-job-queue";
+
 import { stopAllAdminJobs } from "./jobs/admin-job-control";
+import { BullJobQueue } from "./jobs/bull-job-queue";
 import { InsufficientCreditsError, SqliteJobStore } from "./jobs/sqlite-job-store";
 import { seedanceModelIds, videoModels } from "./models/video-models";
 import { getPortraitById } from "./portraits/catalog";
@@ -54,13 +55,13 @@ import { auditSdkRegistry } from "./sdk-registry";
 import { ossutils } from "./storage/ossutils";
 import { rollbackUploadedObjects, uploadFilesStrictly } from "./storage/strict-library-upload";
 import type { JobModuleId, JobRecord } from "./types";
+import { inlineUtf8ContentDisposition } from "./uploads/content-disposition";
 import {
   directUploadExtensions,
   issueDirectUploadTicket,
   maxDirectUploadBytes,
   verifyDirectUploadTicket,
 } from "./uploads/direct-upload";
-import { inlineUtf8ContentDisposition } from "./uploads/content-disposition";
 import {
   VIDEO_CREATE_ANALYSIS_MODEL,
   VideoCreateInputSchema,
@@ -73,6 +74,7 @@ import {
   VideoCreateStateError,
   VideoCreateStore,
   VideoCreateVersionConflictError,
+  videoCreateBatchEligibleShots,
   videoCreateJobValues,
 } from "./video-create/video-create-store";
 import { validateVoiceTaskValues } from "./voice/validate-voice-task";
@@ -242,6 +244,14 @@ const VideoCreateShotSchema = z.object({
   status: VideoCreateShotStatusSchema,
   jobId: z.string().uuid().nullable(),
   videoAssetId: z.string().uuid().nullable(),
+  audioArtifactId: z.string().uuid().nullable(),
+  subtitleCues: z.array(
+    z.object({
+      startSec: z.number().nonnegative(),
+      endSec: z.number().nonnegative(),
+      text: z.string(),
+    }),
+  ),
   audioEnabled: z.boolean(),
   subtitleEnabled: z.boolean(),
   attempts: z.number().int().nonnegative(),
@@ -3312,6 +3322,12 @@ async function enqueueVideoCreateOperation(input: {
   sectionId?: string;
   shotId?: string;
   expectedVersionId?: string;
+  shotOptions?: {
+    videoModel: JobRecord["videoModel"];
+    ratio: "9:16" | "16:9" | "1:1";
+    resolution: "480p" | "720p";
+    generateAudio: boolean;
+  };
 }) {
   if (input.idempotencyKey) {
     const existing = store.getByIdempotencyKey(input.ownerUserId, input.idempotencyKey);
@@ -3327,8 +3343,9 @@ async function enqueueVideoCreateOperation(input: {
       ? {
           prompt: shot.prompt,
           durationSec: String(shot.durationSec),
-          ratio: aggregate.project.input.ratio,
-          generateAudio: String(shot.audioEnabled),
+          ratio: input.shotOptions?.ratio ?? aggregate.project.input.ratio,
+          resolution: input.shotOptions?.resolution ?? "720p",
+          generateAudio: String(input.shotOptions?.generateAudio ?? shot.audioEnabled),
           ...(aggregate.project.input.portraitId
             ? { portraitId: String(aggregate.project.input.portraitId) }
             : referenceId
@@ -3345,7 +3362,8 @@ async function enqueueVideoCreateOperation(input: {
     title: `${aggregate.project.title} · ${input.operation}`,
     values,
     idempotencyKey: input.idempotencyKey,
-    videoModel: input.operation === "shot" ? aggregate.project.input.videoModel : undefined,
+    videoModel:
+      input.operation === "shot" ? (input.shotOptions?.videoModel ?? aggregate.project.input.videoModel) : undefined,
   });
   store.create(job);
   if (shot) videoCreates.updateShot(shot.id, { status: "queued", jobId: job.id, error: null });
@@ -3530,6 +3548,91 @@ app.openapi(generateVideoCreateShotRoute, async (c) => {
   return c.json(job, 202);
 });
 
+const batchGenerateVideoCreateShotsRoute = createRoute({
+  method: "post",
+  path: "/api/video-create/projects/{projectId}/shots/batch-generate",
+  operationId: "batchGenerateVideoCreateShots",
+  request: {
+    params: z.object({ projectId: z.string().uuid() }),
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: z.object({
+            videoModel: VideoModelIdSchema,
+            ratio: z.enum(["9:16", "16:9", "1:1"]),
+            resolution: z.enum(["480p", "720p"]),
+            generateAudio: z.literal(false),
+          }),
+        },
+      },
+    },
+  },
+  responses: {
+    202: {
+      description: "Accepted",
+      content: {
+        "application/json": {
+          schema: z.object({ jobs: z.array(JobSchema), submittedShotIds: z.array(z.string().uuid()) }),
+        },
+      },
+    },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },
+    409: { description: "Nothing to generate", content: { "application/json": { schema: ErrorSchema } } },
+    422: { description: "Model unavailable", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(batchGenerateVideoCreateShotsRoute, async (c) => {
+  const { projectId } = c.req.valid("param");
+  const ownerUserId = c.get("userId");
+  const aggregate = videoCreates.getOwned(projectId, ownerUserId);
+  if (!aggregate)
+    return c.json(
+      { error: { code: "NOT_FOUND", message: "一键成片项目不存在", retryable: false, requestId: crypto.randomUUID() } },
+      404,
+    );
+  const options = c.req.valid("json");
+  if (!videoModelEnabled(options.videoModel))
+    return c.json(
+      {
+        error: {
+          code: "VIDEO_MODEL_UNAVAILABLE",
+          message: "所选视频模型当前不可用",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      422,
+    );
+  const shots = videoCreateBatchEligibleShots(aggregate.shots);
+  if (!shots.length)
+    return c.json(
+      {
+        error: {
+          code: "NO_SHOTS_TO_GENERATE",
+          message: "没有待生成或失败的分镜",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      409,
+    );
+  const batchKey = c.req.header("Idempotency-Key")?.trim().slice(0, 64) ?? crypto.randomUUID();
+  const jobs = [];
+  for (const shot of shots)
+    jobs.push(
+      await enqueueVideoCreateOperation({
+        ownerUserId,
+        projectId,
+        operation: "shot",
+        shotId: shot.id,
+        shotOptions: options,
+        idempotencyKey: `${batchKey}:${shot.id}`,
+      }),
+    );
+  return c.json({ jobs, submittedShotIds: shots.map((shot) => shot.id) }, 202);
+});
+
 const replaceVideoCreateShotRoute = createRoute({
   method: "post",
   path: "/api/video-create/projects/{projectId}/shots/{shotId}/replacement",
@@ -3605,6 +3708,48 @@ app.openapi(updateVideoCreateShotSettingsRoute, (c) => {
     );
   videoCreates.updateShot(shot.id, c.req.valid("json"));
   const updated = videoCreates.getOwned(projectId, c.get("userId"));
+  return updated
+    ? c.json(updated, 200)
+    : c.json(
+        {
+          error: { code: "NOT_FOUND", message: "一键成片项目不存在", retryable: false, requestId: crypto.randomUUID() },
+        },
+        404,
+      );
+});
+
+const updateAllVideoCreateShotSettingsRoute = createRoute({
+  method: "patch",
+  path: "/api/video-create/projects/{projectId}/shots",
+  operationId: "updateAllVideoCreateShotSettings",
+  request: {
+    params: z.object({ projectId: z.string().uuid() }),
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: z
+            .object({ audioEnabled: z.boolean().optional(), subtitleEnabled: z.boolean().optional() })
+            .refine((value) => value.audioEnabled !== undefined || value.subtitleEnabled !== undefined),
+        },
+      },
+    },
+  },
+  responses: {
+    200: { description: "Updated", content: { "application/json": { schema: VideoCreateProjectSchema } } },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(updateAllVideoCreateShotSettingsRoute, (c) => {
+  const { projectId } = c.req.valid("param");
+  if (!videoCreates.getOwned(projectId, c.get("userId")))
+    return c.json(
+      {
+        error: { code: "NOT_FOUND", message: "一键成片项目不存在", retryable: false, requestId: crypto.randomUUID() },
+      },
+      404,
+    );
+  const updated = videoCreates.updateAllShotSettings(projectId, c.req.valid("json"));
   return updated
     ? c.json(updated, 200)
     : c.json(

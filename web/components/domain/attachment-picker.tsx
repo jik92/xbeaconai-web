@@ -58,11 +58,13 @@ function formatDuration(seconds: number | undefined) {
 export function AttachmentPicker({
   accept = "image/*,video/*,audio/*",
   multiple = false,
+  initialSource = "library",
   trigger,
   onSelect,
 }: {
   accept?: string;
   multiple?: boolean;
+  initialSource?: "library" | "upload";
   trigger: (open: () => void) => ReactNode;
   onSelect: (assets: AttachmentSelection[]) => void;
 }) {
@@ -208,7 +210,10 @@ export function AttachmentPicker({
 
   return (
     <>
-      {trigger(() => setOpen(true))}
+      {trigger(() => {
+        setSource(initialSource);
+        setOpen(true);
+      })}
       {open && (
         <div className="attachment-picker-layer" role="presentation" onMouseDown={close}>
           <section

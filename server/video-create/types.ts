@@ -79,6 +79,12 @@ export const VideoCreateShotStatusSchema = z.enum([
   "replaced",
 ]);
 
+export const VideoCreateSubtitleCueSchema = z.object({
+  startSec: z.number().nonnegative(),
+  endSec: z.number().nonnegative(),
+  text: z.string().trim().min(1).max(200),
+});
+
 export const VideoCreateInputSchema = z
   .object({
     productAssetIds: z.array(z.string().uuid()).min(1).max(6),
@@ -169,6 +175,7 @@ export const VideoCreateGeneratedStoryboardSchema = z.object({
 
 export type VideoCreateProjectStatus = z.infer<typeof VideoCreateProjectStatusSchema>;
 export type VideoCreateShotStatus = z.infer<typeof VideoCreateShotStatusSchema>;
+export type VideoCreateSubtitleCue = z.infer<typeof VideoCreateSubtitleCueSchema>;
 export type VideoCreateInput = z.infer<typeof VideoCreateInputSchema>;
 export type VideoCreateRecommendation = z.infer<typeof VideoCreateRecommendationSchema>;
 export type VideoCreateGeneratedScript = z.infer<typeof VideoCreateGeneratedScriptSchema>;

@@ -1447,6 +1447,35 @@
                   "nullable": true,
                   "format": "uuid"
                 },
+                "audioArtifactId": {
+                  "type": "string",
+                  "nullable": true,
+                  "format": "uuid"
+                },
+                "subtitleCues": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "startSec": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "endSec": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "text": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "startSec",
+                      "endSec",
+                      "text"
+                    ]
+                  }
+                },
                 "audioEnabled": {
                   "type": "boolean"
                 },
@@ -1498,6 +1527,8 @@
                 "status",
                 "jobId",
                 "videoAssetId",
+                "audioArtifactId",
+                "subtitleCues",
                 "audioEnabled",
                 "subtitleEnabled",
                 "attempts",
@@ -6630,6 +6661,125 @@
         }
       }
     },
+    "/api/video-create/projects/{projectId}/shots/batch-generate": {
+      "post": {
+        "operationId": "batchGenerateVideoCreateShots",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "videoModel": {
+                    "$ref": "#/components/schemas/SeedanceModelId"
+                  },
+                  "ratio": {
+                    "type": "string",
+                    "enum": [
+                      "9:16",
+                      "16:9",
+                      "1:1"
+                    ]
+                  },
+                  "resolution": {
+                    "type": "string",
+                    "enum": [
+                      "480p",
+                      "720p"
+                    ]
+                  },
+                  "generateAudio": {
+                    "type": "boolean",
+                    "enum": [
+                      false
+                    ]
+                  }
+                },
+                "required": [
+                  "videoModel",
+                  "ratio",
+                  "resolution",
+                  "generateAudio"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jobs": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Job"
+                      }
+                    },
+                    "submittedShotIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "format": "uuid"
+                      }
+                    }
+                  },
+                  "required": [
+                    "jobs",
+                    "submittedShotIds"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Nothing to generate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Model unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/video-create/projects/{projectId}/shots/{shotId}/replacement": {
       "post": {
         "operationId": "replaceVideoCreateShot",
@@ -6747,6 +6897,62 @@
                   "audioEnabled",
                   "subtitleEnabled"
                 ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoCreateProject"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/video-create/projects/{projectId}/shots": {
+      "patch": {
+        "operationId": "updateAllVideoCreateShotSettings",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "audioEnabled": {
+                    "type": "boolean"
+                  },
+                  "subtitleEnabled": {
+                    "type": "boolean"
+                  }
+                }
               }
             }
           }

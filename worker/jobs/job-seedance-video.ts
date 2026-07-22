@@ -50,7 +50,8 @@ export function seedanceVideoSettings(values: Record<string, string>) {
     : values.ratio?.startsWith("1:1")
       ? "1:1"
       : "16:9";
-  return { duration, ratio };
+  const resolution: "480p" | "720p" = values.resolution === "480p" ? "480p" : "720p";
+  return { duration, ratio, resolution };
 }
 
 async function sha256File(path: string) {
@@ -164,7 +165,12 @@ export class SeedanceVideoJob {
       const settings = seedanceVideoSettings(job.values);
       const output = resolve(env.dataDir, "results", `.seedance-mock-${job.id}-${crypto.randomUUID()}.mp4`);
       try {
-        await generateNumberedMockVideo({ output, durationSec: settings.duration, ratio: settings.ratio });
+        await generateNumberedMockVideo({
+          output,
+          durationSec: settings.duration,
+          ratio: settings.ratio,
+          resolution: settings.resolution,
+        });
         await probeMedia(output);
         if (this.context.store.get(job.id)?.cancelRequested)
           throw new SeedanceFlowError("JOB_CANCELLED", "任务已取消", false);
@@ -202,7 +208,7 @@ export class SeedanceVideoJob {
             job.values.topic ||
             job.values.description ||
             "A polished product video in a clean bright studio, stable camera",
-          resolution: "720p",
+          resolution: settings.resolution,
           ratio: settings.ratio,
           duration: settings.duration,
           generateAudio: job.values.generateAudio !== "false",

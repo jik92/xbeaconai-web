@@ -13,8 +13,10 @@ import {
   VideoCreateStateError,
   VideoCreateStore,
   VideoCreateVersionConflictError,
+  videoCreateBatchEligibleShots,
 } from "../../server/video-create/video-create-store";
 import { JobProcessor } from "../../worker/job-processor";
+import { buildSubtitleCues } from "../../worker/jobs/job-video-create";
 import { createTestAccountStore, registerTestAccount } from "./account-test-helper";
 
 const databases: string[] = [];
@@ -62,6 +64,22 @@ const input: VideoCreateInput = {
 };
 
 describe("video create domain", () => {
+  test("batch generation only selects pending and failed shots", () => {
+    const statuses = ["pending", "failed", "queued", "generating", "succeeded", "replaced"] as const;
+    expect(videoCreateBatchEligibleShots(statuses.map((status) => ({ status }))).map((shot) => shot.status)).toEqual([
+      "pending",
+      "failed",
+    ]);
+  });
+
+  test("builds readable subtitle cues across the real audio duration", () => {
+    const cues = buildSubtitleCues("夏天穿搭总没精神？这顶草帽轻松增加层次感。喜欢就试试看！", 9);
+    expect(cues).toHaveLength(3);
+    expect(cues[0]?.startSec).toBe(0);
+    expect(cues.at(-1)?.endSec).toBe(9);
+    expect(cues.every((cue) => cue.endSec > cue.startSec)).toBe(true);
+  });
+
   test("normalizes model aliases and drops unsupported recommendation tags", () => {
     const recommendation = normalizeVideoCreateRecommendation({
       productName: "通勤衬衫",
@@ -259,9 +277,24 @@ describe("video create domain", () => {
     });
     expect(storyboard?.canCompose).toBe(false);
     if (!storyboard) throw new Error("STORYBOARD_NOT_CREATED");
-    store.updateShot(storyboard.shots[0].id, { status: "succeeded", videoAssetId: crypto.randomUUID() });
+    expect(storyboard.shots.every((shot) => shot.audioEnabled && shot.subtitleEnabled)).toBe(true);
+    expect(storyboard.shots.every((shot) => shot.subtitleCues.length === 0)).toBe(true);
+    store.updateAllShotSettings(projectId, { audioEnabled: false });
+    expect(store.get(projectId)?.shots.every((shot) => !shot.audioEnabled)).toBe(true);
+    store.updateAllShotSettings(projectId, { audioEnabled: true });
+    store.updateShot(storyboard.shots[0].id, {
+      status: "succeeded",
+      videoAssetId: crypto.randomUUID(),
+      audioArtifactId: crypto.randomUUID(),
+      subtitleCues: [{ startSec: 0, endSec: 4, text: "开场" }],
+    });
     expect(store.get(projectId)?.canCompose).toBe(false);
-    store.updateShot(storyboard.shots[1].id, { status: "replaced", videoAssetId: crypto.randomUUID() });
+    store.updateShot(storyboard.shots[1].id, {
+      status: "replaced",
+      videoAssetId: crypto.randomUUID(),
+      audioArtifactId: crypto.randomUUID(),
+      subtitleCues: [{ startSec: 0, endSec: 11, text: "卖点" }],
+    });
     expect(store.get(projectId)?.canCompose).toBe(true);
 
     store.close();
@@ -300,7 +333,14 @@ describe("video create domain", () => {
       progress: 0,
       stage: "排队中",
       overallExecutionMode: "mock",
-      values: { operation: "shot", projectId, shotId: shot.id, durationSec: "5", ratio: "9:16" },
+      values: {
+        operation: "shot",
+        projectId,
+        shotId: shot.id,
+        durationSec: "5",
+        ratio: "9:16",
+        __mockAudio: "true",
+      },
       videoModel: "doubao-seedance-2-0-fast-260128",
       executionPlan: [],
       provenance: [],
@@ -313,15 +353,18 @@ describe("video create domain", () => {
     };
     jobs.create(job);
     generatedFiles.push(resolve(env.dataDir, "results", `${job.id}-video-create.mp4`));
+    generatedFiles.push(resolve(env.dataDir, "results", `${job.id}-${shot.id}-voice.wav`));
     const processor = new JobProcessor(jobs, accounts, undefined, projects);
     await processor.process(job.id);
     expect(jobs.get(job.id)?.status).toBe("succeeded");
     expect(jobs.get(job.id)?.overallExecutionMode).toBe("mock");
-    expect(jobs.get(job.id)?.provenance[0]?.implementation).toBe("ffmpeg-seedance-mock");
+    expect(jobs.get(job.id)?.provenance.some((stage) => stage.implementation === "ffmpeg-seedance-mock")).toBe(true);
     expect(jobs.get(job.id)?.result?.artifacts[0]?.executionMode).toBe("mock");
     expect(jobs.get(job.id)?.providerTaskId).toBeUndefined();
     expect(jobs.get(job.id)?.stagingKeys).toEqual([]);
     expect(projects.get(projectId)?.shots[0].status).toBe("succeeded");
+    expect(projects.get(projectId)?.shots[0].audioArtifactId).toBeTruthy();
+    expect(projects.get(projectId)?.shots[0].subtitleCues.length).toBeGreaterThan(0);
     expect(projects.get(projectId)?.canCompose).toBe(true);
 
     jobs.close();

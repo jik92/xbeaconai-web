@@ -51,12 +51,25 @@ function createJob(id: string): JobRecord {
 
 describe("Seedance FFmpeg mock", () => {
   test("normalizes Seedance duration and ratio consistently", () => {
-    expect(seedanceVideoSettings({ duration: "7", ratio: "9:16" })).toEqual({ duration: 7, ratio: "9:16" });
-    expect(seedanceVideoSettings({ durationSec: "99", ratio: "1:1 custom" })).toEqual({ duration: 15, ratio: "1:1" });
-    expect(seedanceVideoSettings({ duration: "invalid", ratio: "adaptive" })).toEqual({ duration: 5, ratio: "16:9" });
+    expect(seedanceVideoSettings({ duration: "7", ratio: "9:16" })).toEqual({
+      duration: 7,
+      ratio: "9:16",
+      resolution: "720p",
+    });
+    expect(seedanceVideoSettings({ durationSec: "99", ratio: "1:1 custom", resolution: "480p" })).toEqual({
+      duration: 15,
+      ratio: "1:1",
+      resolution: "480p",
+    });
+    expect(seedanceVideoSettings({ duration: "invalid", ratio: "adaptive" })).toEqual({
+      duration: 5,
+      ratio: "16:9",
+      resolution: "720p",
+    });
     expect(mockVideoDimensions("16:9")).toEqual({ width: 1280, height: 720 });
     expect(mockVideoDimensions("9:16")).toEqual({ width: 720, height: 1280 });
     expect(mockVideoDimensions("1:1")).toEqual({ width: 720, height: 720 });
+    expect(mockVideoDimensions("16:9", "480p")).toEqual({ width: 854, height: 480 });
     for (let index = 0; index < 100; index += 1) expect(randomTwoDigitNumber()).toBeWithin(10, 100);
   });
 

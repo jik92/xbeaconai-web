@@ -10,6 +10,7 @@ User=root
 WorkingDirectory=/root/build/xbeaconai-web
 Environment=NODE_ENV=production
 EnvironmentFile=/etc/xbeaconai-web.env
+ExecStartPre=/usr/local/bin/bun scripts/check-ffmpeg-production.ts
 ExecStart=/usr/local/bin/bun run worker
 Restart=on-failure
 RestartSec=3
@@ -19,4 +20,3 @@ UMask=0077
 
 [Install]
 WantedBy=multi-user.target
-
