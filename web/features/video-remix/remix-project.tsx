@@ -12,6 +12,7 @@ import {
   Download,
   FileText,
   History,
+  ImageOff,
   LoaderCircle,
   Mic2,
   Pencil,
@@ -23,7 +24,7 @@ import {
   Video,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   downloadAuthenticated,
   fetchJob,
@@ -36,6 +37,8 @@ import { AttachmentPicker, type AttachmentSelection } from "@/components/domain/
 import { AuthenticatedMedia } from "@/components/domain/authenticated-media";
 import type { ApiJobResult, LibraryAsset, LibraryProduct } from "@/entities/types";
 import { fetchPortraits, type Portrait } from "@/features/portrait-library/portrait-data";
+import type { RemixPromptTool } from "../../../shared/video-remix/prompt-tools";
+import { PromptToolModal } from "./prompt-tool-modal";
 import "./remix-project.css";
 
 const stages = ["上传配置", "AI 解析", "提示词校对", "分镜校对", "合并成片"];
@@ -51,6 +54,25 @@ interface SelectedPortrait {
   description?: string;
   gender?: string;
   age?: number;
+}
+
+interface PromptVersion {
+  id: string;
+  label: string;
+  prompt: string;
+}
+
+function PublicPreviewImage({ url, alt }: { url: string; alt: string }) {
+  const [failed, setFailed] = useState(false);
+
+  if (failed)
+    return (
+      <span className="public-image-error" role="img" aria-label={`${alt}加载失败`}>
+        <ImageOff />
+      </span>
+    );
+
+  return <img src={url} alt={alt} onError={() => setFailed(true)} />;
 }
 
 function WorkflowHeader({
@@ -125,6 +147,7 @@ function ConfigSidebar({
   onPick: (kind: "product" | "portrait" | "voice") => void;
 }) {
   const fileName = source ? source.split(":").slice(2).join(":") : "";
+  const sourceAssetId = source.split(":", 3)[1] || "";
   return (
     <aside className="remix-config">
       <div className="remix-mode-tabs">
@@ -162,7 +185,6 @@ function ConfigSidebar({
           <span className="product-thumb" />
         )}
         <span>{selectedProduct?.name || "未选择商品"}</span>
-        <b>{selectedProduct ? "更换" : "选择"}</b>
       </button>
       <div className="config-field-title">
         <b>人像</b>
@@ -201,18 +223,24 @@ function ConfigSidebar({
       <AttachmentPicker
         accept="video/*"
         trigger={(open) =>
-          source ? (
-            <button type="button" className="uploaded-video-card" onClick={open}>
-              <span className="video-card-thumb">
-                <Video />
-              </span>
-              <span>
-                <b>{fileName}</b>
-                <small>点击可从素材库或本地重新选择</small>
-                <small>解析模版：未设置</small>
-                <small>思考深度：深度</small>
-              </span>
-            </button>
+          sourceAssetId ? (
+            <div className="uploaded-video-preview">
+              <div className="uploaded-video-player">
+                <AuthenticatedMedia
+                  url={`/api/assets/${sourceAssetId}/content`}
+                  mimeType="video/mp4"
+                  alt={fileName}
+                  loadingText="正在载入原始片源…"
+                  errorText="原始片源预览失败"
+                />
+              </div>
+              <div className="uploaded-video-meta">
+                <b title={fileName}>{fileName}</b>
+                <button type="button" onClick={open}>
+                  重新选择
+                </button>
+              </div>
+            </div>
           ) : (
             <button type="button" className="config-attachment-picker" onClick={open}>
               <Upload />
@@ -570,6 +598,9 @@ export function RemixProject() {
   const [parsing, setParsing] = useState(false);
   const [editing, setEditing] = useState(false);
   const [prompt, setPrompt] = useState("");
+  const [promptVersions, setPromptVersions] = useState<PromptVersion[]>([]);
+  const [activePromptVersionId, setActivePromptVersionId] = useState("");
+  const [promptTool, setPromptTool] = useState<RemixPromptTool | null>(null);
   const [source, setSource] = useState("");
   const [mode, setMode] = useState<"product" | "talking">("product");
   const [projectName, setProjectName] = useState("");
@@ -631,6 +662,8 @@ export function RemixProject() {
             return;
           }
           if (updated.status === "succeeded" && generatedPrompt && !parsed) {
+            setPromptVersions([{ id: updated.id, label: "AI解析", prompt: generatedPrompt }]);
+            setActivePromptVersionId(updated.id);
             setParsed(true);
             setParsing(false);
             setStage(2);
@@ -742,11 +775,55 @@ export function RemixProject() {
     setProjectName("");
     setDescription("");
     setPrompt("");
+    setPromptVersions([]);
+    setActivePromptVersionId("");
+    setPromptTool(null);
     setJob(null);
     setNotice("");
   };
+  const applyPromptTool = useCallback(
+    (tool: RemixPromptTool, rewrittenPrompt: string, summary: string, findings: string[]) => {
+      const nextVersionId = `${tool}-${Date.now()}`;
+      setPrompt(rewrittenPrompt);
+      setActivePromptVersionId(nextVersionId);
+      setPromptVersions((current) => {
+        const versions = current.some((version) => version.prompt === prompt)
+          ? current
+          : [...current, { id: `manual-${Date.now()}`, label: "手动修改", prompt }];
+        return [
+          ...versions,
+          {
+            id: nextVersionId,
+            label: tool === "check" ? "AI检查" : tool === "modify" ? "AI修改" : "换口播",
+            prompt: rewrittenPrompt,
+          },
+        ];
+      });
+      setNotice(findings.length ? `${summary}（处理 ${findings.length} 项）` : summary);
+    },
+    [prompt],
+  );
   const result = job?.result as ApiJobResult | undefined;
   const resultVideo = result?.artifacts.find((artifact) => artifact.mimeType.startsWith("video/") && artifact.url);
+  const orderedPromptVersions = useMemo(
+    () => promptVersions.map((version, index) => ({ ...version, sequence: index + 1 })).reverse(),
+    [promptVersions],
+  );
+  const promptVersionButton = (version: PromptVersion & { sequence: number }) => (
+    <button
+      key={version.id}
+      className={version.id === activePromptVersionId ? "active" : ""}
+      onClick={() => {
+        setPrompt(version.prompt);
+        setActivePromptVersionId(version.id);
+        setEditing(false);
+      }}
+    >
+      <b>v{version.sequence}</b>
+      <small>{version.label}</small>
+      {version.id === activePromptVersionId && <Check />}
+    </button>
+  );
   const downloadResult = () => {
     if (!resultVideo?.url) {
       setNotice("结果文件仍在生成");
@@ -756,6 +833,7 @@ export function RemixProject() {
       .then(() => setNotice("已开始下载视频"))
       .catch(() => setNotice("下载失败，请稍后重试"));
   };
+  const sourceAssetId = source.split(":", 3)[1] || "";
   const fileName = source ? source.split(":").slice(2).join(":") : "13428656243498662.mp4";
 
   return (
@@ -825,21 +903,15 @@ export function RemixProject() {
                   <button className={`toggle ${compare ? "active" : ""}`} onClick={() => setCompare(!compare)} />
                 </label>
                 <div>
-                  <button onClick={() => setNotice("智能检查通过：结构完整，未发现冲突")}>
+                  <button onClick={() => setPromptTool("check")}>
                     <CircleCheck />
                     智能检查
                   </button>
-                  <button
-                    className="purple"
-                    onClick={() => {
-                      setPrompt(`${prompt}\n\nAI 优化：强化前三秒冲突，提升口语表达。`);
-                      setNotice("已完成智能修改");
-                    }}
-                  >
+                  <button className="purple" onClick={() => setPromptTool("modify")}>
                     <Pencil />
                     智能修改
                   </button>
-                  <button className="orange" onClick={() => setNotice("已切换口播音色")}>
+                  <button className="orange" onClick={() => setPromptTool("voice")}>
                     <Mic2 />
                     换口播
                   </button>
@@ -847,26 +919,19 @@ export function RemixProject() {
               </div>
               <div className="prompt-content">
                 <aside>
-                  <button className="active">
-                    <b>v3</b>
-                    <small>手动修改</small>
-                    <Check />
-                  </button>
-                  <p>历史版本</p>
-                  <button>
-                    <b>v2</b>
-                    <small>AI修改</small>
-                    <Check />
-                  </button>
-                  <button>
-                    <b>v1</b>
-                    <small>AI解析</small>
-                    <Check />
-                  </button>
+                  {orderedPromptVersions[0] && promptVersionButton(orderedPromptVersions[0])}
+                  {orderedPromptVersions.length > 1 && <p>历史版本</p>}
+                  {orderedPromptVersions.slice(1).map(promptVersionButton)}
                 </aside>
                 <div className="prompt-document">
                   {editing ? (
-                    <textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} />
+                    <textarea
+                      value={prompt}
+                      onChange={(event) => {
+                        setPrompt(event.target.value);
+                        setActivePromptVersionId("");
+                      }}
+                    />
                   ) : (
                     <pre>{prompt}</pre>
                   )}
@@ -906,15 +971,18 @@ export function RemixProject() {
                 </header>
                 <div className="result-main">
                   <div className="result-video">
-                    {resultVideo?.url ? (
+                    {sourceAssetId ? (
                       <AuthenticatedMedia
-                        url={resultVideo.url}
-                        mimeType={resultVideo.mimeType}
-                        alt={resultVideo.name}
+                        url={`/api/assets/${sourceAssetId}/content`}
+                        mimeType="video/mp4"
+                        alt={fileName}
+                        loadingText="正在载入原始分镜视频…"
+                        errorText="原始分镜视频加载失败"
                       />
                     ) : (
-                      <div className="warehouse-scene">
-                        <UserRound />
+                      <div className="result-media-empty">
+                        <Video />
+                        <span>未选择分镜视频</span>
                       </div>
                     )}
                   </div>
@@ -924,11 +992,29 @@ export function RemixProject() {
                       2026-07-17 16:39:28　成本：<em>1657星点</em>
                     </p>
                     <div className="result-assets">
-                      <span />
-                      <span />
-                      <span />
-                      <span />
-                      <img src={selectedPortrait?.source_url || fallbackPortrait} alt="人像" />
+                      {selectedProduct?.images.slice(0, 4).map((image) => (
+                        <span className="result-asset" key={image.id}>
+                          <AuthenticatedMedia
+                            url={image.url}
+                            mimeType={image.mimeType}
+                            alt={image.name}
+                            loadingText="加载中…"
+                            errorText="加载失败"
+                          />
+                        </span>
+                      ))}
+                      {selectedPortrait && (
+                        <span className="result-asset">
+                          <PublicPreviewImage
+                            key={selectedPortrait.source_url}
+                            url={selectedPortrait.source_url}
+                            alt={selectedPortrait.name}
+                          />
+                        </span>
+                      )}
+                      {!selectedProduct?.images.length && !selectedPortrait && (
+                        <span className="result-assets-empty">未选择图片素材</span>
+                      )}
                     </div>
                     <div className="result-meta">
                       <i>15秒</i>
@@ -947,7 +1033,7 @@ export function RemixProject() {
                         <Pencil />
                         重新编辑
                       </button>
-                      <button onClick={downloadResult}>
+                      <button disabled={!resultVideo?.url} onClick={downloadResult}>
                         <Download />
                         下载
                       </button>
@@ -956,7 +1042,17 @@ export function RemixProject() {
                 </div>
               </article>
               <article className="shot-prompt-row">
-                <img src={selectedPortrait?.source_url || fallbackPortrait} alt="人物" />
+                <div className="shot-portrait">
+                  {selectedPortrait ? (
+                    <PublicPreviewImage
+                      key={selectedPortrait.source_url}
+                      url={selectedPortrait.source_url}
+                      alt={selectedPortrait.name}
+                    />
+                  ) : (
+                    <UserRound />
+                  )}
+                </div>
                 <button>
                   <Plus />
                 </button>
@@ -1024,6 +1120,14 @@ export function RemixProject() {
         </button>
       )}
       <ProjectHistoryDrawer open={historyOpen} job={job} onClose={() => setHistoryOpen(false)} />
+      <PromptToolModal
+        tool={promptTool}
+        sourceJobId={job?.id}
+        prompt={prompt}
+        fileName={fileName}
+        onClose={() => setPromptTool(null)}
+        onApply={applyPromptTool}
+      />
       {picker === "product" && (
         <ProductPickerModal
           onClose={() => setPicker(null)}

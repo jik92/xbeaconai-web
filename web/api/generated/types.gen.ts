@@ -1928,6 +1928,52 @@ export type ListJobsResponses = {
 
 export type ListJobsResponse = ListJobsResponses[keyof ListJobsResponses];
 
+export type CreateVideoRemixPromptToolJobData = {
+    body: {
+        sourceJobId: string;
+        prompt: string;
+        tool: 'check' | 'modify' | 'voice';
+        config: {
+            scope?: 'cross-script' | 'single-script';
+            referenceMode?: 'anchor' | 'chain';
+            checkTypes?: Array<'action-direction' | 'background-scene' | 'environment-light' | 'character-traits' | 'product-props' | 'platform-policy'>;
+            repairRules?: Array<'preserve-at' | 'product-action-only' | 'preserve-voiceover'>;
+            customInstruction?: string;
+            preset?: 'beauty-soft' | 'beauty-strong' | 'product-replace' | '';
+            voiceMode?: 'correct' | 'replace';
+        };
+    };
+    path?: never;
+    query?: never;
+    url: '/api/video-remix/prompt-tools';
+};
+
+export type CreateVideoRemixPromptToolJobErrors = {
+    /**
+     * Source analysis not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Source analysis is not ready
+     */
+    409: ApiErrorResponse;
+    /**
+     * Invalid prompt tool request
+     */
+    422: ApiErrorResponse;
+};
+
+export type CreateVideoRemixPromptToolJobError = CreateVideoRemixPromptToolJobErrors[keyof CreateVideoRemixPromptToolJobErrors];
+
+export type CreateVideoRemixPromptToolJobResponses = {
+    /**
+     * Prompt tool job accepted
+     */
+    202: Job;
+};
+
+export type CreateVideoRemixPromptToolJobResponse = CreateVideoRemixPromptToolJobResponses[keyof CreateVideoRemixPromptToolJobResponses];
+
 export type ParseAdScriptSourceData = {
     body: {
         sourceScript: string;

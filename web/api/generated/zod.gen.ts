@@ -1479,6 +1479,59 @@ export const zListJobsResponse = z.object({
     jobs: z.array(zJob)
 });
 
+export const zCreateVideoRemixPromptToolJobBody = z.object({
+    sourceJobId: z.uuid(),
+    prompt: z.string().min(20).max(30000),
+    tool: z.enum([
+        'check',
+        'modify',
+        'voice'
+    ]),
+    config: z.object({
+        scope: z.enum(['cross-script', 'single-script']).optional().default('cross-script'),
+        referenceMode: z.enum(['anchor', 'chain']).optional().default('anchor'),
+        checkTypes: z.array(z.enum([
+            'action-direction',
+            'background-scene',
+            'environment-light',
+            'character-traits',
+            'product-props',
+            'platform-policy'
+        ])).max(6).optional().default([
+            'action-direction',
+            'background-scene',
+            'environment-light',
+            'character-traits',
+            'product-props',
+            'platform-policy'
+        ]),
+        repairRules: z.array(z.enum([
+            'preserve-at',
+            'product-action-only',
+            'preserve-voiceover'
+        ])).max(3).optional().default([
+            'preserve-at',
+            'product-action-only',
+            'preserve-voiceover'
+        ]),
+        customInstruction: z.string().max(2000).optional().default(''),
+        preset: z.union([
+            z.enum([
+                'beauty-soft',
+                'beauty-strong',
+                'product-replace'
+            ]),
+            z.enum([''])
+        ]).optional().default(''),
+        voiceMode: z.enum(['correct', 'replace']).optional().default('correct')
+    })
+});
+
+/**
+ * Prompt tool job accepted
+ */
+export const zCreateVideoRemixPromptToolJobResponse = zJob;
+
 export const zParseAdScriptSourceBody = z.object({
     sourceScript: z.string().min(20).max(10000)
 });

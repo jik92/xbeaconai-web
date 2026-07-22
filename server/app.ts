@@ -6,6 +6,17 @@ import type { MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
 import { parseVideoMashupConfig, type VideoMashupConfig } from "../shared/video-mashup/config";
+import {
+  defaultRemixPromptToolConfig,
+  remixCheckTypes,
+  remixModifyPresetIds,
+  remixPromptScopes,
+  remixPromptToolLabels,
+  remixPromptTools,
+  remixReferenceModes,
+  remixRepairRules,
+  remixVoiceModes,
+} from "../shared/video-remix/prompt-tools";
 import { APP_CONFIG, isModuleOpen } from "../web/app/config";
 import type { ModuleId } from "../web/entities/types";
 import {
@@ -2640,6 +2651,28 @@ const remixProjectRequestSchema = z.object({
     .default([]),
 });
 
+const RemixPromptToolConfigSchema = z.object({
+  scope: z.enum(remixPromptScopes).default(defaultRemixPromptToolConfig.scope),
+  referenceMode: z.enum(remixReferenceModes).default(defaultRemixPromptToolConfig.referenceMode),
+  checkTypes: z
+    .array(z.enum(remixCheckTypes))
+    .max(remixCheckTypes.length)
+    .default([...remixCheckTypes]),
+  repairRules: z
+    .array(z.enum(remixRepairRules))
+    .max(remixRepairRules.length)
+    .default([...remixRepairRules]),
+  customInstruction: z.string().trim().max(2_000).default(""),
+  preset: z.union([z.enum(remixModifyPresetIds), z.literal("")]).default(""),
+  voiceMode: z.enum(remixVoiceModes).default(defaultRemixPromptToolConfig.voiceMode),
+});
+const RemixPromptToolRequestSchema = z.object({
+  sourceJobId: z.string().uuid(),
+  prompt: z.string().trim().min(20).max(30_000),
+  tool: z.enum(remixPromptTools),
+  config: RemixPromptToolConfigSchema,
+});
+
 app.post("/api/video-remix/project/generate", async (c) => {
   const requestId = crypto.randomUUID();
   const parsed = remixProjectRequestSchema.safeParse(await c.req.json().catch(() => null));
@@ -2749,6 +2782,83 @@ app.post("/api/video-remix/project/generate", async (c) => {
   };
   store.create(job);
   await queue.enqueue(id);
+  return c.json(job, 202);
+});
+
+const remixPromptToolRoute = createRoute({
+  method: "post",
+  path: "/api/video-remix/prompt-tools",
+  operationId: "createVideoRemixPromptToolJob",
+  request: {
+    body: { required: true, content: { "application/json": { schema: RemixPromptToolRequestSchema } } },
+  },
+  responses: {
+    202: { description: "Prompt tool job accepted", content: { "application/json": { schema: JobSchema } } },
+    404: { description: "Source analysis not found", content: { "application/json": { schema: ErrorSchema } } },
+    409: { description: "Source analysis is not ready", content: { "application/json": { schema: ErrorSchema } } },
+    422: { description: "Invalid prompt tool request", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(remixPromptToolRoute, async (c) => {
+  const ownerUserId = c.get("userId");
+  const body = c.req.valid("json");
+  const requestId = crypto.randomUUID();
+  const sourceJob = store.getOwned(body.sourceJobId, ownerUserId);
+  if (sourceJob?.moduleId !== "video-remix")
+    return c.json(
+      { error: { code: "REMIX_SOURCE_NOT_FOUND", message: "原始解析任务不存在", retryable: false, requestId } },
+      404,
+    );
+  if (sourceJob.status !== "succeeded")
+    return c.json(
+      { error: { code: "REMIX_SOURCE_NOT_READY", message: "原始解析任务尚未完成", retryable: true, requestId } },
+      409,
+    );
+  const idempotencyKey = c.req.header("Idempotency-Key")?.trim().slice(0, 128);
+  if (idempotencyKey) {
+    const existing = store.getByIdempotencyKey(ownerUserId, idempotencyKey);
+    if (existing) return c.json(existing, 202);
+  }
+  const timestamp = new Date().toISOString();
+  const job: JobRecord = {
+    id: crypto.randomUUID(),
+    ownerUserId,
+    moduleId: "video-remix",
+    title: `爆款二创 · ${remixPromptToolLabels[body.tool]}`,
+    status: "queued",
+    progress: 0,
+    stage: "排队中",
+    overallExecutionMode: "real",
+    values: {
+      workflowPhase: "prompt-rewrite",
+      sourceJobId: sourceJob.id,
+      promptTool: body.tool,
+      promptToolConfig: JSON.stringify(body.config),
+      originalPrompt: body.prompt,
+    },
+    executionPlan: [
+      {
+        id: "plan:0:text-rewrite",
+        capability: "text-rewrite",
+        executionMode: "real",
+        implementation: "aihubmix-chat-completions",
+        provider: "aihubmix",
+        model: "deepseek-v4-pro",
+        startedAt: "",
+      },
+    ],
+    provenance: [],
+    parentJobId: sourceJob.id,
+    idempotencyKey,
+    cancelRequested: false,
+    providerCancelState: "none",
+    stagingKeys: [],
+    jobSchemaVersion: 2,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  store.create(job);
+  await queue.enqueue(job.id);
   return c.json(job, 202);
 });
 

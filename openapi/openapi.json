@@ -5798,6 +5798,181 @@
         }
       }
     },
+    "/api/video-remix/prompt-tools": {
+      "post": {
+        "operationId": "createVideoRemixPromptToolJob",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sourceJobId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "prompt": {
+                    "type": "string",
+                    "minLength": 20,
+                    "maxLength": 30000
+                  },
+                  "tool": {
+                    "type": "string",
+                    "enum": [
+                      "check",
+                      "modify",
+                      "voice"
+                    ]
+                  },
+                  "config": {
+                    "type": "object",
+                    "properties": {
+                      "scope": {
+                        "type": "string",
+                        "enum": [
+                          "cross-script",
+                          "single-script"
+                        ],
+                        "default": "cross-script"
+                      },
+                      "referenceMode": {
+                        "type": "string",
+                        "enum": [
+                          "anchor",
+                          "chain"
+                        ],
+                        "default": "anchor"
+                      },
+                      "checkTypes": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "action-direction",
+                            "background-scene",
+                            "environment-light",
+                            "character-traits",
+                            "product-props",
+                            "platform-policy"
+                          ]
+                        },
+                        "maxItems": 6,
+                        "default": [
+                          "action-direction",
+                          "background-scene",
+                          "environment-light",
+                          "character-traits",
+                          "product-props",
+                          "platform-policy"
+                        ]
+                      },
+                      "repairRules": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "preserve-at",
+                            "product-action-only",
+                            "preserve-voiceover"
+                          ]
+                        },
+                        "maxItems": 3,
+                        "default": [
+                          "preserve-at",
+                          "product-action-only",
+                          "preserve-voiceover"
+                        ]
+                      },
+                      "customInstruction": {
+                        "type": "string",
+                        "maxLength": 2000,
+                        "default": ""
+                      },
+                      "preset": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "beauty-soft",
+                              "beauty-strong",
+                              "product-replace"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              ""
+                            ]
+                          }
+                        ],
+                        "default": ""
+                      },
+                      "voiceMode": {
+                        "type": "string",
+                        "enum": [
+                          "correct",
+                          "replace"
+                        ],
+                        "default": "correct"
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "sourceJobId",
+                  "prompt",
+                  "tool",
+                  "config"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Prompt tool job accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Source analysis not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Source analysis is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid prompt tool request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/ad-script/parse": {
       "post": {
         "operationId": "parseAdScriptSource",

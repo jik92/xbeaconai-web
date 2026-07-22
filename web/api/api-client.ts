@@ -1,6 +1,7 @@
 import type { AssetFolder, AssetKind, LibraryAsset, LibraryProduct } from "@/entities/types";
 import { getAuthToken } from "@/features/account/auth-context";
 import { randomUuid } from "@/lib/random-id";
+import type { RemixPromptTool, RemixPromptToolConfig } from "../../shared/video-remix/prompt-tools";
 import { apiBaseUrl, apiUrl } from "./base-url";
 import { client } from "./generated/client.gen";
 import {
@@ -10,6 +11,7 @@ import {
   createAdScriptProject,
   createJob,
   createVideoCreateProject,
+  createVideoRemixPromptToolJob,
   deleteAdminCredential,
   deleteAsset as deleteAssetRequest,
   deleteProduct as deleteProductRequest,
@@ -572,6 +574,19 @@ export async function generateRemixProject(input: RemixProjectRequest, idempoten
   if (!response.ok)
     throw new Error(data && "error" in data ? data.error?.message || "视频解析提交失败" : "视频解析提交失败");
   if (!data || !("status" in data)) throw new Error("视频解析响应无效");
+  return data;
+}
+export async function runRemixPromptTool(
+  input: { sourceJobId: string; prompt: string; tool: RemixPromptTool; config: RemixPromptToolConfig },
+  idempotencyKey = randomUuid(),
+) {
+  configure();
+  const { data } = await createVideoRemixPromptToolJob({
+    body: input,
+    headers: { ...authHeaders(), "Idempotency-Key": idempotencyKey },
+    throwOnError: true,
+  });
+  if (!data) throw new Error("提示词工具任务创建失败");
   return data;
 }
 export async function uploadLibraryAsset(

@@ -7,6 +7,8 @@ export function AuthenticatedMedia({
   alt,
   autoPlay = false,
   controls = true,
+  loadingText = "正在载入结果预览…",
+  errorText = "预览不可用",
   onMetadata,
 }: {
   url: string;
@@ -14,6 +16,8 @@ export function AuthenticatedMedia({
   alt: string;
   autoPlay?: boolean;
   controls?: boolean;
+  loadingText?: string;
+  errorText?: string;
   onMetadata?: (metadata: { width?: number; height?: number; durationSec?: number }) => void;
 }) {
   const [source, setSource] = useState<string>();
@@ -41,8 +45,8 @@ export function AuthenticatedMedia({
   useEffect(() => {
     if (autoPlay && source) void videoRef.current?.play().catch(() => undefined);
   }, [autoPlay, source]);
-  if (loadError) return <span>预览不可用</span>;
-  if (!source) return <span>正在载入结果预览…</span>;
+  if (loadError) return <span>{errorText}</span>;
+  if (!source) return <span>{loadingText}</span>;
   if (mimeType.startsWith("video/"))
     return (
       <video

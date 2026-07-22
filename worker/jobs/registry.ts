@@ -10,6 +10,7 @@ import { videoEditorJob } from "./job-video-editor";
 import { videoExtractJob } from "./job-video-extract";
 import { videoMashupJob } from "./job-video-mashup";
 import { videoRemixAnalysisJob } from "./job-video-remix-analysis";
+import { videoRemixPromptRewriteJob } from "./job-video-remix-prompt-rewrite";
 import { voiceCloneJob } from "./job-voice-clone";
 import type { WorkerJobHandler } from "./types";
 
@@ -17,6 +18,7 @@ export const jobHandlers: readonly WorkerJobHandler[] = [
   douyinVideoImportJob,
   adScriptJob,
   videoCreateJob,
+  videoRemixPromptRewriteJob,
   videoRemixAnalysisJob,
   videoClipMergeJob,
   videoCutJob,
