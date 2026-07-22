@@ -657,10 +657,12 @@
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 140px minmax(0, 1fr);
+  grid-template-columns: 140px minmax(260px, 34%) minmax(0, 1fr);
+  grid-template-areas: "versions video document";
   gap: 14px;
 }
 .prompt-content > aside {
+  grid-area: versions;
   padding-top: 2px;
 }
 .prompt-content > aside > button {
@@ -701,11 +703,31 @@
   color: #999fa9;
 }
 .prompt-document {
+  grid-area: document;
   min-width: 0;
   overflow: auto;
   background: #fff;
   border: 1px solid #e0e3e8;
   border-radius: 8px;
+}
+.prompt-video-preview {
+  grid-area: video;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid #e0e3e8;
+  border-radius: 8px;
+  color: #a8a29e;
+  background: #101113;
+}
+.prompt-video-preview video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #101113;
 }
 .prompt-document pre,
 .prompt-document textarea {
@@ -726,6 +748,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+@media (max-width: 1200px) {
+  .prompt-content {
+    grid-template-columns: 120px minmax(0, 1fr);
+    grid-template-rows: minmax(180px, 42%) minmax(0, 1fr);
+    grid-template-areas:
+      "versions video"
+      "versions document";
+  }
 }
 .stage-actions > div {
   display: flex;
