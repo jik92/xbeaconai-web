@@ -1203,6 +1203,87 @@ export const zRunAdminCredentialDoctorResponse = z.object({
     }))
 });
 
+export const zListAdminUsersQuery = z.object({
+    page: z.int().gte(1).optional().default(1),
+    pageSize: z.int().gte(10).lte(100).optional().default(25),
+    query: z.string().max(80).optional(),
+    status: z.enum([
+        'pending_password',
+        'active',
+        'disabled'
+    ]).optional()
+});
+
+/**
+ * Admin user list
+ */
+export const zListAdminUsersResponse = z.object({
+    users: z.array(zUserSummary.and(z.object({
+        status: z.enum([
+            'pending_password',
+            'active',
+            'disabled'
+        ]),
+        createdAt: z.string(),
+        updatedAt: z.string()
+    }))),
+    total: z.int().gte(0),
+    page: z.int().gte(1),
+    pageSize: z.int().gte(1)
+});
+
+export const zGrantAdminUserCreditsBody = z.object({
+    credits: z.int().gte(1).lte(1000000000)
+});
+
+export const zGrantAdminUserCreditsPath = z.object({
+    userId: z.uuid()
+});
+
+/**
+ * Credits granted
+ */
+export const zGrantAdminUserCreditsResponse = z.object({
+    grant: z.object({
+        id: z.uuid(),
+        userId: z.uuid(),
+        adminUserId: z.uuid(),
+        credits: z.int().gte(1),
+        balanceAfter: z.int().gte(0),
+        createdAt: z.string()
+    }),
+    user: zUserSummary.and(z.object({
+        status: z.enum([
+            'pending_password',
+            'active',
+            'disabled'
+        ]),
+        createdAt: z.string(),
+        updatedAt: z.string()
+    }))
+});
+
+export const zUpdateAdminUserStatusBody = z.object({
+    status: z.enum(['active', 'disabled'])
+});
+
+export const zUpdateAdminUserStatusPath = z.object({
+    userId: z.uuid()
+});
+
+/**
+ * User status updated
+ */
+export const zUpdateAdminUserStatusResponse = zUserSummary.and(z.object({
+    status: z.enum([
+        'pending_password',
+        'active',
+        'disabled'
+    ]),
+    createdAt: z.string(),
+    updatedAt: z.string()
+}));
+
 export const zListAdminJobsQuery = z.object({
     page: z.int().gte(1).optional().default(1),
     pageSize: z.int().gte(10).lte(100).optional().default(25),

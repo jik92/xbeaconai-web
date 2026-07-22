@@ -14,6 +14,7 @@ import {
   deleteProduct as deleteProductRequest,
   exportAdScriptVersion,
   generateVideoCreateShot,
+  grantAdminUserCredits,
   getAdScriptProject,
   getJob,
   getModels,
@@ -21,6 +22,7 @@ import {
   importAdminEnvKey,
   listAdminCredentials,
   listAdminJobs,
+  listAdminUsers,
   listJobs,
   listVideoCreateProjects,
   parseAdScriptSource,
@@ -33,6 +35,7 @@ import {
   saveVideoCreateSection,
   stopAllAdminJobs as stopAllAdminJobsRequest,
   updateAdminCredential,
+  updateAdminUserStatus,
   updateVideoCreateProject,
   updateVideoCreateShotSettings,
 } from "./generated/sdk.gen";
@@ -42,6 +45,7 @@ import type {
   Job,
   ListAdminCredentialsResponse,
   ListAdminJobsResponse,
+  ListAdminUsersResponse,
   ModuleId,
   ProviderCredentialName,
   RunAdminCredentialDoctorResponse,
@@ -53,6 +57,7 @@ import type {
 
 export type AdminCredential = ListAdminCredentialsResponse["credentials"][number];
 export type AdminJob = ListAdminJobsResponse["jobs"][number];
+export type AdminUser = ListAdminUsersResponse["users"][number];
 export type AdminCredentialDoctorResult = RunAdminCredentialDoctorResponse["results"][number];
 export type AdminStopAllJobsResult = StopAllAdminJobsResponse;
 
@@ -135,6 +140,42 @@ export async function stopAllAdminQueueJobs() {
   configure();
   const { data } = await stopAllAdminJobsRequest({ headers: authHeaders(), throwOnError: true });
   if (!data) throw new Error("停止任务失败");
+  return data;
+}
+
+export async function fetchAdminUsers(query: {
+  page: number;
+  pageSize: number;
+  query?: string;
+  status?: AdminUser["status"];
+}) {
+  configure();
+  const { data } = await listAdminUsers({ query, headers: authHeaders(), throwOnError: true });
+  if (!data) throw new Error("用户列表加载失败");
+  return data;
+}
+
+export async function grantCreditsToAdminUser(userId: string, credits: number, idempotencyKey: string) {
+  configure();
+  const { data } = await grantAdminUserCredits({
+    path: { userId },
+    body: { credits },
+    headers: { ...authHeaders(), "Idempotency-Key": idempotencyKey },
+    throwOnError: true,
+  });
+  if (!data) throw new Error("用户充值失败");
+  return data;
+}
+
+export async function setAdminUserStatus(userId: string, status: "active" | "disabled") {
+  configure();
+  const { data } = await updateAdminUserStatus({
+    path: { userId },
+    body: { status },
+    headers: authHeaders(),
+    throwOnError: true,
+  });
+  if (!data) throw new Error("用户状态更新失败");
   return data;
 }
 export async function fetchModels() {

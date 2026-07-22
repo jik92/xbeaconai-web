@@ -153,6 +153,28 @@ export const rechargeOrders = sqliteTable(
   (table) => [uniqueIndex("recharge_orders_user_idempotency_idx").on(table.userId, table.idempotencyKey)],
 );
 
+export const adminCreditGrants = sqliteTable(
+  "admin_credit_grants",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    adminUserId: text("admin_user_id")
+      .notNull()
+      .references(() => users.id),
+    idempotencyKey: text("idempotency_key").notNull(),
+    requestFingerprint: text("request_fingerprint").notNull(),
+    credits: integer("credits").notNull(),
+    balanceAfter: integer("balance_after").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("admin_credit_grants_admin_idempotency_idx").on(table.adminUserId, table.idempotencyKey),
+    index("admin_credit_grants_user_created_idx").on(table.userId, table.createdAt),
+  ],
+);
+
 export const mediaAssets = sqliteTable(
   "media_assets",
   {

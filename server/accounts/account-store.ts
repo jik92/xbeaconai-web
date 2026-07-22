@@ -1,8 +1,9 @@
 import { createHash, randomBytes, randomInt } from "node:crypto";
-import { and, asc, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, like, or, sql } from "drizzle-orm";
 import { APP_CONFIG } from "../../web/app/config";
 import { type AppDatabase, openDatabase } from "../db/database";
 import {
+  adminCreditGrants,
   artifacts,
   assetFolders,
   authSessions,
@@ -25,6 +26,19 @@ export interface UserSummary {
   displayName: string;
   credits: number;
   isAdmin: boolean;
+}
+export interface AdminUserSummary extends UserSummary {
+  status: "pending_password" | "active" | "disabled";
+  createdAt: string;
+  updatedAt: string;
+}
+export interface AdminCreditGrant {
+  id: string;
+  userId: string;
+  adminUserId: string;
+  credits: number;
+  balanceAfter: number;
+  createdAt: string;
 }
 export interface Preferences {
   theme: "light" | "system";
@@ -115,6 +129,7 @@ type UserRow = typeof users.$inferSelect;
 type MediaAssetRow = typeof mediaAssets.$inferSelect;
 type AssetFolderRow = typeof assetFolders.$inferSelect;
 type OrderRow = typeof rechargeOrders.$inferSelect;
+type AdminCreditGrantRow = typeof adminCreditGrants.$inferSelect;
 
 export const normalizePhone = (phone: string) => phone.trim().replaceAll(/[^\d]/g, "");
 export const isMainlandPhone = (phone: string) => /^1[3-9]\d{9}$/.test(normalizePhone(phone));
@@ -133,6 +148,20 @@ const userSummary = (row: UserRow): UserSummary => ({
   displayName: row.displayName,
   credits: row.credits,
   isAdmin: row.phone === env.adminPhone,
+});
+const adminUserSummary = (row: UserRow): AdminUserSummary => ({
+  ...userSummary(row),
+  status: row.status,
+  createdAt: row.createdAt,
+  updatedAt: row.updatedAt,
+});
+const adminCreditGrant = (row: AdminCreditGrantRow): AdminCreditGrant => ({
+  id: row.id,
+  userId: row.userId,
+  adminUserId: row.adminUserId,
+  credits: row.credits,
+  balanceAfter: row.balanceAfter,
+  createdAt: row.createdAt,
 });
 const mediaAsset = (row: MediaAssetRow): MediaAsset => ({
   id: row.id,
@@ -449,6 +478,112 @@ export class AccountStore {
   }
   getUserSecurity(id: string) {
     return this.db.select().from(users).where(eq(users.id, id)).get();
+  }
+  getAdminUser(id: string) {
+    const user = this.getUserSecurity(id);
+    return user ? adminUserSummary(user) : undefined;
+  }
+  listAdminUsers(input: { page: number; pageSize: number; query?: string; status?: AdminUserSummary["status"] }) {
+    const keyword = input.query?.trim();
+    const where = and(
+      input.status ? eq(users.status, input.status) : undefined,
+      keyword ? or(like(users.phone, `%${keyword}%`), like(users.displayName, `%${keyword}%`)) : undefined,
+    );
+    const total = Number(this.db.select({ count: sql<number>`count(*)` }).from(users).where(where).get()?.count ?? 0);
+    const rows = this.db
+      .select()
+      .from(users)
+      .where(where)
+      .orderBy(desc(users.createdAt), desc(users.id))
+      .limit(input.pageSize)
+      .offset((input.page - 1) * input.pageSize)
+      .all();
+    return { users: rows.map(adminUserSummary), total, page: input.page, pageSize: input.pageSize };
+  }
+  grantAdminCredits(input: {
+    userId: string;
+    adminUserId: string;
+    credits: number;
+    idempotencyKey: string;
+  }): AdminCreditGrant {
+    const fingerprint = `${input.userId}:${input.credits}`;
+    return this.db.transaction(
+      (tx) => {
+        const prior = tx
+          .select()
+          .from(adminCreditGrants)
+          .where(
+            and(
+              eq(adminCreditGrants.adminUserId, input.adminUserId),
+              eq(adminCreditGrants.idempotencyKey, input.idempotencyKey),
+            ),
+          )
+          .get();
+        if (prior) {
+          if (prior.requestFingerprint !== fingerprint)
+            throw new AccountError("IDEMPOTENCY_CONFLICT", "幂等键已用于其他充值请求", 409);
+          return adminCreditGrant(prior);
+        }
+        const user = tx.select().from(users).where(eq(users.id, input.userId)).get();
+        if (!user) throw new AccountError("USER_NOT_FOUND", "账号不存在", 404);
+        if (user.status !== "active") throw new AccountError("USER_NOT_ACTIVE", "只能为正常用户充值", 409);
+        const balanceAfter = user.credits + input.credits;
+        if (!Number.isSafeInteger(balanceAfter)) throw new AccountError("BALANCE_LIMIT", "余额超过安全上限", 409);
+        const createdAt = now();
+        const grant: typeof adminCreditGrants.$inferInsert = {
+          id: crypto.randomUUID(),
+          userId: input.userId,
+          adminUserId: input.adminUserId,
+          idempotencyKey: input.idempotencyKey,
+          requestFingerprint: fingerprint,
+          credits: input.credits,
+          balanceAfter,
+          createdAt,
+        };
+        tx.update(users).set({ credits: balanceAfter, updatedAt: createdAt }).where(eq(users.id, input.userId)).run();
+        tx.insert(adminCreditGrants).values(grant).run();
+        tx.insert(notifications)
+          .values({
+            id: crypto.randomUUID(),
+            userId: input.userId,
+            type: "admin_credit_grant",
+            sourceId: grant.id,
+            title: "创作点到账",
+            body: `管理员已充值 ${input.credits.toLocaleString()} 创作点。`,
+            createdAt,
+          })
+          .onConflictDoNothing()
+          .run();
+        return adminCreditGrant(grant as AdminCreditGrantRow);
+      },
+      { behavior: "immediate" },
+    );
+  }
+  setAdminUserStatus(input: { userId: string; adminUserId: string; status: "active" | "disabled" }): AdminUserSummary {
+    const user = this.getUserSecurity(input.userId);
+    if (!user) throw new AccountError("USER_NOT_FOUND", "账号不存在", 404);
+    if (input.status === "disabled" && (input.userId === input.adminUserId || user.phone === env.adminPhone))
+      throw new AccountError("ADMIN_SELF_DISABLE_FORBIDDEN", "不能注销管理员账号", 409);
+    if (user.status === input.status) return adminUserSummary(user);
+    if (input.status === "disabled" && user.status !== "active")
+      throw new AccountError("USER_STATUS_CONFLICT", "只能注销正常用户", 409);
+    if (input.status === "active" && user.status !== "disabled")
+      throw new AccountError("USER_STATUS_CONFLICT", "只能恢复已注销用户", 409);
+    const updatedAt = now();
+    this.db.transaction(
+      (tx) => {
+        tx.update(users).set({ status: input.status, updatedAt }).where(eq(users.id, input.userId)).run();
+        if (input.status === "disabled")
+          tx.update(authSessions)
+            .set({ revokedAt: updatedAt })
+            .where(and(eq(authSessions.userId, input.userId), isNull(authSessions.revokedAt)))
+            .run();
+      },
+      { behavior: "immediate" },
+    );
+    const updated = this.getUserSecurity(input.userId);
+    if (!updated) throw new AccountError("USER_NOT_FOUND", "账号不存在", 404);
+    return adminUserSummary(updated);
   }
   createSession(userId: string, expiresAt: string) {
     const user = this.getUserSecurity(userId);

@@ -4572,6 +4572,401 @@
         }
       }
     },
+    "/api/admin/users": {
+      "get": {
+        "operationId": "listAdminUsers",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 100,
+              "default": 25
+            },
+            "required": false,
+            "name": "pageSize",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 80
+            },
+            "required": false,
+            "name": "query",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending_password",
+                "active",
+                "disabled"
+              ]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Admin user list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "users": {
+                      "type": "array",
+                      "items": {
+                        "allOf": [
+                          {
+                            "$ref": "#/components/schemas/UserSummary"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "pending_password",
+                                  "active",
+                                  "disabled"
+                                ]
+                              },
+                              "createdAt": {
+                                "type": "string"
+                              },
+                              "updatedAt": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "status",
+                              "createdAt",
+                              "updatedAt"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "page": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "pageSize": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  },
+                  "required": [
+                    "users",
+                    "total",
+                    "page",
+                    "pageSize"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/users/{userId}/credits": {
+      "post": {
+        "operationId": "grantAdminUserCredits",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "userId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "credits": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000000
+                  }
+                },
+                "required": [
+                  "credits"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Credits granted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "grant": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "userId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "adminUserId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "credits": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "balanceAfter": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "userId",
+                        "adminUserId",
+                        "credits",
+                        "balanceAfter",
+                        "createdAt"
+                      ]
+                    },
+                    "user": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/UserSummary"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "pending_password",
+                                "active",
+                                "disabled"
+                              ]
+                            },
+                            "createdAt": {
+                              "type": "string"
+                            },
+                            "updatedAt": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "createdAt",
+                            "updatedAt"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "grant",
+                    "user"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing idempotency key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/users/{userId}/status": {
+      "patch": {
+        "operationId": "updateAdminUserStatus",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "userId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "disabled"
+                    ]
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User status updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/UserSummary"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "pending_password",
+                            "active",
+                            "disabled"
+                          ]
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "createdAt",
+                        "updatedAt"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Status conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/jobs": {
       "get": {
         "operationId": "listAdminJobs",

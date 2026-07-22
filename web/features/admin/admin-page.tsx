@@ -5,9 +5,9 @@ import {
   CheckCircle2,
   CircleAlert,
   Clock3,
+  Coins,
   LoaderCircle,
   RefreshCw,
-  ShieldCheck,
   Stethoscope,
   Trash2,
   Upload,
@@ -19,20 +19,27 @@ import {
   type AdminCredential,
   type AdminCredentialDoctorResult,
   type AdminJob,
+  type AdminUser,
   fetchAdminCredentials,
   fetchAdminJobs,
+  fetchAdminUsers,
+  grantCreditsToAdminUser,
   removeAdminCredential,
   runAdminCredentialDoctor,
   saveAdminCredential,
+  setAdminUserStatus,
   stopAllAdminQueueJobs,
   uploadAdminEnvKey,
 } from "@/api/api-client";
+import { ToolCreatorModal } from "@/components/domain/tool-creator-modal";
 import type { ModuleId, ProviderCredentialName } from "@/api/generated/types.gen";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { apiErrorMessage, useAuth } from "@/features/account/auth-context";
+import { randomUuid } from "@/lib/random-id";
 
 const statusLabels: Record<AdminJob["status"], string> = {
   queued: "排队中",
@@ -66,8 +73,20 @@ const doctorStyles: Record<AdminCredentialDoctorResult["status"], string> = {
   timeout: "text-warning",
 };
 
+const userStatusLabels: Record<AdminUser["status"], string> = {
+  pending_password: "待设置密码",
+  active: "正常",
+  disabled: "已注销",
+};
+
+const userStatusStyles: Record<AdminUser["status"], string> = {
+  pending_password: "bg-warning/10 text-warning",
+  active: "bg-success/10 text-success",
+  disabled: "bg-surface-muted text-muted",
+};
+
 function DoctorStatus({ result }: { result?: AdminCredentialDoctorResult }) {
-  if (!result) return null;
+  if (!result) return <span className="text-xs text-muted">未检测</span>;
   const Icon = result.status === "available" ? CheckCircle2 : result.status === "timeout" ? Clock3 : CircleAlert;
   return (
     <span className={`inline-flex min-w-0 items-center gap-1 text-xs ${doctorStyles[result.status]}`}>
@@ -83,45 +102,31 @@ function CredentialsPanel() {
   const queryClient = useQueryClient();
   const fileInput = useRef<HTMLInputElement>(null);
   const [drafts, setDrafts] = useState<Partial<Record<ProviderCredentialName, string>>>({});
-  const [busyProvider, setBusyProvider] = useState("");
+  const [saving, setSaving] = useState<ProviderCredentialName>();
   const [deleting, setDeleting] = useState<ProviderCredentialName>();
   const [doctorBusy, setDoctorBusy] = useState(false);
   const [doctorResults, setDoctorResults] = useState<AdminCredentialDoctorResult[]>([]);
   const [uploading, setUploading] = useState(false);
   const { data = [], isLoading, error } = useQuery({ queryKey: ["admin-credentials"], queryFn: fetchAdminCredentials });
-  const groups = useMemo(
-    () =>
-      Object.entries(
-        data.reduce<Record<string, AdminCredential[]>>((result, item) => {
-          const group = result[item.provider] ?? [];
-          group.push(item);
-          result[item.provider] = group;
-          return result;
-        }, {}),
-      ),
-    [data],
-  );
 
-  const saveGroup = async (provider: string, credentials: AdminCredential[]) => {
-    const changed = credentials.filter((credential) => drafts[credential.name]?.trim());
-    if (!changed.length) return;
-    setBusyProvider(provider);
+  const saveCredential = async (credential: AdminCredential) => {
+    const value = drafts[credential.name]?.trim();
+    if (!value) return;
+    setSaving(credential.name);
     try {
-      await Promise.all(
-        changed.map((credential) => saveAdminCredential(credential.name, drafts[credential.name]?.trim() ?? "")),
-      );
+      await saveAdminCredential(credential.name, value);
       setDrafts((current) => {
         const next = { ...current };
-        for (const credential of changed) delete next[credential.name];
+        delete next[credential.name];
         return next;
       });
       await queryClient.invalidateQueries({ queryKey: ["admin-credentials"] });
       setDoctorResults([]);
-      toast.success(`${provider} 密钥已保存`);
+      toast.success(`${credential.label} 已保存`);
     } catch (reason) {
       toast.error(apiErrorMessage(reason, "密钥保存失败"));
     } finally {
-      setBusyProvider("");
+      setSaving(undefined);
     }
   };
 
@@ -170,6 +175,86 @@ function CredentialsPanel() {
     }
   };
 
+  const columns: ColumnDef<AdminCredential, unknown>[] = [
+    {
+      accessorKey: "provider",
+      header: "Provider",
+      size: 100,
+      cell: ({ row }) => <span className="font-medium text-ink">{row.original.provider}</span>,
+    },
+    {
+      id: "credential",
+      header: "密钥",
+      size: 220,
+      cell: ({ row }) => (
+        <div className="min-w-0">
+          <span className="block truncate font-medium text-ink">{row.original.label}</span>
+          <code className="block truncate text-2xs text-muted">{row.original.name}</code>
+        </div>
+      ),
+    },
+    {
+      id: "status",
+      header: "当前状态",
+      size: 120,
+      cell: ({ row }) => (
+        <span className={`text-xs ${row.original.configured ? "text-success" : "text-warning"}`}>
+          {row.original.configured ? row.original.maskedValue : "未配置"}
+        </span>
+      ),
+    },
+    {
+      id: "value",
+      header: "新值",
+      size: 270,
+      cell: ({ row }) => (
+        <Input
+          type={row.original.secret ? "password" : "text"}
+          autoComplete="new-password"
+          className="h-8 text-xs"
+          value={drafts[row.original.name] ?? ""}
+          placeholder={row.original.configured ? "输入新值以覆盖" : "输入 Key"}
+          onChange={(event) => setDrafts((current) => ({ ...current, [row.original.name]: event.target.value }))}
+        />
+      ),
+    },
+    {
+      id: "doctor",
+      header: "检测结果",
+      size: 300,
+      cell: ({ row }) => (
+        <DoctorStatus result={doctorResults.find((result) => result.provider === row.original.provider)} />
+      ),
+    },
+    {
+      id: "actions",
+      header: "操作",
+      size: 112,
+      cell: ({ row }) => (
+        <div className="flex items-center justify-end gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!drafts[row.original.name]?.trim() || Boolean(saving) || Boolean(deleting)}
+            onClick={() => void saveCredential(row.original)}
+          >
+            {saving === row.original.name && <LoaderCircle className="animate-spin" />} 保存
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8 text-danger hover:bg-danger/10 hover:text-danger"
+            aria-label={`删除 ${row.original.label}`}
+            disabled={!row.original.configured || Boolean(saving) || Boolean(deleting)}
+            onClick={() => void remove(row.original)}
+          >
+            {deleting === row.original.name ? <LoaderCircle className="animate-spin" /> : <Trash2 />}
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   if (isLoading)
     return (
       <div className="grid min-h-48 place-items-center text-xs text-muted">
@@ -182,11 +267,8 @@ function CredentialsPanel() {
     return <div className="grid min-h-48 place-items-center text-xs text-danger">{apiErrorMessage(error)}</div>;
 
   return (
-    <div className="min-h-0 flex-1 overflow-auto">
-      <div className="flex h-11 items-center justify-between gap-3 border-b border-line px-1">
-        <span className="inline-flex items-center gap-1.5 text-xs text-muted">
-          <ShieldCheck className="size-4 text-ink" /> AES-256-GCM 加密存储
-        </span>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="flex h-11 shrink-0 items-center justify-end gap-2 border-b border-line px-1">
         <div className="flex items-center gap-2">
           <input
             ref={fileInput}
@@ -204,63 +286,276 @@ function CredentialsPanel() {
           </Button>
         </div>
       </div>
-      {groups.map(([provider, credentials]) => {
-        const result = doctorResults.find((item) => item.provider === provider);
-        const hasDraft = credentials.some((credential) => drafts[credential.name]?.trim());
-        return (
-          <section className="border-b border-line py-2 last:border-0" key={provider}>
-            <header className="flex min-h-8 items-center justify-between gap-3 px-2">
-              <div className="flex min-w-0 items-center gap-3">
-                <h2 className="shrink-0 text-sm font-medium text-ink">{provider}</h2>
-                <DoctorStatus result={result} />
-              </div>
-              <Button
-                size="sm"
-                disabled={!hasDraft || Boolean(busyProvider) || Boolean(deleting)}
-                onClick={() => void saveGroup(provider, credentials)}
-              >
-                {busyProvider === provider && <LoaderCircle className="animate-spin" />} 保存
-              </Button>
-            </header>
-            <div className="mt-1 divide-y divide-line/60">
-              {credentials.map((credential) => (
-                <div
-                  className="grid min-h-11 grid-cols-[minmax(180px,1fr)_minmax(240px,1.4fr)_32px] items-center gap-2 px-2"
-                  key={credential.name}
-                >
-                  <div className="flex min-w-0 items-center gap-2">
-                    <span className="truncate text-xs font-medium text-ink">{credential.label}</span>
-                    <code className="truncate text-2xs text-muted">{credential.name}</code>
-                    <span className={`shrink-0 text-2xs ${credential.configured ? "text-success" : "text-warning"}`}>
-                      {credential.configured ? credential.maskedValue : "未配置"}
-                    </span>
-                  </div>
-                  <Input
-                    type={credential.secret ? "password" : "text"}
-                    autoComplete="new-password"
-                    className="h-8 text-xs"
-                    value={drafts[credential.name] ?? ""}
-                    placeholder={credential.configured ? "输入新值以覆盖" : "输入 Key"}
-                    onChange={(event) =>
-                      setDrafts((current) => ({ ...current, [credential.name]: event.target.value }))
-                    }
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-8 text-danger hover:bg-danger/10 hover:text-danger"
-                    aria-label={`删除 ${credential.label}`}
-                    disabled={!credential.configured || Boolean(busyProvider) || Boolean(deleting)}
-                    onClick={() => void remove(credential)}
-                  >
-                    {deleting === credential.name ? <LoaderCircle className="animate-spin" /> : <Trash2 />}
-                  </Button>
-                </div>
-              ))}
+      <DataTable
+        columns={columns}
+        data={data}
+        getRowId={(credential) => credential.name}
+        emptyMessage="暂无密钥配置"
+        className="min-h-0 flex-1"
+      />
+    </div>
+  );
+}
+
+function UsersPanel() {
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("");
+  const [rechargeUser, setRechargeUser] = useState<AdminUser>();
+  const [credits, setCredits] = useState("");
+  const [rechargeKey, setRechargeKey] = useState("");
+  const [busyUserId, setBusyUserId] = useState("");
+  const query = useQuery({
+    queryKey: ["admin-users", page, search, status],
+    queryFn: () =>
+      fetchAdminUsers({
+        page,
+        pageSize: 25,
+        query: search.trim() || undefined,
+        status: status ? (status as AdminUser["status"]) : undefined,
+      }),
+  });
+  const totalPages = Math.max(1, Math.ceil((query.data?.total ?? 0) / 25));
+
+  const changeStatus = async (member: AdminUser, nextStatus: "active" | "disabled") => {
+    const action = nextStatus === "disabled" ? "注销" : "恢复";
+    const message =
+      nextStatus === "disabled"
+        ? `确定注销 ${member.displayName}（${member.phone}）？该用户将立即退出登录。`
+        : `确定恢复 ${member.displayName}（${member.phone}）？`;
+    if (!window.confirm(message)) return;
+    setBusyUserId(member.id);
+    try {
+      await setAdminUserStatus(member.id, nextStatus);
+      await query.refetch();
+      toast.success(`用户已${action}`);
+    } catch (reason) {
+      toast.error(apiErrorMessage(reason, `${action}用户失败`));
+    } finally {
+      setBusyUserId("");
+    }
+  };
+
+  const recharge = async () => {
+    if (!rechargeUser || !rechargeKey) return;
+    const amount = Number(credits);
+    if (!Number.isInteger(amount) || amount < 1 || amount > 1_000_000_000) {
+      toast.error("请输入 1 至 1,000,000,000 的整数创作点");
+      return;
+    }
+    setBusyUserId(rechargeUser.id);
+    try {
+      const result = await grantCreditsToAdminUser(rechargeUser.id, amount, rechargeKey);
+      await query.refetch();
+      toast.success(`已充值 ${result.grant.credits.toLocaleString()} 创作点`);
+      setRechargeUser(undefined);
+      setCredits("");
+      setRechargeKey("");
+    } catch (reason) {
+      toast.error(apiErrorMessage(reason, "用户充值失败"));
+    } finally {
+      setBusyUserId("");
+    }
+  };
+
+  const columns: ColumnDef<AdminUser, unknown>[] = [
+    {
+      id: "displayName",
+      header: "用户名",
+      size: 180,
+      cell: ({ row }) => (
+        <span className="inline-flex min-w-0 items-center gap-2 font-medium text-ink">
+          <span className="truncate">{row.original.displayName}</span>
+          {row.original.isAdmin && <span className="text-2xs text-muted">管理员</span>}
+        </span>
+      ),
+    },
+    { accessorKey: "phone", header: "手机号", size: 125 },
+    {
+      id: "credits",
+      header: "创作点",
+      size: 100,
+      cell: ({ row }) => row.original.credits.toLocaleString(),
+    },
+    {
+      id: "status",
+      header: "状态",
+      size: 90,
+      cell: ({ row }) => (
+        <span className={`inline-flex rounded-full px-2 py-0.5 text-2xs ${userStatusStyles[row.original.status]}`}>
+          {userStatusLabels[row.original.status]}
+        </span>
+      ),
+    },
+    {
+      id: "createdAt",
+      header: "注册时间",
+      size: 150,
+      cell: ({ row }) => new Date(row.original.createdAt).toLocaleString("zh-CN", { hour12: false }),
+    },
+    {
+      id: "updatedAt",
+      header: "更新时间",
+      size: 150,
+      cell: ({ row }) => new Date(row.original.updatedAt).toLocaleString("zh-CN", { hour12: false }),
+    },
+    {
+      id: "actions",
+      header: "操作",
+      size: 190,
+      cell: ({ row }) => (
+        <div className="flex items-center justify-end gap-1">
+          {row.original.status === "active" && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={Boolean(busyUserId)}
+              onClick={() => {
+                setRechargeUser(row.original);
+                setCredits("");
+                setRechargeKey(randomUuid());
+              }}
+            >
+              <Coins /> 充值
+            </Button>
+          )}
+          {row.original.status === "active" && !row.original.isAdmin && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-danger hover:bg-danger/10 hover:text-danger"
+              disabled={Boolean(busyUserId)}
+              onClick={() => void changeStatus(row.original, "disabled")}
+            >
+              {busyUserId === row.original.id && <LoaderCircle className="animate-spin" />} 注销
+            </Button>
+          )}
+          {row.original.status === "disabled" && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={Boolean(busyUserId)}
+              onClick={() => void changeStatus(row.original, "active")}
+            >
+              {busyUserId === row.original.id && <LoaderCircle className="animate-spin" />} 恢复
+            </Button>
+          )}
+          {row.original.status === "pending_password" && <span className="text-xs text-muted">—</span>}
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line px-1">
+        <Input
+          className="h-8 w-56 text-xs"
+          placeholder="搜索用户名或手机号"
+          value={search}
+          onChange={(event) => {
+            setPage(1);
+            setSearch(event.target.value.slice(0, 80));
+          }}
+        />
+        <NativeSelect
+          className="h-8 text-xs"
+          value={status}
+          onChange={(event) => {
+            setPage(1);
+            setStatus(event.target.value);
+          }}
+        >
+          <option value="">全部状态</option>
+          {Object.entries(userStatusLabels).map(([value, label]) => (
+            <option value={value} key={value}>
+              {label}
+            </option>
+          ))}
+        </NativeSelect>
+        <Button variant="outline" size="sm" onClick={() => void query.refetch()}>
+          <RefreshCw className={query.isFetching ? "animate-spin" : ""} /> 刷新
+        </Button>
+        <span className="ml-auto text-xs text-muted">共 {query.data?.total ?? 0} 个用户</span>
+      </div>
+      <DataTable
+        columns={columns}
+        data={query.data?.users ?? []}
+        getRowId={(member) => member.id}
+        loading={query.isLoading}
+        error={query.error}
+        emptyMessage="暂无符合条件的用户"
+        className="min-h-0 flex-1"
+      />
+      <footer className="flex h-11 shrink-0 items-center justify-end gap-2 border-t border-line text-xs text-muted">
+        <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>
+          上一页
+        </Button>
+        <span>
+          第 {page} / {totalPages} 页
+        </span>
+        <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((value) => value + 1)}>
+          下一页
+        </Button>
+      </footer>
+      <ToolCreatorModal
+        open={Boolean(rechargeUser)}
+        title="充值创作点"
+        onClose={() => {
+          if (busyUserId) return;
+          setRechargeUser(undefined);
+          setCredits("");
+          setRechargeKey("");
+        }}
+      >
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void recharge();
+          }}
+        >
+          <div className="space-y-4 p-4">
+            <div className="grid grid-cols-[72px_1fr] items-center gap-3 text-sm">
+              <Label>用户</Label>
+              <span className="truncate text-ink">
+                {rechargeUser?.displayName} · {rechargeUser?.phone}
+              </span>
             </div>
-          </section>
-        );
-      })}
+            <div className="grid grid-cols-[72px_1fr] items-center gap-3">
+              <Label htmlFor="admin-recharge-credits">创作点</Label>
+              <Input
+                id="admin-recharge-credits"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={1_000_000_000}
+                step={1}
+                autoFocus
+                value={credits}
+                onChange={(event) => setCredits(event.target.value.replace(/\D/g, "").slice(0, 10))}
+                required
+              />
+            </div>
+          </div>
+          <footer className="flex h-13 items-center justify-end gap-2 border-t border-line px-4">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={Boolean(busyUserId)}
+              onClick={() => {
+                setRechargeUser(undefined);
+                setCredits("");
+                setRechargeKey("");
+              }}
+            >
+              取消
+            </Button>
+            <Button type="submit" disabled={!credits || !rechargeKey || Boolean(busyUserId)}>
+              {busyUserId && <LoaderCircle className="animate-spin" />} 确认充值
+            </Button>
+          </footer>
+        </form>
+      </ToolCreatorModal>
     </div>
   );
 }
@@ -484,7 +779,7 @@ function JobsPanel() {
 
 export function AdminPage() {
   const { user } = useAuth();
-  const [tab, setTab] = useState<"credentials" | "jobs">("credentials");
+  const [tab, setTab] = useState<"credentials" | "users" | "jobs">("credentials");
   if (!user?.isAdmin) return <Navigate to="/" />;
   return (
     <div className="flex h-[calc(100vh-56px)] min-h-0 flex-col bg-white p-3 text-ink">
@@ -501,6 +796,14 @@ export function AdminPage() {
           <Button
             variant="ghost"
             size="sm"
+            className={tab === "users" ? "bg-surface-muted text-ink" : "text-muted"}
+            onClick={() => setTab("users")}
+          >
+            用户管理
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             className={tab === "jobs" ? "bg-surface-muted text-ink" : "text-muted"}
             onClick={() => setTab("jobs")}
           >
@@ -508,7 +811,7 @@ export function AdminPage() {
           </Button>
         </nav>
       </header>
-      {tab === "credentials" ? <CredentialsPanel /> : <JobsPanel />}
+      {tab === "credentials" ? <CredentialsPanel /> : tab === "users" ? <UsersPanel /> : <JobsPanel />}
     </div>
   );
 }

@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { cancelJob, changePassword, completeDirectUpload, createAdScriptAction, createAdScriptProject, createDirectUpload, createJob, createRechargeOrder, createShareImport, createVideoCreateProject, deleteAdminCredential, deleteAsset, deleteProduct, downloadArtifact, exportAdScriptVersion, generateVideoCreateShot, getAdScriptProject, getAssetContent, getCapabilities, getCreationCapabilities, getCurrentUser, getHealth, getJob, getModels, getPreferences, getShareImport, getVideoCreateProject, importAdminEnvKey, listAdminCredentials, listAdminJobs, listAdScriptProjects, listAssets, listJobs, listNotifications, listRechargeOrders, listRechargePackages, listVideoCreateProjects, login, logout, markAllNotificationsRead, markNotificationRead, type Options, parseAdScriptSource, parseShareContent, regenerateVideoCreateSection, register, replaceVideoCreateShot, retryJob, runAdminCredentialDoctor, runVideoCreateAction, saveAdScriptVersion, saveAssetMetadata, savePreferences, saveVideoCreateSection, sendSmsVerificationCode, setupPassword, stopAllAdminJobs, updateAdminCredential, updateProfile, updateVideoCreateProject, updateVideoCreateShotSettings, uploadMedia, verifyPasswordReset } from '../sdk.gen';
-import type { CancelJobData, CancelJobError, CancelJobResponse, ChangePasswordData, ChangePasswordError, ChangePasswordResponse, CompleteDirectUploadData, CompleteDirectUploadError, CompleteDirectUploadResponse, CreateAdScriptActionData, CreateAdScriptActionError, CreateAdScriptActionResponse, CreateAdScriptProjectData, CreateAdScriptProjectError, CreateAdScriptProjectResponse, CreateDirectUploadData, CreateDirectUploadError, CreateDirectUploadResponse, CreateJobData, CreateJobError, CreateJobResponse, CreateRechargeOrderData, CreateRechargeOrderError, CreateRechargeOrderResponse, CreateShareImportData, CreateShareImportError, CreateShareImportResponse, CreateVideoCreateProjectData, CreateVideoCreateProjectError, CreateVideoCreateProjectResponse, DeleteAdminCredentialData, DeleteAdminCredentialError, DeleteAdminCredentialResponse, DeleteAssetData, DeleteAssetError, DeleteAssetResponse, DeleteProductData, DeleteProductError, DeleteProductResponse, DownloadArtifactData, DownloadArtifactError, DownloadArtifactResponse, ExportAdScriptVersionData, ExportAdScriptVersionError, ExportAdScriptVersionResponse, GenerateVideoCreateShotData, GenerateVideoCreateShotError, GenerateVideoCreateShotResponse, GetAdScriptProjectData, GetAdScriptProjectError, GetAdScriptProjectResponse, GetAssetContentData, GetAssetContentError, GetAssetContentResponse, GetCapabilitiesData, GetCapabilitiesResponse, GetCreationCapabilitiesData, GetCreationCapabilitiesResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetHealthData, GetHealthResponse, GetJobData, GetJobError, GetJobResponse, GetModelsData, GetModelsResponse, GetPreferencesData, GetPreferencesResponse, GetShareImportData, GetShareImportError, GetShareImportResponse, GetVideoCreateProjectData, GetVideoCreateProjectError, GetVideoCreateProjectResponse, ImportAdminEnvKeyData, ImportAdminEnvKeyError, ImportAdminEnvKeyResponse, ListAdminCredentialsData, ListAdminCredentialsError, ListAdminCredentialsResponse, ListAdminJobsData, ListAdminJobsError, ListAdminJobsResponse, ListAdScriptProjectsData, ListAdScriptProjectsResponse, ListAssetsData, ListAssetsResponse, ListJobsData, ListJobsResponse, ListNotificationsData, ListNotificationsResponse, ListRechargeOrdersData, ListRechargeOrdersResponse, ListRechargePackagesData, ListRechargePackagesResponse, ListVideoCreateProjectsData, ListVideoCreateProjectsResponse, LoginData, LoginError, LoginResponse, LogoutData, LogoutError, LogoutResponse, MarkAllNotificationsReadData, MarkAllNotificationsReadResponse, MarkNotificationReadData, MarkNotificationReadError, MarkNotificationReadResponse, ParseAdScriptSourceData, ParseAdScriptSourceError, ParseAdScriptSourceResponse, ParseShareContentData, ParseShareContentResponse, RegenerateVideoCreateSectionData, RegenerateVideoCreateSectionError, RegenerateVideoCreateSectionResponse, RegisterData, RegisterError, RegisterResponse, ReplaceVideoCreateShotData, ReplaceVideoCreateShotError, ReplaceVideoCreateShotResponse, RetryJobData, RetryJobError, RetryJobResponse, RunAdminCredentialDoctorData, RunAdminCredentialDoctorError, RunAdminCredentialDoctorResponse, RunVideoCreateActionData, RunVideoCreateActionError, RunVideoCreateActionResponse, SaveAdScriptVersionData, SaveAdScriptVersionError, SaveAdScriptVersionResponse, SaveAssetMetadataData, SaveAssetMetadataError, SaveAssetMetadataResponse, SavePreferencesData, SavePreferencesResponse, SaveVideoCreateSectionData, SaveVideoCreateSectionError, SaveVideoCreateSectionResponse, SendSmsVerificationCodeData, SendSmsVerificationCodeError, SendSmsVerificationCodeResponse, SetupPasswordData, SetupPasswordError, SetupPasswordResponse, StopAllAdminJobsData, StopAllAdminJobsError, StopAllAdminJobsResponse, UpdateAdminCredentialData, UpdateAdminCredentialError, UpdateAdminCredentialResponse, UpdateProfileData, UpdateProfileResponse, UpdateVideoCreateProjectData, UpdateVideoCreateProjectError, UpdateVideoCreateProjectResponse, UpdateVideoCreateShotSettingsData, UpdateVideoCreateShotSettingsError, UpdateVideoCreateShotSettingsResponse, UploadMediaData, UploadMediaError, UploadMediaResponse, VerifyPasswordResetData, VerifyPasswordResetError, VerifyPasswordResetResponse } from '../types.gen';
+import { cancelJob, changePassword, completeDirectUpload, createAdScriptAction, createAdScriptProject, createDirectUpload, createJob, createRechargeOrder, createShareImport, createVideoCreateProject, deleteAdminCredential, deleteAsset, deleteProduct, downloadArtifact, exportAdScriptVersion, generateVideoCreateShot, getAdScriptProject, getAssetContent, getCapabilities, getCreationCapabilities, getCurrentUser, getHealth, getJob, getModels, getPreferences, getShareImport, getVideoCreateProject, grantAdminUserCredits, importAdminEnvKey, listAdminCredentials, listAdminJobs, listAdminUsers, listAdScriptProjects, listAssets, listJobs, listNotifications, listRechargeOrders, listRechargePackages, listVideoCreateProjects, login, logout, markAllNotificationsRead, markNotificationRead, type Options, parseAdScriptSource, parseShareContent, regenerateVideoCreateSection, register, replaceVideoCreateShot, retryJob, runAdminCredentialDoctor, runVideoCreateAction, saveAdScriptVersion, saveAssetMetadata, savePreferences, saveVideoCreateSection, sendSmsVerificationCode, setupPassword, stopAllAdminJobs, updateAdminCredential, updateAdminUserStatus, updateProfile, updateVideoCreateProject, updateVideoCreateShotSettings, uploadMedia, verifyPasswordReset } from '../sdk.gen';
+import type { CancelJobData, CancelJobError, CancelJobResponse, ChangePasswordData, ChangePasswordError, ChangePasswordResponse, CompleteDirectUploadData, CompleteDirectUploadError, CompleteDirectUploadResponse, CreateAdScriptActionData, CreateAdScriptActionError, CreateAdScriptActionResponse, CreateAdScriptProjectData, CreateAdScriptProjectError, CreateAdScriptProjectResponse, CreateDirectUploadData, CreateDirectUploadError, CreateDirectUploadResponse, CreateJobData, CreateJobError, CreateJobResponse, CreateRechargeOrderData, CreateRechargeOrderError, CreateRechargeOrderResponse, CreateShareImportData, CreateShareImportError, CreateShareImportResponse, CreateVideoCreateProjectData, CreateVideoCreateProjectError, CreateVideoCreateProjectResponse, DeleteAdminCredentialData, DeleteAdminCredentialError, DeleteAdminCredentialResponse, DeleteAssetData, DeleteAssetError, DeleteAssetResponse, DeleteProductData, DeleteProductError, DeleteProductResponse, DownloadArtifactData, DownloadArtifactError, DownloadArtifactResponse, ExportAdScriptVersionData, ExportAdScriptVersionError, ExportAdScriptVersionResponse, GenerateVideoCreateShotData, GenerateVideoCreateShotError, GenerateVideoCreateShotResponse, GetAdScriptProjectData, GetAdScriptProjectError, GetAdScriptProjectResponse, GetAssetContentData, GetAssetContentError, GetAssetContentResponse, GetCapabilitiesData, GetCapabilitiesResponse, GetCreationCapabilitiesData, GetCreationCapabilitiesResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetHealthData, GetHealthResponse, GetJobData, GetJobError, GetJobResponse, GetModelsData, GetModelsResponse, GetPreferencesData, GetPreferencesResponse, GetShareImportData, GetShareImportError, GetShareImportResponse, GetVideoCreateProjectData, GetVideoCreateProjectError, GetVideoCreateProjectResponse, GrantAdminUserCreditsData, GrantAdminUserCreditsError, GrantAdminUserCreditsResponse, ImportAdminEnvKeyData, ImportAdminEnvKeyError, ImportAdminEnvKeyResponse, ListAdminCredentialsData, ListAdminCredentialsError, ListAdminCredentialsResponse, ListAdminJobsData, ListAdminJobsError, ListAdminJobsResponse, ListAdminUsersData, ListAdminUsersError, ListAdminUsersResponse, ListAdScriptProjectsData, ListAdScriptProjectsResponse, ListAssetsData, ListAssetsResponse, ListJobsData, ListJobsResponse, ListNotificationsData, ListNotificationsResponse, ListRechargeOrdersData, ListRechargeOrdersResponse, ListRechargePackagesData, ListRechargePackagesResponse, ListVideoCreateProjectsData, ListVideoCreateProjectsResponse, LoginData, LoginError, LoginResponse, LogoutData, LogoutError, LogoutResponse, MarkAllNotificationsReadData, MarkAllNotificationsReadResponse, MarkNotificationReadData, MarkNotificationReadError, MarkNotificationReadResponse, ParseAdScriptSourceData, ParseAdScriptSourceError, ParseAdScriptSourceResponse, ParseShareContentData, ParseShareContentResponse, RegenerateVideoCreateSectionData, RegenerateVideoCreateSectionError, RegenerateVideoCreateSectionResponse, RegisterData, RegisterError, RegisterResponse, ReplaceVideoCreateShotData, ReplaceVideoCreateShotError, ReplaceVideoCreateShotResponse, RetryJobData, RetryJobError, RetryJobResponse, RunAdminCredentialDoctorData, RunAdminCredentialDoctorError, RunAdminCredentialDoctorResponse, RunVideoCreateActionData, RunVideoCreateActionError, RunVideoCreateActionResponse, SaveAdScriptVersionData, SaveAdScriptVersionError, SaveAdScriptVersionResponse, SaveAssetMetadataData, SaveAssetMetadataError, SaveAssetMetadataResponse, SavePreferencesData, SavePreferencesResponse, SaveVideoCreateSectionData, SaveVideoCreateSectionError, SaveVideoCreateSectionResponse, SendSmsVerificationCodeData, SendSmsVerificationCodeError, SendSmsVerificationCodeResponse, SetupPasswordData, SetupPasswordError, SetupPasswordResponse, StopAllAdminJobsData, StopAllAdminJobsError, StopAllAdminJobsResponse, UpdateAdminCredentialData, UpdateAdminCredentialError, UpdateAdminCredentialResponse, UpdateAdminUserStatusData, UpdateAdminUserStatusError, UpdateAdminUserStatusResponse, UpdateProfileData, UpdateProfileResponse, UpdateVideoCreateProjectData, UpdateVideoCreateProjectError, UpdateVideoCreateProjectResponse, UpdateVideoCreateShotSettingsData, UpdateVideoCreateShotSettingsError, UpdateVideoCreateShotSettingsResponse, UploadMediaData, UploadMediaError, UploadMediaResponse, VerifyPasswordResetData, VerifyPasswordResetError, VerifyPasswordResetResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -527,11 +527,11 @@ export const runAdminCredentialDoctorMutation = (options?: Partial<Options<RunAd
     return mutationOptions;
 };
 
-export const listAdminJobsQueryKey = (options?: Options<ListAdminJobsData>) => createQueryKey('listAdminJobs', options);
+export const listAdminUsersQueryKey = (options?: Options<ListAdminUsersData>) => createQueryKey('listAdminUsers', options);
 
-export const listAdminJobsOptions = (options?: Options<ListAdminJobsData>) => queryOptions<ListAdminJobsResponse, ListAdminJobsError, ListAdminJobsResponse, ReturnType<typeof listAdminJobsQueryKey>>({
+export const listAdminUsersOptions = (options?: Options<ListAdminUsersData>) => queryOptions<ListAdminUsersResponse, ListAdminUsersError, ListAdminUsersResponse, ReturnType<typeof listAdminUsersQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
-        const { data } = await listAdminJobs({
+        const { data } = await listAdminUsers({
             ...options,
             ...queryKey[0],
             signal,
@@ -539,7 +539,7 @@ export const listAdminJobsOptions = (options?: Options<ListAdminJobsData>) => qu
         });
         return data;
     },
-    queryKey: listAdminJobsQueryKey(options)
+    queryKey: listAdminUsersQueryKey(options)
 });
 
 const createInfiniteParams = <K extends Pick<QueryKey<Options>[0], 'body' | 'headers' | 'path' | 'query'>>(queryKey: QueryKey<Options>, page: K) => {
@@ -570,6 +570,76 @@ const createInfiniteParams = <K extends Pick<QueryKey<Options>[0], 'body' | 'hea
     }
     return params as unknown as typeof page;
 };
+
+export const listAdminUsersInfiniteQueryKey = (options?: Options<ListAdminUsersData>): QueryKey<Options<ListAdminUsersData>> => createQueryKey('listAdminUsers', options, true);
+
+export const listAdminUsersInfiniteOptions = (options?: Options<ListAdminUsersData>) => {
+    const opts = infiniteQueryOptions<ListAdminUsersResponse, ListAdminUsersError, InfiniteData<ListAdminUsersResponse>, QueryKey<Options<ListAdminUsersData>>, number | Pick<QueryKey<Options<ListAdminUsersData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<ListAdminUsersData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await listAdminUsers({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: listAdminUsersInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
+
+export const grantAdminUserCreditsMutation = (options?: Partial<Options<GrantAdminUserCreditsData>>): UseMutationOptions<GrantAdminUserCreditsResponse, GrantAdminUserCreditsError, Options<GrantAdminUserCreditsData>> => {
+    const mutationOptions: UseMutationOptions<GrantAdminUserCreditsResponse, GrantAdminUserCreditsError, Options<GrantAdminUserCreditsData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await grantAdminUserCredits({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const updateAdminUserStatusMutation = (options?: Partial<Options<UpdateAdminUserStatusData>>): UseMutationOptions<UpdateAdminUserStatusResponse, UpdateAdminUserStatusError, Options<UpdateAdminUserStatusData>> => {
+    const mutationOptions: UseMutationOptions<UpdateAdminUserStatusResponse, UpdateAdminUserStatusError, Options<UpdateAdminUserStatusData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await updateAdminUserStatus({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const listAdminJobsQueryKey = (options?: Options<ListAdminJobsData>) => createQueryKey('listAdminJobs', options);
+
+export const listAdminJobsOptions = (options?: Options<ListAdminJobsData>) => queryOptions<ListAdminJobsResponse, ListAdminJobsError, ListAdminJobsResponse, ReturnType<typeof listAdminJobsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listAdminJobs({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listAdminJobsQueryKey(options)
+});
 
 export const listAdminJobsInfiniteQueryKey = (options?: Options<ListAdminJobsData>): QueryKey<Options<ListAdminJobsData>> => createQueryKey('listAdminJobs', options, true);
 

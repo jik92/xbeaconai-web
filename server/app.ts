@@ -1976,6 +1976,19 @@ const StopAllAdminJobsResultSchema = z.object({
   processingRequested: z.number().int().nonnegative(),
   failed: z.number().int().nonnegative(),
 });
+const AdminUserSchema = UserSchema.extend({
+  status: z.enum(["pending_password", "active", "disabled"]),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+const AdminCreditGrantSchema = z.object({
+  id: z.string().uuid(),
+  userId: z.string().uuid(),
+  adminUserId: z.string().uuid(),
+  credits: z.number().int().min(1),
+  balanceAfter: z.number().int().nonnegative(),
+  createdAt: z.string(),
+});
 const adminCredentialsRoute = createRoute({
   method: "get",
   path: "/api/admin/credentials",
@@ -2197,6 +2210,137 @@ app.openapi(adminCredentialDoctorRoute, async (c) => {
       403,
     );
   return c.json({ results: await credentialDoctor.runAll() }, 200);
+});
+
+const listAdminUsersRoute = createRoute({
+  method: "get",
+  path: "/api/admin/users",
+  operationId: "listAdminUsers",
+  request: {
+    query: z.object({
+      page: z.coerce.number().int().min(1).default(1),
+      pageSize: z.coerce.number().int().min(10).max(100).default(25),
+      query: z.string().trim().max(80).optional(),
+      status: z.enum(["pending_password", "active", "disabled"]).optional(),
+    }),
+  },
+  responses: {
+    200: {
+      description: "Admin user list",
+      content: {
+        "application/json": {
+          schema: z.object({
+            users: z.array(AdminUserSchema),
+            total: z.number().int().nonnegative(),
+            page: z.number().int().min(1),
+            pageSize: z.number().int().min(1),
+          }),
+        },
+      },
+    },
+    403: { description: "Admin required", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(listAdminUsersRoute, (c) => {
+  if (!adminUser(c.get("userId")))
+    return c.json(
+      {
+        error: { code: "ADMIN_REQUIRED", message: "仅管理员可访问", retryable: false, requestId: crypto.randomUUID() },
+      },
+      403,
+    );
+  return c.json(accounts.listAdminUsers(c.req.valid("query")), 200);
+});
+
+const grantAdminUserCreditsRoute = createRoute({
+  method: "post",
+  path: "/api/admin/users/{userId}/credits",
+  operationId: "grantAdminUserCredits",
+  request: {
+    params: z.object({ userId: z.string().uuid() }),
+    body: {
+      required: true,
+      content: { "application/json": { schema: z.object({ credits: z.number().int().min(1).max(1_000_000_000) }) } },
+    },
+  },
+  responses: {
+    201: {
+      description: "Credits granted",
+      content: { "application/json": { schema: z.object({ grant: AdminCreditGrantSchema, user: AdminUserSchema }) } },
+    },
+    400: { description: "Missing idempotency key", content: { "application/json": { schema: ErrorSchema } } },
+    403: { description: "Admin required", content: { "application/json": { schema: ErrorSchema } } },
+    404: { description: "User not found", content: { "application/json": { schema: ErrorSchema } } },
+    409: { description: "Conflict", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(grantAdminUserCreditsRoute, (c) => {
+  const requestId = crypto.randomUUID();
+  if (!adminUser(c.get("userId")))
+    return c.json({ error: { code: "ADMIN_REQUIRED", message: "仅管理员可访问", retryable: false, requestId } }, 403);
+  const idempotencyKey = c.req.header("Idempotency-Key")?.trim().slice(0, 128);
+  if (!idempotencyKey)
+    return c.json(
+      { error: { code: "IDEMPOTENCY_KEY_REQUIRED", message: "缺少幂等键", retryable: false, requestId } },
+      400,
+    );
+  try {
+    const grant = accounts.grantAdminCredits({
+      userId: c.req.valid("param").userId,
+      adminUserId: c.get("userId"),
+      credits: c.req.valid("json").credits,
+      idempotencyKey,
+    });
+    const user = accounts.getAdminUser(grant.userId);
+    if (!user) throw new AccountError("USER_NOT_FOUND", "账号不存在", 404);
+    return c.json({ grant, user }, 201);
+  } catch (error) {
+    if (error instanceof AccountError && error.status === 404)
+      return c.json({ error: { code: error.code, message: error.message, retryable: false, requestId } }, 404);
+    if (error instanceof AccountError)
+      return c.json({ error: { code: error.code, message: error.message, retryable: false, requestId } }, 409);
+    throw error;
+  }
+});
+
+const updateAdminUserStatusRoute = createRoute({
+  method: "patch",
+  path: "/api/admin/users/{userId}/status",
+  operationId: "updateAdminUserStatus",
+  request: {
+    params: z.object({ userId: z.string().uuid() }),
+    body: {
+      required: true,
+      content: { "application/json": { schema: z.object({ status: z.enum(["active", "disabled"]) }) } },
+    },
+  },
+  responses: {
+    200: { description: "User status updated", content: { "application/json": { schema: AdminUserSchema } } },
+    403: { description: "Admin required", content: { "application/json": { schema: ErrorSchema } } },
+    404: { description: "User not found", content: { "application/json": { schema: ErrorSchema } } },
+    409: { description: "Status conflict", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(updateAdminUserStatusRoute, (c) => {
+  const requestId = crypto.randomUUID();
+  if (!adminUser(c.get("userId")))
+    return c.json({ error: { code: "ADMIN_REQUIRED", message: "仅管理员可访问", retryable: false, requestId } }, 403);
+  try {
+    return c.json(
+      accounts.setAdminUserStatus({
+        userId: c.req.valid("param").userId,
+        adminUserId: c.get("userId"),
+        status: c.req.valid("json").status,
+      }),
+      200,
+    );
+  } catch (error) {
+    if (error instanceof AccountError && error.status === 404)
+      return c.json({ error: { code: error.code, message: error.message, retryable: false, requestId } }, 404);
+    if (error instanceof AccountError)
+      return c.json({ error: { code: error.code, message: error.message, retryable: false, requestId } }, 409);
+    throw error;
+  }
 });
 
 const listAdminJobsRoute = createRoute({

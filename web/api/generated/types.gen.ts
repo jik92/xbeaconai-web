@@ -1541,6 +1541,141 @@ export type RunAdminCredentialDoctorResponses = {
 
 export type RunAdminCredentialDoctorResponse = RunAdminCredentialDoctorResponses[keyof RunAdminCredentialDoctorResponses];
 
+export type ListAdminUsersData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        pageSize?: number;
+        query?: string;
+        status?: 'pending_password' | 'active' | 'disabled';
+    };
+    url: '/api/admin/users';
+};
+
+export type ListAdminUsersErrors = {
+    /**
+     * Admin required
+     */
+    403: ApiErrorResponse;
+};
+
+export type ListAdminUsersError = ListAdminUsersErrors[keyof ListAdminUsersErrors];
+
+export type ListAdminUsersResponses = {
+    /**
+     * Admin user list
+     */
+    200: {
+        users: Array<UserSummary & {
+            status: 'pending_password' | 'active' | 'disabled';
+            createdAt: string;
+            updatedAt: string;
+        }>;
+        total: number;
+        page: number;
+        pageSize: number;
+    };
+};
+
+export type ListAdminUsersResponse = ListAdminUsersResponses[keyof ListAdminUsersResponses];
+
+export type GrantAdminUserCreditsData = {
+    body: {
+        credits: number;
+    };
+    path: {
+        userId: string;
+    };
+    query?: never;
+    url: '/api/admin/users/{userId}/credits';
+};
+
+export type GrantAdminUserCreditsErrors = {
+    /**
+     * Missing idempotency key
+     */
+    400: ApiErrorResponse;
+    /**
+     * Admin required
+     */
+    403: ApiErrorResponse;
+    /**
+     * User not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Conflict
+     */
+    409: ApiErrorResponse;
+};
+
+export type GrantAdminUserCreditsError = GrantAdminUserCreditsErrors[keyof GrantAdminUserCreditsErrors];
+
+export type GrantAdminUserCreditsResponses = {
+    /**
+     * Credits granted
+     */
+    201: {
+        grant: {
+            id: string;
+            userId: string;
+            adminUserId: string;
+            credits: number;
+            balanceAfter: number;
+            createdAt: string;
+        };
+        user: UserSummary & {
+            status: 'pending_password' | 'active' | 'disabled';
+            createdAt: string;
+            updatedAt: string;
+        };
+    };
+};
+
+export type GrantAdminUserCreditsResponse = GrantAdminUserCreditsResponses[keyof GrantAdminUserCreditsResponses];
+
+export type UpdateAdminUserStatusData = {
+    body: {
+        status: 'active' | 'disabled';
+    };
+    path: {
+        userId: string;
+    };
+    query?: never;
+    url: '/api/admin/users/{userId}/status';
+};
+
+export type UpdateAdminUserStatusErrors = {
+    /**
+     * Admin required
+     */
+    403: ApiErrorResponse;
+    /**
+     * User not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Status conflict
+     */
+    409: ApiErrorResponse;
+};
+
+export type UpdateAdminUserStatusError = UpdateAdminUserStatusErrors[keyof UpdateAdminUserStatusErrors];
+
+export type UpdateAdminUserStatusResponses = {
+    /**
+     * User status updated
+     */
+    200: UserSummary & {
+        status: 'pending_password' | 'active' | 'disabled';
+        createdAt: string;
+        updatedAt: string;
+    };
+};
+
+export type UpdateAdminUserStatusResponse = UpdateAdminUserStatusResponses[keyof UpdateAdminUserStatusResponses];
+
 export type ListAdminJobsData = {
     body?: never;
     path?: never;
