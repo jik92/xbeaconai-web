@@ -224,6 +224,8 @@ bun run typecheck
 
 默认不要运行 E2E 测试。只有用户在当前任务中明确要求运行 E2E 时，才执行 `bun run e2e`；不得因为完整交付、关键流程或前端改动而自行追加 E2E，以免延长交付时间。
 
+不要使用 `browser:control-in-app-browser` skill 做页面、交互或接口测试。该工具在本仓库不作为可用的验证手段；需要运行时验证时，优先使用项目单元测试、API 请求、类型检查和生产构建，确需浏览器验证则交由用户手动完成。
+
 - 文档或纯样式：运行相关格式检查，必要时构建。
 - 前端逻辑：相关单测、`bun run typecheck`、`bun run build`。
 - API、Store 或 Worker：相关单测、`bun run typecheck`、`bun run build`。

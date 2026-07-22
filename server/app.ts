@@ -51,6 +51,7 @@ import { InsufficientCreditsError, SqliteJobStore } from "./jobs/sqlite-job-stor
 import { seedanceModelIds, videoModels } from "./models/video-models";
 import { auditSdkRegistry } from "./sdk-registry";
 import { ossutils } from "./storage/ossutils";
+import { rollbackUploadedObjects, uploadFilesStrictly } from "./storage/strict-library-upload";
 import type { JobModuleId, JobRecord } from "./types";
 import {
   directUploadExtensions,
@@ -58,6 +59,7 @@ import {
   maxDirectUploadBytes,
   verifyDirectUploadTicket,
 } from "./uploads/direct-upload";
+import { inlineUtf8ContentDisposition } from "./uploads/content-disposition";
 import {
   VideoCreateInputSchema,
   VideoCreateProjectStatusSchema,
@@ -446,6 +448,7 @@ app.use("/api/ad-script/*", providerGuard("ad-script"));
 app.use("/api/video-create/*", providerGuard("video-create"));
 app.use("/api/uploads", providerGuard("video-cut"));
 app.use("/api/uploads/direct*", providerGuard("video-cut"));
+app.use("/api/products", providerGuard("video-cut"));
 app.use("/api/imports/share-content*", providerGuard("video-cut"));
 
 const healthRoute = createRoute({
@@ -1756,39 +1759,94 @@ app.post("/api/products", async (c) => {
       415,
     );
   const productId = crypto.randomUUID();
+  const ownerUserId = c.get("userId");
   const createdAt = new Date().toISOString();
-  const images = files.map((file) => ({
-    id: crypto.randomUUID(),
-    ownerUserId: c.get("userId"),
-    storageKey: `${crypto.randomUUID()}${extensions[file.type]}`,
-    originalName: file.name.slice(0, 200),
-    mimeType: file.type,
-    byteSize: file.size,
-    kind: "product" as const,
-    displayName: name,
-    description: description || undefined,
-    createdAt,
-  }));
-  await Promise.all(
-    images.map((asset, index) => Bun.write(resolve(env.dataDir, "uploads", asset.storageKey), files[index])),
-  );
-  accounts.createProductAssets(
-    {
-      id: productId,
-      ownerUserId: c.get("userId"),
-      name,
+  const images = files.map((file) => {
+    const id = crypto.randomUUID();
+    return {
+      id,
+      ownerUserId,
+      storageKey: `${ownerUserId}/products/${productId}/${id}${extensions[file.type]}`,
+      originalName: file.name.slice(0, 200),
+      mimeType: file.type,
+      byteSize: file.size,
+      kind: "product" as const,
+      displayName: name,
       description: description || undefined,
-      sharingScope,
       createdAt,
-    },
-    images,
-  );
-  const product = accounts.listProducts(c.get("userId")).find((item) => item.id === productId);
-  if (!product)
+    };
+  });
+  if (!ossutils.configured)
+    return c.json(
+      { error: { code: "TOS_NOT_CONFIGURED", message: "TOS 未配置，商品图片无法上传", retryable: false, requestId } },
+      503,
+    );
+  const uploadedKeys: string[] = [];
+  try {
+    uploadedKeys.push(
+      ...(await uploadFilesStrictly(
+        images.map((asset, index) => ({
+          file: files[index],
+          localPath: resolve(env.dataDir, "uploads", asset.storageKey),
+          storageKey: asset.storageKey,
+          mimeType: asset.mimeType,
+          sizeBytes: asset.byteSize,
+        })),
+        {
+          writeLocal: async (item) => {
+            mkdirSync(dirname(item.localPath), { recursive: true, mode: 0o700 });
+            await Bun.write(item.localPath, item.file);
+          },
+          uploadObject: (item) =>
+            ossutils.putLibraryFile({
+              filePath: item.localPath,
+              key: item.storageKey,
+              mimeType: item.mimeType,
+              sizeBytes: item.sizeBytes,
+            }),
+          removeLocal: (path) => rm(path, { force: true }),
+          deleteObject: (key) => ossutils.deleteObject(key),
+        },
+      )),
+    );
+  } catch {
+    return c.json(
+      { error: { code: "PRODUCT_UPLOAD_FAILED", message: "商品图片上传 TOS 失败", retryable: true, requestId } },
+      502,
+    );
+  }
+  try {
+    accounts.createProductAssets(
+      {
+        id: productId,
+        ownerUserId,
+        name,
+        description: description || undefined,
+        sharingScope,
+        createdAt,
+      },
+      images,
+    );
+  } catch {
+    await rollbackUploadedObjects(uploadedKeys, (key) => ossutils.deleteObject(key));
     return c.json(
       { error: { code: "PRODUCT_CREATE_FAILED", message: "商品创建失败", retryable: true, requestId } },
       500,
     );
+  }
+  const product = accounts.listProducts(ownerUserId).find((item) => item.id === productId);
+  if (!product) {
+    try {
+      accounts.deleteProduct(ownerUserId, productId);
+    } catch {
+      // The product lookup already failed; remote cleanup still takes priority.
+    }
+    await rollbackUploadedObjects(uploadedKeys, (key) => ossutils.deleteObject(key));
+    return c.json(
+      { error: { code: "PRODUCT_CREATE_FAILED", message: "商品创建失败", retryable: true, requestId } },
+      500,
+    );
+  }
   return c.json({ product: productResponse(product) }, 201);
 });
 
@@ -2006,7 +2064,7 @@ app.openapi(assetContentRoute, async (c) => {
   return new Response(file, {
     headers: {
       "Content-Type": asset.mimeType || "application/octet-stream",
-      "Content-Disposition": `inline; filename="${asset.originalName.replaceAll('"', "")}"`,
+      "Content-Disposition": inlineUtf8ContentDisposition(asset.originalName),
       "Cache-Control": "private, max-age=300",
     },
   });
