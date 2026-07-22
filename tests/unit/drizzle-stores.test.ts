@@ -71,6 +71,25 @@ describe("Drizzle SQLite stores", () => {
     expect(jobs.update(job.id, { status: "succeeded", progress: 100 })?.status).toBe("succeeded");
     expect(accounts.getUser(registration.user.id)?.credits).toBe(3476);
 
+    const childJob: JobRecord = {
+      ...job,
+      id: crypto.randomUUID(),
+      moduleId: "video-remix",
+      parentJobId: job.id,
+      title: "分镜生成任务",
+      values: { workflowPhase: "shot-generation", sourceAssetId: "source-a" },
+    };
+    jobs.create(childJob);
+    jobs.create({
+      ...childJob,
+      id: crypto.randomUUID(),
+      ownerUserId: otherRegistration.user.id,
+      title: "其他用户的子任务",
+    });
+    expect(jobs.listChildren(registration.user.id, job.id, "video-remix")).toMatchObject([
+      { id: childJob.id, parentJobId: job.id },
+    ]);
+
     jobs.create({
       ...job,
       id: crypto.randomUUID(),
@@ -79,10 +98,12 @@ describe("Drizzle SQLite stores", () => {
       status: "failed",
       updatedAt: new Date(Date.now() + 1).toISOString(),
     });
-    expect(jobs.listAll({ page: 1, pageSize: 10 }).total).toBe(2);
-    expect(jobs.listAll({ page: 1, pageSize: 10, phone: "000006" }).jobs).toMatchObject([
-      { ownerPhone: "13800000006", title: "其他用户任务" },
-    ]);
+    expect(jobs.listAll({ page: 1, pageSize: 10 }).total).toBe(4);
+    expect(
+      jobs
+        .listAll({ page: 1, pageSize: 10, phone: "000006" })
+        .jobs.some((item) => item.ownerPhone === "13800000006" && item.title === "其他用户任务"),
+    ).toBe(true);
     expect(jobs.listAll({ page: 1, pageSize: 10, status: "succeeded" }).jobs).toMatchObject([
       { ownerPhone: "13800000005", id: job.id },
     ]);

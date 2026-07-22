@@ -222,6 +222,17 @@
   top: auto;
   bottom: 44px;
 }
+.ag-composer.embedded {
+  position: relative;
+  inset: auto;
+  transform: none;
+  width: 100%;
+  margin: 0;
+  box-shadow: none;
+}
+.ag-composer.embedded.expanded {
+  height: 430px;
+}
 .ag-reference-row {
   height: 72px;
   display: flex;

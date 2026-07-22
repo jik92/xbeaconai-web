@@ -2674,9 +2674,29 @@ const RemixPromptToolRequestSchema = z.object({
   tool: z.enum(remixPromptTools),
   config: RemixPromptToolConfigSchema,
 });
+const RemixShotGenerationRequestSchema = z.object({
+  sourceJobId: z.string().uuid(),
+  sourceAssetId: z.string().uuid(),
+  prompt: z.string().trim().min(20).max(30_000),
+  modelId: VideoModelIdSchema,
+  ratio: z.string().min(1).max(20),
+  resolution: z.string().min(1).max(20),
+  duration: z.number().int().min(4).max(15),
+  referenceMode: z.string().min(1).max(40).default("omni"),
+  referenceAssetIds: z.array(z.string().uuid()).max(2).default([]),
+  generateAudio: z.boolean().default(true),
+});
 const RemixComposeRequestSchema = z.object({
   sourceJobId: z.string().uuid(),
-  orderedAssetIds: z.array(z.string().uuid()).min(2).max(remixMaxSources),
+  sources: z
+    .array(
+      z.object({
+        sourceAssetId: z.string().uuid(),
+        selectedAssetId: z.string().uuid(),
+      }),
+    )
+    .min(2)
+    .max(remixMaxSources),
 });
 
 app.post("/api/video-remix/project/generate", async (c) => {
@@ -2878,6 +2898,222 @@ app.openapi(remixPromptToolRoute, async (c) => {
   return c.json(job, 202);
 });
 
+const remixShotGenerationRoute = createRoute({
+  method: "post",
+  path: "/api/video-remix/project/shots/generate",
+  operationId: "createVideoRemixShotGenerationJob",
+  request: {
+    body: { required: true, content: { "application/json": { schema: RemixShotGenerationRequestSchema } } },
+  },
+  responses: {
+    202: { description: "Shot generation job accepted", content: { "application/json": { schema: JobSchema } } },
+    404: { description: "Source analysis not found", content: { "application/json": { schema: ErrorSchema } } },
+    409: { description: "Source analysis is not ready", content: { "application/json": { schema: ErrorSchema } } },
+    422: { description: "Invalid shot generation input", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(remixShotGenerationRoute, async (c) => {
+  const ownerUserId = c.get("userId");
+  const body = c.req.valid("json");
+  const requestId = crypto.randomUUID();
+  const sourceJob = store.getOwned(body.sourceJobId, ownerUserId);
+  if (sourceJob?.moduleId !== "video-remix" || sourceJob.values.workflowPhase !== "analysis")
+    return c.json(
+      { error: { code: "REMIX_SOURCE_NOT_FOUND", message: "原始解析任务不存在", retryable: false, requestId } },
+      404,
+    );
+  if (sourceJob.status !== "succeeded" && sourceJob.status !== "partially_succeeded")
+    return c.json(
+      { error: { code: "REMIX_SOURCE_NOT_READY", message: "原始解析任务尚未完成", retryable: true, requestId } },
+      409,
+    );
+  const sourceIds = new Set(parseRemixSources(sourceJob.values.sources).map((source) => source.assetId));
+  if (!sourceIds.has(body.sourceAssetId))
+    return c.json(
+      { error: { code: "REMIX_SOURCE_NOT_FOUND", message: "当前分镜不属于解析任务", retryable: false, requestId } },
+      404,
+    );
+  const sourceAsset = accounts.getOwnedAsset(ownerUserId, body.sourceAssetId);
+  if (!sourceAsset?.mimeType.startsWith("video/"))
+    return c.json(
+      { error: { code: "INVALID_VIDEO_ASSET", message: "原分镜素材不存在或不是视频", retryable: false, requestId } },
+      422,
+    );
+  if (!ossutils.configured)
+    return c.json(
+      {
+        error: {
+          code: "TOS_NOT_CONFIGURED",
+          message: "分镜生成结果需要保存到素材库，请先配置 TOS",
+          retryable: false,
+          requestId,
+        },
+      },
+      422,
+    );
+  const referenceIds = [...new Set(body.referenceAssetIds)].filter((assetId) => assetId !== body.sourceAssetId);
+  if (referenceIds.length !== body.referenceAssetIds.length)
+    return c.json(
+      { error: { code: "INVALID_REFERENCE_ASSETS", message: "参考素材不能重复", retryable: false, requestId } },
+      422,
+    );
+  const referenceAssets = referenceIds.map((assetId) => accounts.getOwnedAsset(ownerUserId, assetId));
+  if (
+    referenceAssets.some(
+      (asset) => !asset || (!asset.mimeType.startsWith("image/") && !asset.mimeType.startsWith("audio/")),
+    )
+  )
+    return c.json(
+      {
+        error: {
+          code: "INVALID_REFERENCE_ASSETS",
+          message: "额外参考素材仅支持当前账号的图片或音频",
+          retryable: false,
+          requestId,
+        },
+      },
+      422,
+    );
+  const referenceKinds = referenceAssets.map((asset) => (asset?.mimeType.startsWith("image/") ? "image" : "audio"));
+  if (new Set(referenceKinds).size !== referenceKinds.length)
+    return c.json(
+      { error: { code: "INVALID_REFERENCE_ASSETS", message: "每类额外参考素材最多一个", retryable: false, requestId } },
+      422,
+    );
+  const creationValues = {
+    type: "视频",
+    creationKind: "video",
+    prompt: body.prompt,
+    modelId: body.modelId,
+    ratio: body.ratio,
+    resolution: body.resolution,
+    count: "1",
+    seed: "",
+    referenceMode: body.referenceMode,
+    duration: String(body.duration),
+  };
+  const models = creationCapabilities(videoModelEnabled, env.mockGenerateVideoApi ? "mock" : "real");
+  const validationError = validateCreationValues(creationValues, models);
+  if (validationError)
+    return c.json(
+      { error: { code: "INVALID_CREATION_CONFIG", message: validationError, retryable: false, requestId } },
+      422,
+    );
+  if (!videoModelEnabled(body.modelId))
+    return c.json(
+      { error: { code: "VIDEO_MODEL_NOT_VERIFIED", message: "该视频模型尚未通过验证", retryable: false, requestId } },
+      422,
+    );
+  const quote = quoteCreation(creationValues, models);
+  const user = accounts.getUser(ownerUserId);
+  if (!user || user.credits < quote)
+    return c.json(
+      {
+        error: {
+          code: "INSUFFICIENT_CREDITS",
+          message: `本次预计消耗 ${quote} 创作点，当前余额不足`,
+          retryable: false,
+          requestId,
+        },
+      },
+      422,
+    );
+  const idempotencyKey = c.req.header("Idempotency-Key")?.trim().slice(0, 128);
+  if (idempotencyKey) {
+    const existing = store.getByIdempotencyKey(ownerUserId, idempotencyKey);
+    if (existing) return c.json(existing, 202);
+  }
+  const timestamp = new Date().toISOString();
+  const references = [sourceAsset, ...referenceAssets].filter((asset) => asset !== undefined);
+  const job: JobRecord = {
+    id: crypto.randomUUID(),
+    ownerUserId,
+    moduleId: "video-remix",
+    title: `${sourceJob.title} · ${sourceAsset.originalName} · 视频生成`,
+    status: "queued",
+    progress: 0,
+    stage: "排队中",
+    overallExecutionMode: env.mockGenerateVideoApi ? "mock" : "real",
+    values: {
+      ...creationValues,
+      workflowPhase: "shot-generation",
+      sourceJobId: sourceJob.id,
+      sourceAssetId: sourceAsset.id,
+      references: `assets:${JSON.stringify(
+        references.map((asset) => ({ id: asset.id, name: asset.originalName, mimeType: asset.mimeType })),
+      )}`,
+      referenceAssetIds: JSON.stringify(referenceIds),
+      generateAudio: String(body.generateAudio),
+      outputFolderId: accounts.getDefaultAssetFolderId(ownerUserId),
+    },
+    videoModel: body.modelId,
+    executionPlan: [],
+    provenance: [],
+    parentJobId: sourceJob.id,
+    idempotencyKey,
+    cancelRequested: false,
+    providerCancelState: "none",
+    stagingKeys: [],
+    jobSchemaVersion: 2,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  try {
+    store.createCharged(job, quote);
+  } catch (error) {
+    if (error instanceof InsufficientCreditsError)
+      return c.json(
+        {
+          error: {
+            code: "INSUFFICIENT_CREDITS",
+            message: "创作点余额发生变化，请刷新后重试",
+            retryable: false,
+            requestId,
+          },
+        },
+        422,
+      );
+    throw error;
+  }
+  await queue.enqueue(job.id);
+  return c.json(job, 202);
+});
+
+const remixShotJobsRoute = createRoute({
+  method: "get",
+  path: "/api/video-remix/project/{sourceJobId}/shots",
+  operationId: "listVideoRemixShotGenerationJobs",
+  request: { params: z.object({ sourceJobId: z.string().uuid() }) },
+  responses: {
+    200: {
+      description: "Shot generation history",
+      content: { "application/json": { schema: z.object({ jobs: z.array(JobSchema) }) } },
+    },
+    404: { description: "Source analysis not found", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(remixShotJobsRoute, (c) => {
+  const ownerUserId = c.get("userId");
+  const sourceJobId = c.req.valid("param").sourceJobId;
+  const sourceJob = store.getOwned(sourceJobId, ownerUserId);
+  if (sourceJob?.moduleId !== "video-remix" || sourceJob.values.workflowPhase !== "analysis")
+    return c.json(
+      {
+        error: {
+          code: "REMIX_SOURCE_NOT_FOUND",
+          message: "原始解析任务不存在",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      404,
+    );
+  const jobs = store
+    .listChildren(ownerUserId, sourceJob.id, "video-remix")
+    .filter((job) => job.values.workflowPhase === "shot-generation");
+  return c.json({ jobs }, 200);
+});
+
 const remixComposeRoute = createRoute({
   method: "post",
   path: "/api/video-remix/project/compose",
@@ -2909,8 +3145,9 @@ app.openapi(remixComposeRoute, async (c) => {
     );
   const sources = parseRemixSources(sourceJob.values.sources);
   const allowedIds = new Set(sources.map((source) => source.assetId));
-  const orderedIds = body.orderedAssetIds;
-  if (new Set(orderedIds).size !== orderedIds.length || orderedIds.length !== sources.length)
+  const composeSources = body.sources;
+  const sourceIds = composeSources.map((source) => source.sourceAssetId);
+  if (new Set(sourceIds).size !== sourceIds.length || composeSources.length !== sources.length)
     return c.json(
       {
         error: {
@@ -2922,11 +3159,37 @@ app.openapi(remixComposeRoute, async (c) => {
       },
       422,
     );
-  if (orderedIds.some((assetId) => !allowedIds.has(assetId)))
+  if (sourceIds.some((assetId) => !allowedIds.has(assetId)))
     return c.json(
       { error: { code: "INVALID_REMIX_ORDER", message: "合并顺序包含无效视频", retryable: false, requestId } },
       422,
     );
+  const shotJobs = store
+    .listChildren(ownerUserId, sourceJob.id, "video-remix")
+    .filter((job) => job.values.workflowPhase === "shot-generation" && job.status === "succeeded");
+  const invalidSelection = composeSources.find(({ sourceAssetId, selectedAssetId }) => {
+    if (selectedAssetId === sourceAssetId) return false;
+    return !shotJobs.some(
+      (job) =>
+        job.values.sourceAssetId === sourceAssetId &&
+        job.result?.artifacts.some(
+          (artifact) => artifact.id === selectedAssetId && artifact.mimeType.startsWith("video/") && artifact.url,
+        ),
+    );
+  });
+  if (invalidSelection)
+    return c.json(
+      {
+        error: {
+          code: "INVALID_REMIX_SELECTION",
+          message: "选择的生成视频不属于对应原分镜",
+          retryable: false,
+          requestId,
+        },
+      },
+      422,
+    );
+  const orderedIds = composeSources.map((source) => source.selectedAssetId);
   const assets = orderedIds.map((assetId) => accounts.getOwnedAsset(ownerUserId, assetId));
   if (assets.some((asset) => !asset?.mimeType.startsWith("video/")))
     return c.json(
@@ -2951,6 +3214,7 @@ app.openapi(remixComposeRoute, async (c) => {
     values: {
       workflowPhase: "compose",
       sourceJobId: sourceJob.id,
+      composeSources: JSON.stringify(composeSources),
       orderedAssetIds: JSON.stringify(orderedIds),
       outputFolderId: accounts.getDefaultAssetFolderId(ownerUserId),
     },

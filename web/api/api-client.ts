@@ -13,6 +13,7 @@ import {
   createVideoCreateProject,
   createVideoRemixComposeJob,
   createVideoRemixPromptToolJob,
+  createVideoRemixShotGenerationJob,
   deleteAdminCredential,
   deleteAsset as deleteAssetRequest,
   deleteProduct as deleteProductRequest,
@@ -31,6 +32,7 @@ import {
   listAdminUsers,
   listJobs,
   listVideoCreateProjects,
+  listVideoRemixShotGenerationJobs,
   parseAdScriptSource,
   regenerateVideoCreateSection,
   replaceVideoCreateShot,
@@ -578,7 +580,7 @@ export async function generateRemixProject(input: RemixProjectRequest, idempoten
   return data;
 }
 export async function composeRemixVideos(
-  input: { sourceJobId: string; orderedAssetIds: string[] },
+  input: { sourceJobId: string; sources: Array<{ sourceAssetId: string; selectedAssetId: string }> },
   idempotencyKey = randomUuid(),
 ) {
   configure();
@@ -589,6 +591,39 @@ export async function composeRemixVideos(
   });
   if (!data) throw new Error("合并任务创建失败");
   return data;
+}
+export async function generateRemixShot(
+  input: {
+    sourceJobId: string;
+    sourceAssetId: string;
+    prompt: string;
+    modelId: SeedanceModelId;
+    ratio: string;
+    resolution: string;
+    duration: number;
+    referenceMode: string;
+    referenceAssetIds: string[];
+    generateAudio: boolean;
+  },
+  idempotencyKey = randomUuid(),
+) {
+  configure();
+  const { data } = await createVideoRemixShotGenerationJob({
+    body: input,
+    headers: { ...authHeaders(), "Idempotency-Key": idempotencyKey },
+    throwOnError: true,
+  });
+  if (!data) throw new Error("分镜生成任务创建失败");
+  return data;
+}
+export async function fetchRemixShotJobs(sourceJobId: string) {
+  configure();
+  const { data } = await listVideoRemixShotGenerationJobs({
+    path: { sourceJobId },
+    headers: authHeaders(),
+    throwOnError: true,
+  });
+  return data?.jobs ?? [];
 }
 export async function runRemixPromptTool(
   input: {

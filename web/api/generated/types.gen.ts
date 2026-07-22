@@ -1975,10 +1975,86 @@ export type CreateVideoRemixPromptToolJobResponses = {
 
 export type CreateVideoRemixPromptToolJobResponse = CreateVideoRemixPromptToolJobResponses[keyof CreateVideoRemixPromptToolJobResponses];
 
+export type CreateVideoRemixShotGenerationJobData = {
+    body: {
+        sourceJobId: string;
+        sourceAssetId: string;
+        prompt: string;
+        modelId: SeedanceModelId;
+        ratio: string;
+        resolution: string;
+        duration: number;
+        referenceMode?: string;
+        referenceAssetIds?: Array<string>;
+        generateAudio?: boolean;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/video-remix/project/shots/generate';
+};
+
+export type CreateVideoRemixShotGenerationJobErrors = {
+    /**
+     * Source analysis not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Source analysis is not ready
+     */
+    409: ApiErrorResponse;
+    /**
+     * Invalid shot generation input
+     */
+    422: ApiErrorResponse;
+};
+
+export type CreateVideoRemixShotGenerationJobError = CreateVideoRemixShotGenerationJobErrors[keyof CreateVideoRemixShotGenerationJobErrors];
+
+export type CreateVideoRemixShotGenerationJobResponses = {
+    /**
+     * Shot generation job accepted
+     */
+    202: Job;
+};
+
+export type CreateVideoRemixShotGenerationJobResponse = CreateVideoRemixShotGenerationJobResponses[keyof CreateVideoRemixShotGenerationJobResponses];
+
+export type ListVideoRemixShotGenerationJobsData = {
+    body?: never;
+    path: {
+        sourceJobId: string;
+    };
+    query?: never;
+    url: '/api/video-remix/project/{sourceJobId}/shots';
+};
+
+export type ListVideoRemixShotGenerationJobsErrors = {
+    /**
+     * Source analysis not found
+     */
+    404: ApiErrorResponse;
+};
+
+export type ListVideoRemixShotGenerationJobsError = ListVideoRemixShotGenerationJobsErrors[keyof ListVideoRemixShotGenerationJobsErrors];
+
+export type ListVideoRemixShotGenerationJobsResponses = {
+    /**
+     * Shot generation history
+     */
+    200: {
+        jobs: Array<Job>;
+    };
+};
+
+export type ListVideoRemixShotGenerationJobsResponse = ListVideoRemixShotGenerationJobsResponses[keyof ListVideoRemixShotGenerationJobsResponses];
+
 export type CreateVideoRemixComposeJobData = {
     body: {
         sourceJobId: string;
-        orderedAssetIds: Array<string>;
+        sources: Array<{
+            sourceAssetId: string;
+            selectedAssetId: string;
+        }>;
     };
     path?: never;
     query?: never;

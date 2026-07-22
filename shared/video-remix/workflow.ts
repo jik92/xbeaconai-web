@@ -12,6 +12,11 @@ export interface RemixAnalysisEntry extends RemixSourceRef {
   error?: string;
 }
 
+export interface RemixComposeSource {
+  sourceAssetId: string;
+  selectedAssetId: string;
+}
+
 export function parseRemixSources(raw: string | undefined): RemixSourceRef[] {
   try {
     const parsed = JSON.parse(raw || "[]");
@@ -60,4 +65,17 @@ export function moveRemixSource<T>(items: readonly T[], fromIndex: number, toInd
   if (moved === undefined) return [...items];
   next.splice(toIndex, 0, moved);
   return next;
+}
+
+export function parseRemixComposeSources(raw: string | undefined): RemixComposeSource[] {
+  try {
+    const parsed = JSON.parse(raw || "[]");
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (item): item is RemixComposeSource =>
+        Boolean(item) && typeof item.sourceAssetId === "string" && typeof item.selectedAssetId === "string",
+    );
+  } catch {
+    return [];
+  }
 }

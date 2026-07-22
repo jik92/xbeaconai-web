@@ -47,6 +47,9 @@ describe("worker job registry", () => {
     expect(findJobHandler(job("video-remix", { workflowPhase: "prompt-rewrite" })).name).toBe(
       "video-remix-prompt-rewrite",
     );
+    expect(findJobHandler(job("video-remix", { workflowPhase: "shot-generation" })).name).toBe(
+      "video-remix-shot-generation",
+    );
     expect(findJobHandler(job("video-cut", { mergeMode: "video-cut-clips" })).name).toBe("video-clip-merge");
     expect(findJobHandler(job("video-cut")).name).toBe("video-cut");
     expect(findJobHandler(job("video-mashup")).name).toBe("video-mashup");

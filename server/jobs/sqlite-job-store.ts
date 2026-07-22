@@ -204,6 +204,19 @@ export class SqliteJobStore {
       .map((row) => this.fromRow(row));
   }
 
+  listChildren(ownerUserId: string, parentJobId: string, moduleId?: JobModuleId): JobRecord[] {
+    const conditions = [eq(jobs.ownerUserId, ownerUserId), eq(jobs.parentJobId, parentJobId)];
+    if (moduleId) conditions.push(eq(jobs.moduleId, moduleId));
+    return this.db
+      .select()
+      .from(jobs)
+      .where(and(...conditions))
+      .orderBy(desc(jobs.createdAt))
+      .limit(500)
+      .all()
+      .map((row) => this.fromRow(row));
+  }
+
   listAll(input: {
     page: number;
     pageSize: number;

@@ -1533,9 +1533,41 @@ export const zCreateVideoRemixPromptToolJobBody = z.object({
  */
 export const zCreateVideoRemixPromptToolJobResponse = zJob;
 
+export const zCreateVideoRemixShotGenerationJobBody = z.object({
+    sourceJobId: z.uuid(),
+    sourceAssetId: z.uuid(),
+    prompt: z.string().min(20).max(30000),
+    modelId: zSeedanceModelId,
+    ratio: z.string().min(1).max(20),
+    resolution: z.string().min(1).max(20),
+    duration: z.int().gte(4).lte(15),
+    referenceMode: z.string().min(1).max(40).optional().default('omni'),
+    referenceAssetIds: z.array(z.uuid()).max(2).optional().default([]),
+    generateAudio: z.boolean().optional().default(true)
+});
+
+/**
+ * Shot generation job accepted
+ */
+export const zCreateVideoRemixShotGenerationJobResponse = zJob;
+
+export const zListVideoRemixShotGenerationJobsPath = z.object({
+    sourceJobId: z.uuid()
+});
+
+/**
+ * Shot generation history
+ */
+export const zListVideoRemixShotGenerationJobsResponse = z.object({
+    jobs: z.array(zJob)
+});
+
 export const zCreateVideoRemixComposeJobBody = z.object({
     sourceJobId: z.uuid(),
-    orderedAssetIds: z.array(z.uuid()).min(2).max(20)
+    sources: z.array(z.object({
+        sourceAssetId: z.uuid(),
+        selectedAssetId: z.uuid()
+    })).min(2).max(20)
 });
 
 /**

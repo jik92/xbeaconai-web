@@ -1,6 +1,6 @@
-import { existsSync } from "node:fs";
-import { unlink } from "node:fs/promises";
-import { extname, relative, resolve } from "node:path";
+import { mkdtemp, rm, unlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { extname, resolve } from "node:path";
 import { env } from "../../server/env";
 import { generateNumberedMockVideo, type MockVideoRatio, probeMedia } from "../../server/media/ffmpeg";
 import type { SeedanceModelId, SeedanceReferenceKind } from "../../server/models/video-models";
@@ -10,6 +10,7 @@ import { ossutils } from "../../server/storage/ossutils";
 import type { JobRecord } from "../../server/types";
 import type { JobHandlerContext } from "./types";
 import { assetIdsFromValues } from "./utils";
+import { materializeRemoteAsset } from "./video-remix-assets";
 
 const wait = (ms: number) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
 
@@ -70,76 +71,87 @@ export class SeedanceVideoJob {
     if (ids.length && !ossutils.configured)
       throw new SeedanceFlowError("TOS_NOT_CONFIGURED", "TOS 素材中转未配置", false);
     const uploadRoot = resolve(env.dataDir, "uploads");
-    const counts = new Map<SeedanceReferenceKind, number>();
-    let totalBytes = 0;
-    const prepared: Array<{
-      kind: SeedanceReferenceKind;
-      path: string;
-      mimeType: string;
-      sizeBytes: number;
-      extension: string;
-    }> = [];
-    for (const id of ids) {
-      const asset = accounts.getOwnedAsset(job.ownerUserId, id);
-      if (!asset) throw new SeedanceFlowError("ASSET_NOT_AVAILABLE", "引用素材不存在或不属于当前账号", false);
-      const kind = referenceKind(asset.mimeType);
-      if (!kind)
-        throw new SeedanceFlowError("UNSUPPORTED_REFERENCE_TYPE", `Seedance 不支持素材类型 ${asset.mimeType}`, false);
-      counts.set(kind, (counts.get(kind) ?? 0) + 1);
-      if ((counts.get(kind) ?? 0) > 1)
-        throw new SeedanceFlowError("TOO_MANY_REFERENCES", `每类最多上传一个${kind}参考`, false);
-      const limit = kind === "image" ? 10 * 1024 * 1024 : kind === "video" ? 200 * 1024 * 1024 : 50 * 1024 * 1024;
-      if (asset.byteSize > limit) throw new SeedanceFlowError("REFERENCE_TOO_LARGE", `${kind}参考超过大小限制`, false);
-      totalBytes += asset.byteSize;
-      const path = resolve(uploadRoot, asset.storageKey);
-      const local = relative(uploadRoot, path);
-      if (!local || local.startsWith("..") || local.startsWith("/") || !existsSync(path))
-        throw new SeedanceFlowError("INVALID_ASSET_PATH", "素材文件路径无效", false);
-      const file = Bun.file(path);
-      if (file.size !== asset.byteSize)
-        throw new SeedanceFlowError("ASSET_SIZE_MISMATCH", "素材文件大小与记录不一致", false);
-      const probe = await probeMedia(path);
-      if (kind === "video" && !probe.streams.some((stream) => stream.codec_type === "video"))
-        throw new SeedanceFlowError("INVALID_VIDEO_REFERENCE", "视频参考无法解码", false);
-      if (kind === "audio" && !probe.streams.some((stream) => stream.codec_type === "audio"))
-        throw new SeedanceFlowError("INVALID_AUDIO_REFERENCE", "音频参考无法解码", false);
-      if (kind === "image" && !probe.streams.some((stream) => stream.codec_type === "video"))
-        throw new SeedanceFlowError("INVALID_IMAGE_REFERENCE", "图片参考无法解码", false);
-      prepared.push({
-        kind,
-        path,
-        mimeType: asset.mimeType,
-        sizeBytes: asset.byteSize,
-        extension: extname(asset.storageKey),
-      });
-    }
-    if (prepared.length > 3 || totalBytes > 250 * 1024 * 1024)
-      throw new SeedanceFlowError("REFERENCES_TOO_LARGE", "参考素材总量超过限制", false);
+    const tempDir = await mkdtemp(resolve(tmpdir(), "yaozuo-seedance-references-"));
+    try {
+      const counts = new Map<SeedanceReferenceKind, number>();
+      let totalBytes = 0;
+      const prepared: Array<{
+        kind: SeedanceReferenceKind;
+        path: string;
+        mimeType: string;
+        sizeBytes: number;
+        extension: string;
+      }> = [];
+      for (const id of ids) {
+        const asset = accounts.getOwnedAsset(job.ownerUserId, id);
+        if (!asset) throw new SeedanceFlowError("ASSET_NOT_AVAILABLE", "引用素材不存在或不属于当前账号", false);
+        const kind = referenceKind(asset.mimeType);
+        if (!kind)
+          throw new SeedanceFlowError("UNSUPPORTED_REFERENCE_TYPE", `Seedance 不支持素材类型 ${asset.mimeType}`, false);
+        counts.set(kind, (counts.get(kind) ?? 0) + 1);
+        if ((counts.get(kind) ?? 0) > 1)
+          throw new SeedanceFlowError("TOO_MANY_REFERENCES", `每类最多上传一个${kind}参考`, false);
+        const limit = kind === "image" ? 10 * 1024 * 1024 : kind === "video" ? 200 * 1024 * 1024 : 50 * 1024 * 1024;
+        if (asset.byteSize > limit)
+          throw new SeedanceFlowError("REFERENCE_TOO_LARGE", `${kind}参考超过大小限制`, false);
+        totalBytes += asset.byteSize;
+        const path = await materializeRemoteAsset({
+          uploadRoot,
+          tempDir,
+          asset,
+          targetName: `${id}${extname(asset.originalName) || ".bin"}`,
+          label: `${kind}参考素材`,
+          tosConfigured: ossutils.configured,
+          download: (storageKey, filePath) => ossutils.downloadLibraryFile(storageKey, filePath),
+        });
+        const file = Bun.file(path);
+        if (file.size !== asset.byteSize)
+          throw new SeedanceFlowError("ASSET_SIZE_MISMATCH", "素材文件大小与记录不一致", false);
+        const probe = await probeMedia(path);
+        if (kind === "video" && !probe.streams.some((stream) => stream.codec_type === "video"))
+          throw new SeedanceFlowError("INVALID_VIDEO_REFERENCE", "视频参考无法解码", false);
+        if (kind === "audio" && !probe.streams.some((stream) => stream.codec_type === "audio"))
+          throw new SeedanceFlowError("INVALID_AUDIO_REFERENCE", "音频参考无法解码", false);
+        if (kind === "image" && !probe.streams.some((stream) => stream.codec_type === "video"))
+          throw new SeedanceFlowError("INVALID_IMAGE_REFERENCE", "图片参考无法解码", false);
+        prepared.push({
+          kind,
+          path,
+          mimeType: asset.mimeType,
+          sizeBytes: asset.byteSize,
+          extension: extname(asset.storageKey),
+        });
+      }
+      if (prepared.length > 3 || totalBytes > 250 * 1024 * 1024)
+        throw new SeedanceFlowError("REFERENCES_TOO_LARGE", "参考素材总量超过限制", false);
 
-    const references: Array<{ kind: SeedanceReferenceKind; url: string }> = [];
-    if (job.values.portraitId) {
-      const portrait = getPortraitById(Number(job.values.portraitId));
-      if (!portrait) throw new SeedanceFlowError("PORTRAIT_NOT_AVAILABLE", "所选人像不存在", false);
-      if ((counts.get("image") ?? 0) > 0)
-        throw new SeedanceFlowError("TOO_MANY_REFERENCES", "每类最多上传一个图片参考", false);
-      references.push({ kind: "image", url: portrait.source_url });
+      const references: Array<{ kind: SeedanceReferenceKind; url: string }> = [];
+      if (job.values.portraitId) {
+        const portrait = getPortraitById(Number(job.values.portraitId));
+        if (!portrait) throw new SeedanceFlowError("PORTRAIT_NOT_AVAILABLE", "所选人像不存在", false);
+        if ((counts.get("image") ?? 0) > 0)
+          throw new SeedanceFlowError("TOO_MANY_REFERENCES", "每类最多上传一个图片参考", false);
+        references.push({ kind: "image", url: portrait.source_url });
+      }
+      for (const item of prepared) {
+        if (store.get(job.id)?.cancelRequested) throw new SeedanceFlowError("JOB_CANCELLED", "任务已取消", false);
+        const uploaded = await ossutils.putStagedFile({
+          filePath: item.path,
+          sizeBytes: item.sizeBytes,
+          sha256: await sha256File(item.path),
+          mimeType: item.mimeType,
+          jobId: job.id,
+          extension: item.extension,
+        });
+        const latest = store.get(job.id);
+        if (!latest || latest.cancelRequested) throw new SeedanceFlowError("JOB_CANCELLED", "任务已取消", false);
+        this.context.change(job.id, { stagingKeys: [...latest.stagingKeys, uploaded.key] });
+        references.push({ kind: item.kind, url: ossutils.createSignedReadUrl(uploaded.key) });
+      }
+      return references;
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
     }
-    for (const item of prepared) {
-      if (store.get(job.id)?.cancelRequested) throw new SeedanceFlowError("JOB_CANCELLED", "任务已取消", false);
-      const uploaded = await ossutils.putStagedFile({
-        filePath: item.path,
-        sizeBytes: item.sizeBytes,
-        sha256: await sha256File(item.path),
-        mimeType: item.mimeType,
-        jobId: job.id,
-        extension: item.extension,
-      });
-      const latest = store.get(job.id);
-      if (!latest || latest.cancelRequested) throw new SeedanceFlowError("JOB_CANCELLED", "任务已取消", false);
-      this.context.change(job.id, { stagingKeys: [...latest.stagingKeys, uploaded.key] });
-      references.push({ kind: item.kind, url: ossutils.createSignedReadUrl(uploaded.key) });
-    }
-    return references;
   }
 
   private async cleanupStaging(jobId: string) {

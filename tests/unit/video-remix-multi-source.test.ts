@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import {
   moveRemixSource,
   parseRemixAnalysisEntries,
+  parseRemixComposeSources,
   parseRemixSources,
   remixMaxSources,
 } from "../../shared/video-remix/workflow";
@@ -45,19 +46,40 @@ describe("video remix multi-source workflow", () => {
     expect(moveRemixSource(original, -1, 0)).toEqual(original);
   });
 
+  test("preserves the source-to-selected-version mapping for mixed composition", () => {
+    expect(
+      parseRemixComposeSources(
+        JSON.stringify([
+          { sourceAssetId: "source-a", selectedAssetId: "generated-a" },
+          { sourceAssetId: "source-b", selectedAssetId: "source-b" },
+        ]),
+      ),
+    ).toEqual([
+      { sourceAssetId: "source-a", selectedAssetId: "generated-a" },
+      { sourceAssetId: "source-b", selectedAssetId: "source-b" },
+    ]);
+  });
+
   test("publishes a queued compose API and keeps preview separate from starting the merge", async () => {
     const spec = (await Bun.file(resolve(import.meta.dir, "../../openapi/openapi.json")).json()) as {
       paths: Record<string, Record<string, { operationId?: string; responses?: Record<string, unknown> }>>;
     };
     const route = spec.paths["/api/video-remix/project/compose"]?.post;
+    const shotRoute = spec.paths["/api/video-remix/project/shots/generate"]?.post;
+    const shotHistoryRoute = spec.paths["/api/video-remix/project/{sourceJobId}/shots"]?.get;
     const page = readFileSync(resolve(import.meta.dir, "../../web/features/video-remix/remix-project.tsx"), "utf8");
 
     expect(route?.operationId).toBe("createVideoRemixComposeJob");
     expect(route?.responses).toHaveProperty("202");
+    expect(shotRoute?.operationId).toBe("createVideoRemixShotGenerationJob");
+    expect(shotHistoryRoute?.operationId).toBe("listVideoRemixShotGenerationJobs");
     expect(page).toContain("multiple");
     expect(page).toContain("draggable");
     expect(page).toContain("composePreviewSource");
     expect(page).toContain("await composeRemixVideos");
+    expect(page).toContain("<PromptWorkbench");
+    expect(page).toContain("generateRemixShot");
+    expect(page).toContain("selectedShotAssets");
     expect(page).toContain("开始合并");
   });
 });

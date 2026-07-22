@@ -12,6 +12,8 @@ export interface PromptReference {
 export function PromptWorkbench({
   expanded,
   docked = false,
+  embedded = false,
+  lockedReferenceIds = [],
   references,
   prompt,
   placeholder,
@@ -30,6 +32,8 @@ export function PromptWorkbench({
 }: {
   expanded: boolean;
   docked?: boolean;
+  embedded?: boolean;
+  lockedReferenceIds?: readonly string[];
   references: PromptReference[];
   prompt: string;
   placeholder: string;
@@ -47,7 +51,9 @@ export function PromptWorkbench({
   onSubmit: () => void;
 }) {
   return (
-    <section className={`ag-composer ${expanded ? "expanded" : ""} ${docked ? "docked" : ""}`}>
+    <section
+      className={`ag-composer ${expanded ? "expanded" : ""} ${docked ? "docked" : ""} ${embedded ? "embedded" : ""}`}
+    >
       <div className="ag-reference-row">
         <AttachmentPicker
           accept={accept}
@@ -67,9 +73,11 @@ export function PromptWorkbench({
               <b>{reference.name}</b>
               <small>{reference.kind}</small>
             </span>
-            <button aria-label={`移除 ${reference.name}`} onClick={() => onRemoveReference(reference.id)}>
-              <Trash2 />
-            </button>
+            {!lockedReferenceIds.includes(reference.id) && (
+              <button aria-label={`移除 ${reference.name}`} onClick={() => onRemoveReference(reference.id)}>
+                <Trash2 />
+              </button>
+            )}
           </div>
         ))}
       </div>

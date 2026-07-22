@@ -20,7 +20,6 @@ import {
   Search,
   Sparkles,
   Upload,
-  UserRound,
   Video,
   X,
 } from "lucide-react";
@@ -28,15 +27,20 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   composeRemixVideos,
   downloadAuthenticated,
+  fetchCreationCapabilities,
   fetchJob,
   fetchLibraryAssets,
   fetchProducts,
+  fetchRemixShotJobs,
   generateRemixProject,
+  generateRemixShot,
 } from "@/api/api-client";
-import type { Job } from "@/api/generated/types.gen";
+import type { Job, SeedanceModelId } from "@/api/generated/types.gen";
 import { AttachmentPicker, type AttachmentSelection } from "@/components/domain/attachment-picker";
 import { AuthenticatedMedia } from "@/components/domain/authenticated-media";
+import { type PromptReference, PromptWorkbench } from "@/components/domain/prompt-workbench";
 import type { ApiJobResult, LibraryAsset, LibraryProduct } from "@/entities/types";
+import type { CreationModelCapability } from "@/features/ai-creation/ai-creation-composer";
 import { fetchPortraits, type Portrait } from "@/features/portrait-library/portrait-data";
 import type { RemixPromptTool } from "../../../shared/video-remix/prompt-tools";
 import {
@@ -73,6 +77,16 @@ interface SourcePromptState {
   prompt: string;
   versions: PromptVersion[];
   activeVersionId: string;
+}
+
+interface ShotGenerationDraft {
+  modelId: SeedanceModelId;
+  ratio: string;
+  resolution: string;
+  duration: number;
+  referenceMode: string;
+  references: AttachmentSelection[];
+  expanded: boolean;
 }
 
 function PublicPreviewImage({ url, alt }: { url: string; alt: string }) {
@@ -646,6 +660,9 @@ export function RemixProject() {
   const [activeSourceId, setActiveSourceId] = useState("");
   const [composeOrder, setComposeOrder] = useState<string[]>([]);
   const [composePreviewId, setComposePreviewId] = useState("");
+  const [shotDrafts, setShotDrafts] = useState<Record<string, ShotGenerationDraft>>({});
+  const [selectedShotAssets, setSelectedShotAssets] = useState<Record<string, string>>({});
+  const [shotSelectionTouched, setShotSelectionTouched] = useState<Record<string, boolean>>({});
   const [draggingSourceId, setDraggingSourceId] = useState("");
   const [mode, setMode] = useState<"product" | "talking">("product");
   const [projectName, setProjectName] = useState("");
@@ -700,6 +717,82 @@ export function RemixProject() {
     [job],
   );
   const activeAnalysisEntry = analysisEntries.find((entry) => entry.assetId === activeSourceId);
+  const { data: creationCapabilities } = useQuery({
+    queryKey: ["creation-capabilities"],
+    queryFn: fetchCreationCapabilities,
+  });
+  const videoModels = (creationCapabilities?.models ?? []).filter(
+    (model): model is CreationModelCapability & { id: SeedanceModelId } => model.kind === "video" && model.enabled,
+  );
+  const defaultVideoModel = videoModels.find((model) => model.isDefault) ?? videoModels[0];
+  const { data: shotJobs = [], refetch: refetchShotJobs } = useQuery({
+    queryKey: ["video-remix-shot-jobs", job?.id],
+    queryFn: () => fetchRemixShotJobs(job?.id || ""),
+    enabled: Boolean(job?.id && parsed),
+    refetchInterval: (query) =>
+      query.state.data?.some((shotJob) => shotJob.status === "queued" || shotJob.status === "processing")
+        ? 2_500
+        : false,
+  });
+
+  useEffect(() => {
+    if (!defaultVideoModel) return;
+    setShotDrafts((current) => {
+      let changed = false;
+      const next = { ...current };
+      for (const source of sources) {
+        if (next[source.id]) continue;
+        const productImage = selectedProduct?.images[0];
+        next[source.id] = {
+          modelId: defaultVideoModel.id,
+          ratio: defaultVideoModel.supportedRatios.includes("9:16")
+            ? "9:16"
+            : defaultVideoModel.supportedRatios[0] || "9:16",
+          resolution: defaultVideoModel.supportedResolutions.includes("720p")
+            ? "720p"
+            : defaultVideoModel.supportedResolutions[0] || "720p",
+          duration: defaultVideoModel.supportedDurations.includes(5) ? 5 : defaultVideoModel.supportedDurations[0] || 5,
+          referenceMode: defaultVideoModel.referenceModes[0] || "omni",
+          references: productImage
+            ? [
+                {
+                  id: productImage.id,
+                  name: productImage.name,
+                  mimeType: productImage.mimeType,
+                  size: productImage.size,
+                  url: productImage.url,
+                  source: "library",
+                },
+              ]
+            : [],
+          expanded: false,
+        };
+        changed = true;
+      }
+      return changed ? next : current;
+    });
+  }, [defaultVideoModel, selectedProduct, sources]);
+
+  useEffect(() => {
+    setSelectedShotAssets((current) => {
+      const next = { ...current };
+      let changed = false;
+      for (const source of sources) {
+        const latest = shotJobs.find(
+          (shotJob) => shotJob.values.sourceAssetId === source.id && shotJob.status === "succeeded",
+        );
+        const artifact = (latest?.result as ApiJobResult | undefined)?.artifacts.find((item) =>
+          item.mimeType.startsWith("video/"),
+        );
+        const selectedId = artifact?.id ?? source.id;
+        if (!shotSelectionTouched[source.id] && next[source.id] !== selectedId) {
+          next[source.id] = selectedId;
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }, [shotJobs, shotSelectionTouched, sources]);
 
   const patchPromptState = useCallback((assetId: string, update: (current: SourcePromptState) => SourcePromptState) => {
     if (!assetId) return;
@@ -890,6 +983,9 @@ export function RemixProject() {
     setActiveSourceId("");
     setComposeOrder([]);
     setComposePreviewId("");
+    setShotDrafts({});
+    setSelectedShotAssets({});
+    setShotSelectionTouched({});
     setDraggingSourceId("");
     setProjectName("");
     setDescription("");
@@ -944,23 +1040,89 @@ export function RemixProject() {
       {version.id === activePromptVersionId && <Check />}
     </button>
   );
-  const downloadResult = () => {
-    if (!resultVideo?.url) {
-      setNotice("结果文件仍在生成");
-      return;
-    }
-    void downloadAuthenticated(resultVideo.url, resultVideo.name)
-      .then(() => setNotice("已开始下载视频"))
-      .catch(() => setNotice("下载失败，请稍后重试"));
-  };
   const activeSource = sources.find((source) => source.id === activeSourceId) ?? sources[0];
   const sourceAssetId = activeSource?.id || "";
   const fileName = activeSource?.name || "未选择视频";
+  const activeDraft = shotDrafts[sourceAssetId];
+  const activeModel = videoModels.find((model) => model.id === activeDraft?.modelId) ?? defaultVideoModel;
+  const activeShotJobs = shotJobs.filter((shotJob) => shotJob.values.sourceAssetId === sourceAssetId);
+  const activeShotRunning = activeShotJobs.find(
+    (shotJob) => shotJob.status === "queued" || shotJob.status === "processing",
+  );
+  const activeShotVersions = activeShotJobs.flatMap((shotJob) => {
+    if (shotJob.status !== "succeeded") return [];
+    const artifact = (shotJob.result as ApiJobResult | undefined)?.artifacts.find((item) =>
+      item.mimeType.startsWith("video/"),
+    );
+    return artifact ? [{ job: shotJob, artifact }] : [];
+  });
+  const activeSelectedAssetId = selectedShotAssets[sourceAssetId] ?? sourceAssetId;
+  const activeGeneratedVersion = activeShotVersions.find(({ artifact }) => artifact.id === activeSelectedAssetId);
+  const activeGeneratedSequence = activeGeneratedVersion
+    ? activeShotVersions.length - activeShotVersions.indexOf(activeGeneratedVersion)
+    : 0;
+  const activePreview = activeGeneratedVersion?.artifact ?? {
+    id: sourceAssetId,
+    name: fileName,
+    mimeType: activeSource?.mimeType || "video/mp4",
+    url: sourceAssetId ? `/api/assets/${sourceAssetId}/content` : undefined,
+  };
+  const promptReferences: PromptReference[] = activeSource
+    ? [
+        { id: activeSource.id, name: activeSource.name, kind: "video" },
+        ...(activeDraft?.references ?? []).map((reference) => ({
+          id: reference.id,
+          name: reference.name,
+          kind: reference.mimeType.startsWith("image/") ? ("image" as const) : ("audio" as const),
+        })),
+      ]
+    : [];
+  const patchShotDraft = (update: Partial<ShotGenerationDraft>) => {
+    if (!sourceAssetId || !activeDraft) return;
+    setShotDrafts((current) => ({
+      ...current,
+      [sourceAssetId]: { ...current[sourceAssetId], ...update },
+    }));
+  };
+  const submitShotGeneration = async () => {
+    if (!job?.id || !sourceAssetId || !activeDraft || activeShotRunning) return;
+    if (prompt.trim().length < 20) {
+      setNotice("分镜生成提示词至少需要 20 个字符");
+      return;
+    }
+    setNotice("");
+    try {
+      await generateRemixShot({
+        sourceJobId: job.id,
+        sourceAssetId,
+        prompt,
+        modelId: activeDraft.modelId,
+        ratio: activeDraft.ratio,
+        resolution: activeDraft.resolution,
+        duration: activeDraft.duration,
+        referenceMode: activeDraft.referenceMode,
+        referenceAssetIds: activeDraft.references.map((reference) => reference.id),
+        generateAudio: true,
+      });
+      setShotSelectionTouched((current) => ({ ...current, [sourceAssetId]: false }));
+      setNotice("当前分镜已提交生成，可继续处理其他分镜");
+      await refetchShotJobs();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "分镜生成任务提交失败");
+    }
+  };
   const orderedSources = composeOrder
     .map((assetId) => sources.find((source) => source.id === assetId))
     .filter((source): source is AttachmentSelection => Boolean(source));
   const composePreviewSource =
     orderedSources.find((source) => source.id === composePreviewId) ?? orderedSources[0] ?? sources[0];
+  const selectedComposeAssetId = composePreviewSource
+    ? (selectedShotAssets[composePreviewSource.id] ?? composePreviewSource.id)
+    : "";
+  const selectedComposeVersion = shotJobs
+    .filter((shotJob) => shotJob.values.sourceAssetId === composePreviewSource?.id && shotJob.status === "succeeded")
+    .flatMap((shotJob) => (shotJob.result as ApiJobResult | undefined)?.artifacts ?? [])
+    .find((artifact) => artifact.id === selectedComposeAssetId);
   const moveComposeSource = (assetId: string, direction: -1 | 1) => {
     setComposeOrder((current) => {
       const fromIndex = current.indexOf(assetId);
@@ -973,7 +1135,15 @@ export function RemixProject() {
     if (!job?.id || composeOrder.length < 2 || activeComposeJobId) return;
     setNotice("");
     try {
-      setComposeJob(await composeRemixVideos({ sourceJobId: job.id, orderedAssetIds: composeOrder }));
+      setComposeJob(
+        await composeRemixVideos({
+          sourceJobId: job.id,
+          sources: composeOrder.map((sourceId) => ({
+            sourceAssetId: sourceId,
+            selectedAssetId: selectedShotAssets[sourceId] ?? sourceId,
+          })),
+        }),
+      );
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "合并任务提交失败");
     }
@@ -1057,6 +1227,7 @@ export function RemixProject() {
             <div className="source-strip">
               {sources.map((source, index) => {
                 const entry = analysisEntries.find((item) => item.assetId === source.id);
+                const latestShot = shotJobs.find((shotJob) => shotJob.values.sourceAssetId === source.id);
                 return (
                   <button
                     key={source.id}
@@ -1068,16 +1239,26 @@ export function RemixProject() {
                   >
                     <span className="source-mini">
                       <AuthenticatedMedia
-                        url={`/api/assets/${source.id}/content`}
-                        mimeType={source.mimeType}
-                        alt={source.name}
+                        url={`/api/assets/${selectedShotAssets[source.id] ?? source.id}/content`}
+                        mimeType="video/mp4"
+                        alt={`${source.name}${selectedShotAssets[source.id] && selectedShotAssets[source.id] !== source.id ? "生成版本" : "原片"}`}
                         controls={false}
                         loadingText="载入中…"
                         errorText="预览失败"
                       />
                     </span>
                     <b>{source.name}</b>
-                    <i>{entry?.status === "failed" ? "失败" : `v${index + 1}`}</i>
+                    <i>
+                      {entry?.status === "failed"
+                        ? "解析失败"
+                        : latestShot?.status === "queued" || latestShot?.status === "processing"
+                          ? "生成中"
+                          : latestShot?.status === "succeeded"
+                            ? "已生成"
+                            : latestShot?.status === "failed"
+                              ? "生成失败"
+                              : `v${index + 1}`}
+                    </i>
                   </button>
                 );
               })}
@@ -1155,22 +1336,23 @@ export function RemixProject() {
                 <header>
                   <b>
                     <Video />
-                    结果预览 <i>v1</i>
+                    结果预览 <i>{activeGeneratedVersion ? `v${activeGeneratedSequence}` : "原片"}</i>
                   </b>
-                  <button>
+                  <button disabled={!activeShotVersions.length}>
                     <Clock3 />
-                    版本历史（1）
+                    版本历史（{activeShotVersions.length + 1}）
                   </button>
                 </header>
                 <div className="result-main">
                   <div className="result-video">
-                    {sourceAssetId ? (
+                    {activePreview.url ? (
                       <AuthenticatedMedia
-                        url={`/api/assets/${sourceAssetId}/content`}
-                        mimeType={activeSource?.mimeType || "video/mp4"}
-                        alt={fileName}
-                        loadingText="正在载入原始分镜视频…"
-                        errorText="原始分镜视频加载失败"
+                        key={activePreview.id}
+                        url={activePreview.url}
+                        mimeType={activePreview.mimeType}
+                        alt={activePreview.name}
+                        loadingText="正在载入分镜视频…"
+                        errorText="分镜视频加载失败"
                       />
                     ) : (
                       <div className="result-media-empty">
@@ -1180,9 +1362,11 @@ export function RemixProject() {
                     )}
                   </div>
                   <div className="result-info">
-                    <h3>字节Seedance 2.0</h3>
+                    <h3>{activeGeneratedVersion ? activeGeneratedVersion.job.videoModel : "原始片源"}</h3>
                     <p>
-                      2026-07-17 16:39:28　成本：<em>1657星点</em>
+                      {activeGeneratedVersion
+                        ? new Date(activeGeneratedVersion.job.createdAt).toLocaleString()
+                        : "未生成时将使用原始片源参与合成"}
                     </p>
                     <div className="result-assets">
                       {selectedProduct?.images.slice(0, 4).map((image) => (
@@ -1210,10 +1394,10 @@ export function RemixProject() {
                       )}
                     </div>
                     <div className="result-meta">
-                      <i>15秒</i>
-                      <i>9:16</i>
-                      <i>720p</i>
-                      <i>Seed: 1175242905</i>
+                      <i>{activeDraft?.duration ?? 5}秒</i>
+                      <i>{activeDraft?.ratio ?? "9:16"}</i>
+                      <i>{activeDraft?.resolution ?? "720p"}</i>
+                      <i>{activeGeneratedVersion?.artifact.executionMode ?? "原片"}</i>
                     </div>
                     <b className="creative-title">创意描述</b>
                     <pre>{prompt}</pre>
@@ -1226,7 +1410,16 @@ export function RemixProject() {
                         <Pencil />
                         重新编辑
                       </button>
-                      <button disabled={!resultVideo?.url} onClick={downloadResult}>
+                      <button
+                        disabled={!activeGeneratedVersion?.artifact.url}
+                        onClick={() => {
+                          if (activeGeneratedVersion?.artifact.url)
+                            void downloadAuthenticated(
+                              activeGeneratedVersion.artifact.url,
+                              activeGeneratedVersion.artifact.name,
+                            );
+                        }}
+                      >
                         <Download />
                         下载
                       </button>
@@ -1234,23 +1427,140 @@ export function RemixProject() {
                   </div>
                 </div>
               </article>
-              <article className="shot-prompt-row">
-                <div className="shot-portrait">
-                  {selectedPortrait ? (
-                    <PublicPreviewImage
-                      key={selectedPortrait.source_url}
-                      url={selectedPortrait.source_url}
-                      alt={selectedPortrait.name}
-                    />
-                  ) : (
-                    <UserRound />
-                  )}
-                </div>
-                <button>
-                  <Plus />
+              <div className="shot-version-strip">
+                <button
+                  className={activeSelectedAssetId === sourceAssetId ? "active" : ""}
+                  onClick={() => {
+                    setSelectedShotAssets((current) => ({ ...current, [sourceAssetId]: sourceAssetId }));
+                    setShotSelectionTouched((current) => ({ ...current, [sourceAssetId]: true }));
+                  }}
+                >
+                  <b>原片</b>
+                  <small>用于合成</small>
                 </button>
-                <pre>{prompt}</pre>
-              </article>
+                {activeShotVersions.map(({ artifact }, index) => (
+                  <button
+                    key={artifact.id}
+                    className={activeSelectedAssetId === artifact.id ? "active" : ""}
+                    onClick={() => {
+                      setSelectedShotAssets((current) => ({ ...current, [sourceAssetId]: artifact.id }));
+                      setShotSelectionTouched((current) => ({ ...current, [sourceAssetId]: true }));
+                    }}
+                  >
+                    <b>生成 v{activeShotVersions.length - index}</b>
+                    <small>{artifact.executionMode}</small>
+                  </button>
+                ))}
+                {activeShotRunning && (
+                  <span>
+                    <LoaderCircle className="animate-spin" />
+                    {activeShotRunning.stage} {activeShotRunning.progress}%
+                  </span>
+                )}
+                {activeShotJobs[0]?.status === "failed" && (
+                  <span className="failed">{activeShotJobs[0].error?.message}</span>
+                )}
+              </div>
+              {activeDraft && (
+                <PromptWorkbench
+                  embedded
+                  expanded={activeDraft.expanded}
+                  references={promptReferences}
+                  lockedReferenceIds={sourceAssetId ? [sourceAssetId] : []}
+                  prompt={prompt}
+                  placeholder="描述当前镜头的动作、主体、场景与运镜"
+                  inputLabel="当前分镜生成提示词"
+                  accept="image/*,audio/*"
+                  multiple
+                  submitting={Boolean(activeShotRunning)}
+                  onChooseAssets={(assets) => {
+                    const merged = [...activeDraft.references];
+                    for (const asset of assets) {
+                      const kind = asset.mimeType.split("/")[0];
+                      const existingIndex = merged.findIndex((item) => item.mimeType.startsWith(`${kind}/`));
+                      if (existingIndex >= 0) merged.splice(existingIndex, 1, asset);
+                      else merged.push(asset);
+                    }
+                    patchShotDraft({ references: merged.slice(0, 2) });
+                  }}
+                  onRemoveReference={(id) =>
+                    patchShotDraft({ references: activeDraft.references.filter((reference) => reference.id !== id) })
+                  }
+                  onPromptChange={(value) => {
+                    setPrompt(value);
+                    setActivePromptVersionId("");
+                  }}
+                  onExpandedChange={(expanded) => patchShotDraft({ expanded })}
+                  onSubmit={() => void submitShotGeneration()}
+                  controls={
+                    <>
+                      <select
+                        aria-label="视频模型"
+                        value={activeDraft.modelId}
+                        onChange={(event) => {
+                          const model = videoModels.find((item) => item.id === event.target.value);
+                          if (!model) return;
+                          patchShotDraft({
+                            modelId: model.id,
+                            ratio: model.supportedRatios.includes(activeDraft.ratio)
+                              ? activeDraft.ratio
+                              : model.supportedRatios[0],
+                            resolution: model.supportedResolutions.includes(activeDraft.resolution)
+                              ? activeDraft.resolution
+                              : model.supportedResolutions[0],
+                            duration: model.supportedDurations.includes(activeDraft.duration)
+                              ? activeDraft.duration
+                              : model.supportedDurations[0],
+                            referenceMode: model.referenceModes[0] || "omni",
+                          });
+                        }}
+                      >
+                        {videoModels.map((model) => (
+                          <option key={model.id} value={model.id}>
+                            {model.displayName}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        aria-label="画面比例"
+                        value={activeDraft.ratio}
+                        onChange={(event) => patchShotDraft({ ratio: event.target.value })}
+                      >
+                        {(activeModel?.supportedRatios ?? []).map((value) => (
+                          <option key={value}>{value}</option>
+                        ))}
+                      </select>
+                      <select
+                        aria-label="清晰度"
+                        value={activeDraft.resolution}
+                        onChange={(event) => patchShotDraft({ resolution: event.target.value })}
+                      >
+                        {(activeModel?.supportedResolutions ?? []).map((value) => (
+                          <option key={value}>{value}</option>
+                        ))}
+                      </select>
+                      <select
+                        aria-label="视频时长"
+                        value={activeDraft.duration}
+                        onChange={(event) => patchShotDraft({ duration: Number(event.target.value) })}
+                      >
+                        {(activeModel?.supportedDurations ?? []).map((value) => (
+                          <option key={value} value={value}>
+                            {value}秒
+                          </option>
+                        ))}
+                      </select>
+                    </>
+                  }
+                />
+              )}
+              {!activeDraft && <div className="shot-generation-unavailable">当前没有已启用的视频生成模型</div>}
+              <footer className="stage-actions shot-stage-actions">
+                <span>未生成的镜头将直接使用原始片源</span>
+                <button className="primary" onClick={() => setStage(4)}>
+                  下一步
+                </button>
+              </footer>
             </div>
           )}
           {stage === 4 && (
@@ -1287,9 +1597,9 @@ export function RemixProject() {
                       onClick={() => setComposePreviewId(source.id)}
                     >
                       <AuthenticatedMedia
-                        url={`/api/assets/${source.id}/content`}
-                        mimeType={source.mimeType}
-                        alt={source.name}
+                        url={`/api/assets/${selectedShotAssets[source.id] ?? source.id}/content`}
+                        mimeType="video/mp4"
+                        alt={`${source.name}${selectedShotAssets[source.id] && selectedShotAssets[source.id] !== source.id ? "生成版本" : "原片"}`}
                         controls={false}
                         loadingText="载入中…"
                         errorText="预览失败"
@@ -1297,7 +1607,14 @@ export function RemixProject() {
                       <b>{index + 1}</b>
                     </button>
                     <footer>
-                      <span title={source.name}>{source.name}</span>
+                      <span title={source.name}>
+                        {source.name}
+                        <small>
+                          {selectedShotAssets[source.id] && selectedShotAssets[source.id] !== source.id
+                            ? "生成版本"
+                            : "原片"}
+                        </small>
+                      </span>
                       <div>
                         <button
                           type="button"
@@ -1338,9 +1655,10 @@ export function RemixProject() {
                     <AuthenticatedMedia url={resultVideo.url} mimeType={resultVideo.mimeType} alt={resultVideo.name} />
                   ) : composePreviewSource ? (
                     <AuthenticatedMedia
-                      url={`/api/assets/${composePreviewSource.id}/content`}
-                      mimeType={composePreviewSource.mimeType}
-                      alt={composePreviewSource.name}
+                      key={selectedComposeAssetId}
+                      url={selectedComposeVersion?.url ?? `/api/assets/${selectedComposeAssetId}/content`}
+                      mimeType={selectedComposeVersion?.mimeType ?? "video/mp4"}
+                      alt={`${composePreviewSource.name}待合并版本`}
                       loadingText="正在载入待合并视频…"
                       errorText="待合并视频预览失败"
                     />

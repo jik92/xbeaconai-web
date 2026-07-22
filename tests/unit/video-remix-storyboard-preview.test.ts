@@ -6,10 +6,12 @@ const page = readFileSync(resolve(import.meta.dir, "../../web/features/video-rem
 const storyboard = page.split("{stage === 3 && (")[1]?.split("{stage === 4 && (")[0] ?? "";
 
 describe("video remix storyboard media preview", () => {
-  test("previews the selected original video through the authenticated asset route", () => {
-    expect(storyboard).toMatch(/url=\{`\/api\/assets\/\$\{sourceAssetId\}\/content`\}/);
-    expect(storyboard).toContain('loadingText="正在载入原始分镜视频…"');
-    expect(storyboard).toContain('errorText="原始分镜视频加载失败"');
+  test("previews the selected original or generated version through an authenticated asset route", () => {
+    expect(page).toContain("activeGeneratedVersion?.artifact ??");
+    expect(page).toContain("`/api/assets/${sourceAssetId}/content`");
+    expect(storyboard).toContain("url={activePreview.url}");
+    expect(storyboard).toContain('loadingText="正在载入分镜视频…"');
+    expect(storyboard).toContain('errorText="分镜视频加载失败"');
     expect(storyboard).not.toContain('<div className="warehouse-scene">');
   });
 
@@ -23,6 +25,6 @@ describe("video remix storyboard media preview", () => {
   test("handles public portrait failures and disables unavailable result downloads", () => {
     expect(page).toContain('className="public-image-error"');
     expect(page).toContain("onError={() => setFailed(true)}");
-    expect(storyboard).toContain("disabled={!resultVideo?.url}");
+    expect(storyboard).toContain("disabled={!activeGeneratedVersion?.artifact.url}");
   });
 });

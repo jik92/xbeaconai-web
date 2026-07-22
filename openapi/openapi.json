@@ -5978,6 +5978,173 @@
         }
       }
     },
+    "/api/video-remix/project/shots/generate": {
+      "post": {
+        "operationId": "createVideoRemixShotGenerationJob",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sourceJobId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "sourceAssetId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "prompt": {
+                    "type": "string",
+                    "minLength": 20,
+                    "maxLength": 30000
+                  },
+                  "modelId": {
+                    "$ref": "#/components/schemas/SeedanceModelId"
+                  },
+                  "ratio": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 20
+                  },
+                  "resolution": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 20
+                  },
+                  "duration": {
+                    "type": "integer",
+                    "minimum": 4,
+                    "maximum": 15
+                  },
+                  "referenceMode": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40,
+                    "default": "omni"
+                  },
+                  "referenceAssetIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "maxItems": 2,
+                    "default": []
+                  },
+                  "generateAudio": {
+                    "type": "boolean",
+                    "default": true
+                  }
+                },
+                "required": [
+                  "sourceJobId",
+                  "sourceAssetId",
+                  "prompt",
+                  "modelId",
+                  "ratio",
+                  "resolution",
+                  "duration"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Shot generation job accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Source analysis not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Source analysis is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid shot generation input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/video-remix/project/{sourceJobId}/shots": {
+      "get": {
+        "operationId": "listVideoRemixShotGenerationJobs",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "sourceJobId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Shot generation history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jobs": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Job"
+                      }
+                    }
+                  },
+                  "required": [
+                    "jobs"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Source analysis not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/video-remix/project/compose": {
       "post": {
         "operationId": "createVideoRemixComposeJob",
@@ -5992,11 +6159,24 @@
                     "type": "string",
                     "format": "uuid"
                   },
-                  "orderedAssetIds": {
+                  "sources": {
                     "type": "array",
                     "items": {
-                      "type": "string",
-                      "format": "uuid"
+                      "type": "object",
+                      "properties": {
+                        "sourceAssetId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "selectedAssetId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "required": [
+                        "sourceAssetId",
+                        "selectedAssetId"
+                      ]
                     },
                     "minItems": 2,
                     "maxItems": 20
@@ -6004,7 +6184,7 @@
                 },
                 "required": [
                   "sourceJobId",
-                  "orderedAssetIds"
+                  "sources"
                 ]
               }
             }
