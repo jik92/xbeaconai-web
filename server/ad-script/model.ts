@@ -13,14 +13,31 @@ import {
   totalScore,
 } from "./types";
 
+const SemanticFindingWithoutSourceSchema = AdScriptComplianceFindingSchema.omit({ source: true });
+const RecoverableSemanticFindingSchema = z.union([
+  SemanticFindingWithoutSourceSchema,
+  z
+    .string()
+    .trim()
+    .min(1)
+    .max(1_000)
+    .transform((message) => ({
+      ruleId: "ai-semantic-risk",
+      severity: "warning" as const,
+      excerpt: "",
+      message,
+      suggestion: "请人工复核相关表述",
+    })),
+]);
 const EvaluationSchema = AdScriptScoresSchema.extend({
   suggestions: z.array(z.string().max(500)).max(12),
-  semanticFindings: AdScriptComplianceFindingSchema.omit({ source: true }).array().max(12),
+  semanticFindings: RecoverableSemanticFindingSchema.array().max(12),
 });
 const ScriptSchema = z.object({ script: z.string().min(20).max(4_000) });
 const OptimizedScriptSchema = ScriptSchema.extend({ changeSummary: z.string().min(1).max(1_000) });
 const ScoredScriptSchema = ScriptSchema.extend(EvaluationSchema.shape);
 const ScoredOptimizedScriptSchema = OptimizedScriptSchema.extend(EvaluationSchema.shape);
+const semanticFindingsContract = `semanticFindings 必须是数组。每项必须是对象：{"ruleId":"规则标识","severity":"warning 或 blocking","excerpt":"原文摘录","message":"风险说明","suggestion":"修改建议"}，start/end 为可选非负整数。没有风险时返回 []；禁止返回字符串数组。`;
 
 let modelCheck: { expiresAt: number; available: boolean } | undefined;
 
@@ -43,6 +60,10 @@ export function parseAdScriptModelJson(text: string) {
   const end = cleaned.lastIndexOf("}");
   if (start < 0 || end <= start) throw new Error("JSON_OBJECT_NOT_FOUND");
   return JSON.parse(cleaned.slice(start, end + 1)) as unknown;
+}
+
+export function parseAdScriptModelEvaluation(value: unknown) {
+  return EvaluationSchema.parse(value);
 }
 
 function remainingBudget(deadlineAt?: number) {
@@ -101,7 +122,10 @@ export async function generateStructured<T>(
         repairContext = "\n上一次输出无法通过 JSON Schema 校验。只返回一个完整 JSON 对象，不要 Markdown。";
         continue;
       }
-      throw new AdScriptModelError("MODEL_OUTPUT_INVALID", message, true);
+      console.warn("[ad-script-model] structured output remained invalid after retry", {
+        reason: message.slice(0, 1_000),
+      });
+      throw new AdScriptModelError("MODEL_OUTPUT_INVALID", "模型返回格式不稳定，系统已自动重试；请重新生成", true);
     }
   }
   throw new AdScriptModelError("MODEL_OUTPUT_INVALID", "模型输出无法解析", true);
@@ -128,6 +152,7 @@ export async function generateScoredInitialScript(input: AdScriptInput, variantO
   const result = await generateStructured(
     `你是专业中文短视频口播编导和严格评审。生成第 ${variantOrdinal} 个差异化脚本，并在同一次响应中完成四维评分和语义广告风险检测。
 每项评分为 0-25 整数。严格返回：{"script":"...","openingAttraction":0,"painResonance":0,"benefitClarity":0,"callToAction":0,"suggestions":[],"semanticFindings":[]}。
+${semanticFindingsContract}
 脚本需符合目标字数，包含明确但不过度承诺的 CTA，避免绝对化和保证性表达。输入：${JSON.stringify(input)}`,
     ScoredScriptSchema,
     { maxTokens: 2_400, deadlineAt },
@@ -148,6 +173,7 @@ export async function optimizeScoredScript(
   const result = await generateStructured(
     `你是中文短视频口播改稿专家和严格评审。根据问题改写脚本，并在同一次响应中重新完成四维评分和语义广告风险检测。
 每项评分为 0-25 整数。严格返回：{"script":"...","changeSummary":"...","openingAttraction":0,"painResonance":0,"benefitClarity":0,"callToAction":0,"suggestions":[],"semanticFindings":[]}。
+${semanticFindingsContract}
 保留事实，不虚构证明材料。这是第 ${input.round} 轮。业务输入：${JSON.stringify(input.projectInput)}
 当前评分：${JSON.stringify(input.score)}
 合规问题：${JSON.stringify(input.compliance.findings)}
@@ -186,7 +212,8 @@ export async function evaluateScript(
   const evaluation = await generateStructured(
     `你是严格的中文广告脚本评审。每项只能给 0-25 整数分，并提供具体建议和仅靠语义才能发现的广告风险。
 严格返回：{"openingAttraction":0,"painResonance":0,"benefitClarity":0,"callToAction":0,"suggestions":[],"semanticFindings":[]}
-semanticFindings 每项包含 ruleId、severity（warning/blocking）、excerpt、message、suggestion，可选 start/end；不要重复简单极限词规则。
+${semanticFindingsContract}
+不要重复简单极限词规则。
 业务输入：${JSON.stringify(input)}\n脚本：${script}`,
     EvaluationSchema,
     { maxTokens: 2_000, deadlineAt },

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AdScriptStore, AdScriptVersionConflictError } from "../../server/ad-script/ad-script-store";
 import { checkAdScriptCompliance } from "../../server/ad-script/compliance";
-import { parseAdScriptModelJson } from "../../server/ad-script/model";
+import { parseAdScriptModelEvaluation, parseAdScriptModelJson } from "../../server/ad-script/model";
 import {
   AD_SCRIPT_OPERATION_BUDGET_MS,
   type AdScriptInput,
@@ -93,6 +93,45 @@ describe("ad script domain", () => {
   test("extracts JSON from fenced model output", () => {
     expect(parseAdScriptModelJson('```json\n{"script":"可用脚本"}\n```')).toEqual({ script: "可用脚本" });
     expect(() => parseAdScriptModelJson("没有 JSON")).toThrow("JSON_OBJECT_NOT_FOUND");
+  });
+
+  test("normalizes string semantic findings without hiding malformed structures", () => {
+    const baseEvaluation = {
+      openingAttraction: 20,
+      painResonance: 20,
+      benefitClarity: 20,
+      callToAction: 20,
+      suggestions: ["强化行动指引"],
+    };
+    const normalized = parseAdScriptModelEvaluation({
+      ...baseEvaluation,
+      semanticFindings: ["疗效承诺需要人工复核"],
+    });
+
+    expect(normalized.semanticFindings).toEqual([
+      {
+        ruleId: "ai-semantic-risk",
+        severity: "warning",
+        excerpt: "",
+        message: "疗效承诺需要人工复核",
+        suggestion: "请人工复核相关表述",
+      },
+    ]);
+    expect(
+      parseAdScriptModelEvaluation({
+        ...baseEvaluation,
+        semanticFindings: [
+          {
+            ruleId: "medical-claim",
+            severity: "blocking",
+            excerpt: "保证见效",
+            message: "包含保证性疗效承诺",
+            suggestion: "改为客观描述",
+          },
+        ],
+      }).semanticFindings[0],
+    ).toMatchObject({ ruleId: "medical-claim", severity: "blocking" });
+    expect(() => parseAdScriptModelEvaluation({ ...baseEvaluation, semanticFindings: [42] })).toThrow();
   });
 
   test("isolates owners, versions batches, and only refunds a fully failed batch once", async () => {
