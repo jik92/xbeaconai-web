@@ -234,17 +234,6 @@ export function VideoExtractPage() {
 
   return (
     <main className="utility-task-page">
-      <header className="utility-page-header">
-        <div>
-          <span>实用工具</span>
-          <h1>视频提取</h1>
-          <p>粘贴分享文案、短链接或直接视频 URL，自动识别并保存到素材库。</p>
-        </div>
-        <button className="primary-action" type="button" onClick={openDialog}>
-          <Plus size={16} />
-          新建任务
-        </button>
-      </header>
 
       {/* ── Unified job list ──────────────────────────────────────────── */}
       <section className="utility-job-list" aria-label="任务列表">

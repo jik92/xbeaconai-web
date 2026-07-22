@@ -109,17 +109,6 @@ export function VideoMashupPage() {
   const result = selectedJob?.result as ApiJobResult | undefined;
   return (
     <main className="mashup-page">
-      <header className="mashup-page-header">
-        <div>
-          <span>AI 工具箱</span>
-          <h1>视频混剪</h1>
-          <p>从每个视频组选择一个素材，批量生成差异化成片。</p>
-        </div>
-        <button type="button" className="primary-action" onClick={openCreator}>
-          <Plus />
-          新建混剪任务
-        </button>
-      </header>
       <section className="mashup-dashboard">
         <div className="mashup-task-list">
           <header>

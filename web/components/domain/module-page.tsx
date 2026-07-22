@@ -1460,35 +1460,6 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
         </div>
       )}
       <section className={`tasks-section${isVideoCutPage ? " video-cut-tasks" : ""}`}>
-        {isVideoCutPage && (
-          <header className="video-cut-page-head">
-            <div>
-              <span>VIDEO CUT</span>
-              <h1>AI视频分割</h1>
-              <p>识别镜头边界与文案动作，将长视频拆分为可复用片段。</p>
-            </div>
-            <div className="video-cut-page-actions">
-              <dl>
-                <div>
-                  <dt>全部任务</dt>
-                  <dd>{tasks.length}</dd>
-                </div>
-                <div>
-                  <dt>处理中</dt>
-                  <dd>{activeTaskCount}</dd>
-                </div>
-                <div>
-                  <dt>已完成</dt>
-                  <dd>{finishedTaskCount}</dd>
-                </div>
-              </dl>
-              <button type="button" className="new-task-button" onClick={() => setCreatorOpen(true)}>
-                <Plus />
-                新建分割任务
-              </button>
-            </div>
-          </header>
-        )}
         <TaskSearchFilters compact={isVideoCutPage} onSearch={setAppliedFilters} />
         {!isVideoCutPage && (
           <div className="task-toolbar">
