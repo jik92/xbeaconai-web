@@ -16,7 +16,7 @@ test.beforeEach(async ({ page }) => {
 
 test("configures a real ad-script workflow across all three steps", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "口播脚本" })).toBeVisible();
-  await expect(page.getByText("deepseek/deepseek-v4-pro")).toBeVisible();
+  await expect(page.getByText(/deepseek/i)).toHaveCount(0);
   await page.getByRole("button", { name: /本地到店/ }).click();
   await page.getByRole("button", { name: "下一步" }).click();
 
