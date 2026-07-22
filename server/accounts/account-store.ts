@@ -147,7 +147,7 @@ const userSummary = (row: UserRow): UserSummary => ({
   phone: row.phone,
   displayName: row.displayName,
   credits: row.credits,
-  isAdmin: row.phone === env.adminPhone,
+  isAdmin: env.adminPhones.has(row.phone),
 });
 const adminUserSummary = (row: UserRow): AdminUserSummary => ({
   ...userSummary(row),
@@ -562,7 +562,7 @@ export class AccountStore {
   setAdminUserStatus(input: { userId: string; adminUserId: string; status: "active" | "disabled" }): AdminUserSummary {
     const user = this.getUserSecurity(input.userId);
     if (!user) throw new AccountError("USER_NOT_FOUND", "账号不存在", 404);
-    if (input.status === "disabled" && (input.userId === input.adminUserId || user.phone === env.adminPhone))
+    if (input.status === "disabled" && (input.userId === input.adminUserId || env.adminPhones.has(user.phone)))
       throw new AccountError("ADMIN_SELF_DISABLE_FORBIDDEN", "不能注销管理员账号", 409);
     if (user.status === input.status) return adminUserSummary(user);
     if (input.status === "disabled" && user.status !== "active")

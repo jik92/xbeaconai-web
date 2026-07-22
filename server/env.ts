@@ -8,6 +8,14 @@ const configuredAllowedOrigins = (process.env.ALLOWED_ORIGINS ?? "")
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
+export const parseAdminPhones = (value: string) =>
+  new Set(
+    value
+      .split(",")
+      .map((phone) => phone.trim())
+      .filter(Boolean),
+  );
+const configuredAdminPhones = parseAdminPhones(process.env.ADMIN_PHONE ?? "17688743518");
 const generatedJwtSecret = crypto.randomUUID().replaceAll("-", "") + crypto.randomUUID().replaceAll("-", "");
 if (!process.env.JWT_SECRET) console.warn("JWT_SECRET 未配置：当前进程使用临时开发密钥，重启后所有登录会话失效。");
 if (process.env.NODE_ENV === "production" && !process.env.JWT_SECRET) throw new Error("生产启动必须配置 JWT_SECRET");
@@ -47,7 +55,7 @@ export const env = {
   tos: APP_CONFIG.providerDefaults.tos,
   jwtSecret: process.env.JWT_SECRET ?? generatedJwtSecret,
   authRateLimitMax: Number(process.env.AUTH_RATE_LIMIT_MAX ?? 12),
-  adminPhone: process.env.ADMIN_PHONE ?? "17688743518",
+  adminPhones: configuredAdminPhones,
   smsVerificationFixedCode: process.env.SMS_VERIFICATION_FIXED_CODE ?? "",
   allowedOrigins: new Set([
     "http://127.0.0.1:5173",

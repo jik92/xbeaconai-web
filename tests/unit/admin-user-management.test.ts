@@ -7,6 +7,11 @@ import { env } from "../../server/env";
 import { createTestAccountStore, registerTestAccount } from "./account-test-helper";
 
 const databases: string[] = [];
+const primaryAdminPhone = () => {
+  const phone = env.adminPhones.values().next().value;
+  if (!phone) throw new Error("ADMIN_PHONE must contain at least one phone number");
+  return phone;
+};
 
 afterEach(() => {
   for (const path of databases.splice(0)) {
@@ -22,7 +27,7 @@ describe("admin user management", () => {
     databases.push(path);
     const store = createTestAccountStore(path);
     const admin = await registerTestAccount(store, {
-      phone: env.adminPhone,
+      phone: primaryAdminPhone(),
       password: "Password123",
       displayName: "管理员",
     });
@@ -79,5 +84,38 @@ describe("admin user management", () => {
     ).toThrow(new AccountError("ADMIN_SELF_DISABLE_FORBIDDEN", "不能注销管理员账号", 409));
 
     store.close();
+  });
+
+  test("recognizes every configured administrator and prevents disabling any of them", async () => {
+    const secondaryAdminPhone = "13900000098";
+    env.adminPhones.add(secondaryAdminPhone);
+    const path = join(tmpdir(), `multiple-admin-users-${crypto.randomUUID()}.sqlite`);
+    databases.push(path);
+    const store = createTestAccountStore(path);
+    try {
+      const primary = await registerTestAccount(store, {
+        phone: primaryAdminPhone(),
+        password: "Password123",
+        displayName: "主管理员",
+      });
+      const secondary = await registerTestAccount(store, {
+        phone: secondaryAdminPhone,
+        password: "Password123",
+        displayName: "次管理员",
+      });
+
+      expect(primary.user.isAdmin).toBe(true);
+      expect(secondary.user.isAdmin).toBe(true);
+      expect(() =>
+        store.setAdminUserStatus({
+          userId: secondary.user.id,
+          adminUserId: primary.user.id,
+          status: "disabled",
+        }),
+      ).toThrow(new AccountError("ADMIN_SELF_DISABLE_FORBIDDEN", "不能注销管理员账号", 409));
+    } finally {
+      store.close();
+      env.adminPhones.delete(secondaryAdminPhone);
+    }
   });
 });
