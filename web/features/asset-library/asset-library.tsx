@@ -17,7 +17,7 @@ import {
   X,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   deleteLibraryAsset,
   deleteLibraryProduct,
@@ -29,8 +29,9 @@ import {
   uploadProduct,
 } from "@/api/api-client";
 import { AuthenticatedMedia } from "@/components/domain/authenticated-media";
+import { FileUpload } from "@/components/domain/file-upload";
 import { DataTable } from "@/components/ui/data-table";
-import type { AssetFolder, LibraryAsset, LibraryProduct } from "@/entities/types";
+import type { LibraryAsset, LibraryProduct } from "@/entities/types";
 import { AssetFolderSpace } from "./asset-folder-space";
 import { fitMediaPreviewSize } from "./media-preview-size";
 import "./asset-library.css";
@@ -50,16 +51,22 @@ function ProductLibrary() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [sharingScope, setSharingScope] = useState<LibraryProduct["sharingScope"]>("private");
-  const previews = useMemo(() => files.map((file) => URL.createObjectURL(file)), [files]);
-  useEffect(() => () => previews.forEach(URL.revokeObjectURL), [previews]);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const { data = [], isLoading, error } = useQuery({ queryKey: ["product-library"], queryFn: fetchProducts });
   const upload = useMutation({
     mutationFn: () => {
       if (!files.length) throw new Error("请至少选择一张商品图");
       if (!name.trim()) throw new Error("请填写产品名称");
-      return uploadProduct({ files, name: name.trim(), description: description.trim(), sharingScope });
+      return uploadProduct({
+        files,
+        name: name.trim(),
+        description: description.trim(),
+        sharingScope,
+        onProgress: setUploadProgress,
+      });
     },
+    onMutate: () => setUploadProgress(0),
     onSuccess: (product) => {
       void queryClient.invalidateQueries({ queryKey: ["product-library"] });
       void queryClient.invalidateQueries({ queryKey: ["asset-library", "product"] });
@@ -68,6 +75,7 @@ function ProductLibrary() {
       setName("");
       setDescription("");
       setSharingScope("private");
+      setUploadProgress(0);
       setSelected(product);
     },
   });
@@ -181,24 +189,31 @@ function ProductLibrary() {
                 </label>
               ))}
             </fieldset>
-            <label className="asset-file-drop product-file-drop">
-              <input
-                type="file"
-                multiple
-                accept="image/png,image/jpeg,image/webp"
-                onChange={(event) => setFiles(Array.from(event.target.files || []).slice(0, 8))}
-              />
-              <Upload />
-              <b>{files.length ? `已选择 ${files.length} 张商品图` : "点击选择多张商品图"}</b>
-              <span>PNG、JPG、WEBP，最多 8 张，创作时将全部提供给 AI</span>
-            </label>
-            {!!previews.length && (
-              <div className="product-upload-previews">
-                {previews.map((preview, index) => (
-                  <img key={preview} src={preview} alt={`待上传商品图 ${index + 1}`} />
-                ))}
-              </div>
-            )}
+            <FileUpload
+              className="mx-5 my-4"
+              label="商品图片"
+              multiple
+              accept="image/png,image/jpeg,image/webp"
+              files={files}
+              uploading={upload.isPending}
+              progress={uploadProgress}
+              error={upload.error?.message}
+              description={
+                files.length
+                  ? `已选择 ${files.length} 张商品图，最多上传 8 张。`
+                  : "PNG、JPG、WEBP，最多 8 张，创作时将全部提供给 AI。"
+              }
+              onFilesChange={(nextFiles) => {
+                upload.reset();
+                setUploadProgress(0);
+                setFiles(nextFiles.slice(0, 8));
+              }}
+              onClear={() => {
+                upload.reset();
+                setFiles([]);
+                setUploadProgress(0);
+              }}
+            />
             <label>
               形态描述
               <textarea
@@ -208,7 +223,6 @@ function ProductLibrary() {
                 placeholder="描述产品形态、材质、卖点等"
               />
             </label>
-            {upload.error && <p className="asset-upload-error">{upload.error.message}</p>}
             <ModalFooter
               disabled={!files.length || !name.trim() || upload.isPending}
               pending={upload.isPending}
@@ -519,7 +533,7 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
         name.trim() || file.name.replace(/\.[^.]+$/, ""),
         description,
         kind === "media" ? selectedFolderId || folders[0]?.id : undefined,
-        kind === "media" ? setUploadProgress : undefined,
+        setUploadProgress,
         metadata,
       );
     },
@@ -685,37 +699,37 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
               title={kind === "voice" ? "上传音色" : "上传素材"}
               onClose={() => setUploadOpen(false)}
             />
-            <label className="asset-file-drop">
-              <input
-                type="file"
-                accept={
-                  kind === "voice"
-                    ? "audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/ogg,audio/webm"
-                    : "image/png,image/jpeg,image/webp,image/gif,video/mp4,video/quicktime,video/webm,audio/mpeg,audio/wav,audio/x-wav,audio/ogg,audio/mp4,audio/webm,.mp4,.mov,.webm"
-                }
-                onChange={(event) => {
-                  const next = event.target.files?.[0] || null;
-                  setFile(next);
-                  setUploadProgress(0);
-                  if (next && !name) setName(next.name.replace(/\.[^.]+$/, ""));
-                }}
-              />
-              <Upload />
-              <b>{file?.name || "点击选择文件"}</b>
-              <span>
-                {kind === "voice"
-                  ? "MP3、WAV、M4A、OGG，建议 10–60 秒干声"
-                  : "支持常见图片、视频和音频格式，单文件最大 500MB"}
-              </span>
-            </label>
-            {kind === "media" && upload.isPending && (
-              <div className="asset-upload-progress" role="progressbar" aria-valuenow={uploadProgress}>
-                <span>
-                  <i style={{ width: `${uploadProgress}%` }} />
-                </span>
-                <b>{uploadProgress < 100 ? `正在直传 TOS · ${uploadProgress}%` : "TOS 上传完成，正在写入素材库…"}</b>
-              </div>
-            )}
+            <FileUpload
+              className="mx-5 my-4"
+              label={kind === "voice" ? "音色文件" : "素材文件"}
+              files={file ? [file] : []}
+              uploading={upload.isPending}
+              progress={uploadProgress}
+              error={upload.error?.message}
+              accept={
+                kind === "voice"
+                  ? "audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/ogg,audio/webm"
+                  : "image/png,image/jpeg,image/webp,image/gif,video/mp4,video/quicktime,video/webm,audio/mpeg,audio/wav,audio/x-wav,audio/ogg,audio/mp4,audio/webm,.mp4,.mov,.webm"
+              }
+              description={
+                file?.name ||
+                (kind === "voice"
+                  ? "MP3、WAV、M4A、OGG，建议 10–60 秒干声。"
+                  : "支持常见图片、视频和音频格式，单文件最大 500MB。")
+              }
+              onFilesChange={(files) => {
+                const next = files[0] || null;
+                upload.reset();
+                setFile(next);
+                setUploadProgress(0);
+                if (next && !name) setName(next.name.replace(/\.[^.]+$/, ""));
+              }}
+              onClear={() => {
+                upload.reset();
+                setFile(null);
+                setUploadProgress(0);
+              }}
+            />
             <label>
               资产名称
               <input
@@ -734,7 +748,6 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
                 placeholder="选填：音色特征或适用场景"
               />
             </label>
-            {upload.error && <p className="asset-upload-error">{upload.error.message}</p>}
             <ModalFooter
               disabled={!file || upload.isPending}
               pending={upload.isPending}

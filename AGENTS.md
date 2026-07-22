@@ -221,12 +221,14 @@ bun run typecheck
 
 修改代码时，为变更补充或更新测试。按影响范围选择最小充分验证：
 
+默认不要运行 E2E 测试。只有用户在当前任务中明确要求运行 E2E 时，才执行 `bun run e2e`；不得因为完整交付、关键流程或前端改动而自行追加 E2E，以免延长交付时间。
+
 - 文档或纯样式：运行相关格式检查，必要时构建。
 - 前端逻辑：相关单测、`bun run typecheck`、`bun run build`。
 - API、Store 或 Worker：相关单测、`bun run typecheck`、`bun run build`。
 - Schema 或迁移：相关数据库测试、`bun run db:check`、`bun run typecheck`。
 - API 契约：重新生成 OpenAPI/SDK，并运行类型检查和相关测试。
-- 跨页面关键流程：`bun run e2e`。
+- 跨页面关键流程：补充或更新 E2E 用例，但默认不运行；仅在用户明确要求时执行 `bun run e2e`。
 
 完整交付基线为：
 
@@ -234,8 +236,9 @@ bun run typecheck
 make ci
 bun run typecheck
 bun run build
-bun run e2e
 ```
+
+E2E 不属于默认完整交付基线；用户明确要求时再单独运行。
 
 若外部依赖、密钥、Redis、TOS、FFmpeg 或环境问题导致某项未运行，交付时必须明确说明未验证项及原因。不要把与本次改动无关的既有失败归因于当前修改，但也不要隐瞒。
 

@@ -23,16 +23,16 @@
   align-items: center;
   justify-content: center;
   gap: 9px;
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
+  @apply text-2xl;
+  @apply font-semibold;
+  @apply tracking-widest;
 }
 .auth-brand .brand-logo {
   width: 48px;
   border-radius: 6px;
 }
 .auth-card header p {
-  font-size: 12px;
+  @apply text-xs;
   color: #7a8495;
   margin: 10px 0 22px;
 }
@@ -54,7 +54,7 @@
 .auth-tabs button.active {
   background: white;
   color: #246bfd;
-  font-weight: 700;
+  @apply font-semibold;
   box-shadow: 0 2px 8px #17203310;
 }
 .auth-flow-heading {
@@ -69,21 +69,21 @@
   border: 0;
   background: transparent;
   color: #246bfd;
-  font-size: 11px;
+  @apply text-2xs;
 }
 .auth-flow-heading b {
   color: #263248;
-  font-size: 17px;
+  @apply text-base;
 }
 .auth-flow-heading span {
   color: #8a94a5;
-  font-size: 11px;
+  @apply text-2xs;
 }
 .auth-card form > label,
 .panel-form > label {
   display: block;
-  font-size: 12px;
-  font-weight: 600;
+  @apply text-xs;
+  @apply font-semibold;
   color: #445066;
   margin: 13px 0;
 }
@@ -116,8 +116,8 @@
   border-radius: 8px;
   background: #f7f9fc;
   color: #246bfd;
-  font-size: 12px;
-  font-weight: 700;
+  @apply text-xs;
+  @apply font-semibold;
 }
 .verification-field button:disabled {
   color: #9aa4b2;
@@ -140,7 +140,7 @@
   width: 17px;
 }
 .form-error {
-  font-size: 11px;
+  @apply text-2xs;
   color: #c83e51;
   background: #fff0f2;
   border-radius: 7px;
@@ -152,7 +152,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  font-size: 11px;
+  @apply text-2xs;
   color: #24734a;
   background: #edf9f2;
   border-radius: 7px;
@@ -167,8 +167,8 @@
 
 .verification-code-inline strong {
   color: #165b38;
-  font-size: 14px;
-  letter-spacing: 0.12em;
+  @apply text-sm;
+  @apply tracking-widest;
 }
 .auth-text-action {
   display: block;
@@ -182,7 +182,7 @@
   border-radius: 8px;
   background: #246bfd;
   color: white;
-  font-weight: 700;
+  @apply font-semibold;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -199,7 +199,7 @@
   display: block;
   text-align: center;
   color: #a0a8b5;
-  font-size: 9px;
+  @apply text-2xs;
   margin-top: 16px;
 }
 .app-loading {
@@ -207,7 +207,7 @@
   align-items: center;
   gap: 10px;
   color: #64738e;
-  font-size: 13px;
+  @apply text-xs;
 }
 .app-loading .loading-logo {
   width: 38px;
@@ -252,14 +252,14 @@
   justify-content: space-between;
 }
 .workspace-drawer header span {
-  font-size: 9px;
+  @apply text-2xs;
   color: #246bfd;
-  font-weight: 800;
-  letter-spacing: 0.13em;
+  @apply font-semibold;
+  @apply tracking-widest;
 }
 .workspace-drawer header h2 {
   margin: 4px 0 0;
-  font-size: 20px;
+  @apply text-xl;
 }
 .workspace-drawer header > button {
   width: 34px;
@@ -280,7 +280,7 @@
 .panel-muted {
   text-align: center;
   color: #919baa;
-  font-size: 12px;
+  @apply text-xs;
   padding: 36px 0;
 }
 .help-list {
@@ -301,11 +301,11 @@
   color: #246bfd;
 }
 .help-list b {
-  font-size: 13px;
+  @apply text-xs;
 }
 .help-list p {
-  font-size: 11px;
-  line-height: 1.65;
+  @apply text-2xs;
+  @apply leading-relaxed;
   color: #717c8d;
   margin: 5px 0 0;
 }
@@ -327,7 +327,7 @@
 .switch-row span small {
   margin-top: 4px;
   color: #929aa7;
-  font-weight: 400;
+  @apply font-normal;
 }
 .switch-row input {
   width: 18px !important;
@@ -342,14 +342,14 @@
   justify-content: space-between;
   align-items: center;
   color: #818b9c;
-  font-size: 11px;
+  @apply text-2xs;
   margin-bottom: 10px;
 }
 .panel-toolbar button {
   border: 0;
   background: transparent;
   color: #246bfd;
-  font-size: 11px;
+  @apply text-2xs;
 }
 .panel-toolbar button:disabled {
   color: #b4bbc5;
@@ -383,17 +383,17 @@
   flex: 1;
 }
 .notification-list b {
-  font-size: 12px;
+  @apply text-xs;
 }
 .notification-list p {
   margin: 4px 0;
   color: #6e798b;
-  font-size: 11px;
-  line-height: 1.5;
+  @apply text-2xs;
+  @apply leading-normal;
 }
 .notification-list small {
   color: #a0a8b5;
-  font-size: 9px;
+  @apply text-2xs;
 }
 .mock-warning,
 .security-note {
@@ -401,7 +401,7 @@
   border-radius: 8px;
   background: #fff8e7;
   color: #8f661b;
-  font-size: 11px;
+  @apply text-2xs;
 }
 .package-grid {
   display: grid;
@@ -415,7 +415,7 @@
   border-radius: 10px;
 }
 .package-grid article > span {
-  font-size: 8px;
+  @apply text-2xs;
   color: #246bfd;
   background: #edf3ff;
   border-radius: 99px;
@@ -426,19 +426,19 @@
   display: block;
 }
 .package-grid article > b {
-  font-size: 11px;
+  @apply text-2xs;
   margin-top: 13px;
 }
 .package-grid strong {
-  font-size: 18px;
+  @apply text-lg;
   margin-top: 5px;
 }
 .package-grid strong small {
-  font-size: 8px;
+  @apply text-2xs;
   color: #8b95a5;
 }
 .package-grid p {
-  font-size: 11px;
+  @apply text-2xs;
   color: #6d7788;
 }
 .package-grid button {
@@ -448,10 +448,10 @@
   border-radius: 6px;
   background: #246bfd;
   color: white;
-  font-size: 10px;
+  @apply text-2xs;
 }
 .panel-subtitle {
-  font-size: 13px;
+  @apply text-xs;
   margin: 24px 0 8px;
 }
 .order-list > div {
@@ -464,17 +464,17 @@
 .order-list b,
 .order-list small {
   display: block;
-  font-size: 11px;
+  @apply text-2xs;
 }
 .order-list small {
   color: #9aa3b1;
-  font-size: 9px;
+  @apply text-2xs;
   margin-top: 3px;
 }
 .order-list em {
   font-style: normal;
   color: #18a464;
-  font-size: 10px;
+  @apply text-2xs;
 }
 .account-hero {
   display: flex;
@@ -494,7 +494,7 @@
   background: #17213b;
   color: white;
   font-style: normal;
-  font-weight: 700;
+  @apply font-semibold;
 }
 .account-hero b,
 .account-hero span,
@@ -502,16 +502,16 @@
   display: block;
 }
 .account-hero b {
-  font-size: 15px;
+  @apply text-sm;
   margin-top: 2px;
 }
 .account-hero span {
-  font-size: 10px;
+  @apply text-2xs;
   color: #748096;
   margin-top: 4px;
 }
 .account-hero small {
-  font-size: 10px;
+  @apply text-2xs;
   color: #246bfd;
   margin-top: 4px;
 }
@@ -538,11 +538,11 @@
   display: block;
 }
 .account-summary > button b {
-  font-size: 12px;
+  @apply text-xs;
   color: #344158;
 }
 .account-summary > button small {
-  font-size: 9px;
+  @apply text-2xs;
   color: #99a1af;
   margin-top: 4px;
 }
@@ -554,7 +554,7 @@
 }
 .avatar-editor {
   margin: 2px auto 18px;
-  font-size: 16px;
+  @apply text-base;
 }
 .security-note {
   display: flex;
@@ -572,7 +572,7 @@
   color: white;
 }
 .merge-preview > span {
-  font-size: 11px;
+  @apply text-2xs;
   color: #dce5f5;
 }
 @media (max-width: 700px) {

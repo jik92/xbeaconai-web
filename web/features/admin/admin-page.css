@@ -1,3 +1,5 @@
+@reference "../../styles/tailwind.css";
+
 .admin-page {
   height: calc(100vh - 56px);
   min-height: 0;
@@ -36,7 +38,7 @@
   border: 0;
   background: transparent;
   color: #777169;
-  font-weight: 600;
+  @apply font-semibold;
 }
 .admin-tab.active {
   color: #0c0a09;
@@ -67,8 +69,8 @@
   border-radius: 999px;
   color: #fff;
   background: #292524;
-  font-size: 13px;
-  font-weight: 500;
+  @apply text-xs;
+  @apply font-medium;
 }
 .admin-upload button:disabled,
 .admin-credential-row button:disabled,
@@ -115,18 +117,18 @@
   width: 16px;
 }
 .admin-security-note b {
-  font-size: 12px;
+  @apply text-xs;
 }
 .admin-security-note span {
   color: #777169;
-  font-size: 11px;
+  @apply text-2xs;
 }
 .admin-credentials {
   min-width: 720px;
 }
 .admin-notice {
   margin: 6px 2px 8px;
-  font-size: 11px;
+  @apply text-2xs;
 }
 .admin-notice.success {
   color: #16a34a;
@@ -149,15 +151,15 @@
 }
 .admin-credential-group h2 {
   margin: 0;
-  font-size: 13px;
-  font-weight: 600;
+  @apply text-xs;
+  @apply font-semibold;
 }
 .admin-credential-group header svg {
   width: 15px;
 }
 .admin-credential-group header small {
   color: #777169;
-  font-size: 10px;
+  @apply text-2xs;
 }
 .admin-credential-row {
   min-height: 62px;
@@ -181,21 +183,21 @@
   width: 132px;
   flex: none;
   overflow: hidden;
-  font-size: 12px;
+  @apply text-xs;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .admin-credential-meta code {
   min-width: 100px;
   color: #778398;
-  font-size: 9px;
+  @apply text-2xs;
 }
 .admin-credential-meta span {
   width: max-content;
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 10px;
+  @apply text-2xs;
 }
 .admin-credential-meta span svg {
   width: 12px;
@@ -209,7 +211,7 @@
 .admin-credential-meta time {
   margin-left: auto;
   color: #a8a29e;
-  font-size: 9px;
+  @apply text-2xs;
   white-space: nowrap;
 }
 .admin-credential-row input,
@@ -280,7 +282,7 @@
 .admin-job-filters > span {
   margin-left: auto;
   color: #777169;
-  font-size: 11px;
+  @apply text-2xs;
 }
 .admin-job-table td {
   height: 54px;
@@ -289,7 +291,7 @@
   border: 0;
   background: transparent;
   color: #292524;
-  font-family: monospace;
+  @apply font-mono;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -318,7 +320,7 @@
   align-items: center;
   gap: 9px;
   color: #777169;
-  font-size: 11px;
+  @apply text-2xs;
 }
 .admin-detail-layer {
   position: fixed;
@@ -354,7 +356,7 @@
 .admin-detail-layer dt {
   margin-top: 18px;
   color: #8994a5;
-  font-size: 11px;
+  @apply text-2xs;
 }
 .admin-detail-layer dd {
   margin: 5px 0 0;

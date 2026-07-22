@@ -1,3 +1,5 @@
+@reference "../../styles/tailwind.css";
+
 .mu-page {
   min-height: calc(100vh - 56px);
   padding: 42px clamp(24px, 4vw, 64px) 80px;
@@ -20,12 +22,12 @@
   height: 430px;
 }
 .mu-workbench .ag-composer textarea {
-  font-size: 16px;
+  @apply text-base;
 }
 .mu-workbench .ag-parameters > div > button {
   height: 42px;
   padding: 0 15px;
-  font-size: 13px;
+  @apply text-xs;
 }
 .mu-workbench .ag-send {
   width: 40px;
@@ -85,7 +87,7 @@
   align-items: center;
   gap: 7px;
   color: #66748a;
-  font-size: 12px;
+  @apply text-xs;
 }
 .mu-loading svg {
   width: 15px;
@@ -123,12 +125,12 @@
 }
 .mu-tasks header span {
   color: #6b7890;
-  font-size: 10px;
-  letter-spacing: 0.1em;
+  @apply text-2xs;
+  @apply tracking-widest;
 }
 .mu-tasks h2 {
   margin: 3px 0 0;
-  font-size: 19px;
+  @apply text-lg;
 }
 .mu-tasks header small {
   color: #8c96a5;
@@ -165,16 +167,16 @@
   white-space: nowrap;
 }
 .mu-tasks b {
-  font-size: 12px;
+  @apply text-xs;
 }
 .mu-tasks small {
   margin-top: 4px;
   color: #929ba9;
-  font-size: 10px;
+  @apply text-2xs;
 }
 .mu-tasks i {
   color: #607089;
-  font-size: 10px;
+  @apply text-2xs;
   font-style: normal;
 }
 .mu-tasks i.succeeded {
@@ -208,7 +210,7 @@
 }
 .mu-result-mask h2 {
   margin: 0;
-  font-size: 18px;
+  @apply text-lg;
 }
 .mu-result-mask header button {
   width: 30px;
@@ -228,7 +230,7 @@
   overflow: auto;
   white-space: pre-wrap;
   color: #424d5e;
-  font: 13px / 1.7 inherit;
+  @apply text-xs leading-relaxed;
 }
 @media (max-width: 900px) {
   .mu-page {

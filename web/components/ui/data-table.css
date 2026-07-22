@@ -1,3 +1,5 @@
+@reference "../../styles/tailwind.css";
+
 .data-table-wrap {
   min-height: 0;
   overflow: auto;
@@ -21,8 +23,8 @@
   border: 0;
   background: #f8fafc;
   color: #657086;
-  font-size: 12px;
-  font-weight: 600;
+  @apply text-xs;
+  @apply font-semibold;
   text-align: left;
 }
 
@@ -31,7 +33,7 @@
   padding: 12px 18px;
   border-top: 1px solid #edf0f4;
   color: #4d586b;
-  font-size: 12px;
+  @apply text-xs;
   vertical-align: middle;
 }
 

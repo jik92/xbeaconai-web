@@ -33,7 +33,6 @@ import {
   updateAdminCredential,
   updateVideoCreateProject,
   updateVideoCreateShotSettings,
-  uploadMedia,
 } from "./generated/sdk.gen";
 import type {
   AdScriptInput,
@@ -343,12 +342,8 @@ export async function fetchCreationCapabilities() {
     models: import("@/features/ai-creation/ai-creation-composer").CreationModelCapability[];
   }>;
 }
-export async function uploadMediaFile(file: File, folderId?: string) {
-  if (folderId) return uploadLibraryAsset(file, "media", file.name.replace(/\.[^.]+$/, ""), "", folderId);
-  configure();
-  const { data } = await uploadMedia({ body: { file }, headers: authHeaders(), throwOnError: true });
-  if (!data?.asset) throw new Error("文件上传失败");
-  return data.asset;
+export async function uploadMediaFile(file: File, folderId?: string, onProgress?: (percent: number) => void) {
+  return uploadLibraryAsset(file, "media", file.name.replace(/\.[^.]+$/, ""), "", folderId, onProgress);
 }
 export async function fetchLibraryAssets(kind: Exclude<AssetKind, "product">, folderId?: string) {
   const params = new URLSearchParams({ kind });
@@ -388,6 +383,7 @@ export async function uploadProduct(input: {
   name: string;
   description: string;
   sharingScope: LibraryProduct["sharingScope"];
+  onProgress?: (percent: number) => void;
 }) {
   const body = new FormData();
   input.files.forEach((file) => {
@@ -396,12 +392,11 @@ export async function uploadProduct(input: {
   body.set("productName", input.name);
   body.set("description", input.description);
   body.set("sharingScope", input.sharingScope);
-  const response = await fetch(apiUrl("/api/products"), { method: "POST", headers: authHeaders(), body });
-  const data = (await response.json().catch(() => null)) as {
+  const data = await postFormDataWithProgress<{
     product?: LibraryProduct;
     error?: { message?: string };
-  } | null;
-  if (!response.ok || !data?.product) throw new Error(data?.error?.message || "商品上传失败");
+  }>("/api/products", body, input.onProgress, "商品上传失败");
+  if (!data.product) throw new Error(data.error?.message || "商品上传失败");
   return data.product;
 }
 interface RemixMaterialFile {
@@ -477,12 +472,12 @@ export async function uploadLibraryAsset(
   body.set("displayName", displayName);
   if (description.trim()) body.set("description", description.trim());
   if (folderId) body.set("folderId", folderId);
-  const response = await fetch(apiUrl("/api/uploads"), { method: "POST", headers: authHeaders(), body });
-  if (!response.ok) {
-    const data = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
-    throw new Error(data?.error?.message || "资产上传失败");
-  }
-  const data = (await response.json()) as { asset: LibraryAsset & { displayName?: string } };
+  const data = await postFormDataWithProgress<{ asset: LibraryAsset & { displayName?: string } }>(
+    "/api/uploads",
+    body,
+    onProgress,
+    "资产上传失败",
+  );
   return { ...data.asset, name: data.asset.displayName || data.asset.name } as LibraryAsset;
 }
 
@@ -516,6 +511,39 @@ function putDirectFile(authorization: DirectUploadAuthorization, file: File, onP
       } else reject(new Error(`TOS 直传失败（HTTP ${request.status || "未知"}）`));
     };
     request.send(file);
+  });
+}
+
+function postFormDataWithProgress<T>(
+  path: string,
+  body: FormData,
+  onProgress: ((percent: number) => void) | undefined,
+  fallbackMessage: string,
+) {
+  return new Promise<T>((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("POST", apiUrl(path));
+    for (const [name, value] of Object.entries(authHeaders())) request.setRequestHeader(name, value);
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress?.(Math.min(99, Math.round((event.loaded / event.total) * 100)));
+    };
+    request.onerror = () => reject(new Error(`${fallbackMessage}，请检查网络连接`));
+    request.onabort = () => reject(new Error(`${fallbackMessage}，上传已取消`));
+    request.onload = () => {
+      let data: (T & { error?: { message?: string } }) | undefined;
+      try {
+        data = JSON.parse(request.responseText) as T & { error?: { message?: string } };
+      } catch {
+        data = undefined;
+      }
+      if (request.status >= 200 && request.status < 300 && data) {
+        onProgress?.(100);
+        resolve(data);
+      } else {
+        reject(new Error(data?.error?.message || fallbackMessage));
+      }
+    };
+    request.send(body);
   });
 }
 

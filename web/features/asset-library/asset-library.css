@@ -1,3 +1,5 @@
+@reference "../../styles/tailwind.css";
+
 .asset-library-page {
   height: calc(100vh - 56px);
   padding: 26px 28px;
@@ -38,12 +40,12 @@
 .material-folder-sidebar > header > div > span {
   margin-bottom: 4px;
   color: #246bfd;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  @apply text-2xs;
+  @apply font-semibold;
+  @apply tracking-widest;
 }
 .material-folder-sidebar > header > div > b {
-  font-size: 16px;
+  @apply text-base;
 }
 .material-folder-sidebar > header button,
 .folder-actions button {
@@ -113,7 +115,7 @@
 .folder-space-state {
   margin: 12px;
   color: #929baa;
-  font-size: 11px;
+  @apply text-2xs;
 }
 .material-folder-sidebar > footer {
   margin-top: auto;
@@ -126,14 +128,14 @@
 }
 .material-folder-sidebar > footer span {
   color: #929baa;
-  font-size: 10px;
+  @apply text-2xs;
 }
 .material-folder-sidebar > footer b {
   margin-top: 5px;
   overflow-wrap: anywhere;
   color: #667186;
-  font-size: 9px;
-  font-weight: 500;
+  @apply text-2xs;
+  @apply font-medium;
 }
 .material-library-content {
   padding: 24px;
@@ -148,9 +150,9 @@
 }
 .asset-upload-modal header span {
   color: #246bfd;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.15em;
+  @apply text-2xs;
+  @apply font-semibold;
+  @apply tracking-widest;
 }
 .asset-library-toolbar {
   display: flex;
@@ -193,11 +195,11 @@
 .asset-library-results {
   height: 38px;
   color: #9099a8;
-  font-size: 11px;
+  @apply text-2xs;
 }
 .asset-library-results b {
   color: #344056;
-  font-size: 13px;
+  @apply text-xs;
 }
 .asset-import-notice {
   margin: 10px 0;
@@ -209,7 +211,7 @@
   gap: 7px;
   color: #276044;
   background: #edf9f2;
-  font-size: 12px;
+  @apply text-xs;
 }
 .asset-import-notice svg {
   width: 15px;
@@ -223,7 +225,7 @@
   place-items: center;
   background: #eef1f5;
   color: #7e8898;
-  font-size: 10px;
+  @apply text-2xs;
 }
 .media-table-preview-content {
   max-width: 100%;
@@ -295,7 +297,7 @@
   display: block;
   overflow: hidden;
   color: #263147;
-  font-size: 13px;
+  @apply text-xs;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -305,7 +307,7 @@
   margin-top: 6px;
   overflow: hidden;
   color: #929baa;
-  font-size: 10px;
+  @apply text-2xs;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -363,7 +365,7 @@
   border-radius: 999px;
   color: #fff;
   background: #172033c9;
-  font-size: 10px;
+  @apply text-2xs;
   font-style: normal;
   backdrop-filter: blur(6px);
 }
@@ -406,7 +408,7 @@
   border-radius: 999px;
   color: #395d9f;
   background: #ffffffb8;
-  font-size: 11px;
+  @apply text-2xs;
 }
 .library-asset-preview.voice audio {
   width: calc(100% - 28px);
@@ -427,21 +429,21 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
+  @apply text-xs;
 }
 .library-asset-card p {
   height: 30px;
   margin: 0;
   overflow: hidden;
   color: #7d8797;
-  font-size: 10px;
-  line-height: 1.5;
+  @apply text-2xs;
+  @apply leading-normal;
 }
 .library-asset-card small {
   display: block;
   margin-top: 8px;
   color: #a0a7b2;
-  font-size: 9px;
+  @apply text-2xs;
 }
 .asset-library-empty {
   min-height: 300px;
@@ -496,11 +498,11 @@
   padding: 0;
   border: 0;
   color: #4c5668;
-  font-size: 12px;
+  @apply text-xs;
 }
 .sharing-scope legend {
   margin-bottom: 10px;
-  font-weight: 600;
+  @apply font-semibold;
 }
 .sharing-scope label {
   display: flex;
@@ -509,22 +511,6 @@
 }
 .sharing-scope input {
   accent-color: #246bfd;
-}
-.product-file-drop {
-  height: 118px;
-}
-.product-upload-previews {
-  display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-  gap: 6px;
-  margin: 10px 20px 2px;
-}
-.product-upload-previews img {
-  width: 100%;
-  aspect-ratio: 1;
-  object-fit: cover;
-  border: 1px solid #e1e5eb;
-  border-radius: 6px;
 }
 .asset-upload-modal > header,
 .asset-detail-modal > header {
@@ -537,18 +523,18 @@
 }
 .asset-upload-modal h2 {
   margin: 4px 0 0;
-  font-size: 19px;
+  @apply text-lg;
 }
 .asset-upload-modal header button,
 .asset-detail-modal header button {
   color: #858e9c;
 }
-.asset-upload-modal > label:not(.asset-file-drop) {
+.asset-upload-modal > label {
   display: block;
   margin: 16px 20px;
   color: #4c5668;
-  font-size: 12px;
-  font-weight: 600;
+  @apply text-xs;
+  @apply font-semibold;
 }
 .asset-upload-modal > label input,
 .asset-upload-modal > label textarea {
@@ -558,38 +544,11 @@
   border: 1px solid #dce1e8;
   border-radius: 7px;
   padding: 9px 10px;
-  font-weight: 400;
+  @apply font-normal;
 }
 .asset-upload-modal > label textarea {
   height: 78px;
   resize: none;
-}
-.asset-file-drop {
-  height: 150px;
-  margin: 18px 20px 4px;
-  border: 1px dashed #b8c5d8;
-  border-radius: 9px;
-  background: #fafcff;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: #6d7a8e;
-  cursor: pointer;
-}
-.asset-file-drop input {
-  display: none;
-}
-.asset-file-drop svg {
-  width: 32px;
-  height: 32px;
-  color: #246bfd;
-  margin-bottom: 9px;
-}
-.asset-file-drop span {
-  margin-top: 5px;
-  color: #9aa3b0;
-  font-size: 10px;
 }
 .asset-upload-modal > footer,
 .asset-detail-modal > footer {
@@ -632,34 +591,6 @@
 .asset-upload-modal footer .primary:disabled {
   opacity: 0.55;
 }
-.asset-upload-error {
-  margin: 0 20px 10px;
-  color: #d9485c;
-  font-size: 11px;
-}
-.asset-upload-progress {
-  margin: 0 20px 12px;
-  display: grid;
-  gap: 7px;
-}
-.asset-upload-progress > span {
-  height: 6px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: #e8edf5;
-}
-.asset-upload-progress > span > i {
-  height: 100%;
-  display: block;
-  border-radius: inherit;
-  background: #246bfd;
-  transition: width 160ms ease;
-}
-.asset-upload-progress > b {
-  color: #657086;
-  font-size: 11px;
-  font-weight: 500;
-}
 .asset-detail-media {
   height: 330px;
   background: #eef1f5;
@@ -689,14 +620,14 @@
 }
 .asset-detail-copy span {
   color: #21a665;
-  font-size: 11px;
+  @apply text-2xs;
   display: flex;
   align-items: center;
   gap: 6px;
 }
 .asset-detail-copy p {
   color: #5d6879;
-  line-height: 1.6;
+  @apply leading-relaxed;
 }
 .asset-detail-copy small {
   color: #969fac;
@@ -735,7 +666,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  @apply text-xs;
   cursor: pointer;
 }
 .asset-library-toolbar-actions button.primary {
@@ -750,7 +681,7 @@
   padding: 9px 10px;
   border: 1px solid #dce1e8;
   border-radius: 7px;
-  font-weight: 400;
+  @apply font-normal;
   background: #fff;
 }
 .asset-upload-modal > label textarea {
@@ -760,8 +691,7 @@
   padding: 9px 10px;
   border: 1px solid #dce1e8;
   border-radius: 7px;
-  font-weight: 400;
-  font-family: inherit;
+  @apply font-normal;
   resize: vertical;
 }
 .asset-upload-modal > label em {

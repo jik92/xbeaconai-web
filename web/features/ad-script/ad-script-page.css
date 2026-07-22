@@ -1,3 +1,5 @@
+@reference "../../styles/tailwind.css";
+
 .ad-script-page {
   max-width: 1420px;
   margin: 0 auto;
@@ -12,18 +14,18 @@
 }
 .ad-script-eyebrow {
   color: var(--primary);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
+  @apply text-2xs;
+  @apply font-semibold;
+  @apply tracking-widest;
 }
 .ad-script-head h1 {
   margin: 6px 0;
-  font-size: 28px;
+  @apply text-2xl;
 }
 .ad-script-head p {
   margin: 0;
   color: var(--muted);
-  font-size: 13px;
+  @apply text-xs;
 }
 .ad-script-model {
   display: flex;
@@ -34,7 +36,7 @@
   border-radius: 999px;
   background: var(--surface);
   color: var(--muted);
-  font-size: 12px;
+  @apply text-xs;
 }
 .ad-script-steps {
   display: grid;
@@ -75,7 +77,7 @@
 .ad-script-steps .active,
 .ad-script-steps .done {
   color: var(--primary);
-  font-weight: 600;
+  @apply font-semibold;
 }
 .ad-script-steps .active i,
 .ad-script-steps .done i {
@@ -92,12 +94,12 @@
 }
 .ad-script-section h2 {
   margin: 0 0 16px;
-  font-size: 21px;
+  @apply text-xl;
 }
 .section-note {
   margin: 10px 0 18px;
   color: var(--muted);
-  font-size: 13px;
+  @apply text-xs;
 }
 .scene-tabs {
   display: flex;
@@ -114,7 +116,7 @@
   border-radius: 7px;
   background: transparent;
   color: var(--muted);
-  font-weight: 600;
+  @apply font-semibold;
 }
 .scene-tabs button.active {
   background: var(--surface);
@@ -144,12 +146,12 @@
 }
 .scene-grid b {
   margin-top: 12px;
-  font-size: 15px;
+  @apply text-sm;
 }
 .scene-grid small {
   margin-top: 5px;
   color: var(--muted);
-  line-height: 1.5;
+  @apply leading-normal;
 }
 .scene-grid em {
   margin-top: auto;
@@ -158,7 +160,7 @@
   border-radius: 5px;
   padding: 3px 7px;
   font-style: normal;
-  font-size: 12px;
+  @apply text-xs;
 }
 .scene-icon {
   width: 38px;
@@ -185,7 +187,7 @@
   display: block;
   margin-top: 4px;
   color: var(--muted);
-  font-size: 12px;
+  @apply text-xs;
 }
 .counter {
   display: flex;
@@ -223,7 +225,7 @@
   align-items: center;
   justify-content: center;
   padding: 0 18px;
-  font-weight: 600;
+  @apply font-semibold;
 }
 .primary {
   border: 1px solid var(--primary);
@@ -265,7 +267,7 @@
 }
 .source-toggle span {
   color: var(--muted);
-  font-size: 12px;
+  @apply text-xs;
 }
 .source-toggle svg:last-child {
   margin-left: auto;
@@ -296,7 +298,7 @@
 }
 .source-panel label {
   color: var(--muted);
-  font-size: 12px;
+  @apply text-xs;
 }
 .extract-review {
   margin-top: 12px;
@@ -334,12 +336,12 @@
 .selected-scene span {
   display: block;
   color: var(--muted);
-  font-size: 12px;
+  @apply text-xs;
   margin-top: 3px;
 }
 .selected-scene em {
   font-style: normal;
-  font-size: 12px;
+  @apply text-xs;
 }
 .form-section {
   max-width: 1120px;
@@ -354,8 +356,8 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  font-weight: 600;
-  font-size: 13px;
+  @apply font-semibold;
+  @apply text-xs;
   margin-bottom: 7px;
 }
 .field > span i {
@@ -366,8 +368,8 @@
   margin-left: auto;
   color: var(--muted);
   font-style: normal;
-  font-size: 11px;
-  font-weight: 400;
+  @apply text-2xs;
+  @apply font-normal;
 }
 .field input,
 .field textarea,
@@ -464,7 +466,7 @@
 }
 .advanced p {
   color: var(--muted);
-  font-size: 12px;
+  @apply text-xs;
 }
 .advanced svg {
   width: 16px;
@@ -488,7 +490,7 @@
 .cost-summary span {
   display: block;
   color: var(--muted);
-  font-size: 12px;
+  @apply text-xs;
   margin-top: 3px;
 }
 .cost-summary strong {
@@ -497,7 +499,7 @@
 .ad-script-feedback {
   padding: 10px 12px;
   border-radius: 8px;
-  font-size: 13px;
+  @apply text-xs;
 }
 .ad-script-feedback.error {
   color: #a62e42;
@@ -568,7 +570,7 @@
 .variant-progress-list p {
   margin: 5px 0 0;
   color: var(--muted);
-  font-size: 12px;
+  @apply text-xs;
 }
 .variant-progress-list em {
   font-style: normal;
@@ -623,7 +625,7 @@
 .result-summary span {
   display: block;
   color: var(--muted);
-  font-size: 11px;
+  @apply text-2xs;
   margin-top: 3px;
 }
 .summary-metrics {
@@ -641,7 +643,7 @@
   align-items: center;
   justify-content: center;
   color: var(--ink);
-  font-size: 22px;
+  @apply text-xl;
 }
 .summary-metrics svg {
   color: var(--success);
@@ -655,7 +657,7 @@
   border: 1px solid var(--border);
   border-radius: 5px;
   padding: 5px 8px;
-  font-size: 11px;
+  @apply text-2xs;
 }
 .summary-tags em.pass {
   color: var(--success);
@@ -706,7 +708,7 @@
   border-bottom: 1px solid var(--border);
 }
 .script-editor h2 {
-  font-size: 17px;
+  @apply text-base;
 }
 .script-editor textarea {
   flex: 1;
@@ -714,8 +716,8 @@
   border: 0;
   resize: none;
   padding: 24px;
-  font-size: 17px;
-  line-height: 1.9;
+  @apply text-base;
+  @apply leading-loose;
   outline: 0;
 }
 .script-editor footer {
@@ -725,7 +727,7 @@
   border-top: 1px solid var(--border);
   padding: 12px 18px;
   color: var(--muted);
-  font-size: 11px;
+  @apply text-2xs;
 }
 .analysis-panel nav {
   min-height: 64px;
@@ -762,11 +764,11 @@
 .analysis-scroll h3 strong {
   margin-left: auto;
   color: var(--success);
-  font-size: 28px;
+  @apply text-2xl;
 }
 .analysis-scroll h3 small {
   color: var(--muted);
-  font-size: 13px;
+  @apply text-xs;
 }
 .score-row {
   margin: 12px 0;
@@ -798,7 +800,7 @@
   background: var(--surface-muted);
   border-radius: 8px;
   color: var(--muted);
-  line-height: 1.55;
+  @apply leading-relaxed;
 }
 .suggestion {
   display: flex;

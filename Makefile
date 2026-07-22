@@ -17,6 +17,7 @@ run-worker: _check_bun
 lint: _check_bun
 	$(BUN) run format:check
 	$(BUN) run lint
+	$(BUN) run check:typography
 
 test: _check_bun
 	$(BUN) run test

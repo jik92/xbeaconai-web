@@ -36,6 +36,7 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc --noEmit",
     "lint": "biome lint .",
+    "check:typography": "bun scripts/check-typography.ts",
     "format": "biome format --write .",
     "format:check": "biome format .",
     "check": "biome check .",

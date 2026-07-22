@@ -1,3 +1,5 @@
+@reference "../../styles/tailwind.css";
+
 .mashup-page {
   min-height: 100%;
   padding: 30px;
@@ -13,13 +15,13 @@
 .mashup-page-header span,
 .mashup-creator > header span {
   color: #777169;
-  font-size: 12px;
-  letter-spacing: 0.08em;
+  @apply text-xs;
+  @apply tracking-widest;
 }
 .mashup-page-header h1 {
   margin: 5px 0;
-  font-size: 32px;
-  font-weight: 400;
+  @apply text-3xl;
+  @apply font-normal;
 }
 .mashup-page-header p {
   margin: 0;
@@ -49,7 +51,7 @@
 }
 .mashup-task-list h2 {
   margin: 0;
-  font-size: 15px;
+  @apply text-sm;
 }
 .mashup-task-list small {
   color: #777169;
@@ -92,8 +94,8 @@
   color: #777169;
 }
 .mashup-result-panel > header strong {
-  font-size: 28px;
-  font-weight: 400;
+  @apply text-2xl;
+  @apply font-normal;
 }
 .mashup-result-grid {
   display: grid;
@@ -123,7 +125,7 @@
   padding: 10px 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  @apply text-xs;
 }
 .mashup-result-grid footer {
   display: flex;
@@ -138,7 +140,7 @@
   color: #4e4e4e;
   border: 0;
   background: transparent;
-  font-size: 12px;
+  @apply text-xs;
 }
 .mashup-result-grid footer svg {
   width: 14px;
@@ -199,7 +201,7 @@
 .mashup-section-title p {
   margin: 0 0 18px;
   color: #777169;
-  font-size: 13px;
+  @apply text-xs;
 }
 .mashup-group-card {
   margin-bottom: 14px;
@@ -216,7 +218,7 @@
   flex: 1;
   border: 0;
   background: transparent;
-  font-weight: 600;
+  @apply font-semibold;
 }
 .mashup-group-card > header button {
   border: 0;
@@ -231,24 +233,24 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
-.mashup-selected-assets > div {
+.mashup-selected-assets > div:not(.attachment-picker-layer) {
   position: relative;
   min-width: 0;
   overflow: hidden;
   border: 1px solid #e7e5e4;
   border-radius: 8px;
 }
-.mashup-selected-assets video {
+.mashup-selected-assets > div:not(.attachment-picker-layer) > video {
   width: 100%;
   height: 72px;
   object-fit: cover;
   background: #000;
 }
-.mashup-selected-assets span {
+.mashup-selected-assets > div:not(.attachment-picker-layer) > span {
   display: block;
   overflow: hidden;
   padding: 5px;
-  font-size: 10px;
+  @apply text-2xs;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -302,7 +304,7 @@
   gap: 7px;
   margin-top: 18px;
   color: #4e4e4e;
-  font-size: 13px;
+  @apply text-xs;
 }
 .mashup-settings input,
 .mashup-settings select {
@@ -323,7 +325,7 @@
 .mashup-settings legend {
   margin-bottom: 7px;
   color: #4e4e4e;
-  font-size: 13px;
+  @apply text-xs;
 }
 .mashup-settings fieldset button {
   height: 38px;
@@ -349,11 +351,11 @@
 }
 .mashup-settings dd {
   margin: 0;
-  font-weight: 600;
+  @apply font-semibold;
 }
 .mashup-error {
   color: #dc2626;
-  font-size: 13px;
+  @apply text-xs;
 }
 .mashup-submit {
   width: 100%;

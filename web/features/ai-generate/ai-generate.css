@@ -1,3 +1,5 @@
+@reference "../../styles/tailwind.css";
+
 .ag-page {
   height: calc(100vh - 56px);
   min-height: 700px;
@@ -7,7 +9,7 @@
   box-sizing: border-box;
   background: radial-gradient(circle at 55% 26%, #fafcff 0, #f3f7ff 36%, #edf3ff 100%);
   color: #242c38;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  @apply font-sans;
 }
 .ag-conversations {
   width: 120px;
@@ -64,7 +66,7 @@
   border-radius: 8px;
   background: #fff;
   color: #687282;
-  font-size: 12px;
+  @apply text-xs;
 }
 .ag-filters label {
   width: 142px;
@@ -130,7 +132,7 @@
   height: 38px;
 }
 .ag-result-preview > span {
-  font-size: 12px;
+  @apply text-xs;
 }
 .ag-result-preview > i {
   position: absolute;
@@ -154,17 +156,17 @@
   color: #8d97a7;
 }
 .ag-result-copy h3 {
-  font-size: 17px;
+  @apply text-base;
   margin: 7px 0;
 }
 .ag-result-copy p {
-  font-size: 13px;
+  @apply text-xs;
   color: #596576;
-  line-height: 1.6;
+  @apply leading-relaxed;
   margin: 0;
 }
 .ag-result-refs {
-  font-size: 11px;
+  @apply text-2xs;
   color: #8a94a3;
   margin-top: 8px;
 }
@@ -245,7 +247,7 @@
   width: 16px;
 }
 .ag-add-reference span {
-  font-size: 12px;
+  @apply text-xs;
 }
 .ag-reference {
   height: 62px;
@@ -275,11 +277,11 @@
   white-space: nowrap;
 }
 .ag-reference b {
-  font-size: 12px;
+  @apply text-xs;
 }
 .ag-reference small {
   color: #9aa3b1;
-  font-size: 10px;
+  @apply text-2xs;
   margin-top: 3px;
 }
 .ag-reference > button {
@@ -303,7 +305,7 @@
   outline: 0;
   background: transparent;
   color: #252d39;
-  font: 14px / 1.7 inherit;
+  @apply text-sm leading-relaxed;
 }
 .ag-composer textarea::placeholder {
   color: #c4c8cf;
@@ -350,7 +352,7 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 12px;
+  @apply text-xs;
 }
 .ag-parameters button svg {
   width: 14px;
@@ -382,7 +384,7 @@
   align-items: center;
   gap: 7px;
   color: #788292;
-  font-size: 13px;
+  @apply text-xs;
 }
 .ag-manual-confirm.docked {
   top: auto;
@@ -404,7 +406,7 @@
   padding: 10px;
 }
 .ag-popover h3 {
-  font-size: 13px;
+  @apply text-xs;
   margin: 2px 4px 9px;
 }
 .ag-popover button {
@@ -458,10 +460,10 @@
   display: block;
 }
 .ag-model-panel b {
-  font-size: 13px;
+  @apply text-xs;
 }
 .ag-model-panel small {
-  font-size: 11px;
+  @apply text-2xs;
   color: #858f9d;
   margin-top: 4px;
 }
@@ -470,7 +472,7 @@
   color: #4d83e3;
   background: #edf3ff;
   border-radius: 4px;
-  font-size: 9px;
+  @apply text-2xs;
   padding: 2px 4px;
   margin-left: 7px;
 }
@@ -484,7 +486,7 @@
   border-radius: 7px;
   background: #f6f8fb;
   color: #7c8797;
-  font-size: 10px;
+  @apply text-2xs;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -502,7 +504,7 @@
 }
 .ag-reference-panel small {
   color: #7f8998;
-  line-height: 1.5;
+  @apply leading-normal;
   margin-top: 5px;
 }
 .ag-format-panel {
@@ -533,7 +535,7 @@
   width: 210px;
 }
 .ag-count-panel label {
-  font-size: 11px;
+  @apply text-2xs;
   color: #788291;
 }
 .ag-count-panel input {
@@ -567,7 +569,7 @@
   justify-content: space-between;
 }
 .ag-confirm-mask h2 {
-  font-size: 18px;
+  @apply text-lg;
   margin: 0;
 }
 .ag-confirm-mask header button {
@@ -593,11 +595,11 @@
   border-bottom: 1px solid #eef1f4;
 }
 .ag-confirm-mask dt {
-  font-size: 10px;
+  @apply text-2xs;
   color: #929ba8;
 }
 .ag-confirm-mask dd {
-  font-size: 12px;
+  @apply text-xs;
   margin: 4px 0 0;
 }
 .ag-confirm-mask p {
@@ -605,7 +607,7 @@
   border-radius: 8px;
   background: #f7f9fc;
   color: #596576;
-  font-size: 12px;
+  @apply text-xs;
 }
 .ag-confirm-mask footer {
   display: flex;
@@ -665,10 +667,10 @@
   height: 48px;
 }
 .ag-preview-art b {
-  font-size: 18px;
+  @apply text-lg;
 }
 .ag-preview-art span {
-  font-size: 12px;
+  @apply text-xs;
 }
 @media (max-width: 1150px) {
   .ag-composer,

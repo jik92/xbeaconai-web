@@ -1,3 +1,5 @@
+@reference "../../styles/tailwind.css";
+
 .video-create-page {
   --vc-blue: #176bff;
   --vc-blue-soft: #eef4ff;
@@ -11,7 +13,7 @@
   overflow: hidden;
   background: #f7f9fc;
   color: var(--vc-text);
-  font-size: 14px;
+  @apply text-sm;
 }
 .video-create-page button {
   border: 0;
@@ -45,14 +47,14 @@
 .vc-config-head span,
 .vc-history header span {
   color: #9aa4b5;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 1.1px;
+  @apply text-2xs;
+  @apply font-semibold;
+  @apply tracking-widest;
 }
 .vc-config-head h1,
 .vc-history h2 {
   margin: 2px 0 0;
-  font-size: 19px;
+  @apply text-lg;
 }
 .vc-config-head > button {
   display: flex;
@@ -80,11 +82,11 @@ label.vc-field > span,
 .vc-advanced-field {
   display: block;
   margin-bottom: 10px;
-  font-weight: 650;
+  @apply font-semibold;
 }
 .vc-field small {
   color: #a5adba;
-  font-weight: 400;
+  @apply font-normal;
 }
 .vc-field em {
   color: #ef4444;
@@ -157,7 +159,7 @@ label.vc-field > span,
   padding: 2px 5px;
   background: #25c66b;
   color: #fff;
-  font-size: 10px;
+  @apply text-2xs;
 }
 .vc-add-image {
   border: 1px dashed #c7cfda;
@@ -180,8 +182,8 @@ label.vc-field > span,
   gap: 9px;
   background: var(--vc-blue);
   color: #fff;
-  font-size: 16px;
-  font-weight: 650;
+  @apply text-base;
+  @apply font-semibold;
   box-shadow: 0 8px 20px #176bff26;
 }
 .vc-ai-fill:disabled,
@@ -231,7 +233,7 @@ label.vc-field > span,
   border-color: var(--vc-blue);
   background: var(--vc-blue-soft);
   color: var(--vc-blue);
-  font-weight: 600;
+  @apply font-semibold;
 }
 .vc-selling-points {
   display: flex;
@@ -272,14 +274,14 @@ label.vc-field > span,
   border-radius: 10px;
   background: #fff;
   color: #758197;
-  font-size: 16px;
+  @apply text-base;
 }
 .vc-duration-grid button.active,
 .vc-speed-grid button.active {
   border: 2px solid var(--vc-blue);
   background: var(--vc-blue-soft);
   color: var(--vc-blue);
-  font-weight: 650;
+  @apply font-semibold;
 }
 .vc-inline-controls > div {
   display: flex;
@@ -292,11 +294,11 @@ label.vc-field > span,
   border: 1px solid #dfe4eb;
   border-radius: 9px;
   background: #fff;
-  font-size: 20px;
+  @apply text-xl;
 }
 .vc-inline-controls b {
   color: var(--vc-blue);
-  font-size: 17px;
+  @apply text-base;
 }
 .vc-inline-controls small {
   color: #9aa4b5;
@@ -330,7 +332,7 @@ label.vc-field > span,
   border: 1px solid #dfe5ee;
   border-radius: 11px;
   background: #fff;
-  font-weight: 650;
+  @apply font-semibold;
 }
 .vc-collapse > span {
   display: flex;
@@ -338,7 +340,7 @@ label.vc-field > span,
   gap: 9px;
 }
 .vc-collapse b {
-  font-size: 15px;
+  @apply text-sm;
 }
 .vc-collapse i {
   min-width: 23px;
@@ -350,11 +352,11 @@ label.vc-field > span,
   background: var(--vc-blue);
   color: #fff;
   font-style: normal;
-  font-size: 12px;
+  @apply text-xs;
 }
 .vc-collapse small {
   color: #a4adbc;
-  font-weight: 400;
+  @apply font-normal;
 }
 .vc-collapse svg {
   color: #9aa4b5;
@@ -383,7 +385,7 @@ label.vc-field > span,
 .vc-advanced-field > strong {
   display: block;
   margin-bottom: 10px;
-  font-size: 14px;
+  @apply text-sm;
 }
 .vc-choice-list {
   display: flex;
@@ -409,7 +411,7 @@ label.vc-field > span,
   border-color: var(--vc-blue);
   background: var(--vc-blue-soft);
   color: var(--vc-blue);
-  font-weight: 650;
+  @apply font-semibold;
 }
 .vc-choice-list button svg {
   width: 13px;
@@ -430,7 +432,7 @@ label.vc-field > span,
 .vc-advanced-grid label {
   display: grid;
   gap: 7px;
-  font-weight: 650;
+  @apply font-semibold;
 }
 .vc-select-asset {
   width: 100%;
@@ -459,8 +461,8 @@ label.vc-field > span,
   border-radius: 11px;
   background: var(--vc-blue);
   color: #fff;
-  font-size: 17px;
-  font-weight: 700;
+  @apply text-base;
+  @apply font-semibold;
   box-shadow: 0 8px 18px #176bff27;
 }
 .vc-output-panel {
@@ -483,11 +485,11 @@ label.vc-field > span,
   position: relative;
   min-width: 92px;
   color: #7d8797;
-  font-size: 16px;
+  @apply text-base;
 }
 .vc-output-head nav button.active {
   color: var(--vc-blue);
-  font-weight: 650;
+  @apply font-semibold;
 }
 .vc-output-head nav button.active:after {
   content: "";
@@ -507,7 +509,7 @@ label.vc-field > span,
   border-radius: 50%;
   background: #99a2b0;
   color: #fff;
-  font-size: 12px;
+  @apply text-xs;
   font-style: normal;
 }
 .vc-output-head button.active i {
@@ -557,11 +559,11 @@ label.vc-field > span,
 }
 .vc-empty b {
   color: #667085;
-  font-size: 17px;
+  @apply text-base;
 }
 .vc-empty p,
 .vc-generating p {
-  line-height: 1.7;
+  @apply leading-relaxed;
 }
 .vc-generating span {
   width: 96px;
@@ -653,7 +655,7 @@ label.vc-field > span,
   border-radius: 7px;
   background: #fff;
   color: #d54b0b;
-  font-weight: 650;
+  @apply font-semibold;
 }
 .vc-script-list article.tone-1 > header > span {
   border-color: #c9e9ce;
@@ -685,9 +687,7 @@ label.vc-field > span,
   border: 0;
   padding: 15px;
   color: #39465b;
-  font:
-    15px / 1.7 Inter,
-    sans-serif;
+  @apply font-sans text-sm leading-relaxed;
   outline: 0;
 }
 .vc-script-list article > footer {
@@ -722,8 +722,8 @@ label.vc-field > span,
   border-radius: 10px;
   background: var(--vc-blue);
   color: #fff;
-  font-size: 16px;
-  font-weight: 650;
+  @apply text-base;
+  @apply font-semibold;
   box-shadow: 0 5px 0 #dce9ff;
 }
 .vc-storyboard-toolbar > div:first-child {
@@ -732,7 +732,7 @@ label.vc-field > span,
   gap: 14px;
 }
 .vc-storyboard-toolbar > div:first-child b {
-  font-size: 16px;
+  @apply text-base;
 }
 .vc-storyboard-toolbar > div:first-child span {
   padding: 4px 9px;
@@ -760,9 +760,9 @@ label.vc-field > span,
 }
 .vc-final-result span {
   color: var(--vc-blue);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 1.2px;
+  @apply text-2xs;
+  @apply font-semibold;
+  @apply tracking-widest;
 }
 .vc-final-result h2 {
   margin: 8px 0;
@@ -816,7 +816,7 @@ label.vc-field > span,
   background: #f8f9fb;
   border-bottom: 1px solid var(--vc-line);
   color: #69758a;
-  font-weight: 650;
+  @apply font-semibold;
 }
 .vc-shot-head span,
 .vc-shot-table article > span,
@@ -847,11 +847,11 @@ label.vc-field > span,
   color: var(--vc-blue);
   font-style: normal;
   text-align: center;
-  line-height: 1.6;
+  @apply leading-relaxed;
 }
 .vc-shot-copy p {
   margin: 5px 0;
-  line-height: 1.65;
+  @apply leading-relaxed;
 }
 .vc-shot-copy small {
   color: #9aa4b5;
@@ -1014,7 +1014,7 @@ label.vc-field > span,
   grid-row: 1 / 3;
   align-self: center;
   color: #a0a9b7;
-  font-size: 11px;
+  @apply text-2xs;
 }
 .vc-history-status {
   width: max-content;
@@ -1023,7 +1023,7 @@ label.vc-field > span,
   border-radius: 6px;
   background: var(--vc-blue-soft);
   color: var(--vc-blue);
-  font-size: 11px;
+  @apply text-2xs;
 }
 .vc-history-status.completed {
   background: #e9f9ef;

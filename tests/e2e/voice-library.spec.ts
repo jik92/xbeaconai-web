@@ -35,11 +35,20 @@ test.beforeEach(async ({ page }) => {
 
 test("plays an uploaded voice from the card and detail dialog", async ({ page }) => {
   await page.getByRole("button", { name: "上传音色" }).click();
-  await page.locator('.asset-upload-modal input[type="file"]').setInputFiles({
-    name: "voice-preview.wav",
-    mimeType: "audio/wav",
-    buffer: wavFixture(),
-  });
+  const dropzone = page.locator('.asset-upload-modal [role="button"]');
+  const wavBytes = Array.from(wavFixture());
+  await dropzone.evaluate((element, bytes) => {
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([Uint8Array.from(bytes)], "voice-preview.wav", { type: "audio/wav" }));
+    element.dispatchEvent(new DragEvent("dragenter", { bubbles: true, dataTransfer: transfer }));
+  }, wavBytes);
+  await expect(dropzone).toContainText("松开即可添加文件");
+  await dropzone.evaluate((element, bytes) => {
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([Uint8Array.from(bytes)], "voice-preview.wav", { type: "audio/wav" }));
+    element.dispatchEvent(new DragEvent("drop", { bubbles: true, dataTransfer: transfer }));
+  }, wavBytes);
+  await expect(page.getByText("voice-preview.wav").first()).toBeVisible();
   await page.getByRole("button", { name: "确认上传" }).click();
 
   const detail = page.locator(".asset-detail-modal");

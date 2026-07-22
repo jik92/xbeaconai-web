@@ -1,7 +1,7 @@
 ---
 version: alpha
 name: ElevenLabs-design-analysis
-description: A voice-AI brand whose marketing surfaces read like a quietly editorial print magazine. The base canvas is off-white (`#f5f5f5`) holding warm near-black ink (`#292524`); the brand voltage is photographic, not chromatic — soft pastel atmospheric gradient orbs (mint → peach → lavender → sky) drift through the page as the only "color" moments. Display runs Waldenburg Light at weight 300 — the editorial signature. Inter carries body, navigation, captions. CTAs are subtle: a near-black ink pill is the primary, a transparent outline is the secondary. The brand trusts atmospheric photography and modest type weights to do all of the brand work; there is no neon accent, no saturated CTA color, no developer-tools dark canvas.
+description: A compact AI creation workspace with an editorial off-white canvas, warm near-black ink, restrained atmospheric color, and one Tailwind-governed typography system. Product surfaces default to a compact 14px sans body; headings use the same Chinese-first system stack with controlled size, weight, line height, and tracking. No page may introduce raw CSS typography values outside the Tailwind theme.
 
 colors:
   primary: "#292524"
@@ -33,91 +33,21 @@ colors:
   semantic-success: "#16a34a"
 
 typography:
-  display-mega:
-    fontFamily: "'Waldenburg', 'Times New Roman', serif"
-    fontSize: 64px
-    fontWeight: 300
-    lineHeight: 1.05
-    letterSpacing: -1.92px
-  display-xl:
-    fontFamily: "'Waldenburg', serif"
-    fontSize: 48px
-    fontWeight: 300
-    lineHeight: 1.08
-    letterSpacing: -0.96px
-  display-lg:
-    fontFamily: "'Waldenburg', serif"
-    fontSize: 36px
-    fontWeight: 300
-    lineHeight: 1.17
-    letterSpacing: -0.36px
-  display-md:
-    fontFamily: "'Waldenburg', serif"
-    fontSize: 32px
-    fontWeight: 300
-    lineHeight: 1.13
-    letterSpacing: -0.32px
-  display-sm:
-    fontFamily: "'Waldenburg', serif"
-    fontSize: 24px
-    fontWeight: 300
-    lineHeight: 1.2
-    letterSpacing: 0
-  title-md:
-    fontFamily: "'Inter', sans-serif"
-    fontSize: 20px
-    fontWeight: 500
-    lineHeight: 1.35
-    letterSpacing: 0
-  title-sm:
-    fontFamily: "'Inter', sans-serif"
-    fontSize: 18px
-    fontWeight: 500
-    lineHeight: 1.44
-    letterSpacing: 0.18px
-  body-md:
-    fontFamily: "'Inter', sans-serif"
-    fontSize: 16px
-    fontWeight: 400
-    lineHeight: 1.5
-    letterSpacing: 0.16px
-  body-strong:
-    fontFamily: "'Inter', sans-serif"
-    fontSize: 16px
-    fontWeight: 500
-    lineHeight: 1.5
-    letterSpacing: 0.16px
-  body-sm:
-    fontFamily: "'Inter', sans-serif"
-    fontSize: 15px
-    fontWeight: 400
-    lineHeight: 1.47
-    letterSpacing: 0.15px
-  caption:
-    fontFamily: "'Inter', sans-serif"
-    fontSize: 14px
-    fontWeight: 400
-    lineHeight: 1.5
-    letterSpacing: 0
-  caption-uppercase:
-    fontFamily: "'Inter', sans-serif"
-    fontSize: 12px
-    fontWeight: 600
-    lineHeight: 1.4
-    letterSpacing: 0.96px
-    textTransform: uppercase
-  button:
-    fontFamily: "'Inter', sans-serif"
-    fontSize: 15px
-    fontWeight: 500
-    lineHeight: 1.0
-    letterSpacing: 0
-  nav-link:
-    fontFamily: "'Inter', sans-serif"
-    fontSize: 15px
-    fontWeight: 500
-    lineHeight: 1.4
-    letterSpacing: 0
+  font-sans: "'Inter', 'PingFang SC', 'Microsoft YaHei', ui-sans-serif, system-ui, sans-serif"
+  font-display: "{typography.font-sans}"
+  text-2xs: 10px / 14px
+  text-xs: 12px / 16px
+  text-sm: 14px / 20px
+  text-base: 16px / 24px
+  text-lg: 18px / 26px
+  text-xl: 20px / 28px
+  text-2xl: 24px / 32px
+  text-3xl: 30px / 36px
+  text-4xl: 36px / 42px
+  text-5xl: 48px / 52px
+  text-6xl: 64px / 68px
+  weights: [300, 400, 500, 600]
+  tracking: [tight, normal, wide, wider, widest]
 
 rounded:
   none: 0px
@@ -145,12 +75,12 @@ components:
   top-nav:
     backgroundColor: "{colors.canvas}"
     textColor: "{colors.ink}"
-    typography: "{typography.nav-link}"
+    typography: "font-sans text-sm font-medium"
     height: 64px
   button-primary:
     backgroundColor: "{colors.primary}"
     textColor: "{colors.on-primary}"
-    typography: "{typography.button}"
+    typography: "font-sans text-sm font-medium"
     rounded: "{rounded.pill}"
     padding: 10px 20px
     height: 40px
@@ -161,18 +91,18 @@ components:
   button-outline:
     backgroundColor: transparent
     textColor: "{colors.ink}"
-    typography: "{typography.button}"
+    typography: "font-sans text-sm font-medium"
     rounded: "{rounded.pill}"
     padding: 9px 19px
     height: 40px
   button-tertiary-text:
     backgroundColor: transparent
     textColor: "{colors.ink}"
-    typography: "{typography.button}"
+    typography: "font-sans text-sm font-medium"
   hero-band:
     backgroundColor: "{colors.canvas}"
     textColor: "{colors.ink}"
-    typography: "{typography.display-mega}"
+    typography: "font-display text-5xl font-light tracking-tight"
     padding: 96px
   gradient-orb-card:
     backgroundColor: "{colors.canvas-soft}"
@@ -182,19 +112,19 @@ components:
   feature-card:
     backgroundColor: "{colors.surface-card}"
     textColor: "{colors.ink}"
-    typography: "{typography.title-md}"
+    typography: "font-sans text-xl font-medium"
     rounded: "{rounded.xl}"
     padding: 24px
   product-card-stack:
     backgroundColor: "{colors.surface-card}"
     textColor: "{colors.ink}"
-    typography: "{typography.body-md}"
+    typography: "font-sans text-sm font-normal"
     rounded: "{rounded.xl}"
     padding: 0
   voice-row:
     backgroundColor: transparent
     textColor: "{colors.ink}"
-    typography: "{typography.body-md}"
+    typography: "font-sans text-sm font-normal"
     padding: 12px 0
   voice-icon-circular:
     backgroundColor: "{colors.surface-strong}"
@@ -203,37 +133,37 @@ components:
   pricing-tier-card:
     backgroundColor: "{colors.surface-card}"
     textColor: "{colors.ink}"
-    typography: "{typography.body-md}"
+    typography: "font-sans text-sm font-normal"
     rounded: "{rounded.xl}"
     padding: 32px
   pricing-tier-featured:
     backgroundColor: "{colors.surface-dark}"
     textColor: "{colors.on-dark}"
-    typography: "{typography.body-md}"
+    typography: "font-sans text-sm font-normal"
     rounded: "{rounded.xl}"
     padding: 32px
   text-input:
     backgroundColor: "{colors.surface-card}"
     textColor: "{colors.ink}"
-    typography: "{typography.body-md}"
+    typography: "font-sans text-sm font-normal"
     rounded: "{rounded.md}"
     padding: 12px 16px
     height: 44px
   badge-pill:
     backgroundColor: "{colors.surface-strong}"
     textColor: "{colors.ink}"
-    typography: "{typography.caption-uppercase}"
+    typography: "font-sans text-xs font-semibold tracking-widest uppercase"
     rounded: "{rounded.pill}"
     padding: 4px 10px
   cta-band:
     backgroundColor: "{colors.canvas}"
     textColor: "{colors.ink}"
-    typography: "{typography.display-lg}"
+    typography: "font-display text-3xl font-light tracking-tight"
     padding: 96px
   testimonial-card:
     backgroundColor: "{colors.surface-card}"
     textColor: "{colors.body}"
-    typography: "{typography.body-md}"
+    typography: "font-sans text-sm font-normal"
     rounded: "{rounded.xl}"
     padding: 32px
   audio-waveform-card:
@@ -244,27 +174,27 @@ components:
   footer:
     backgroundColor: "{colors.canvas}"
     textColor: "{colors.body}"
-    typography: "{typography.body-sm}"
+    typography: "font-sans text-sm font-normal"
     padding: 64px 48px
   footer-link:
     backgroundColor: transparent
     textColor: "{colors.body}"
-    typography: "{typography.body-sm}"
+    typography: "font-sans text-sm font-normal"
 ---
 
 ## Overview
 
 ElevenLabs reads like a quietly editorial print magazine that happens to be a voice-AI product. The base canvas is off-white `{colors.canvas}` (#f5f5f5) holding warm near-black ink `{colors.ink}` (#0c0a09). The brand voltage is **photographic, not chromatic**: soft pastel atmospheric gradient orbs (mint, peach, lavender, sky, rose) drift through the page as the only "color" moments. There is no neon accent, no saturated CTA color, no dark-canvas dev-tools atmosphere.
 
-Type pairs **Waldenburg Light** (custom serif at weight 300) for display with **Inter** for body, navigation, captions. The display weight at 300 is the editorial signature — never bold, never heavy.
+Typography uses one Tailwind-governed, Chinese-first sans stack across product and marketing surfaces. Product body copy defaults to a compact 14px; hierarchy comes from the approved Tailwind size, weight, line-height, and tracking utilities rather than page-specific CSS values.
 
 CTAs are subtle: a near-black ink pill (`{component.button-primary}`) is the primary, a transparent outline (`{component.button-outline}`) is the secondary. The brand trusts atmospheric photography and modest type weights to carry brand work.
 
 **Key Characteristics:**
 - Off-white canvas, warm near-black ink. No saturated CTA color.
 - Single primary action: ink pill at `{rounded.pill}`. Atmospheric gradients carry visual brand voltage.
-- Display runs Waldenburg Light at weight 300 — editorial magazine voice.
-- Body runs Inter at 400 with subtle letter-spacing (+0.15-0.18px).
+- Product UI defaults to `font-sans text-sm`; regular page titles remain between `text-xl` and `text-3xl`.
+- All typography values come from `web/styles/tailwind.css`; business CSS contains no raw typography declarations.
 - Pastel gradient orbs (5 tokens: mint, peach, lavender, sky, rose) used as atmospheric brand decoration only.
 - Soft pill geometry (`{rounded.pill}` for CTAs, `{rounded.xl}` for cards).
 - 96px section rhythm.
@@ -314,35 +244,35 @@ These appear ONLY as soft radial-gradient atmospheric orbs inside `{component.gr
 
 ## Typography
 
-### Font Family
-**Waldenburg Light** is the licensed display serif at weight 300. **Inter** carries body, navigation, captions, and buttons. Fallback: `'Times New Roman', serif` for Waldenburg, `sans-serif` for Inter.
+### Single Source of Truth
+
+`web/styles/tailwind.css` is the only runtime source for font families and the type scale. `font-sans` uses `Inter`, `PingFang SC`, `Microsoft YaHei`, `ui-sans-serif`, `system-ui`, then `sans-serif`. The repository does not currently ship Inter or Waldenburg font files, so installed system fonts provide the actual rendering. `font-display` intentionally aliases `font-sans` until an approved, bundled display font is available.
+
+TSX uses Tailwind classes directly. Legacy selector-based CSS uses `@apply` after referencing the shared Tailwind theme. Raw `font-family`, `font-size`, `font-weight`, `line-height`, `letter-spacing`, inline typography styles, and arbitrary typography utilities are prohibited. The only base-layer exception is `font: inherit` on native form controls.
 
 ### Hierarchy
 
-| Token | Size | Weight | Line Height | Letter Spacing | Use |
-|---|---|---|---|---|---|
-| `{typography.display-mega}` | 64px | 300 | 1.05 | -1.92px | Homepage hero h1 |
-| `{typography.display-xl}` | 48px | 300 | 1.08 | -0.96px | Subsidiary heroes |
-| `{typography.display-lg}` | 36px | 300 | 1.17 | -0.36px | Section heads |
-| `{typography.display-md}` | 32px | 300 | 1.13 | -0.32px | Sub-section heads |
-| `{typography.display-sm}` | 24px | 300 | 1.2 | 0 | Card group titles |
-| `{typography.title-md}` | 20px | 500 | 1.35 | 0 | Component titles — Inter |
-| `{typography.title-sm}` | 18px | 500 | 1.44 | 0.18px | List labels |
-| `{typography.body-md}` | 16px | 400 | 1.5 | 0.16px | Default body — Inter |
-| `{typography.body-strong}` | 16px | 500 | 1.5 | 0.16px | Emphasized body |
-| `{typography.body-sm}` | 15px | 400 | 1.47 | 0.15px | Footer body |
-| `{typography.caption}` | 14px | 400 | 1.5 | 0 | Photo captions |
-| `{typography.caption-uppercase}` | 12px | 600 | 1.4 | 0.96px | Section labels, badges |
-| `{typography.button}` | 15px | 500 | 1.0 | 0 | CTA pill |
-| `{typography.nav-link}` | 15px | 500 | 1.4 | 0 | Top-nav menu |
+| Tailwind Token | Size / Line Height | Use |
+|---|---|---|
+| `text-2xs` | 10px / 14px | Dense metadata and compact status only |
+| `text-xs` | 12px / 16px | Helper copy, labels, badges, timestamps |
+| `text-sm` | 14px / 20px | Default product body, buttons, forms, tables, navigation |
+| `text-base` | 16px / 24px | Emphasized body and relaxed reading content |
+| `text-lg` | 18px / 26px | Small section and dialog titles |
+| `text-xl` | 20px / 28px | Component and standard dialog titles |
+| `text-2xl` | 24px / 32px | Product page titles |
+| `text-3xl` | 30px / 36px | Large product page titles |
+| `text-4xl` | 36px / 42px | Compact marketing display titles |
+| `text-5xl` | 48px / 52px | Marketing hero titles |
+| `text-6xl` | 64px / 68px | Homepage hero only; forbidden in product workspaces |
 
 ### Principles
-- **Display weight stays at 300.** Waldenburg Light is the editorial signature. Never bold display copy.
-- **Subtle letter-spacing on body.** Inter at +0.15-0.18px tracking — slightly looser than default Inter for a more editorial feel.
-- **Negative letter-spacing on display.** Waldenburg pulls -0.32px to -1.92px tighter on display sizes.
-
-### Note on Font Substitutes
-Waldenburg is licensed. Open-source substitute: **EB Garamond** at weight 300 (slightly more humanist) or **GT Sectra** (closer to Waldenburg's modernity). Use Inter directly for body — it's the same family ElevenLabs uses.
+- **Compact product default.** Product pages inherit `font-sans text-sm`; use larger body text only when reading comfort materially benefits.
+- **Limited weights.** Use only `font-light`, `font-normal`, `font-medium`, and `font-semibold`. `font-light` is display-only; normal text never drops below 400.
+- **Controlled rhythm.** Prefer the line height bundled with each `text-*` Token. Overrides are limited to Tailwind `leading-none`, `leading-tight`, `leading-snug`, `leading-normal`, `leading-relaxed`, and `leading-loose`.
+- **Controlled tracking.** Use only `tracking-tight`, `tracking-normal`, `tracking-wide`, `tracking-wider`, and `tracking-widest`. Running body copy normally uses default tracking.
+- **No arbitrary values.** Do not use `text-[…]`, `font-[…]`, `leading-[…]`, `tracking-[…]`, or inline typography styles.
+- **No fake fonts.** Do not reference a font family unless its files are bundled or it exists in the approved fallback stack.
 
 ## Layout
 
@@ -399,7 +329,7 @@ The system uses **hairline + soft drop**. Cards float above the off-white canvas
 
 ### Buttons
 
-**`button-primary`** — Near-black ink pill. Background `{colors.primary}`, text `{colors.on-primary}`, type `{typography.button}` (15px / 500), padding 10px × 20px, height 40px, rounded `{rounded.pill}`.
+**`button-primary`** — Near-black ink pill. Background `{colors.primary}`, text `{colors.on-primary}`, type `font-sans text-sm font-medium` (14px / 500), padding 10px × 20px, height 40px, rounded `{rounded.pill}`.
 
 **`button-primary-active`** — Press state. Background `{colors.primary-active}`.
 
@@ -409,7 +339,7 @@ The system uses **hairline + soft drop**. Cards float above the off-white canvas
 
 ### Hero & Atmospheric
 
-**`hero-band`** — Background `{colors.canvas}`, full-width display headline in `{typography.display-mega}` (64px / 300 / -1.92px), subhead in `{typography.body-md}`, two CTAs, and an atmospheric gradient orb behind the centered headline.
+**`hero-band`** — Background `{colors.canvas}`, full-width display headline in `font-display text-5xl font-light tracking-tight` (48px / 300), subhead in `font-sans text-sm font-normal`, two CTAs, and an atmospheric gradient orb behind the centered headline.
 
 **`gradient-orb-card`** — A large card with a soft radial-gradient orb behind centered display copy. Background `{colors.canvas-soft}`, rounded `{rounded.xxl}` (24px), padding 32px. Each variant uses one of the five gradient tokens (`gradient-mint`, `gradient-peach`, `gradient-lavender`, `gradient-sky`, `gradient-rose`).
 
@@ -437,33 +367,37 @@ The system uses **hairline + soft drop**. Cards float above the off-white canvas
 
 ### Forms & Tags
 
-**`text-input`** — Background `{colors.surface-card}`, text `{colors.ink}`, rounded `{rounded.md}` (8px), padding 12px × 16px, height 44px, 1px `{colors.hairline-strong}` border. On focus, border thickens to 2px ink.
+**`text-input`** — Background `{colors.surface-card}`, text `{colors.ink}`, type `font-sans text-sm font-normal`, rounded `{rounded.md}` (8px), padding 12px × 16px, height 44px, 1px `{colors.hairline-strong}` border. On focus, border thickens to 2px ink.
 
-**`badge-pill`** — Background `{colors.surface-strong}`, text `{colors.ink}`, type `{typography.caption-uppercase}`, rounded `{rounded.pill}`, padding 4px × 10px.
+**`file-upload`** — Compact shadcn-style drop container using the same border, radius, focus ring, label, and helper-text semantics as other form controls. The default state supports click and drag selection; active drag uses a restrained primary tint. Upload progress, errors, retry actions, and type-aware media previews stay inside the same container. Avoid oversized icons and tall decorative drop zones; the idle container should remain close to 112px high.
+
+**`badge-pill`** — Background `{colors.surface-strong}`, text `{colors.ink}`, type `font-sans text-xs font-semibold tracking-widest uppercase`, rounded `{rounded.pill}`, padding 4px × 10px.
 
 ### CTA / Footer
 
-**`cta-band`** — Pre-footer. Background `{colors.canvas}`, centered display headline in `{typography.display-lg}`, single ink pill CTA. 96px padding.
+**`cta-band`** — Pre-footer. Background `{colors.canvas}`, centered display headline in `font-display text-3xl font-light tracking-tight`, single ink pill CTA. 96px padding.
 
 **`footer`** — Closing footer. Background `{colors.canvas}`, text `{colors.body}`. 5-column link list. 64×48px padding.
 
-**`footer-link`** — Background transparent, text `{colors.body}`, type `{typography.body-sm}`.
+**`footer-link`** — Background transparent, text `{colors.body}`, type `font-sans text-sm font-normal`.
 
 ## Do's and Don'ts
 
 ### Do
 - Reserve `{colors.primary}` (ink pill) for primary CTAs.
-- Use Waldenburg Light at weight 300 for every display headline. Never bold.
-- Use Inter at +0.15-0.18px tracking for body — the editorial dialect.
+- Use `font-sans text-sm` as the default product typography.
+- Use only the Tailwind font, text, leading, tracking, and weight Tokens documented above.
+- Keep regular product page titles at `text-xl`–`text-3xl`; reserve larger sizes for marketing surfaces.
 - Use atmospheric gradient orbs (mint/peach/lavender/sky/rose) as decoration only.
 - Use the pill shape for every CTA and badge.
 
 ### Don't
 - Don't introduce a saturated brand action color. Ink pill is the only CTA color.
-- Don't bold display copy. Display sits at weight 300 — bolding shifts the brand voice from editorial to consumer-marketing.
+- Don't add raw CSS typography declarations, inline typography styles, or arbitrary typography utilities.
+- Don't use `font-bold` or `font-extrabold`; `font-semibold` is the maximum approved UI weight.
 - Don't use gradient orbs as button fills, text colors, or component backgrounds. They are pure atmosphere.
 - Don't use sharp `{rounded.none}` (0px) on CTAs. Pill geometry is the brand button.
-- Don't drop body Inter to weight 300 to match Waldenburg — body stays at 400/500 for legibility.
+- Don't use `font-light` for body text; body stays at 400 or 500 for legibility.
 - Don't extract a CTA color from a third-party widget (cookie consent, OneTrust). The brand's CTA color is what appears on actual product CTAs.
 
 ## Responsive Behavior
@@ -472,9 +406,9 @@ The system uses **hairline + soft drop**. Cards float above the off-white canvas
 
 | Name | Width | Key Changes |
 |---|---|---|
-| Mobile | < 640px | Hero h1 64→32px; feature cards 1-up; nav hamburger; gradient orbs shrink. |
+| Mobile | < 640px | Marketing hero h1 48→36px; feature cards 1-up; nav hamburger; gradient orbs shrink. |
 | Tablet | 640–1024px | Hero h1 48px; feature cards 2-up. |
-| Desktop | 1024–1280px | Full hero h1 64px; feature cards 3-up. |
+| Desktop | 1024–1280px | Full marketing hero h1 48px; feature cards 3-up. |
 | Wide | > 1280px | Content caps at 1200px. |
 
 ### Touch Targets
@@ -493,12 +427,12 @@ The system uses **hairline + soft drop**. Cards float above the off-white canvas
 3. Variants live as separate entries.
 4. Use `{token.refs}` everywhere — never inline hex.
 5. Hover state never documented.
-6. Waldenburg 300 for display, Inter 400/500 for body.
+6. Run `bun run check:typography`; Tailwind theme utilities are mandatory for all text styling.
 7. Gradient orbs scoped to atmospheric decoration.
 
 ## Known Gaps
 
-- Waldenburg is a licensed typeface; EB Garamond / GT Sectra are documented substitutes.
+- Inter is preferred but not bundled; actual rendering falls through to the approved Chinese-first system stack.
 - Animation timings (orb drift, waveform pulse, hero entrance) out of scope.
 - In-product surfaces (voice library editor, agent playground) only partially captured via marketing mockups.
 - Form validation states beyond focus not visible on captured surfaces.

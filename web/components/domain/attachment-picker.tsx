@@ -8,15 +8,15 @@ import {
   FileVideo2,
   Folder,
   FolderOpen,
-  LoaderCircle,
   Search,
   Upload,
   X,
 } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { fetchAssetFolders, fetchLibraryAssets, uploadMediaFile } from "@/api/api-client";
 import type { AssetFolder, LibraryAsset } from "@/entities/types";
 import { AuthenticatedMedia } from "./authenticated-media";
+import { FileUpload } from "./file-upload";
 
 export interface AttachmentSelection {
   id: string;
@@ -67,7 +67,6 @@ export function AttachmentPicker({
   onSelect: (assets: AttachmentSelection[]) => void;
 }) {
   const queryClient = useQueryClient();
-  const fileInput = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [source, setSource] = useState<"library" | "upload">("library");
   const [query, setQuery] = useState("");
@@ -75,6 +74,9 @@ export function AttachmentPicker({
   const [previewId, setPreviewId] = useState("");
   const [folderId, setFolderId] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<AttachmentSelection[]>([]);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState("");
   const { data: folders = [], isLoading: foldersLoading } = useQuery({
     queryKey: ["asset-folders"],
@@ -129,6 +131,9 @@ export function AttachmentPicker({
     setOpen(false);
     setSelected([]);
     setPreviewId("");
+    setUploadFiles([]);
+    setUploadedFiles([]);
+    setUploadProgress(0);
     setError("");
   };
   const chooseLibrary = () => {
@@ -147,31 +152,58 @@ export function AttachmentPicker({
     onSelect(assets);
     close();
   };
-  const upload = async (files: File[]) => {
+  const upload = async (files: File[], retainedUploads: AttachmentSelection[] = []) => {
     if (!files.length) return;
+    const pendingFiles = multiple ? files : files.slice(0, 1);
+    const totalBytes = pendingFiles.reduce((total, file) => total + Math.max(file.size, 1), 0);
+    const fileProgress = pendingFiles.map(() => 0);
+    setUploadFiles(pendingFiles);
+    setUploadedFiles(retainedUploads);
+    setUploadProgress(0);
     setUploading(true);
     setError("");
     try {
-      const uploaded = await Promise.all(
-        (multiple ? files : files.slice(0, 1)).map((file) => uploadMediaFile(file, folderId || undefined)),
+      const results = await Promise.all(
+        pendingFiles.map(async (file, index) => {
+          try {
+            const asset = await uploadMediaFile(file, folderId || undefined, (progress) => {
+              fileProgress[index] = progress;
+              const weightedProgress = fileProgress.reduce(
+                (total, current, currentIndex) => total + current * Math.max(pendingFiles[currentIndex]?.size ?? 0, 1),
+                0,
+              );
+              setUploadProgress(Math.round(weightedProgress / totalBytes));
+            });
+            return { file, asset };
+          } catch (reason) {
+            return { file, error: reason instanceof Error ? reason.message : "附件上传失败" };
+          }
+        }),
       );
-      onSelect(
-        uploaded.map((asset) => ({
-          id: asset.id,
-          name: asset.name,
-          mimeType: asset.mimeType,
-          size: asset.size,
-          url: asset.url,
-          source: "upload" as const,
-        })),
+      const selections = results.flatMap((result) =>
+        result.asset
+          ? [
+              {
+                id: result.asset.id,
+                name: result.file.name,
+                mimeType: result.asset.mimeType,
+                size: result.asset.size,
+                url: result.asset.url,
+                source: "upload" as const,
+              },
+            ]
+          : [],
       );
+      const failed = results.filter((result) => result.error);
+      setUploadProgress(100);
+      setUploadFiles(failed.map((result) => result.file));
+      setUploadedFiles([...retainedUploads, ...selections]);
+      if (failed.length) setError(failed[0]?.error ?? `${failed.length} 个文件上传失败`);
       void queryClient.invalidateQueries({ queryKey: ["asset-library", "media"] });
-      close();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "附件上传失败");
     } finally {
       setUploading(false);
-      if (fileInput.current) fileInput.current.value = "";
     }
   };
 
@@ -353,22 +385,28 @@ export function AttachmentPicker({
               </div>
             ) : (
               <div className="attachment-upload-panel">
-                <input
-                  ref={fileInput}
-                  type="file"
-                  hidden
+                <FileUpload
+                  label="选择本地文件"
                   accept={accept}
                   multiple={multiple}
-                  onChange={(event) => void upload(Array.from(event.target.files ?? []))}
+                  files={uploadFiles}
+                  uploadedFiles={uploadedFiles}
+                  uploading={uploading}
+                  progress={uploadProgress}
+                  error={error}
+                  description={`将上传到“${currentFolder?.name ?? "默认"}”，上传后可在素材库中重复使用。`}
+                  onFilesChange={(files) => void upload(files)}
+                  onClear={() => {
+                    setUploadFiles([]);
+                    setUploadedFiles([]);
+                    setUploadProgress(0);
+                    setError("");
+                  }}
+                  onRetry={uploadFiles.length ? () => void upload(uploadFiles, uploadedFiles) : undefined}
                 />
-                <button type="button" disabled={uploading} onClick={() => fileInput.current?.click()}>
-                  {uploading ? <LoaderCircle className="animate-spin" /> : <Upload />}
-                  <b>{uploading ? "正在上传…" : "点击选择本地文件"}</b>
-                  <span>将上传到“{currentFolder?.name ?? "默认"}”，后续可重复使用</span>
-                </button>
               </div>
             )}
-            {error && <p className="attachment-error">{error}</p>}
+            {error && source === "library" && <p className="attachment-error">{error}</p>}
             <footer>
               <button type="button" onClick={close}>
                 取消
@@ -376,6 +414,18 @@ export function AttachmentPicker({
               {source === "library" && (
                 <button type="button" className="primary" disabled={!selected.length} onClick={chooseLibrary}>
                   使用所选素材{selected.length ? `（${selected.length}）` : ""}
+                </button>
+              )}
+              {source === "upload" && uploadedFiles.length > 0 && (
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={() => {
+                    onSelect(uploadedFiles);
+                    close();
+                  }}
+                >
+                  使用已上传文件
                 </button>
               )}
             </footer>

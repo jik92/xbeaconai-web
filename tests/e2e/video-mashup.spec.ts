@@ -28,3 +28,25 @@ test("manages video groups and shows a live combination summary", async ({ page 
   await creator.getByRole("button", { name: "创建 0 个混剪成片" }).click();
   await expect(creator.getByText("必须选择 1–20 个视频")).toBeVisible();
 });
+
+test("auto-uploads a local attachment and keeps its uploaded preview before selection", async ({ page }) => {
+  await page.getByRole("button", { name: "新建混剪任务" }).click();
+  const creator = page.getByRole("dialog", { name: "新建混剪任务" });
+  await creator
+    .getByRole("button", { name: /选择素材/ })
+    .first()
+    .click();
+
+  const picker = page.getByRole("dialog", { name: "选择附件" });
+  await picker.getByRole("button", { name: /从本地上传/ }).click();
+  await picker.locator('input[type="file"]').setInputFiles({
+    name: "auto-upload-preview.mp4",
+    mimeType: "video/mp4",
+    buffer: Buffer.from("test-video"),
+  });
+
+  await expect(picker.getByText("上传完成")).toBeVisible();
+  await expect(picker.getByText("auto-upload-preview.mp4")).toBeVisible();
+  await picker.getByRole("button", { name: "使用已上传文件" }).click();
+  await expect(creator.getByText("auto-upload-preview.mp4")).toBeVisible();
+});
