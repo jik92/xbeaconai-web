@@ -280,10 +280,7 @@ function JobsPanel() {
         <div className="admin-detail-layer" role="presentation" onMouseDown={() => setSelected(undefined)}>
           <aside role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
             <header>
-              <div>
-                <small>QUEUE JOB</small>
-                <h2>任务详情</h2>
-              </div>
+              <h2 className="text-ink">任务详情</h2>
               <button aria-label="关闭" onClick={() => setSelected(undefined)}>
                 <X />
               </button>

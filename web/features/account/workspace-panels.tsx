@@ -30,17 +30,7 @@ import { apiErrorMessage, useAuth } from "./auth-context";
 
 export type WorkspacePanel = "help" | "preferences" | "notifications" | "recharge" | "account" | "profile" | "security";
 
-function Drawer({
-  title,
-  eyebrow,
-  children,
-  onClose,
-}: {
-  title: string;
-  eyebrow: string;
-  children: ReactNode;
-  onClose: () => void;
-}) {
+function Drawer({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
   return (
     <div
       className="workspace-backdrop"
@@ -50,10 +40,7 @@ function Drawer({
     >
       <section className="workspace-drawer" role="dialog" aria-modal="true" aria-label={title}>
         <header>
-          <div>
-            <span>{eyebrow}</span>
-            <h2>{title}</h2>
-          </div>
+          <h2 className="text-ink">{title}</h2>
           <button aria-label="关闭" onClick={onClose}>
             <X />
           </button>
@@ -447,14 +434,14 @@ function SecurityPanel() {
   );
 }
 
-const titles: Record<WorkspacePanel, [string, string]> = {
-  help: ["使用帮助", "HELP"],
-  preferences: ["偏好设置", "PREFERENCES"],
-  notifications: ["通知中心", "NOTIFICATIONS"],
-  recharge: ["创作点充值", "MOCK PAYMENT"],
-  account: ["账号中心", "ACCOUNT"],
-  profile: ["个人资料", "PROFILE"],
-  security: ["账号与密码", "SECURITY"],
+const titles: Record<WorkspacePanel, string> = {
+  help: "使用帮助",
+  preferences: "偏好设置",
+  notifications: "通知中心",
+  recharge: "创作点充值",
+  account: "账号中心",
+  profile: "个人资料",
+  security: "账号与密码",
 };
 export function WorkspacePanelDrawer({
   panel,
@@ -467,9 +454,9 @@ export function WorkspacePanelDrawer({
   onChange: (panel: WorkspacePanel) => void;
   onUnread: (count: number) => void;
 }) {
-  const [title, eyebrow] = titles[panel];
+  const title = titles[panel];
   return (
-    <Drawer title={title} eyebrow={eyebrow} onClose={onClose}>
+    <Drawer title={title} onClose={onClose}>
       {panel === "help" && <HelpPanel />}
       {panel === "preferences" && <PreferencesPanel />}
       {panel === "notifications" && <NotificationsPanel onUnread={onUnread} />}

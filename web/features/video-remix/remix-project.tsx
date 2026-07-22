@@ -251,10 +251,7 @@ function AssetPickerModal({
     <div className="remix-picker-layer" role="presentation" onMouseDown={onClose}>
       <aside className="remix-picker" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
         <header>
-          <div>
-            <small>ASSET LIBRARY</small>
-            <h2>{title}</h2>
-          </div>
+          <h2 className="text-ink">{title}</h2>
           <button aria-label="关闭" onClick={onClose}>
             <X />
           </button>
@@ -309,10 +306,7 @@ function ProductPickerModal({
     <div className="remix-picker-layer" role="presentation" onMouseDown={onClose}>
       <aside className="remix-picker" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
         <header>
-          <div>
-            <small>PRODUCT LIBRARY</small>
-            <h2>选择商品</h2>
-          </div>
+          <h2 className="text-ink">选择商品</h2>
           <button aria-label="关闭" onClick={onClose}>
             <X />
           </button>
@@ -398,10 +392,7 @@ function PortraitPickerModal({
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header>
-          <div>
-            <small>PORTRAIT LIBRARY</small>
-            <h2>选择人像</h2>
-          </div>
+          <h2 className="text-ink">选择人像</h2>
           <button aria-label="关闭" onClick={onClose}>
             <X />
           </button>

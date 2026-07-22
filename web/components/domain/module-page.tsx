@@ -1539,23 +1539,11 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
         <div className="result-backdrop" onMouseDown={() => setSelectedTask(null)}>
           <section className="result-drawer" onMouseDown={(e) => e.stopPropagation()}>
             <header>
-              <div>
-                <span>
-                  生成结果 ·{" "}
-                  {selectedTask.overallExecutionMode === "mixed"
-                    ? "混合链路"
-                    : selectedTask.overallExecutionMode === "mock"
-                      ? "模拟结果"
-                      : selectedTask.overallExecutionMode === "local"
-                        ? "本地处理"
-                        : "真实生成"}
-                </span>
-                <h2>
-                  {(selectedTask.result as ApiJobResult | undefined)?.kind === "video-merge"
-                    ? "合并视频"
-                    : config.result.label}
-                </h2>
-              </div>
+              <h2 className="text-ink">
+                {(selectedTask.result as ApiJobResult | undefined)?.kind === "video-merge"
+                  ? "合并视频"
+                  : config.result.label}
+              </h2>
               <button onClick={() => setSelectedTask(null)} aria-label="关闭">
                 <X />
               </button>

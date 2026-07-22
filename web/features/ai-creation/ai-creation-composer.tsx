@@ -792,10 +792,7 @@ export function AiCreationComposer() {
         <div className="composer-review-backdrop" onMouseDown={() => setShowReview(false)}>
           <section onMouseDown={(event) => event.stopPropagation()}>
             <header>
-              <div>
-                <span>提交前手动确认</span>
-                <h2>确认视频生成参数</h2>
-              </div>
+              <h2 className="text-ink">确认视频生成参数</h2>
               <button aria-label="关闭确认" onClick={() => setShowReview(false)}>
                 <X />
               </button>
@@ -831,10 +828,7 @@ export function AiCreationComposer() {
         <div className="result-backdrop" onMouseDown={() => setSelectedTask(null)}>
           <section className="result-drawer" onMouseDown={(event) => event.stopPropagation()}>
             <header>
-              <div>
-                <span>生成结果 · {selectedTask.overallExecutionMode === "mock" ? "模拟能力" : "真实生成"}</span>
-                <h2>对话作品</h2>
-              </div>
+              <h2 className="text-ink">对话作品</h2>
               <button aria-label="关闭" onClick={() => setSelectedTask(null)}>
                 <X />
               </button>

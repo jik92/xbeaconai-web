@@ -136,13 +136,10 @@
   background: transparent;
 }
 .utility-dialog h2 {
-  margin: 0 0 6px;
-  @apply text-xl;
-}
-.utility-dialog p {
   margin: 0;
-  color: #777169;
-  @apply text-xs;
+  color: var(--ink);
+  @apply text-base;
+  @apply font-medium;
 }
 .utility-dialog label,
 .video-editor-inspector label {
@@ -3434,22 +3431,18 @@ td small {
   box-shadow: 0 24px 80px #10182840;
 }
 .attachment-picker-dialog > header {
-  min-height: 72px;
+  min-height: 52px;
   padding: 0 22px;
   border-bottom: 1px solid #e6e9ee;
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
-.attachment-picker-dialog > header span {
-  color: #246bfd;
-  @apply text-2xs;
-  @apply font-semibold;
-  @apply tracking-widest;
-}
 .attachment-picker-dialog > header h2 {
-  margin: 3px 0 0;
-  @apply text-xl;
+  margin: 0;
+  color: var(--ink);
+  @apply text-base;
+  @apply font-medium;
 }
 .attachment-picker-dialog > header button {
   width: 34px;
@@ -4146,19 +4139,16 @@ td small {
 }
 .result-drawer header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid var(--border);
   padding-bottom: 15px;
 }
-.result-drawer header span {
-  @apply text-2xs;
-  color: #246bfd;
-  @apply font-semibold;
-}
 .result-drawer h2 {
-  margin: 4px 0 0;
-  @apply text-xl;
+  margin: 0;
+  color: var(--ink);
+  @apply text-base;
+  @apply font-medium;
 }
 .result-drawer header button {
   border: 0;

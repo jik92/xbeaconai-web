@@ -355,7 +355,7 @@ The system uses **hairline + soft drop**. Cards float above the off-white canvas
 
 **`data-table`** — One shared shadcn-style table appearance across the system. Use a 40px sticky header, 56px rows, compact cell padding, and subtle horizontal row dividers. The component has no outer card border, radius, shadow, owned background, page-specific visual variant, or horizontal scrollbar. Columns share the available width proportionally; long content stays on one line and truncates. Pages control layout and background only; compose filters and actions with shadcn `h-8` controls and Tailwind spacing utilities.
 
-**`asset-page`** — Shared compact shell for materials, portraits, products, and voices. Use a white `p-3` page, one compact search/action toolbar, an independently scrolling content region, and a small result count. Materials retain a two-column folder-and-table layout; portraits and products retain preview grids; voices use horizontal `voice-row` items. Do not add page cards, subtitles, descriptions, or per-page toolbar styling.
+**`asset-page`** — Shared compact shell for materials, portraits, products, and voices. Use a full-content-height white `p-3` page, one compact search/action toolbar, an independently scrolling content region, and a small result count. Materials retain a two-column folder-and-table layout separated by one `border-line` vertical hairline; portraits and products retain preview grids; voices use horizontal `voice-row` items. Do not add page cards, subtitles, descriptions, or per-page toolbar styling.
 
 ### Voice Library
 
@@ -378,6 +378,8 @@ The system uses **hairline + soft drop**. Cards float above the off-white canvas
 **`file-upload`** — Compact shadcn-style drop container using the same border, radius, focus ring, label, and helper-text semantics as other form controls. The default state supports click and drag selection; active drag uses a restrained primary tint. Upload progress, errors, retry actions, and type-aware media previews stay inside the same container. Avoid oversized icons and tall decorative drop zones; the idle container should remain close to 112px high.
 
 **`creator-modal`** — Shared compact task-creation modal for every `ModulePage`. Use one `max-w-lg` shell, 52px header/footer, a single `text-base font-medium` title, `text-sm` body, `text-xs` labels/help, and shadcn small controls. Do not place a subtitle or description below the title. Desktop form rows use a 96px label column and flexible control column; small screens collapse to one column. Do not introduce per-module modal sizing, typography, footer, or field spacing.
+
+All Modal and drawer-style Dialog headers use one Chinese `text-ink` title only. Do not add English eyebrows, category labels, colored title accents, or two-level title stacks.
 
 **`badge-pill`** — Background `{colors.surface-strong}`, text `{colors.ink}`, type `font-sans text-xs font-semibold tracking-widest uppercase`, rounded `{rounded.pill}`, padding 4px × 10px.
 

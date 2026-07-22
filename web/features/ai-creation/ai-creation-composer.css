@@ -630,15 +630,14 @@
 }
 .composer-review-backdrop header {
   display: flex;
+  align-items: center;
   justify-content: space-between;
 }
-.composer-review-backdrop header span {
-  @apply text-2xs;
-  color: #3872df;
-}
 .composer-review-backdrop h2 {
-  margin: 5px 0 0;
-  @apply text-lg;
+  margin: 0;
+  color: var(--ink);
+  @apply text-base;
+  @apply font-medium;
 }
 .composer-review-backdrop header button {
   width: 32px;

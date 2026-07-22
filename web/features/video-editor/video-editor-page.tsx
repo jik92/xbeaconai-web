@@ -470,10 +470,7 @@ export function VideoEditorPage() {
             }}
           >
             <header>
-              <div>
-                <h2>导出视频</h2>
-                <p>Remotion 将在 Worker 中渲染 H.264 MP4</p>
-              </div>
+              <h2 className="text-ink">导出视频</h2>
               <button type="button" aria-label="关闭" onClick={() => setExportOpen(false)}>
                 <X />
               </button>

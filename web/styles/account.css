@@ -242,7 +242,7 @@
   position: sticky;
   top: 0;
   z-index: 2;
-  height: 76px;
+  height: 60px;
   padding: 0 22px;
   border-bottom: 1px solid var(--border);
   background: #fffc;
@@ -251,15 +251,11 @@
   align-items: center;
   justify-content: space-between;
 }
-.workspace-drawer header span {
-  @apply text-2xs;
-  color: #246bfd;
-  @apply font-semibold;
-  @apply tracking-widest;
-}
 .workspace-drawer header h2 {
-  margin: 4px 0 0;
-  @apply text-xl;
+  margin: 0;
+  color: var(--ink);
+  @apply text-base;
+  @apply font-medium;
 }
 .workspace-drawer header > button {
   width: 34px;

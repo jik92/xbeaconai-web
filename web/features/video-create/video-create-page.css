@@ -44,17 +44,21 @@
   background: #fff;
   border-bottom: 1px solid var(--vc-line);
 }
-.vc-config-head span,
-.vc-history header span {
+.vc-config-head span {
   color: #9aa4b5;
   @apply text-2xs;
   @apply font-semibold;
   @apply tracking-widest;
 }
-.vc-config-head h1,
-.vc-history h2 {
+.vc-config-head h1 {
   margin: 2px 0 0;
   @apply text-lg;
+}
+.vc-history h2 {
+  margin: 0;
+  color: var(--ink);
+  @apply text-base;
+  @apply font-medium;
 }
 .vc-config-head > button {
   display: flex;
@@ -971,7 +975,7 @@ label.vc-field > span,
   box-shadow: -16px 0 40px #1720331c;
 }
 .vc-history > .vc-history-head {
-  height: 70px;
+  height: 52px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -987,7 +991,7 @@ label.vc-field > span,
   background: #f3f5f8;
 }
 .vc-history-list {
-  height: calc(100% - 70px);
+  height: calc(100% - 52px);
   overflow: auto;
   padding: 14px;
 }

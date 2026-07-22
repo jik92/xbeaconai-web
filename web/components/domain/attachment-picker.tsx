@@ -220,10 +220,7 @@ export function AttachmentPicker({
             onMouseDown={(event) => event.stopPropagation()}
           >
             <header>
-              <div>
-                <span>ATTACHMENT</span>
-                <h2>选择附件</h2>
-              </div>
+              <h2 className="text-ink">选择附件</h2>
               <button type="button" aria-label="关闭" onClick={close}>
                 <X />
               </button>

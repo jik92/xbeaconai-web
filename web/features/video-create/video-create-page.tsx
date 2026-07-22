@@ -258,10 +258,7 @@ function HistoryDrawer({
     <div className="vc-history-layer" role="presentation" onMouseDown={onClose}>
       <aside className="vc-history" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
         <header className="vc-history-head">
-          <div>
-            <span>PROJECT HISTORY</span>
-            <h2>生成记录</h2>
-          </div>
+          <h2 className="text-ink">生成记录</h2>
           <button aria-label="关闭生成记录" onClick={onClose}>
             <X />
           </button>
