@@ -2,7 +2,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Files, Folder, FolderOpen, FolderPlus, Pencil, Trash2 } from "lucide-react";
 import { useMemo } from "react";
 import { createAssetFolder, deleteAssetFolder, renameAssetFolder } from "@/api/api-client";
+import { Button } from "@/components/ui/button";
 import type { AssetFolder } from "@/entities/types";
+import { cn } from "@/lib/utils";
 
 interface AssetFolderSpaceProps {
   folders: AssetFolder[];
@@ -60,54 +62,79 @@ export function AssetFolderSpace({ folders, selectedFolderId, loading, onSelect 
   };
 
   return (
-    <aside className="material-folder-sidebar" aria-label="文件夹空间管理">
-      <header>
-        <div>
-          <span>FOLDER SPACE</span>
-          <b>我的文件夹</b>
-        </div>
-        <button type="button" aria-label="新建文件夹" title="新建文件夹" onClick={() => void addFolder()}>
+    <aside className="flex h-full min-h-0 flex-col overflow-hidden bg-white" aria-label="文件夹空间管理">
+      <header className="flex h-8 flex-none items-center justify-between px-1">
+        <b className="text-xs font-medium text-ink">我的文件夹</b>
+        <Button
+          className="size-8"
+          size="icon"
+          variant="ghost"
+          aria-label="新建文件夹"
+          title="新建文件夹"
+          onClick={() => void addFolder()}
+        >
           <FolderPlus />
-        </button>
+        </Button>
       </header>
-      <nav aria-label="素材文件夹">
-        <div className={!selectedFolderId ? "active" : ""}>
-          <button type="button" onClick={() => onSelect("")}>
+      <nav className="min-h-0 flex-1 overflow-y-auto py-1" aria-label="素材文件夹">
+        <div>
+          <button
+            type="button"
+            className={cn(
+              "flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-xs text-muted hover:bg-surface-muted",
+              !selectedFolderId && "bg-surface-muted text-ink",
+            )}
+            onClick={() => onSelect("")}
+          >
             <Files />
-            <span>全部素材</span>
+            <span className="truncate">全部素材</span>
           </button>
         </div>
         {orderedFolders.map(({ folder, depth }) => (
-          <div key={folder.id} className={selectedFolderId === folder.id ? "active" : ""}>
-            <button type="button" style={{ paddingLeft: 7 + depth * 18 }} onClick={() => onSelect(folder.id)}>
+          <div className="group flex items-center" key={folder.id}>
+            <button
+              type="button"
+              className={cn(
+                "flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md pr-1 text-left text-xs text-muted hover:bg-surface-muted",
+                selectedFolderId === folder.id && "bg-surface-muted text-ink",
+              )}
+              style={{ paddingLeft: 8 + depth * 16 }}
+              onClick={() => onSelect(folder.id)}
+            >
               {selectedFolderId === folder.id ? <FolderOpen /> : <Folder />}
-              <span>{folder.name}</span>
+              <span className="truncate">{folder.name}</span>
             </button>
-            <span className="folder-actions">
-              <button
-                type="button"
+            <span className="hidden items-center group-hover:flex">
+              <Button
+                className="size-7"
+                size="icon"
+                variant="ghost"
                 aria-label={`重命名 ${folder.name}`}
                 title="重命名"
                 onClick={() => void renameFolder(folder)}
               >
                 <Pencil />
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                className="size-7 text-danger"
+                size="icon"
+                variant="ghost"
                 aria-label={`删除 ${folder.name}`}
                 title="删除"
                 onClick={() => void removeFolder(folder)}
               >
                 <Trash2 />
-              </button>
+              </Button>
             </span>
           </div>
         ))}
-        {loading && <p className="folder-space-state">正在加载文件夹…</p>}
+        {loading && <p className="px-2 py-3 text-2xs text-muted">正在加载文件夹…</p>}
       </nav>
-      <footer>
-        <span>当前空间</span>
-        <b>{selectedFolder?.storagePrefix ?? (loading ? "正在初始化…" : "全部素材")}</b>
+      <footer className="flex-none border-t border-line px-2 py-2">
+        <span className="block text-2xs text-muted">当前空间</span>
+        <b className="mt-0.5 block truncate text-2xs font-medium text-ink">
+          {selectedFolder?.storagePrefix ?? (loading ? "正在初始化…" : "全部素材")}
+        </b>
       </footer>
     </aside>
   );

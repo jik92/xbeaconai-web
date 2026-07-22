@@ -355,6 +355,8 @@ The system uses **hairline + soft drop**. Cards float above the off-white canvas
 
 **`data-table`** — One shared shadcn-style table appearance across the system. Use a 40px sticky header, 56px rows, compact cell padding, and subtle horizontal row dividers. The component has no outer card border, radius, shadow, owned background, page-specific visual variant, or horizontal scrollbar. Columns share the available width proportionally; long content stays on one line and truncates. Pages control layout and background only; compose filters and actions with shadcn `h-8` controls and Tailwind spacing utilities.
 
+**`asset-page`** — Shared compact shell for materials, portraits, products, and voices. Use a white `p-3` page, one compact search/action toolbar, an independently scrolling content region, and a small result count. Materials retain a two-column folder-and-table layout; portraits and products retain preview grids; voices use horizontal `voice-row` items. Do not add page cards, subtitles, descriptions, or per-page toolbar styling.
+
 ### Voice Library
 
 **`voice-row`** — Horizontal row in voice list. Background transparent, 1px hairline divider. Layout: 32px circular voice icon (`{component.voice-icon-circular}`) left, voice name + accent stack, optional preview button right.

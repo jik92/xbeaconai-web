@@ -11,10 +11,8 @@ import {
   Package,
   Play,
   Plus,
-  Search,
   Trash2,
   Upload,
-  X,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -28,9 +26,14 @@ import {
   uploadLibraryAsset,
   uploadProduct,
 } from "@/api/api-client";
+import { AssetPageShell, AssetPageToolbar } from "@/components/domain/asset-page-shell";
 import { AuthenticatedMedia } from "@/components/domain/authenticated-media";
 import { FileUpload } from "@/components/domain/file-upload";
+import { ToolCreatorModal } from "@/components/domain/tool-creator-modal";
+import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import type { LibraryAsset, LibraryProduct } from "@/entities/types";
 import { AssetFolderSpace } from "./asset-folder-space";
 import { fitMediaPreviewSize } from "./media-preview-size";
@@ -117,136 +120,122 @@ function ProductLibrary() {
   };
 
   return (
-    <div className="asset-library-page">
-      <LibraryToolbar
-        query={query}
-        setQuery={setQuery}
-        title="商品库"
-        uploadLabel="创建商品"
-        onUpload={() => setUploadOpen(true)}
-      />
-      <div className="asset-library-results">
-        <b>{filtered.length}</b> 个匹配结果
-      </div>
-      <section className="asset-library-grid">
-        {filtered.map((product) => (
-          <button className="library-asset-card" key={product.id} onClick={() => setSelected(product)}>
-            <div className="library-asset-preview product">
-              <AuthenticatedMedia
-                url={product.images[0]?.url || ""}
-                mimeType={product.images[0]?.mimeType || "image/png"}
-                alt={product.name}
-              />
-              <i className="product-image-count">
-                <ImageIcon /> {product.images.length} 张
-              </i>
-            </div>
-            <div>
-              <h3>{product.name}</h3>
-              <p>{product.description || "暂无形态描述"}</p>
-              <small>
-                {scopeLabel(product.sharingScope)} · {new Date(product.createdAt).toLocaleDateString("zh-CN")}
-              </small>
-            </div>
-          </button>
-        ))}
-        <LibraryState
-          loading={isLoading}
-          error={error}
-          empty={!filtered.length}
-          icon={<Package />}
-          emptyText="还没有商品"
-          onUpload={() => setUploadOpen(true)}
-        />
-      </section>
+    <>
+      <AssetPageShell
+        count={filtered.length}
+        toolbar={
+          <LibraryToolbar
+            query={query}
+            setQuery={setQuery}
+            title="商品库"
+            uploadLabel="创建商品"
+            onUpload={() => setUploadOpen(true)}
+          />
+        }
+      >
+        <section className="asset-library-grid h-full overflow-y-auto pb-3">
+          {filtered.map((product) => (
+            <button className="library-asset-card" key={product.id} onClick={() => setSelected(product)}>
+              <div className="library-asset-preview product">
+                <AuthenticatedMedia
+                  url={product.images[0]?.url || ""}
+                  mimeType={product.images[0]?.mimeType || "image/png"}
+                  alt={product.name}
+                />
+                <i className="product-image-count">
+                  <ImageIcon /> {product.images.length} 张
+                </i>
+              </div>
+              <div>
+                <h3>{product.name}</h3>
+                <p>{product.description || "暂无形态描述"}</p>
+                <small>
+                  {scopeLabel(product.sharingScope)} · {new Date(product.createdAt).toLocaleDateString("zh-CN")}
+                </small>
+              </div>
+            </button>
+          ))}
+          <LibraryState
+            loading={isLoading}
+            error={error}
+            empty={!filtered.length}
+            icon={<Package />}
+            emptyText="还没有商品"
+            onUpload={() => setUploadOpen(true)}
+          />
+        </section>
+      </AssetPageShell>
 
-      {uploadOpen && (
-        <div className="asset-modal-layer" role="presentation" onMouseDown={() => setUploadOpen(false)}>
-          <aside
-            className="asset-upload-modal product-upload-modal"
-            role="dialog"
-            aria-modal="true"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <ModalHeader eyebrow="ASSET / PRODUCT" title="创建商品" onClose={() => setUploadOpen(false)} />
-            <label>
-              产品名称 <em>*</em>
-              <input
-                value={name}
-                maxLength={200}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="请输入产品名称"
-              />
-            </label>
-            <fieldset className="sharing-scope">
-              <legend>
-                共享范围 <em>*</em>
-              </legend>
-              {(["private", "team", "organization"] as const).map((scope) => (
-                <label key={scope}>
-                  <input type="radio" checked={sharingScope === scope} onChange={() => setSharingScope(scope)} />
-                  {scopeLabel(scope)}
-                </label>
-              ))}
-            </fieldset>
-            <FileUpload
-              className="mx-5 my-4"
-              label="商品图片"
-              multiple
-              accept="image/png,image/jpeg,image/webp"
-              files={files}
-              uploading={upload.isPending}
-              progress={uploadProgress}
-              error={upload.error?.message}
-              description={
-                files.length
-                  ? `已选择 ${files.length} 张商品图，最多上传 8 张。`
-                  : "PNG、JPG、WEBP，最多 8 张，创作时将全部提供给 AI。"
-              }
-              onFilesChange={(nextFiles) => {
-                upload.reset();
-                setUploadProgress(0);
-                setFiles(nextFiles.slice(0, 8));
-              }}
-              onClear={() => {
-                upload.reset();
-                setFiles([]);
-                setUploadProgress(0);
-              }}
+      <ToolCreatorModal open={uploadOpen} title="创建商品" onClose={() => setUploadOpen(false)}>
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4 text-sm">
+          <Label className="flex-col items-start text-xs text-muted">
+            <span>
+              产品名称 <b className="text-danger">*</b>
+            </span>
+            <Input
+              value={name}
+              maxLength={200}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="请输入产品名称"
             />
-            <label>
-              形态描述
-              <textarea
-                value={description}
-                maxLength={1000}
-                onChange={(event) => setDescription(event.target.value)}
-                placeholder="描述产品形态、材质、卖点等"
-              />
-            </label>
-            <ModalFooter
-              disabled={!files.length || !name.trim() || upload.isPending}
-              pending={upload.isPending}
-              onCancel={() => setUploadOpen(false)}
-              onConfirm={() => upload.mutate()}
+          </Label>
+          <fieldset className="flex flex-wrap gap-3 text-xs text-muted">
+            <legend className="mb-2 w-full font-medium text-ink">
+              共享范围 <b className="text-danger">*</b>
+            </legend>
+            {(["private", "team", "organization"] as const).map((scope) => (
+              <label className="flex items-center gap-1.5" key={scope}>
+                <input type="radio" checked={sharingScope === scope} onChange={() => setSharingScope(scope)} />
+                {scopeLabel(scope)}
+              </label>
+            ))}
+          </fieldset>
+          <FileUpload
+            label="商品图片"
+            multiple
+            accept="image/png,image/jpeg,image/webp"
+            files={files}
+            uploading={upload.isPending}
+            progress={uploadProgress}
+            error={upload.error?.message}
+            description={
+              files.length
+                ? `已选择 ${files.length} 张商品图，最多上传 8 张。`
+                : "PNG、JPG、WEBP，最多 8 张，创作时将全部提供给 AI。"
+            }
+            onFilesChange={(nextFiles) => {
+              upload.reset();
+              setUploadProgress(0);
+              setFiles(nextFiles.slice(0, 8));
+            }}
+            onClear={() => {
+              upload.reset();
+              setFiles([]);
+              setUploadProgress(0);
+            }}
+          />
+          <Label className="flex-col items-start text-xs text-muted">
+            形态描述
+            <textarea
+              className="min-h-20 w-full resize-y rounded-md border border-line bg-transparent p-3 text-sm text-ink outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+              value={description}
+              maxLength={1000}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="描述产品形态、材质、卖点等"
             />
-          </aside>
+          </Label>
         </div>
-      )}
+        <ModalFooter
+          disabled={!files.length || !name.trim() || upload.isPending}
+          pending={upload.isPending}
+          onCancel={() => setUploadOpen(false)}
+          onConfirm={() => upload.mutate()}
+        />
+      </ToolCreatorModal>
 
-      {selected && (
-        <div className="asset-modal-layer" role="presentation" onMouseDown={() => setSelected(null)}>
-          <aside
-            className="asset-detail-modal product-detail-modal"
-            role="dialog"
-            aria-modal="true"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <header>
-              <b>{selected.name}</b>
-              <button aria-label="关闭" onClick={() => setSelected(null)}>
-                <X />
-              </button>
-            </header>
+      <ToolCreatorModal open={Boolean(selected)} title={selected?.name ?? "商品详情"} onClose={() => setSelected(null)}>
+        {selected && (
+          <>
             <div className="product-detail-gallery">
               {selected.images.map((image) => (
                 <AuthenticatedMedia key={image.id} url={image.url} mimeType={image.mimeType} alt={selected.name} />
@@ -259,18 +248,24 @@ function ProductLibrary() {
               <p>{selected.description || "暂无形态描述"}</p>
               <small>{scopeLabel(selected.sharingScope)}</small>
             </div>
-            <footer>
-              <button className="danger" disabled={remove.isPending} onClick={() => void removeProduct(selected)}>
+            <footer className="flex h-13 flex-none items-center justify-end gap-2 border-t border-line px-4">
+              <Button
+                className="mr-auto text-danger"
+                size="sm"
+                variant="outline"
+                disabled={remove.isPending}
+                onClick={() => void removeProduct(selected)}
+              >
                 <Trash2 /> {remove.isPending ? "删除中…" : "删除商品"}
-              </button>
-              <button className="primary" onClick={() => applyToRemix(selected)}>
+              </Button>
+              <Button size="sm" onClick={() => applyToRemix(selected)}>
                 <Package /> 用于爆款二创
-              </button>
+              </Button>
             </footer>
-          </aside>
-        </div>
-      )}
-    </div>
+          </>
+        )}
+      </ToolCreatorModal>
+    </>
   );
 }
 
@@ -483,8 +478,12 @@ function MediaAssetTable({
       error={error}
       emptyMessage="还没有素材"
       emptyIcon={<Files />}
-      emptyAction={<button onClick={onUpload}>上传第一个素材</button>}
-      height="calc(100vh - 198px)"
+      emptyAction={
+        <Button size="sm" onClick={onUpload}>
+          上传第一个素材
+        </Button>
+      }
+      height="100%"
     />
   );
 }
@@ -610,25 +609,31 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
   );
 
   return (
-    <div className={`asset-library-page ${kind === "media" ? "material-library-page" : ""}`}>
-      {kind === "media" && (
-        <AssetFolderSpace
-          folders={folders}
-          selectedFolderId={selectedFolderId}
-          loading={foldersLoading}
-          onSelect={setSelectedFolderId}
-        />
-      )}
-      <div className="material-library-content">
-        <LibraryToolbar
-          query={query}
-          setQuery={setQuery}
-          title={kind === "voice" ? "音色库" : "素材库"}
-          uploadLabel={kind === "voice" ? "上传音色" : "上传素材"}
-          onUpload={() => setUploadOpen(true)}
-        />
+    <>
+      <AssetPageShell
+        count={filtered.length}
+        sidebar={
+          kind === "media" ? (
+            <AssetFolderSpace
+              folders={folders}
+              selectedFolderId={selectedFolderId}
+              loading={foldersLoading}
+              onSelect={setSelectedFolderId}
+            />
+          ) : undefined
+        }
+        toolbar={
+          <LibraryToolbar
+            query={query}
+            setQuery={setQuery}
+            title={kind === "voice" ? "音色库" : "素材库"}
+            uploadLabel={kind === "voice" ? "上传音色" : "上传素材"}
+            onUpload={() => setUploadOpen(true)}
+          />
+        }
+      >
         {!!requestedAssetIds.size && (
-          <div className="asset-import-notice">
+          <div className="mb-2 flex flex-none items-center gap-1.5 rounded-md bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
             <Check /> 已在当前文件夹中定位 {data.filter((asset) => requestedAssetIds.has(asset.id)).length} 个切片
           </div>
         )}
@@ -644,132 +649,111 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
             deleting={remove.isPending}
           />
         ) : (
-          <>
-            <div className="asset-library-results">
-              <b>{filtered.length}</b> 个匹配结果
-            </div>
-            <section className="asset-library-grid">
-              {filtered.map((asset) => (
-                <article className="library-asset-card voice-asset-card" key={asset.id}>
-                  <div className="library-asset-preview voice">
-                    {previewingVoiceId === asset.id ? (
-                      <AuthenticatedMedia url={asset.url} mimeType={asset.mimeType} alt={asset.name} autoPlay />
-                    ) : (
-                      <>
-                        <FileAudio />
-                        <button type="button" onClick={() => setPreviewingVoiceId(asset.id)}>
-                          试听音色
-                        </button>
-                      </>
-                    )}
+          <section className="h-full overflow-y-auto">
+            {filtered.map((asset) => (
+              <article className="flex min-h-14 items-center gap-3 border-b border-line/60 px-2 py-2" key={asset.id}>
+                <div className="grid size-8 shrink-0 place-items-center rounded-full bg-surface-muted text-muted">
+                  <FileAudio className="size-4" />
+                </div>
+                <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setSelected(asset)}>
+                  <b className="block truncate text-xs font-medium text-ink">{asset.name}</b>
+                  <span className="block truncate text-2xs text-muted">{asset.description || asset.originalName}</span>
+                  <small className="block text-2xs text-muted">
+                    {(asset.size / 1024 / 1024).toFixed(1)} MB · {new Date(asset.createdAt).toLocaleDateString("zh-CN")}
+                  </small>
+                </button>
+                {previewingVoiceId === asset.id ? (
+                  <div className="w-56 max-w-[40%]">
+                    <AuthenticatedMedia url={asset.url} mimeType={asset.mimeType} alt={asset.name} autoPlay controls />
                   </div>
-                  <button type="button" className="voice-asset-details" onClick={() => setSelected(asset)}>
-                    <h3>{asset.name}</h3>
-                    <p>{asset.description || asset.originalName}</p>
-                    <small>
-                      {(asset.size / 1024 / 1024).toFixed(1)} MB ·{" "}
-                      {new Date(asset.createdAt).toLocaleDateString("zh-CN")}
-                    </small>
-                  </button>
-                </article>
-              ))}
-              <LibraryState
-                loading={isLoading}
-                error={error}
-                empty={!filtered.length}
-                icon={<AudioLines />}
-                emptyText="还没有音色资产"
-                onUpload={() => setUploadOpen(true)}
-              />
-            </section>
-          </>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => setPreviewingVoiceId(asset.id)}>
+                    试听
+                  </Button>
+                )}
+              </article>
+            ))}
+            <LibraryState
+              loading={isLoading}
+              error={error}
+              empty={!filtered.length}
+              icon={<AudioLines />}
+              emptyText="还没有音色资产"
+              onUpload={() => setUploadOpen(true)}
+            />
+          </section>
         )}
-      </div>
-      {uploadOpen && (
-        <div className="asset-modal-layer" role="presentation" onMouseDown={() => setUploadOpen(false)}>
-          <aside
-            className="asset-upload-modal"
-            role="dialog"
-            aria-modal="true"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <ModalHeader
-              eyebrow={kind === "voice" ? "ASSET / VOICE" : "ASSET / MEDIA"}
-              title={kind === "voice" ? "上传音色" : "上传素材"}
-              onClose={() => setUploadOpen(false)}
+      </AssetPageShell>
+      <ToolCreatorModal
+        open={uploadOpen}
+        title={kind === "voice" ? "上传音色" : "上传素材"}
+        onClose={() => setUploadOpen(false)}
+      >
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4 text-sm">
+          <FileUpload
+            label={kind === "voice" ? "音色文件" : "素材文件"}
+            files={file ? [file] : []}
+            uploading={upload.isPending}
+            progress={uploadProgress}
+            error={upload.error?.message}
+            accept={
+              kind === "voice"
+                ? "audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/ogg,audio/webm"
+                : "image/png,image/jpeg,image/webp,image/gif,video/mp4,video/quicktime,video/webm,audio/mpeg,audio/wav,audio/x-wav,audio/ogg,audio/mp4,audio/webm,.mp4,.mov,.webm"
+            }
+            description={
+              file?.name ||
+              (kind === "voice"
+                ? "MP3、WAV、M4A、OGG，建议 10–60 秒干声。"
+                : "支持常见图片、视频和音频格式，单文件最大 500MB。")
+            }
+            onFilesChange={(files) => {
+              const next = files[0] || null;
+              upload.reset();
+              setFile(next);
+              setUploadProgress(0);
+              if (next && !name) setName(next.name.replace(/\.[^.]+$/, ""));
+            }}
+            onClear={() => {
+              upload.reset();
+              setFile(null);
+              setUploadProgress(0);
+            }}
+          />
+          <Label className="flex-col items-start text-xs text-muted">
+            资产名称
+            <Input
+              value={name}
+              maxLength={80}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="请输入便于识别的名称"
             />
-            <FileUpload
-              className="mx-5 my-4"
-              label={kind === "voice" ? "音色文件" : "素材文件"}
-              files={file ? [file] : []}
-              uploading={upload.isPending}
-              progress={uploadProgress}
-              error={upload.error?.message}
-              accept={
-                kind === "voice"
-                  ? "audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/ogg,audio/webm"
-                  : "image/png,image/jpeg,image/webp,image/gif,video/mp4,video/quicktime,video/webm,audio/mpeg,audio/wav,audio/x-wav,audio/ogg,audio/mp4,audio/webm,.mp4,.mov,.webm"
-              }
-              description={
-                file?.name ||
-                (kind === "voice"
-                  ? "MP3、WAV、M4A、OGG，建议 10–60 秒干声。"
-                  : "支持常见图片、视频和音频格式，单文件最大 500MB。")
-              }
-              onFilesChange={(files) => {
-                const next = files[0] || null;
-                upload.reset();
-                setFile(next);
-                setUploadProgress(0);
-                if (next && !name) setName(next.name.replace(/\.[^.]+$/, ""));
-              }}
-              onClear={() => {
-                upload.reset();
-                setFile(null);
-                setUploadProgress(0);
-              }}
+          </Label>
+          <Label className="flex-col items-start text-xs text-muted">
+            资产说明
+            <textarea
+              className="min-h-20 w-full resize-y rounded-md border border-line bg-transparent p-3 text-sm text-ink outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+              value={description}
+              maxLength={300}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="选填：音色特征或适用场景"
             />
-            <label>
-              资产名称
-              <input
-                value={name}
-                maxLength={80}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="请输入便于识别的名称"
-              />
-            </label>
-            <label>
-              资产说明
-              <textarea
-                value={description}
-                maxLength={300}
-                onChange={(event) => setDescription(event.target.value)}
-                placeholder="选填：音色特征或适用场景"
-              />
-            </label>
-            <ModalFooter
-              disabled={!file || upload.isPending}
-              pending={upload.isPending}
-              onCancel={() => setUploadOpen(false)}
-              onConfirm={() => upload.mutate()}
-            />
-          </aside>
+          </Label>
         </div>
-      )}
-      {kind === "voice" && selected && (
-        <div className="asset-modal-layer" role="presentation" onMouseDown={() => setSelected(null)}>
-          <aside
-            className="asset-detail-modal"
-            role="dialog"
-            aria-modal="true"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <header>
-              <b>{selected.name}</b>
-              <button aria-label="关闭" onClick={() => setSelected(null)}>
-                <X />
-              </button>
-            </header>
+        <ModalFooter
+          disabled={!file || upload.isPending}
+          pending={upload.isPending}
+          onCancel={() => setUploadOpen(false)}
+          onConfirm={() => upload.mutate()}
+        />
+      </ToolCreatorModal>
+      <ToolCreatorModal
+        open={kind === "voice" && Boolean(selected)}
+        title={selected?.name ?? "音色详情"}
+        onClose={() => setSelected(null)}
+      >
+        {selected && (
+          <>
             <div className="asset-detail-media voice">
               <AuthenticatedMedia url={selected.url} mimeType={selected.mimeType} alt={selected.name} />
             </div>
@@ -782,20 +766,24 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
                 {selected.mimeType} · {(selected.size / 1024 / 1024).toFixed(2)} MB
               </small>
             </div>
-            {kind === "voice" && (
-              <footer>
-                <button className="danger" disabled={remove.isPending} onClick={() => void removeAsset(selected)}>
-                  <Trash2 /> {remove.isPending ? "删除中…" : "删除音色"}
-                </button>
-                <button className="primary" onClick={() => applyToRemix(selected)}>
-                  <AudioLines /> 用于爆款二创
-                </button>
-              </footer>
-            )}
-          </aside>
-        </div>
-      )}
-    </div>
+            <footer className="flex h-13 flex-none items-center justify-end gap-2 border-t border-line px-4">
+              <Button
+                className="mr-auto text-danger"
+                size="sm"
+                variant="outline"
+                disabled={remove.isPending}
+                onClick={() => void removeAsset(selected)}
+              >
+                <Trash2 /> {remove.isPending ? "删除中…" : "删除音色"}
+              </Button>
+              <Button size="sm" onClick={() => applyToRemix(selected)}>
+                <AudioLines /> 用于爆款二创
+              </Button>
+            </footer>
+          </>
+        )}
+      </ToolCreatorModal>
+    </>
   );
 }
 
@@ -813,21 +801,14 @@ function LibraryToolbar({
   onUpload: () => void;
 }) {
   return (
-    <section className="asset-library-toolbar">
-      <label>
-        <Search />
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder={`搜索${title}名称或描述…`}
-        />
-      </label>
-      <span className="asset-library-toolbar-actions">
-        <button className="primary" onClick={onUpload}>
-          <Upload /> {uploadLabel}
-        </button>
-      </span>
-    </section>
+    <AssetPageToolbar
+      query={query}
+      onQueryChange={setQuery}
+      placeholder={`搜索${title}名称或描述`}
+      actionLabel={uploadLabel}
+      actionIcon={<Upload />}
+      onAction={onUpload}
+    />
   );
 }
 
@@ -852,28 +833,11 @@ function LibraryState({
       {icon}
       <b>{loading ? "正在加载资产…" : error instanceof Error ? error.message : emptyText}</b>
       {!loading && !error && (
-        <>
-          <span>点击右上角上传，建立自己的可复用资产库</span>
-          <button onClick={onUpload}>
-            <Plus /> 立即上传
-          </button>
-        </>
+        <Button size="sm" variant="outline" onClick={onUpload}>
+          <Plus /> 立即上传
+        </Button>
       )}
     </div>
-  );
-}
-
-function ModalHeader({ eyebrow, title, onClose }: { eyebrow: string; title: string; onClose: () => void }) {
-  return (
-    <header>
-      <div>
-        <span>{eyebrow}</span>
-        <h2>{title}</h2>
-      </div>
-      <button aria-label="关闭" onClick={onClose}>
-        <X />
-      </button>
-    </header>
   );
 }
 
@@ -889,11 +853,13 @@ function ModalFooter({
   onConfirm: () => void;
 }) {
   return (
-    <footer>
-      <button onClick={onCancel}>取消</button>
-      <button className="primary" disabled={disabled} onClick={onConfirm}>
+    <footer className="flex h-13 flex-none items-center justify-end gap-2 border-t border-line px-4">
+      <Button size="sm" variant="outline" onClick={onCancel}>
+        取消
+      </Button>
+      <Button size="sm" disabled={disabled} onClick={onConfirm}>
         {pending ? "上传中…" : "确认上传"}
-      </button>
+      </Button>
     </footer>
   );
 }
