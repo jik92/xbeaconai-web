@@ -1067,7 +1067,14 @@ export function RemixProject() {
                     }}
                   >
                     <span className="source-mini">
-                      <Video />
+                      <AuthenticatedMedia
+                        url={`/api/assets/${source.id}/content`}
+                        mimeType={source.mimeType}
+                        alt={source.name}
+                        controls={false}
+                        loadingText="载入中…"
+                        errorText="预览失败"
+                      />
                     </span>
                     <b>{source.name}</b>
                     <i>{entry?.status === "failed" ? "失败" : `v${index + 1}`}</i>
@@ -1104,20 +1111,6 @@ export function RemixProject() {
                   {orderedPromptVersions.length > 1 && <p>历史版本</p>}
                   {orderedPromptVersions.slice(1).map(promptVersionButton)}
                 </aside>
-                <section className="prompt-video-preview" aria-label={`预览 ${fileName}`}>
-                  {sourceAssetId ? (
-                    <AuthenticatedMedia
-                      key={sourceAssetId}
-                      url={`/api/assets/${sourceAssetId}/content`}
-                      mimeType={activeSource?.mimeType || "video/mp4"}
-                      alt={fileName}
-                      loadingText="正在载入当前分镜视频…"
-                      errorText="当前分镜视频加载失败"
-                    />
-                  ) : (
-                    <span>未选择分镜视频</span>
-                  )}
-                </section>
                 <div className="prompt-document">
                   {activeAnalysisEntry?.status === "failed" ? (
                     <div className="source-analysis-error">

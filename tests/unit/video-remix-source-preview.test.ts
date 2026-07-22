@@ -23,13 +23,13 @@ describe("video remix source preview", () => {
     expect(page).not.toContain('className="uploaded-video-card" onClick={open}');
   });
 
-  test("previews the active source beside its prompt during prompt review", () => {
+  test("renders each source video inside its prompt-switching card", () => {
     const page = readFileSync(resolve(import.meta.dir, "../../web/features/video-remix/remix-project.tsx"), "utf8");
 
-    expect(page).toContain('className="prompt-video-preview"');
-    expect(page).toContain("key={sourceAssetId}");
-    expect(page).toContain("url={`/api/assets/${sourceAssetId}/content`}");
-    expect(page).toContain('loadingText="正在载入当前分镜视频…"');
-    expect(page).toContain('errorText="当前分镜视频加载失败"');
+    expect(page).toContain('className="source-mini"');
+    expect(page).toContain("url={`/api/assets/${source.id}/content`}");
+    expect(page).toContain("controls={false}");
+    expect(page).toContain('errorText="预览失败"');
+    expect(page).not.toContain('className="prompt-video-preview"');
   });
 });
