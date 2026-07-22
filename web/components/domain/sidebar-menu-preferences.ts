@@ -1,6 +1,7 @@
 export interface SidebarMenuPreferences {
   order: Record<string, string[]>;
   hidden: string[];
+  shown: string[];
 }
 
 export type SidebarMenuDefaults = Readonly<Record<string, readonly string[]>>;
@@ -9,6 +10,7 @@ export function createDefaultSidebarMenuPreferences(defaults: SidebarMenuDefault
   return {
     order: Object.fromEntries(Object.entries(defaults).map(([group, itemIds]) => [group, [...itemIds]])),
     hidden: [],
+    shown: [],
   };
 }
 
@@ -16,7 +18,7 @@ export function normalizeSidebarMenuPreferences(value: unknown, defaults: Sideba
   const fallback = createDefaultSidebarMenuPreferences(defaults);
   if (!value || typeof value !== "object") return fallback;
 
-  const candidate = value as { order?: unknown; hidden?: unknown };
+  const candidate = value as { order?: unknown; hidden?: unknown; shown?: unknown };
   const candidateOrder =
     candidate.order && typeof candidate.order === "object" ? (candidate.order as Record<string, unknown>) : {};
   const allItemIds = new Set(Object.values(defaults).flat());
@@ -37,8 +39,18 @@ export function normalizeSidebarMenuPreferences(value: unknown, defaults: Sideba
           typeof itemId === "string" && allItemIds.has(itemId) && savedHiddenItemIds.indexOf(itemId) === index,
       )
     : [];
+  const savedShownItemIds = Array.isArray(candidate.shown) ? candidate.shown : [];
+  const shown = savedShownItemIds.length
+    ? savedShownItemIds.filter(
+        (itemId, index): itemId is string =>
+          typeof itemId === "string" &&
+          allItemIds.has(itemId) &&
+          !hidden.includes(itemId) &&
+          savedShownItemIds.indexOf(itemId) === index,
+      )
+    : [];
 
-  return { order, hidden };
+  return { order, hidden, shown };
 }
 
 export function reorderSidebarMenuItem(
@@ -71,8 +83,28 @@ export function moveSidebarMenuItem(
   return targetId ? reorderSidebarMenuItem(preferences, group, itemId, targetId) : preferences;
 }
 
-export function toggleSidebarMenuItem(preferences: SidebarMenuPreferences, itemId: string): SidebarMenuPreferences {
-  return preferences.hidden.includes(itemId)
-    ? { ...preferences, hidden: preferences.hidden.filter((hiddenId) => hiddenId !== itemId) }
-    : { ...preferences, hidden: [...preferences.hidden, itemId] };
+export function isSidebarMenuItemHidden(
+  preferences: SidebarMenuPreferences,
+  itemId: string,
+  available: boolean,
+): boolean {
+  return preferences.hidden.includes(itemId) || (!available && !preferences.shown.includes(itemId));
+}
+
+export function setSidebarMenuItemVisibility(
+  preferences: SidebarMenuPreferences,
+  itemId: string,
+  visible: boolean,
+): SidebarMenuPreferences {
+  return visible
+    ? {
+        ...preferences,
+        hidden: preferences.hidden.filter((hiddenId) => hiddenId !== itemId),
+        shown: preferences.shown.includes(itemId) ? preferences.shown : [...preferences.shown, itemId],
+      }
+    : {
+        ...preferences,
+        hidden: preferences.hidden.includes(itemId) ? preferences.hidden : [...preferences.hidden, itemId],
+        shown: preferences.shown.filter((shownId) => shownId !== itemId),
+      };
 }

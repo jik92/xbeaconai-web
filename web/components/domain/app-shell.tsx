@@ -30,10 +30,11 @@ import { type WorkspacePanel, WorkspacePanelDrawer } from "@/features/account/wo
 import { BrandLogo } from "./brand-logo";
 import {
   createDefaultSidebarMenuPreferences,
+  isSidebarMenuItemHidden,
   moveSidebarMenuItem,
   normalizeSidebarMenuPreferences,
   reorderSidebarMenuItem,
-  toggleSidebarMenuItem,
+  setSidebarMenuItemVisibility,
 } from "./sidebar-menu-preferences";
 
 const SIDEBAR_MENU_STORAGE_KEY = "yaozuo:sidebar-menu:v2";
@@ -183,7 +184,7 @@ export function AppShell() {
               <nav key={group} aria-label={group}>
                 <h3>{group}</h3>
                 {groupItems.map((item, index) => {
-                  const hidden = menuPreferences.hidden.includes(item.id);
+                  const hidden = isSidebarMenuItemHidden(menuPreferences, item.id, item.available);
                   if (hidden && !menuEditing) return null;
                   if (menuEditing)
                     return (
@@ -236,7 +237,9 @@ export function AppShell() {
                             type="button"
                             aria-label={`${hidden ? "显示" : "隐藏"}${item.label}`}
                             title={hidden ? "显示菜单" : "隐藏菜单"}
-                            onClick={() => setMenuPreferences((current) => toggleSidebarMenuItem(current, item.id))}
+                            onClick={() =>
+                              setMenuPreferences((current) => setSidebarMenuItemVisibility(current, item.id, hidden))
+                            }
                           >
                             {hidden ? <EyeOff /> : <Eye />}
                           </button>

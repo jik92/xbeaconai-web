@@ -79,7 +79,7 @@ export const APP_CONFIG = {
     },
     utilities: {
       "video-extract": true,
-      "video-editor": true,
+      "video-editor": false,
     },
     assets: {
       materials: true,
