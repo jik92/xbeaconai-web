@@ -1,9 +1,19 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
 import { Download, Film, FolderOpen, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { downloadAuthenticated, fetchAssetFolders, fetchJobs, submitJob } from "@/api/api-client";
 import { AttachmentPicker, type AttachmentSelection } from "@/components/domain/attachment-picker";
 import { AuthenticatedMedia } from "@/components/domain/authenticated-media";
+import type { TaskSearchFilterValue } from "@/components/domain/task-search-filters";
+import { ToolCreatorModal } from "@/components/domain/tool-creator-modal";
+import { createToolTaskLabel, ToolTaskPage } from "@/components/domain/tool-task-page";
+import { Button } from "@/components/ui/button";
+import { DataTable } from "@/components/ui/data-table";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
+import type { Job } from "@/api/generated/types.gen";
 import type { ApiJobResult } from "@/entities/types";
 import { randomUuid } from "@/lib/random-id";
 import {
@@ -11,7 +21,6 @@ import {
   type VideoMashupConfig,
   validateVideoMashupConfig,
 } from "../../../shared/video-mashup/config";
-import "./video-mashup.css";
 
 interface EditorGroup {
   id: string;
@@ -21,8 +30,11 @@ interface EditorGroup {
 
 const newGroup = (index: number): EditorGroup => ({ id: randomUuid(), name: `视频组-${index}`, assets: [] });
 const activeStatuses = new Set(["queued", "processing"]);
+const jobColumn = createColumnHelper<Job>();
+const emptyFilters: TaskSearchFilterValue = { name: "", status: "", from: "", to: "" };
 
 export function VideoMashupPage() {
+  const newTaskLabel = createToolTaskLabel("视频混剪");
   const queryClient = useQueryClient();
   const { data: folders = [] } = useQuery({ queryKey: ["asset-folders"], queryFn: fetchAssetFolders });
   const { data: jobs = [], refetch } = useQuery({
@@ -39,6 +51,8 @@ export function VideoMashupPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [selectedJobId, setSelectedJobId] = useState("");
+  const [resultOpen, setResultOpen] = useState(false);
+  const [filters, setFilters] = useState(emptyFilters);
   useEffect(() => {
     if (!outputFolderId && folders.length)
       setOutputFolderId(folders.find((folder) => folder.isDefault)?.id ?? folders[0]?.id ?? "");
@@ -107,274 +121,272 @@ export function VideoMashupPage() {
     }
   };
   const result = selectedJob?.result as ApiJobResult | undefined;
+  const filteredJobs = jobs.filter(
+    (job) =>
+      (!filters.name || job.title.toLowerCase().includes(filters.name.toLowerCase())) &&
+      (!filters.status || job.status === filters.status) &&
+      (!filters.from || new Date(job.createdAt) >= new Date(`${filters.from}T00:00:00`)) &&
+      (!filters.to || new Date(job.createdAt) <= new Date(`${filters.to}T23:59:59.999`)),
+  );
+  const columns = [
+    jobColumn.accessor("title", {
+      header: "任务名称",
+      size: 300,
+      cell: (info) => <span className="truncate font-medium text-ink">{info.getValue()}</span>,
+    }),
+    jobColumn.accessor("status", {
+      header: "状态",
+      size: 130,
+      cell: (info) => <span>{info.row.original.stage}</span>,
+    }),
+    jobColumn.accessor("progress", {
+      header: "进度",
+      size: 170,
+      cell: (info) => (
+        <div className="flex items-center gap-2">
+          <div className="h-1.5 w-24 overflow-hidden rounded-full bg-surface-muted">
+            <span className="block h-full rounded-full bg-primary" style={{ width: `${info.getValue()}%` }} />
+          </div>
+          <span className="text-2xs text-muted">{info.getValue()}%</span>
+        </div>
+      ),
+    }),
+    jobColumn.display({
+      id: "resultCount",
+      header: "结果数",
+      size: 90,
+      cell: (info) => info.row.original.result?.artifacts.length ?? "—",
+    }),
+    jobColumn.accessor("createdAt", {
+      header: "创建时间",
+      size: 190,
+      cell: (info) => new Date(info.getValue()).toLocaleString(),
+    }),
+    jobColumn.display({
+      id: "actions",
+      header: "操作",
+      size: 120,
+      cell: (info) => (
+        <Button
+          className="h-7 px-2 text-2xs text-primary"
+          size="sm"
+          variant="ghost"
+          onClick={() => {
+            setSelectedJobId(info.row.original.id);
+            setResultOpen(true);
+          }}
+        >
+          查看结果
+        </Button>
+      ),
+    }),
+  ] as ColumnDef<Job, unknown>[];
   return (
-    <main className="mashup-page">
-      <section className="mashup-dashboard">
-        <div className="mashup-task-list">
-          <header>
-            <h2>混剪任务</h2>
-            <small>{jobs.length} 个任务</small>
-          </header>
-          {jobs.map((job) => (
-            <button
-              type="button"
-              key={job.id}
-              className={selectedJob?.id === job.id ? "selected" : ""}
-              onClick={() => setSelectedJobId(job.id)}
-            >
-              <span>
-                <Film />
-                {job.title}
-              </span>
-              <small>
-                {job.stage} · {job.progress}%
-              </small>
-            </button>
-          ))}
-          {!jobs.length && <div className="mashup-empty">还没有混剪任务</div>}
-        </div>
-        <div className="mashup-result-panel">
-          {selectedJob ? (
-            <>
-              <header>
-                <div>
-                  <span>{selectedJob.status}</span>
-                  <h2>{selectedJob.title}</h2>
-                  <p>{result?.summary ?? selectedJob.stage}</p>
-                </div>
-                <strong>{selectedJob.progress}%</strong>
-              </header>
-              <div className="mashup-result-grid">
-                {result?.artifacts.map((artifact, index) => (
-                  <article key={artifact.id}>
-                    <div>
-                      {artifact.url ? (
-                        <AuthenticatedMedia url={artifact.url} mimeType={artifact.mimeType} alt={artifact.name} />
-                      ) : (
-                        <Film />
-                      )}
-                    </div>
-                    <span>
-                      {String(index + 1).padStart(2, "0")} · {artifact.name}
+    <>
+      <ToolTaskPage
+        actionLabel={newTaskLabel}
+        onAction={openCreator}
+        onSearch={setFilters}
+        count={filteredJobs.length}
+        totalCount={jobs.length}
+      >
+        <DataTable
+          className="min-h-0 flex-1"
+          columns={columns}
+          data={filteredJobs}
+          getRowId={(job) => job.id}
+          emptyMessage={jobs.length ? "没有符合条件的任务" : "暂无任务"}
+          emptyAction={!jobs.length ? <Button onClick={openCreator}>{newTaskLabel}</Button> : undefined}
+          height="100%"
+        />
+      </ToolTaskPage>
+      <ToolCreatorModal open={creatorOpen} title={newTaskLabel} onClose={() => setCreatorOpen(false)}>
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 text-sm">
+          {groups.map((group, groupIndex) => (
+            <section className="border-b border-line pb-3" key={group.id}>
+              <div className="flex items-center gap-2">
+                <Input
+                  aria-label={`视频组 ${groupIndex + 1} 名称`}
+                  value={group.name}
+                  onChange={(event) =>
+                    setGroups((current) =>
+                      current.map((item) => (item.id === group.id ? { ...item, name: event.target.value } : item)),
+                    )
+                  }
+                />
+                {groups.length > 2 && (
+                  <Button
+                    className="size-8"
+                    size="icon"
+                    variant="ghost"
+                    aria-label={`删除${group.name}`}
+                    onClick={() => setGroups((current) => current.filter((item) => item.id !== group.id))}
+                  >
+                    <Trash2 />
+                  </Button>
+                )}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {group.assets.map((asset) => (
+                  <div className="flex h-8 max-w-40 items-center gap-1 rounded-md bg-surface-muted px-2" key={asset.id}>
+                    <Film className="size-3.5 shrink-0" />
+                    <span className="truncate text-xs" title={asset.name}>
+                      {asset.name}
                     </span>
-                    <footer>
-                      {artifact.url && (
-                        <button
-                          type="button"
-                          onClick={() => artifact.url && void downloadAuthenticated(artifact.url, artifact.name)}
-                        >
-                          <Download />
-                          下载
-                        </button>
-                      )}
-                      <a href="/assets/materials">
-                        <FolderOpen />
-                        素材库
-                      </a>
-                    </footer>
-                  </article>
+                    <button
+                      type="button"
+                      className="shrink-0 text-muted"
+                      aria-label={`移除${asset.name}`}
+                      onClick={() =>
+                        setGroups((current) =>
+                          current.map((item) =>
+                            item.id === group.id
+                              ? { ...item, assets: item.assets.filter((selected) => selected.id !== asset.id) }
+                              : item,
+                          ),
+                        )
+                      }
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
                 ))}
+                <AttachmentPicker
+                  accept="video/*"
+                  multiple
+                  onSelect={(assets) => addAssets(group.id, assets)}
+                  trigger={(open) => (
+                    <Button size="sm" variant="outline" onClick={open}>
+                      <Plus />
+                      选择素材 {group.assets.length}/20
+                    </Button>
+                  )}
+                />
               </div>
-              {!result?.artifacts.length && <div className="mashup-empty">任务结果将在这里显示</div>}
-            </>
-          ) : (
-            <div className="mashup-empty">选择任务查看批次结果</div>
-          )}
-        </div>
-      </section>
-      {creatorOpen && (
-        <div className="mashup-creator-layer" role="presentation">
-          <section className="mashup-creator" role="dialog" aria-modal="true" aria-label="新建混剪任务">
-            <header>
-              <div>
-                <span>VIDEO MASHUP</span>
-                <h2>新建混剪任务</h2>
-              </div>
-              <button type="button" aria-label="关闭" onClick={() => setCreatorOpen(false)}>
-                <X />
-              </button>
-            </header>
-            <div className="mashup-creator-body">
-              <div className="mashup-group-editor">
-                <div className="mashup-section-title">
-                  <div>
-                    <h3>视频组</h3>
-                    <p>每个成片会按顺序从每组选择一个视频。</p>
-                  </div>
-                  <b>{groups.length}/10 组</b>
-                </div>
-                {groups.map((group, groupIndex) => (
-                  <article className="mashup-group-card" key={group.id}>
-                    <header>
-                      <input
-                        aria-label={`视频组 ${groupIndex + 1} 名称`}
-                        value={group.name}
-                        onChange={(event) =>
-                          setGroups((current) =>
-                            current.map((item) =>
-                              item.id === group.id ? { ...item, name: event.target.value } : item,
-                            ),
-                          )
-                        }
-                      />
-                      {groups.length > 2 && (
-                        <button
-                          type="button"
-                          aria-label={`删除${group.name}`}
-                          onClick={() => setGroups((current) => current.filter((item) => item.id !== group.id))}
-                        >
-                          <Trash2 />
-                        </button>
-                      )}
-                    </header>
-                    <div className="mashup-selected-assets">
-                      {group.assets.map((asset) => (
-                        <div key={asset.id}>
-                          {asset.url ? (
-                            <AuthenticatedMedia
-                              url={asset.url}
-                              mimeType={asset.mimeType}
-                              alt={asset.name}
-                              controls={false}
-                            />
-                          ) : (
-                            <Film />
-                          )}
-                          <span title={asset.name}>{asset.name}</span>
-                          <button
-                            type="button"
-                            aria-label={`移除${asset.name}`}
-                            onClick={() =>
-                              setGroups((current) =>
-                                current.map((item) =>
-                                  item.id === group.id
-                                    ? { ...item, assets: item.assets.filter((selected) => selected.id !== asset.id) }
-                                    : item,
-                                ),
-                              )
-                            }
-                          >
-                            <X />
-                          </button>
-                        </div>
-                      ))}
-                      <AttachmentPicker
-                        accept="video/*"
-                        multiple
-                        onSelect={(assets) => addAssets(group.id, assets)}
-                        trigger={(open) => (
-                          <button type="button" className="mashup-add-assets" onClick={open}>
-                            <Plus />
-                            选择素材<small>{group.assets.length}/20</small>
-                          </button>
-                        )}
-                      />
-                    </div>
-                  </article>
-                ))}
-                <button
-                  type="button"
-                  className="mashup-add-group"
-                  disabled={groups.length >= 10}
-                  onClick={() => setGroups((current) => [...current, newGroup(current.length + 1)])}
-                >
-                  <Plus />
-                  添加视频组
-                </button>
-              </div>
-              <aside className="mashup-settings">
-                <h3>输出设置</h3>
-                <label>
-                  任务名称
-                  <input value={taskName} onChange={(event) => setTaskName(event.target.value)} />
-                </label>
-                <fieldset>
-                  <legend>组合模式</legend>
-                  <button
-                    type="button"
-                    className={combinationMode === "max-results" ? "selected" : ""}
-                    onClick={() => setCombinationMode("max-results")}
-                  >
-                    最多结果数
-                  </button>
-                  <button
-                    type="button"
-                    className={combinationMode === "max-difference" ? "selected" : ""}
-                    onClick={() => setCombinationMode("max-difference")}
-                  >
-                    最大差异化
-                  </button>
-                </fieldset>
-                <fieldset>
-                  <legend>分辨率</legend>
-                  <button
-                    type="button"
-                    className={resolution === "720P" ? "selected" : ""}
-                    onClick={() => setResolution("720P")}
-                  >
-                    720P
-                  </button>
-                  <button
-                    type="button"
-                    className={resolution === "1080P" ? "selected" : ""}
-                    onClick={() => setResolution("1080P")}
-                  >
-                    1080P
-                  </button>
-                </fieldset>
-                <label>
-                  最多生成数量
-                  <input
-                    type="number"
-                    min="1"
-                    max={Math.min(20, Math.max(1, theoretical))}
-                    value={count}
-                    onChange={(event) => setCount(Number(event.target.value))}
-                  />
-                </label>
-                <label>
-                  保存位置
-                  <select value={outputFolderId} onChange={(event) => setOutputFolderId(event.target.value)}>
-                    {folders.map((folder) => (
-                      <option key={folder.id} value={folder.id}>
-                        {folder.name}
-                        {folder.isDefault ? "（默认）" : ""}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <dl>
-                  <div>
-                    <dt>视频组</dt>
-                    <dd>{groups.length}</dd>
-                  </div>
-                  <div>
-                    <dt>可用素材</dt>
-                    <dd>{groups.reduce((sum, group) => sum + group.assets.length, 0)}</dd>
-                  </div>
-                  <div>
-                    <dt>理论组合</dt>
-                    <dd>{theoretical.toLocaleString()}</dd>
-                  </div>
-                  <div>
-                    <dt>预计生成</dt>
-                    <dd>{expected}</dd>
-                  </div>
-                </dl>
-                {error && <p className="mashup-error">{error}</p>}
-                <button
-                  type="button"
-                  className="primary-action mashup-submit"
-                  disabled={submitting}
-                  onClick={() => void submit()}
-                >
-                  {submitting ? "正在提交…" : `创建 ${expected || 0} 个混剪成片`}
-                </button>
-              </aside>
+            </section>
+          ))}
+          <Button
+            className="self-start"
+            size="sm"
+            variant="outline"
+            disabled={groups.length >= 10}
+            onClick={() => setGroups((current) => [...current, newGroup(current.length + 1)])}
+          >
+            <Plus />
+            添加视频组
+          </Button>
+          <Label className="flex-col items-start text-xs text-muted">
+            任务名称
+            <Input value={taskName} onChange={(event) => setTaskName(event.target.value)} />
+          </Label>
+          <Label className="flex-col items-start text-xs text-muted">
+            组合模式
+            <div className="flex gap-1">
+              <Button
+                size="sm"
+                variant={combinationMode === "max-results" ? "default" : "outline"}
+                onClick={() => setCombinationMode("max-results")}
+              >
+                最多结果数
+              </Button>
+              <Button
+                size="sm"
+                variant={combinationMode === "max-difference" ? "default" : "outline"}
+                onClick={() => setCombinationMode("max-difference")}
+              >
+                最大差异化
+              </Button>
             </div>
-          </section>
+          </Label>
+          <Label className="flex-col items-start text-xs text-muted">
+            分辨率
+            <div className="flex gap-1">
+              {(["720P", "1080P"] as const).map((value) => (
+                <Button
+                  key={value}
+                  size="sm"
+                  variant={resolution === value ? "default" : "outline"}
+                  onClick={() => setResolution(value)}
+                >
+                  {value}
+                </Button>
+              ))}
+            </div>
+          </Label>
+          <Label className="flex-col items-start text-xs text-muted">
+            最多生成数量
+            <Input
+              className="w-24"
+              type="number"
+              min="1"
+              max={Math.min(20, Math.max(1, theoretical))}
+              value={count}
+              onChange={(event) => setCount(Number(event.target.value))}
+            />
+          </Label>
+          <Label className="flex-col items-start text-xs text-muted">
+            保存位置
+            <NativeSelect value={outputFolderId} onChange={(event) => setOutputFolderId(event.target.value)}>
+              {folders.map((folder) => (
+                <option key={folder.id} value={folder.id}>
+                  {folder.name}
+                  {folder.isDefault ? "（默认）" : ""}
+                </option>
+              ))}
+            </NativeSelect>
+          </Label>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+            <span>视频组 {groups.length}</span>
+            <span>可用素材 {groups.reduce((sum, group) => sum + group.assets.length, 0)}</span>
+            <span>理论组合 {theoretical.toLocaleString()}</span>
+            <span>预计生成 {expected}</span>
+          </div>
+          {error && <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
         </div>
-      )}
-    </main>
+        <footer className="flex h-13 flex-none items-center justify-end gap-2 border-t border-line px-4">
+          <Button size="sm" variant="outline" onClick={() => setCreatorOpen(false)}>
+            取消
+          </Button>
+          <Button size="sm" disabled={submitting} onClick={() => void submit()}>
+            {submitting ? "正在提交…" : `创建 ${expected || 0} 个混剪成片`}
+          </Button>
+        </footer>
+      </ToolCreatorModal>
+      <ToolCreatorModal open={resultOpen && Boolean(selectedJob)} title="任务结果" onClose={() => setResultOpen(false)}>
+        <div className="grid min-h-0 flex-1 gap-3 overflow-y-auto p-4 sm:grid-cols-2">
+          {result?.artifacts.map((artifact) => (
+            <article className="min-w-0" key={artifact.id}>
+              <div className="grid h-32 place-items-center overflow-hidden rounded-md bg-black text-white">
+                {artifact.url ? (
+                  <AuthenticatedMedia url={artifact.url} mimeType={artifact.mimeType} alt={artifact.name} />
+                ) : (
+                  <Film />
+                )}
+              </div>
+              <p className="mt-1 truncate text-xs text-ink" title={artifact.name}>
+                {artifact.name}
+              </p>
+              <div className="mt-1 flex gap-1">
+                {artifact.url && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => artifact.url && void downloadAuthenticated(artifact.url, artifact.name)}
+                  >
+                    <Download />
+                    下载
+                  </Button>
+                )}
+                <Button size="sm" variant="ghost" onClick={() => window.location.assign("/assets/materials")}>
+                  <FolderOpen />
+                  素材库
+                </Button>
+              </div>
+            </article>
+          ))}
+          {!result?.artifacts.length && <p className="text-xs text-muted">任务结果尚未生成</p>}
+        </div>
+      </ToolCreatorModal>
+    </>
   );
 }

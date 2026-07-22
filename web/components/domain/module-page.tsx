@@ -47,7 +47,8 @@ import { db } from "@/lib/db";
 import { cn } from "@/lib/utils";
 import { AttachmentPicker } from "./attachment-picker";
 import { AuthenticatedMedia } from "./authenticated-media";
-import { TaskSearchFilters } from "./task-search-filters";
+import { ToolCreatorModal } from "./tool-creator-modal";
+import { createToolTaskLabel, ToolTaskPage } from "./tool-task-page";
 
 const statusMap: Record<Job["status"], string> = {
   queued: "排队中",
@@ -66,8 +67,6 @@ const statusClassMap: Record<Job["status"], string> = {
   failed: "bg-red-50 text-red-600",
   cancelled: "bg-surface-muted text-muted",
 };
-const toolboxDisplayName = (config: ModuleConfig) =>
-  config.id === "video-cut" ? "AI视频分割" : config.id === "video-mashup" ? "素材混剪" : config.label;
 function UploadField({
   field,
   value,
@@ -969,6 +968,7 @@ function AssetStrip({ onSelect }: { onSelect: (asset: { id: number; name: string
 }
 
 export function ModulePage({ config }: { config: ModuleConfig }) {
+  const newTaskLabel = createToolTaskLabel(config.label);
   const initialValues = () =>
     Object.fromEntries(
       config.fields.map((field) => [
@@ -1108,7 +1108,6 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
       (!appliedFilters.from || new Date(task.createdAt) >= new Date(`${appliedFilters.from}T00:00:00`)) &&
       (!appliedFilters.to || new Date(task.createdAt) <= new Date(`${appliedFilters.to}T23:59:59.999`)),
   );
-  const isVideoCutPage = config.id === "video-cut";
   const submit = async () => {
     setSubmitted(true);
     if (missing.length) return;
@@ -1278,311 +1277,264 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
     setActionNotice(`${action}已打开，可继续查看结果细节`);
   };
   return (
-    <div className={cn("module-page tool-task-page", isVideoCutPage && "!m-0 !max-w-none !bg-white !p-3")}>
-      {creatorOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onMouseDown={() => setCreatorOpen(false)}
-        >
-          <section
-            className="flex max-h-[calc(100vh-32px)] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-white shadow-xl"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <header className="flex h-13 flex-none items-center justify-between border-b border-line px-4">
-              <div className="min-w-0">
-                <h2 className="truncate text-base font-medium text-ink">{toolboxDisplayName(config)}</h2>
-              </div>
-              <Button
-                className="size-8"
-                variant="ghost"
-                size="icon"
-                aria-label="关闭新建窗口"
-                onClick={() => setCreatorOpen(false)}
-              >
-                <X />
-              </Button>
-            </header>
-            <div className="flex min-h-0 flex-1 flex-col">
-              <ToolboxCreatorForm
-                config={config}
-                values={values}
-                setValue={setValue}
-                submitted={submitted}
-                running={running}
-                hydrated={hydrated}
-                assetFolders={assetFolders}
-                foldersLoading={foldersLoading}
-                onSetDefaultFolder={setDefaultOutputFolder}
-                onCancel={() => setCreatorOpen(false)}
-                onSubmit={() => void submit()}
-                error={apiError}
-              />
-              {false && (
-                <>
-                  <div className="workspace-grid legacy-creator-body" aria-hidden="true">
-                    <section className="work-card">
-                      <div className="steps">
-                        {config.steps.map((step, index) => (
-                          <button
-                            type="button"
-                            className={index === currentStep ? "active" : index < currentStep ? "done" : ""}
-                            key={step}
-                            onClick={() => index < currentStep && setCurrentStep(index)}
-                          >
-                            <i>{index < currentStep ? <Check size={12} /> : index + 1}</i>
-                            {step}
-                            {index < config.steps.length - 1 && <ChevronRight />}
-                          </button>
-                        ))}
-                      </div>
-                      {currentStep < 2 ? (
-                        <div className="form-stack">
-                          {hydrated ? (
-                            visibleFields.map((field) => (
-                              <BusinessField
-                                key={field.id}
-                                field={field}
-                                value={values[field.id] ?? ""}
-                                onChange={(value) => setValue(field.id, value)}
-                                invalid={Boolean(submitted && field.required && !values[field.id])}
-                              />
-                            ))
-                          ) : (
-                            <>
-                              <div className="form-skeleton" />
-                              <div className="form-skeleton" />
-                              <div className="form-skeleton wide" />
-                            </>
-                          )}
-                          {usesSeedance && (
-                            <div className="engine-panel">
-                              <span>视频生成引擎</span>
-                              <div className="model-cards">
-                                {selectableModels.map((model) => (
-                                  <button
-                                    type="button"
-                                    key={model.id}
-                                    className={videoModel === model.id ? "active" : ""}
-                                    onClick={() => setVideoModel(model.id as SeedanceModelId)}
-                                  >
-                                    <b>{model.name}</b>
-                                    <small>{model.description}</small>
-                                    <em>{model.tags.join(" · ")}</em>
-                                  </button>
-                                ))}
-                              </div>
-                              {!selectableModels.length && (
-                                <small className="field-error">
-                                  三款 Seedance 尚未全部通过真实基线测试，当前不可提交真实视频生成。
-                                </small>
-                              )}
-                            </div>
-                          )}
-                          {localVideoModules.has(config.id) && (
-                            <div className="engine-panel local-engine">
-                              <span>生成引擎</span>
-                              <b>本地处理，不使用视频生成模型</b>
-                              <small>该工具使用 FFmpeg 或本地滤镜，不会发起 Seedance 付费请求。</small>
-                            </div>
-                          )}
-                        </div>
+    <div className="!m-0 !max-w-none !bg-white !p-0">
+      <ToolCreatorModal open={creatorOpen} title={newTaskLabel} onClose={() => setCreatorOpen(false)}>
+        <div className="flex min-h-0 flex-1 flex-col">
+          <ToolboxCreatorForm
+            config={config}
+            values={values}
+            setValue={setValue}
+            submitted={submitted}
+            running={running}
+            hydrated={hydrated}
+            assetFolders={assetFolders}
+            foldersLoading={foldersLoading}
+            onSetDefaultFolder={setDefaultOutputFolder}
+            onCancel={() => setCreatorOpen(false)}
+            onSubmit={() => void submit()}
+            error={apiError}
+          />
+          {false && (
+            <>
+              <div className="workspace-grid legacy-creator-body" aria-hidden="true">
+                <section className="work-card">
+                  <div className="steps">
+                    {config.steps.map((step, index) => (
+                      <button
+                        type="button"
+                        className={index === currentStep ? "active" : index < currentStep ? "done" : ""}
+                        key={step}
+                        onClick={() => index < currentStep && setCurrentStep(index)}
+                      >
+                        <i>{index < currentStep ? <Check size={12} /> : index + 1}</i>
+                        {step}
+                        {index < config.steps.length - 1 && <ChevronRight />}
+                      </button>
+                    ))}
+                  </div>
+                  {currentStep < 2 ? (
+                    <div className="form-stack">
+                      {hydrated ? (
+                        visibleFields.map((field) => (
+                          <BusinessField
+                            key={field.id}
+                            field={field}
+                            value={values[field.id] ?? ""}
+                            onChange={(value) => setValue(field.id, value)}
+                            invalid={Boolean(submitted && field.required && !values[field.id])}
+                          />
+                        ))
                       ) : (
-                        <div className="review-panel">
-                          <div className="review-head">
-                            <span>
-                              <Check size={18} />
-                            </span>
-                            <div>
-                              <h3>确认创作配置</h3>
-                              <p>检查以下信息，确认后任务将进入异步生成队列。</p>
-                            </div>
-                          </div>
-                          <dl>
-                            {config.fields.map((field) => (
-                              <div key={field.id}>
-                                <dt>{field.label}</dt>
-                                <dd>{values[field.id] || "未设置"}</dd>
-                              </div>
-                            ))}
-                            {usesSeedance && (
-                              <div>
-                                <dt>视频模型</dt>
-                                <dd>{selectableModels.find((model) => model.id === videoModel)?.name ?? videoModel}</dd>
-                              </div>
-                            )}
-                          </dl>
-                          <button type="button" className="edit-config" onClick={() => setCurrentStep(0)}>
-                            返回修改内容
-                          </button>
-                        </div>
-                      )}
-                      {currentStep === 1 && (
                         <>
-                          <button className="advanced" onClick={() => setAdvanced((v) => !v)}>
-                            <span>高级设置</span>
-                            <small>{advanced ? "收起" : "展开更多生成参数"}</small>
-                          </button>
-                          {advanced && (
-                            <div className="advanced-panel">
-                              <label>
-                                生成策略
-                                <select>
-                                  <option>创意优先</option>
-                                  <option>稳定优先</option>
-                                </select>
-                              </label>
-                              <label>
-                                测试场景
-                                <select value={scenario} onChange={(e) => setScenario(e.target.value)}>
-                                  <option value="success">正常完成</option>
-                                  <option value="fail-analysis">素材分析失败</option>
-                                  <option value="partial-batch">批量任务部分成功</option>
-                                  <option value="insufficient-credits">创作点不足</option>
-                                </select>
-                              </label>
-                            </div>
-                          )}
+                          <div className="form-skeleton" />
+                          <div className="form-skeleton" />
+                          <div className="form-skeleton wide" />
                         </>
                       )}
-                      {apiError && <div className="field-error">{apiError}</div>}
-                      <div className="submit-bar">
-                        <div>
-                          <b>
-                            {currentStep === 2 ? `预计消耗 ${config.cost} 创作点` : `第 ${currentStep + 1} 步，共 3 步`}
-                          </b>
-                          <small>
-                            {hydrated ? "已自动保存草稿" : "正在恢复草稿…"} · {config.duration}
-                          </small>
-                        </div>
-                        <div className="wizard-actions">
-                          {currentStep > 0 && (
-                            <button type="button" className="secondary" onClick={back}>
-                              <ArrowLeft />
-                              上一步
-                            </button>
-                          )}
-                          {currentStep < 2 ? (
-                            <button type="button" disabled={!hydrated} onClick={next}>
-                              下一步
-                              <ArrowRight />
-                            </button>
-                          ) : (
-                            <button
-                              disabled={running || !hydrated || (usesSeedance && !selectableModels.length)}
-                              onClick={submit}
-                            >
-                              {running ? <LoaderCircle className="animate-spin" /> : <WandSparkles />}
-                              {running ? "正在提交…" : config.action}
-                            </button>
+                      {usesSeedance && (
+                        <div className="engine-panel">
+                          <span>视频生成引擎</span>
+                          <div className="model-cards">
+                            {selectableModels.map((model) => (
+                              <button
+                                type="button"
+                                key={model.id}
+                                className={videoModel === model.id ? "active" : ""}
+                                onClick={() => setVideoModel(model.id as SeedanceModelId)}
+                              >
+                                <b>{model.name}</b>
+                                <small>{model.description}</small>
+                                <em>{model.tags.join(" · ")}</em>
+                              </button>
+                            ))}
+                          </div>
+                          {!selectableModels.length && (
+                            <small className="field-error">
+                              三款 Seedance 尚未全部通过真实基线测试，当前不可提交真实视频生成。
+                            </small>
                           )}
                         </div>
-                      </div>
-                    </section>
-                    <aside className="guide-card">
-                      <div className="visual">
-                        <config.icon size={42} />
-                        <span />
-                        <span />
-                      </div>
-                      <h3>获得更好的结果</h3>
-                      <ol>
-                        {config.tips.map((tip) => (
-                          <li key={tip}>{tip}</li>
-                        ))}
-                      </ol>
-                      <div className="safe-note">
-                        <Clock3 size={17} />
+                      )}
+                      {localVideoModules.has(config.id) && (
+                        <div className="engine-panel local-engine">
+                          <span>生成引擎</span>
+                          <b>本地处理，不使用视频生成模型</b>
+                          <small>该工具使用 FFmpeg 或本地滤镜，不会发起 Seedance 付费请求。</small>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="review-panel">
+                      <div className="review-head">
                         <span>
-                          <b>异步生成</b>
-                          <small>{config.duration}</small>
+                          <Check size={18} />
                         </span>
-                      </div>
-                    </aside>
-                  </div>
-                  {config.id === "ai-generate" && (
-                    <section className="asset-section">
-                      <div className="section-title">
                         <div>
-                          <span>灵感素材</span>
-                          <h2>从已有素材开始</h2>
+                          <h3>确认创作配置</h3>
+                          <p>检查以下信息，确认后任务将进入异步生成队列。</p>
                         </div>
-                        <button type="button" onClick={() => setActionNotice("素材库已展开，可点击下方素材引用")}>
-                          查看素材库
-                        </button>
                       </div>
-                      <AssetStrip
-                        onSelect={(asset) => {
-                          setValue(
-                            "references",
-                            `assets:${JSON.stringify([{ id: `library-${asset.id}`, name: asset.name, mimeType: "image/png" }])}`,
-                          );
-                          setActionNotice(`已引用 ${asset.name}`);
-                        }}
-                      />
-                    </section>
-                  )}
-                  {actionNotice && (
-                    <div className="safe-note">
-                      <Sparkles size={17} />
-                      <span>
-                        <b>{actionNotice}</b>
-                        <small>操作已完成</small>
-                      </span>
+                      <dl>
+                        {config.fields.map((field) => (
+                          <div key={field.id}>
+                            <dt>{field.label}</dt>
+                            <dd>{values[field.id] || "未设置"}</dd>
+                          </div>
+                        ))}
+                        {usesSeedance && (
+                          <div>
+                            <dt>视频模型</dt>
+                            <dd>{selectableModels.find((model) => model.id === videoModel)?.name ?? videoModel}</dd>
+                          </div>
+                        )}
+                      </dl>
+                      <button type="button" className="edit-config" onClick={() => setCurrentStep(0)}>
+                        返回修改内容
+                      </button>
                     </div>
                   )}
-                </>
+                  {currentStep === 1 && (
+                    <>
+                      <button className="advanced" onClick={() => setAdvanced((v) => !v)}>
+                        <span>高级设置</span>
+                        <small>{advanced ? "收起" : "展开更多生成参数"}</small>
+                      </button>
+                      {advanced && (
+                        <div className="advanced-panel">
+                          <label>
+                            生成策略
+                            <select>
+                              <option>创意优先</option>
+                              <option>稳定优先</option>
+                            </select>
+                          </label>
+                          <label>
+                            测试场景
+                            <select value={scenario} onChange={(e) => setScenario(e.target.value)}>
+                              <option value="success">正常完成</option>
+                              <option value="fail-analysis">素材分析失败</option>
+                              <option value="partial-batch">批量任务部分成功</option>
+                              <option value="insufficient-credits">创作点不足</option>
+                            </select>
+                          </label>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {apiError && <div className="field-error">{apiError}</div>}
+                  <div className="submit-bar">
+                    <div>
+                      <b>
+                        {currentStep === 2 ? `预计消耗 ${config.cost} 创作点` : `第 ${currentStep + 1} 步，共 3 步`}
+                      </b>
+                      <small>
+                        {hydrated ? "已自动保存草稿" : "正在恢复草稿…"} · {config.duration}
+                      </small>
+                    </div>
+                    <div className="wizard-actions">
+                      {currentStep > 0 && (
+                        <button type="button" className="secondary" onClick={back}>
+                          <ArrowLeft />
+                          上一步
+                        </button>
+                      )}
+                      {currentStep < 2 ? (
+                        <button type="button" disabled={!hydrated} onClick={next}>
+                          下一步
+                          <ArrowRight />
+                        </button>
+                      ) : (
+                        <button
+                          disabled={running || !hydrated || (usesSeedance && !selectableModels.length)}
+                          onClick={submit}
+                        >
+                          {running ? <LoaderCircle className="animate-spin" /> : <WandSparkles />}
+                          {running ? "正在提交…" : config.action}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </section>
+                <aside className="guide-card">
+                  <div className="visual">
+                    <config.icon size={42} />
+                    <span />
+                    <span />
+                  </div>
+                  <h3>获得更好的结果</h3>
+                  <ol>
+                    {config.tips.map((tip) => (
+                      <li key={tip}>{tip}</li>
+                    ))}
+                  </ol>
+                  <div className="safe-note">
+                    <Clock3 size={17} />
+                    <span>
+                      <b>异步生成</b>
+                      <small>{config.duration}</small>
+                    </span>
+                  </div>
+                </aside>
+              </div>
+              {config.id === "ai-generate" && (
+                <section className="asset-section">
+                  <div className="section-title">
+                    <div>
+                      <span>灵感素材</span>
+                      <h2>从已有素材开始</h2>
+                    </div>
+                    <button type="button" onClick={() => setActionNotice("素材库已展开，可点击下方素材引用")}>
+                      查看素材库
+                    </button>
+                  </div>
+                  <AssetStrip
+                    onSelect={(asset) => {
+                      setValue(
+                        "references",
+                        `assets:${JSON.stringify([{ id: `library-${asset.id}`, name: asset.name, mimeType: "image/png" }])}`,
+                      );
+                      setActionNotice(`已引用 ${asset.name}`);
+                    }}
+                  />
+                </section>
               )}
-            </div>
-          </section>
-        </div>
-      )}
-      <section
-        className={cn(
-          isVideoCutPage ? "flex h-[calc(100vh-80px)] min-h-[520px] flex-col overflow-hidden" : "tasks-section",
-        )}
-      >
-        <div className={cn(isVideoCutPage && "flex flex-none items-center gap-2")}>
-          <TaskSearchFilters compact={isVideoCutPage} onSearch={setAppliedFilters} />
-          {isVideoCutPage && (
-            <Button size="sm" onClick={() => setCreatorOpen(true)}>
-              <Plus />
-              新建任务
-            </Button>
+              {actionNotice && (
+                <div className="safe-note">
+                  <Sparkles size={17} />
+                  <span>
+                    <b>{actionNotice}</b>
+                    <small>操作已完成</small>
+                  </span>
+                </div>
+              )}
+            </>
           )}
         </div>
-        {!isVideoCutPage && (
-          <div className="task-toolbar">
-            <button type="button" className="new-task-button" onClick={() => setCreatorOpen(true)}>
-              <Plus />
-              {toolboxDisplayName(config)}
-            </button>
-          </div>
-        )}
-        <div className={cn("task-table-container", isVideoCutPage && "mt-2 flex min-h-0 flex-1 flex-col")}>
-          <TaskTable
-            tasks={filteredTasks}
-            retry={retry}
-            preview={setSelectedTask}
-            cancel={cancel}
-            className={isVideoCutPage ? "min-h-0 flex-1" : "job-task-table"}
-            height={isVideoCutPage ? "100%" : undefined}
-            emptyMessage={tasks.length ? "没有符合条件的任务" : "暂无任务"}
-            emptyAction={
-              !tasks.length ? (
-                <Button size="sm" onClick={() => setCreatorOpen(true)}>
-                  新建第一个任务
-                </Button>
-              ) : undefined
-            }
-          />
-          <small
-            className={cn(isVideoCutPage ? "flex flex-none justify-end pt-1 text-2xs text-muted" : "task-table-count")}
-          >
-            共 {filteredTasks.length} 个任务
-            {filteredTasks.length !== tasks.length && ` / 全部 ${tasks.length} 个`}
-          </small>
-        </div>
-      </section>
+      </ToolCreatorModal>
+      <ToolTaskPage
+        actionLabel={newTaskLabel}
+        onAction={() => setCreatorOpen(true)}
+        onSearch={setAppliedFilters}
+        count={filteredTasks.length}
+        totalCount={tasks.length}
+      >
+        <TaskTable
+          tasks={filteredTasks}
+          retry={retry}
+          preview={setSelectedTask}
+          cancel={cancel}
+          className="min-h-0 flex-1"
+          height="100%"
+          emptyMessage={tasks.length ? "没有符合条件的任务" : "暂无任务"}
+          emptyAction={
+            !tasks.length ? (
+              <Button size="sm" onClick={() => setCreatorOpen(true)}>
+                {newTaskLabel}
+              </Button>
+            ) : undefined
+          }
+        />
+      </ToolTaskPage>
       {selectedTask && (
         <div className="result-backdrop" onMouseDown={() => setSelectedTask(null)}>
           <section className="result-drawer" onMouseDown={(e) => e.stopPropagation()}>
