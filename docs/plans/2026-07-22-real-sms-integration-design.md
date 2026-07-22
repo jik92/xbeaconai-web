@@ -23,8 +23,10 @@ flows.
 
 ## API and UI behavior
 
-Real SMS responses contain only expiry and resend timing. The plaintext verification code is included only when the
-fixed-code test setting is active. OpenAPI models this field as optional, and the UI displays it only when present.
+Production SMS responses contain only expiry and resend timing. Development responses include the generated
+verification code so authentication flows remain testable while SMS delivery is unavailable. OpenAPI models this
+field as optional. The UI renders the code inline beside the `验证码已发送` notice instead of using a separate panel.
+Production never returns or displays the plaintext code.
 
 Provider failures remove the newly persisted verification challenge and return a structured, retryable
 `SMS_PROVIDER_ERROR` response with HTTP 503. Credentials and upstream response bodies are never returned to the
