@@ -150,6 +150,7 @@ bun run test:ffmpeg
 ## 前端约束
 
 - 涉及视觉或交互的任务，先按“渐进披露与文档路由”读取 `DESIGN.md` 的相关章节。
+- 除非用户在当前任务中明确要求，否则不要新增副标题、description、tagline 或标题下方的解释性文案。页面、卡片和 Modal 标题默认只保留主标题；字段帮助、校验错误、风险警告和运行状态等必要功能信息不受此限制。
 - 应用入口为 `web/main.tsx`，路由集中在 `web/app/router.tsx`。
 - 项目名称和功能开放状态集中在 `web/app/config.ts`，不要在组件内另建一套功能开关。
 - 新业务页面放入对应的 `web/features/<feature>/`，跨业务复用的组件放入 `web/components/`。

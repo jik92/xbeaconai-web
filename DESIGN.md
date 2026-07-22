@@ -353,6 +353,8 @@ The system uses **hairline + soft drop**. Cards float above the off-white canvas
 
 **`testimonial-card`** — Quote card. Background `{colors.surface-card}`, text `{colors.body}`, rounded `{rounded.xl}`, padding 32px.
 
+**`data-table`** — One shared shadcn-style table appearance across the system. Use a 40px sticky header, 56px rows, compact cell padding, and subtle horizontal row dividers. The component has no outer card border, radius, shadow, owned background, page-specific visual variant, or horizontal scrollbar. Columns share the available width proportionally; long content stays on one line and truncates. Pages control layout and background only; compose filters and actions with shadcn `h-8` controls and Tailwind spacing utilities.
+
 ### Voice Library
 
 **`voice-row`** — Horizontal row in voice list. Background transparent, 1px hairline divider. Layout: 32px circular voice icon (`{component.voice-icon-circular}`) left, voice name + accent stack, optional preview button right.
@@ -369,7 +371,11 @@ The system uses **hairline + soft drop**. Cards float above the off-white canvas
 
 **`text-input`** — Background `{colors.surface-card}`, text `{colors.ink}`, type `font-sans text-sm font-normal`, rounded `{rounded.md}` (8px), padding 12px × 16px, height 44px, 1px `{colors.hairline-strong}` border. On focus, border thickens to 2px ink.
 
+**`native-select`** — Select width follows its selected content instead of filling the form control column. Different Select controls may have different natural widths; preserve compact arrow padding, cap width at the parent, and allow secondary actions beside the control when space permits. Do not add empty internal width merely to align unrelated controls.
+
 **`file-upload`** — Compact shadcn-style drop container using the same border, radius, focus ring, label, and helper-text semantics as other form controls. The default state supports click and drag selection; active drag uses a restrained primary tint. Upload progress, errors, retry actions, and type-aware media previews stay inside the same container. Avoid oversized icons and tall decorative drop zones; the idle container should remain close to 112px high.
+
+**`creator-modal`** — Shared compact task-creation modal for every `ModulePage`. Use one `max-w-lg` shell, 52px header/footer, a single `text-base font-medium` title, `text-sm` body, `text-xs` labels/help, and shadcn small controls. Do not place a subtitle or description below the title. Desktop form rows use a 96px label column and flexible control column; small screens collapse to one column. Do not introduce per-module modal sizing, typography, footer, or field spacing.
 
 **`badge-pill`** — Background `{colors.surface-strong}`, text `{colors.ink}`, type `font-sans text-xs font-semibold tracking-widest uppercase`, rounded `{rounded.pill}`, padding 4px × 10px.
 
@@ -393,6 +399,7 @@ The system uses **hairline + soft drop**. Cards float above the off-white canvas
 
 ### Don't
 - Don't introduce a saturated brand action color. Ink pill is the only CTA color.
+- Don't add subtitles, descriptions, taglines, or explanatory copy below titles unless the user explicitly requests them.
 - Don't add raw CSS typography declarations, inline typography styles, or arbitrary typography utilities.
 - Don't use `font-bold` or `font-extrabold`; `font-semibold` is the maximum approved UI weight.
 - Don't use gradient orbs as button fills, text colors, or component backgrounds. They are pure atmosphere.

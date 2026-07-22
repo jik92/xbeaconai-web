@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 export interface TaskSearchFilterValue {
   name: string;
@@ -60,12 +61,13 @@ export function TaskSearchFilters({ compact = false, onSearch }: TaskSearchFilte
   const applyFilters = () => onSearch({ ...filters, name: filters.name.trim() });
 
   return (
-    <div className="flex w-full flex-nowrap items-center gap-3 overflow-x-auto pb-1">
-      <div className="flex min-w-[260px] flex-1 items-center gap-2">
-        <Label className="shrink-0" htmlFor="task-name-filter">
+    <div className={cn("flex w-full flex-nowrap items-center overflow-x-auto", compact ? "gap-2" : "gap-3 pb-1")}>
+      <div className={cn("flex flex-1 items-center gap-2", compact ? "min-w-52" : "min-w-[260px]")}>
+        <Label className={cn("shrink-0", compact && "text-xs")} htmlFor="task-name-filter">
           任务名称
         </Label>
         <Input
+          className={cn(compact && "h-8")}
           id="task-name-filter"
           value={filters.name}
           onChange={(event) => updateFilter("name", event.target.value)}
@@ -73,11 +75,12 @@ export function TaskSearchFilters({ compact = false, onSearch }: TaskSearchFilte
           placeholder="请输入"
         />
       </div>
-      <div className="flex w-[210px] shrink-0 items-center gap-2">
-        <Label className="shrink-0" htmlFor="task-status-filter">
+      <div className={cn("flex shrink-0 items-center gap-2", compact ? "w-44" : "w-[210px]")}>
+        <Label className={cn("shrink-0", compact && "text-xs")} htmlFor="task-status-filter">
           处理状态
         </Label>
         <NativeSelect
+          className={cn(compact && "h-8")}
           id="task-status-filter"
           value={filters.status}
           onChange={(event) => updateFilter("status", event.target.value)}
@@ -101,13 +104,18 @@ export function TaskSearchFilters({ compact = false, onSearch }: TaskSearchFilte
           </NativeSelect>
         </div>
       )}
-      <div className="flex w-[340px] shrink-0 items-center gap-2">
-        <Label className="shrink-0" htmlFor="task-date-filter">
+      <div className={cn("flex shrink-0 items-center gap-2", compact ? "w-72" : "w-[340px]")}>
+        <Label className={cn("shrink-0", compact && "text-xs")} htmlFor="task-date-filter">
           创建时间
         </Label>
         <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
           <PopoverTrigger asChild>
-            <Button id="task-date-filter" className="min-w-0 flex-1 justify-start px-3 font-normal" variant="outline">
+            <Button
+              id="task-date-filter"
+              className="min-w-0 flex-1 justify-start px-3 font-normal"
+              size={compact ? "sm" : "default"}
+              variant="outline"
+            >
               <CalendarDays />
               <span className="truncate">
                 {selectedRange?.from
@@ -135,10 +143,10 @@ export function TaskSearchFilters({ compact = false, onSearch }: TaskSearchFilte
         </Popover>
       </div>
       <div className="flex shrink-0 gap-2">
-        <Button variant="outline" onClick={resetFilters}>
+        <Button size={compact ? "sm" : "default"} variant="outline" onClick={resetFilters}>
           重置
         </Button>
-        <Button onClick={applyFilters}>
+        <Button size={compact ? "sm" : "default"} onClick={applyFilters}>
           <Search />
           查询
         </Button>

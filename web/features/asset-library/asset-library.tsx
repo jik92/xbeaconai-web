@@ -484,7 +484,6 @@ function MediaAssetTable({
       emptyMessage="还没有素材"
       emptyIcon={<Files />}
       emptyAction={<button onClick={onUpload}>上传第一个素材</button>}
-      minWidth={1010}
       height="calc(100vh - 198px)"
     />
   );

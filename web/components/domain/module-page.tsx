@@ -36,10 +36,15 @@ import {
 } from "@/api/api-client";
 import type { Job, ModuleId, SeedanceModelId } from "@/api/generated/types.gen";
 import type { FieldSpec, ModuleConfig } from "@/app/routes";
+import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Slider } from "@/components/ui/slider";
 import type { ApiJobResult, AssetFolder } from "@/entities/types";
 import { db } from "@/lib/db";
+import { cn } from "@/lib/utils";
 import { AttachmentPicker } from "./attachment-picker";
 import { AuthenticatedMedia } from "./authenticated-media";
 import { TaskSearchFilters } from "./task-search-filters";
@@ -53,6 +58,14 @@ const statusMap: Record<Job["status"], string> = {
   cancelled: "已取消",
 };
 const emptyJobs: Job[] = [];
+const statusClassMap: Record<Job["status"], string> = {
+  queued: "bg-surface-muted text-muted",
+  processing: "bg-blue-50 text-blue-600",
+  succeeded: "bg-emerald-50 text-emerald-700",
+  partially_succeeded: "bg-amber-50 text-amber-700",
+  failed: "bg-red-50 text-red-600",
+  cancelled: "bg-surface-muted text-muted",
+};
 const toolboxDisplayName = (config: ModuleConfig) =>
   config.id === "video-cut" ? "AI视频分割" : config.id === "video-mashup" ? "素材混剪" : config.label;
 function UploadField({
@@ -276,7 +289,14 @@ function ToolboxUploadTile({
       accept={accept}
       multiple={multiple}
       trigger={(open) => (
-        <button type="button" className={`tool-upload-tile ${value ? "has-file" : ""}`} onClick={open}>
+        <button
+          type="button"
+          className={cn(
+            "tool-upload-tile !size-24 !rounded-md !border-line bg-white transition-colors hover:!bg-surface-muted",
+            value && "has-file",
+          )}
+          onClick={open}
+        >
           {preview?.url ? (
             <span className="tool-upload-preview">
               <AuthenticatedMedia url={preview.url} mimeType={preview.mimeType} alt={preview.name} controls={false} />
@@ -314,10 +334,18 @@ function ToolboxSwitch({ value, onChange }: { value: string; onChange: (value: s
       type="button"
       role="switch"
       aria-checked={value === "true"}
-      className={`tool-switch ${value === "true" ? "active" : ""}`}
+      className={cn(
+        "relative h-5 w-9 rounded-full border-0 transition-colors",
+        value === "true" ? "bg-primary" : "bg-line",
+      )}
       onClick={() => onChange(value === "true" ? "" : "true")}
     >
-      <i />
+      <span
+        className={cn(
+          "absolute top-0.5 left-0.5 size-4 rounded-full bg-white shadow-sm transition-transform",
+          value === "true" && "translate-x-4",
+        )}
+      />
     </button>
   );
 }
@@ -334,6 +362,7 @@ function ToolboxCreatorForm({
   onSetDefaultFolder,
   onCancel,
   onSubmit,
+  error,
 }: {
   config: ModuleConfig;
   values: Record<string, string>;
@@ -346,18 +375,19 @@ function ToolboxCreatorForm({
   onSetDefaultFolder: (folderId: string) => Promise<void>;
   onCancel: () => void;
   onSubmit: () => void;
+  error?: string;
 }) {
   const field = (id: string) => config.fields.find((item) => item.id === id) as FieldSpec;
   const requiredLabel = (text: string, required = false) => (
-    <span className="tool-form-label">
-      {required && <em>*</em>}
-      {text}：
-    </span>
+    <Label className="tool-form-label text-xs text-muted sm:justify-end">
+      {required && <span className="text-red-500">*</span>}
+      {text}
+    </Label>
   );
   const select = (id: string, placeholder = "请选择") => {
     const item = field(id);
     return (
-      <select value={values[id] ?? ""} onChange={(event) => setValue(id, event.target.value)}>
+      <NativeSelect value={values[id] ?? ""} onChange={(event) => setValue(id, event.target.value)}>
         {!item.defaultValue && (
           <option value="" disabled>
             {placeholder}
@@ -366,20 +396,20 @@ function ToolboxCreatorForm({
         {item.options?.map((option) => (
           <option key={option}>{option}</option>
         ))}
-      </select>
+      </NativeSelect>
     );
   };
   const segments = (id: string) => (
-    <div className="tool-segments">
+    <div className="tool-segments flex flex-wrap gap-1">
       {field(id).options?.map((option) => (
-        <button
-          type="button"
+        <Button
+          size="sm"
+          variant={values[id] === option ? "default" : "outline"}
           key={option}
-          className={values[id] === option ? "active" : ""}
           onClick={() => setValue(id, option)}
         >
           {option}
-        </button>
+        </Button>
       ))}
     </div>
   );
@@ -406,116 +436,126 @@ function ToolboxCreatorForm({
     return result;
   }, [assetFolders]);
   const selectedFolder = assetFolders.find((folder) => folder.id === values.saveLocation);
+  const compactLabel = (text: string, required = false) => (
+    <Label className="text-xs text-muted sm:justify-end">
+      {required && <span className="text-red-500">*</span>}
+      {text}
+    </Label>
+  );
   let content: React.ReactNode;
 
   if (config.id === "video-cut") {
     content = (
-      <div className="tool-simple-form video-cut-form">
-        <p>分割后排序：按原始播放顺序</p>
-        <p>分割后命名：原始文件名 + 切片序号</p>
-        <div className={`tool-form-row ${invalid("method") ? "invalid" : ""}`}>
-          {requiredLabel("分割策略", true)}
-          {select("method", "请选择分割策略")}
+      <div className="flex w-full flex-col gap-3">
+        <div className="grid items-center gap-2 sm:grid-cols-[96px_minmax(0,1fr)]">
+          {compactLabel("分割策略", true)}
+          <NativeSelect
+            className={cn("h-8", invalid("method") && "border-red-500")}
+            value={values.method ?? ""}
+            onChange={(event) => setValue("method", event.target.value)}
+          >
+            {!field("method").defaultValue && (
+              <option value="" disabled>
+                请选择分割策略
+              </option>
+            )}
+            {field("method").options?.map((option) => (
+              <option key={option}>{option}</option>
+            ))}
+          </NativeSelect>
         </div>
-        <div className="tool-form-row compact-row">
-          {requiredLabel("自动保存")}
+        <div className="grid min-h-8 items-center gap-2 sm:grid-cols-[96px_minmax(0,1fr)]">
+          {compactLabel("自动保存")}
           <ToolboxSwitch value={values.autoSave ?? ""} onChange={(value) => setValue("autoSave", value)} />
         </div>
-        <div className={`tool-form-row save-location ${invalid("saveLocation") ? "invalid" : ""}`}>
-          {requiredLabel("保存位置", true)}
-          <select value={values.saveLocation ?? ""} onChange={(event) => setValue("saveLocation", event.target.value)}>
-            <option value="" disabled>
-              {foldersLoading ? "正在加载我的文件夹…" : "请选择我的文件夹"}
-            </option>
-            {orderedFolders.map(({ folder, depth }) => (
-              <option key={folder.id} value={folder.id}>
-                {`${"　".repeat(depth)}${folder.name}${folder.isDefault ? "（默认）" : ""}`}
+        <div className="grid items-start gap-2 sm:grid-cols-[96px_minmax(0,1fr)]">
+          {compactLabel("保存位置", true)}
+          <div className="flex min-w-0 items-center gap-2">
+            <NativeSelect
+              className={cn("h-8", invalid("saveLocation") && "border-red-500")}
+              value={values.saveLocation ?? ""}
+              onChange={(event) => setValue("saveLocation", event.target.value)}
+            >
+              <option value="" disabled>
+                {foldersLoading ? "正在加载我的文件夹…" : "请选择我的文件夹"}
               </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            disabled={!selectedFolder || selectedFolder.isDefault}
-            onClick={() => selectedFolder && void onSetDefaultFolder(selectedFolder.id)}
-          >
-            {selectedFolder?.isDefault ? "当前默认" : "设为默认"}
-          </button>
+              {orderedFolders.map(({ folder, depth }) => (
+                <option key={folder.id} value={folder.id}>
+                  {`${"　".repeat(depth)}${folder.name}${folder.isDefault ? "（默认）" : ""}`}
+                </option>
+              ))}
+            </NativeSelect>
+            <Button
+              className="h-7 px-2 text-xs"
+              size="sm"
+              variant="ghost"
+              disabled={!selectedFolder || selectedFolder.isDefault}
+              onClick={() => selectedFolder && void onSetDefaultFolder(selectedFolder.id)}
+            >
+              {selectedFolder?.isDefault ? "当前默认" : "设为默认"}
+            </Button>
+          </div>
         </div>
-        <div className={`tool-form-row upload-row ${invalid("source") ? "invalid" : ""}`}>
-          {requiredLabel("选择视频", true)}
-          {upload("source")}
+        <div
+          className={cn(
+            "grid items-start gap-2 sm:grid-cols-[96px_minmax(0,1fr)] [&_.tool-upload-tile]:!size-24",
+            invalid("source") && "[&_.tool-upload-tile]:!border-red-500",
+          )}
+        >
+          {compactLabel("选择视频", true)}
+          <div>{upload("source")}</div>
         </div>
       </div>
     );
   } else if (config.id === "video-mashup") {
     content = (
-      <div className="mashup-form">
-        <section className="mashup-left">
-          <div className="gold-template">
-            <b>黄金模板：</b>
-            <button type="button">选择</button>
-          </div>
-          <div className="video-group-card">
-            <div className="video-group-head">
-              <b>视频组-1</b>
-              {requiredLabel("画面类型", true)}
-              {select("pictureType")}
-              <span>分镜贴纸：</span>
-              <ToolboxSwitch value={values.shotSticker ?? ""} onChange={(value) => setValue("shotSticker", value)} />
-            </div>
-            <div className={`material-pick ${invalid("assets") ? "invalid" : ""}`}>
-              {requiredLabel("选择素材", true)}
-              {upload("assets", true)}
-            </div>
-          </div>
-          <button type="button" className="add-video-group">
-            <Plus /> 添加视频组
-          </button>
-        </section>
-        <section className="mashup-right">
-          <div className={`tool-form-row ${invalid("taskName") ? "invalid" : ""}`}>
-            {requiredLabel("任务名称", true)}
-            <input value={values.taskName ?? ""} onChange={(event) => setValue("taskName", event.target.value)} />
-          </div>
-          <div className="tool-form-row">
-            {requiredLabel("组合模式")}
-            {segments("combinationMode")}
-          </div>
-          <div className="tool-form-row combo-summary">
-            {requiredLabel("混剪组合")}
-            <span>
-              <b>外观样式</b>
-              <small>商品信息</small>
-            </span>
-          </div>
-          <div className="tool-form-row">
-            {requiredLabel("分辨率")}
-            {segments("resolution")}
-          </div>
-          <div className="tool-form-row short-input">
-            {requiredLabel("最多生成数量")}
-            <input
-              type="number"
-              min="1"
-              max="20"
-              value={values.count ?? "1"}
-              onChange={(event) => setValue("count", event.target.value)}
-            />
-          </div>
-          <div className={`tool-form-row save-location ${invalid("saveLocation") ? "invalid" : ""}`}>
-            {requiredLabel("保存位置", true)}
-            {select("saveLocation")}
-            <button type="button">设为默认</button>
-          </div>
-          <div className="tool-form-row compact-row">
-            {requiredLabel("自动采纳")}
-            <ToolboxSwitch value={values.autoAccept ?? ""} onChange={(value) => setValue("autoAccept", value)} />
-          </div>
-          <div className="tool-form-row compact-row">
-            {requiredLabel("全局贴纸")}
-            <ToolboxSwitch value={values.globalSticker ?? ""} onChange={(value) => setValue("globalSticker", value)} />
-          </div>
-        </section>
+      <div className="tool-simple-form space-y-1">
+        <div className={`tool-form-row ${invalid("taskName") ? "invalid" : ""}`}>
+          {requiredLabel("任务名称", true)}
+          <Input value={values.taskName ?? ""} onChange={(event) => setValue("taskName", event.target.value)} />
+        </div>
+        <div className="tool-form-row">
+          {requiredLabel("画面类型", true)}
+          {select("pictureType")}
+        </div>
+        <div className="tool-form-row">
+          {requiredLabel("分镜贴纸")}
+          <ToolboxSwitch value={values.shotSticker ?? ""} onChange={(value) => setValue("shotSticker", value)} />
+        </div>
+        <div className={`tool-form-row upload-row ${invalid("assets") ? "invalid" : ""}`}>
+          {requiredLabel("选择素材", true)}
+          {upload("assets", true)}
+        </div>
+        <div className="tool-form-row">
+          {requiredLabel("组合模式")}
+          {segments("combinationMode")}
+        </div>
+        <div className="tool-form-row">
+          {requiredLabel("分辨率")}
+          {segments("resolution")}
+        </div>
+        <div className="tool-form-row">
+          {requiredLabel("最多生成数量")}
+          <Input
+            type="number"
+            min="1"
+            max="20"
+            value={values.count ?? "1"}
+            onChange={(event) => setValue("count", event.target.value)}
+          />
+        </div>
+        <div className={`tool-form-row ${invalid("saveLocation") ? "invalid" : ""}`}>
+          {requiredLabel("保存位置", true)}
+          {select("saveLocation")}
+        </div>
+        <div className="tool-form-row">
+          {requiredLabel("自动采纳")}
+          <ToolboxSwitch value={values.autoAccept ?? ""} onChange={(value) => setValue("autoAccept", value)} />
+        </div>
+        <div className="tool-form-row">
+          {requiredLabel("全局贴纸")}
+          <ToolboxSwitch value={values.globalSticker ?? ""} onChange={(value) => setValue("globalSticker", value)} />
+        </div>
       </div>
     );
   } else if (config.id === "voice-clone") {
@@ -636,15 +676,18 @@ function ToolboxCreatorForm({
 
   return (
     <>
-      <div className="tool-creator-content">{content}</div>
-      <footer className="tool-creator-footer">
-        <button type="button" onClick={onCancel}>
+      <div className="min-h-0 flex-1 overflow-y-auto p-4 text-sm max-sm:[&_.tool-form-label]:!justify-start max-sm:[&_.tool-form-row]:!grid-cols-1 [&_.mashup-form]:!grid-cols-1 [&_.mashup-left]:!border-0 [&_.mashup-left]:!p-0 [&_.mashup-right]:!p-0 [&_.tool-form-label]:!justify-end [&_.tool-form-label]:!text-xs [&_.tool-form-label]:!text-muted [&_.tool-form-row]:!min-h-10 [&_.tool-form-row]:!grid-cols-[96px_minmax(0,1fr)] [&_.tool-form-row]:!gap-3 [&_.tool-simple-form]:!mx-auto [&_.tool-simple-form]:!w-full [&_.tool-simple-form]:!max-w-2xl [&_.tool-simple-form]:!p-0 [&_input:not([type=range])]:!h-8 [&_input:not([type=range])]:!rounded-md [&_input:not([type=range])]:!border-line [&_input:not([type=range])]:!px-3 [&_select]:!h-8 [&_textarea]:!rounded-md [&_textarea]:!border-line [&_textarea]:!p-3">
+        {content}
+      </div>
+      {error && <div className="border-t border-red-100 bg-red-50 px-4 py-2 text-xs text-red-600">{error}</div>}
+      <footer className="flex h-13 flex-none items-center justify-end gap-2 border-t border-line px-4">
+        <Button size="sm" variant="outline" onClick={onCancel}>
           取消
-        </button>
-        <button type="button" className="primary" disabled={running || !hydrated} onClick={onSubmit}>
+        </Button>
+        <Button size="sm" disabled={running || !hydrated} onClick={onSubmit}>
           {running ? <LoaderCircle className="animate-spin" /> : null}
           {running ? "提交中…" : "确定"}
-        </button>
+        </Button>
       </footer>
     </>
   );
@@ -677,8 +720,8 @@ function TaskTable({
         size: 260,
         cell: (i) => (
           <div>
-            <b>{i.getValue()}</b>
-            <small className="block">
+            <b className="text-xs font-medium text-ink">{i.getValue()}</b>
+            <small className="mt-0.5 block text-2xs text-muted">
               {new Date(i.row.original.createdAt).toLocaleString()} ·{" "}
               {i.row.original.overallExecutionMode === "mock"
                 ? "模拟"
@@ -695,7 +738,12 @@ function TaskTable({
         header: "状态",
         size: 110,
         cell: (i) => (
-          <span className={`status status-${i.getValue()}`}>
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full px-2 py-1 text-2xs",
+              statusClassMap[i.getValue()],
+            )}
+          >
             {i.getValue() === "processing" && <LoaderCircle size={13} className="animate-spin" />}
             {statusMap[i.getValue()]}
           </span>
@@ -705,9 +753,11 @@ function TaskTable({
         header: "进度",
         size: 170,
         cell: (i) => (
-          <div className="progress">
-            <span style={{ width: `${i.getValue()}%` }} />
-            <em>{i.getValue()}%</em>
+          <div className="flex items-center gap-2">
+            <div className="h-1.5 w-24 overflow-hidden rounded-full bg-surface-muted">
+              <span className="block h-full rounded-full bg-primary" style={{ width: `${i.getValue()}%` }} />
+            </div>
+            <span className="text-2xs text-muted">{i.getValue()}%</span>
           </div>
         ),
       }),
@@ -740,35 +790,60 @@ function TaskTable({
         header: "操作",
         size: 210,
         cell: (i) => (
-          <div className="row-actions">
+          <div className="flex items-center gap-1">
             {i.row.original.status === "succeeded" || i.row.original.status === "partially_succeeded" ? (
               <>
-                <button type="button" onClick={() => preview(i.row.original)}>
+                <Button
+                  className="h-7 px-2 text-2xs text-primary"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => preview(i.row.original)}
+                >
                   <Play size={14} />
                   查看结果
-                </button>
+                </Button>
                 {i.row.original.status === "partially_succeeded" ? (
-                  <button type="button" onClick={() => retry(i.row.original)}>
+                  <Button
+                    className="h-7 px-2 text-2xs text-primary"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => retry(i.row.original)}
+                  >
                     <RotateCcw size={14} />
                     重试未完成
-                  </button>
+                  </Button>
                 ) : (
-                  <button type="button" onClick={() => preview(i.row.original)}>
+                  <Button
+                    className="h-7 px-2 text-2xs text-primary"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => preview(i.row.original)}
+                  >
                     <Download size={14} />
                     导出
-                  </button>
+                  </Button>
                 )}
               </>
             ) : i.row.original.status === "failed" || i.row.original.status === "cancelled" ? (
-              <button type="button" onClick={() => retry(i.row.original)}>
+              <Button
+                className="h-7 px-2 text-2xs text-primary"
+                size="sm"
+                variant="ghost"
+                onClick={() => retry(i.row.original)}
+              >
                 <RotateCcw size={14} />
                 重试
-              </button>
+              </Button>
             ) : (
-              <button type="button" onClick={() => cancel(i.row.original)}>
+              <Button
+                className="h-7 px-2 text-2xs text-primary"
+                size="sm"
+                variant="ghost"
+                onClick={() => cancel(i.row.original)}
+              >
                 <X size={14} />
                 取消
-              </button>
+              </Button>
             )}
           </div>
         ),
@@ -785,7 +860,6 @@ function TaskTable({
       emptyMessage={emptyMessage}
       emptyIcon={<X />}
       emptyAction={emptyAction}
-      minWidth={1270}
       height={height}
     />
   );
@@ -1035,10 +1109,6 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
       (!appliedFilters.to || new Date(task.createdAt) <= new Date(`${appliedFilters.to}T23:59:59.999`)),
   );
   const isVideoCutPage = config.id === "video-cut";
-  const activeTaskCount = tasks.filter((task) => task.status === "queued" || task.status === "processing").length;
-  const finishedTaskCount = tasks.filter(
-    (task) => task.status === "succeeded" || task.status === "partially_succeeded",
-  ).length;
   const submit = async () => {
     setSubmitted(true);
     if (missing.length) return;
@@ -1208,24 +1278,31 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
     setActionNotice(`${action}已打开，可继续查看结果细节`);
   };
   return (
-    <div className="module-page tool-task-page">
+    <div className={cn("module-page tool-task-page", isVideoCutPage && "!m-0 !max-w-none !bg-white !p-3")}>
       {creatorOpen && (
-        <div className="creator-backdrop" onMouseDown={() => setCreatorOpen(false)}>
-          <section className={`creator-dialog creator-${config.id}`} onMouseDown={(event) => event.stopPropagation()}>
-            <header className="creator-head">
-              <div>
-                <h2>{toolboxDisplayName(config)}</h2>
-                {config.id === "subtitle-erase" && (
-                  <span>
-                    字幕擦除 · 精细擦除 <small>自动识别画面字幕</small>
-                  </span>
-                )}
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onMouseDown={() => setCreatorOpen(false)}
+        >
+          <section
+            className="flex max-h-[calc(100vh-32px)] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-white shadow-xl"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header className="flex h-13 flex-none items-center justify-between border-b border-line px-4">
+              <div className="min-w-0">
+                <h2 className="truncate text-base font-medium text-ink">{toolboxDisplayName(config)}</h2>
               </div>
-              <button type="button" aria-label="关闭新建窗口" onClick={() => setCreatorOpen(false)}>
+              <Button
+                className="size-8"
+                variant="ghost"
+                size="icon"
+                aria-label="关闭新建窗口"
+                onClick={() => setCreatorOpen(false)}
+              >
                 <X />
-              </button>
+              </Button>
             </header>
-            <div className="creator-body">
+            <div className="flex min-h-0 flex-1 flex-col">
               <ToolboxCreatorForm
                 config={config}
                 values={values}
@@ -1238,8 +1315,8 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
                 onSetDefaultFolder={setDefaultOutputFolder}
                 onCancel={() => setCreatorOpen(false)}
                 onSubmit={() => void submit()}
+                error={apiError}
               />
-              {apiError && <div className="tool-creator-error">{apiError}</div>}
               {false && (
                 <>
                   <div className="workspace-grid legacy-creator-body" aria-hidden="true">
@@ -1459,8 +1536,20 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
           </section>
         </div>
       )}
-      <section className={`tasks-section${isVideoCutPage ? " video-cut-tasks" : ""}`}>
-        <TaskSearchFilters compact={isVideoCutPage} onSearch={setAppliedFilters} />
+      <section
+        className={cn(
+          isVideoCutPage ? "flex h-[calc(100vh-80px)] min-h-[520px] flex-col overflow-hidden" : "tasks-section",
+        )}
+      >
+        <div className={cn(isVideoCutPage && "flex flex-none items-center gap-2")}>
+          <TaskSearchFilters compact={isVideoCutPage} onSearch={setAppliedFilters} />
+          {isVideoCutPage && (
+            <Button size="sm" onClick={() => setCreatorOpen(true)}>
+              <Plus />
+              新建任务
+            </Button>
+          )}
+        </div>
         {!isVideoCutPage && (
           <div className="task-toolbar">
             <button type="button" className="new-task-button" onClick={() => setCreatorOpen(true)}>
@@ -1469,24 +1558,26 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
             </button>
           </div>
         )}
-        <div className={`task-table-container${isVideoCutPage ? " video-cut-task-table-container" : ""}`}>
+        <div className={cn("task-table-container", isVideoCutPage && "mt-2 flex min-h-0 flex-1 flex-col")}>
           <TaskTable
             tasks={filteredTasks}
             retry={retry}
             preview={setSelectedTask}
             cancel={cancel}
-            className={isVideoCutPage ? "video-cut-task-table" : "job-task-table"}
+            className={isVideoCutPage ? "min-h-0 flex-1" : "job-task-table"}
             height={isVideoCutPage ? "100%" : undefined}
             emptyMessage={tasks.length ? "没有符合条件的任务" : "暂无任务"}
             emptyAction={
               !tasks.length ? (
-                <button type="button" onClick={() => setCreatorOpen(true)}>
+                <Button size="sm" onClick={() => setCreatorOpen(true)}>
                   新建第一个任务
-                </button>
+                </Button>
               ) : undefined
             }
           />
-          <small className="task-table-count">
+          <small
+            className={cn(isVideoCutPage ? "flex flex-none justify-end pt-1 text-2xs text-muted" : "task-table-count")}
+          >
             共 {filteredTasks.length} 个任务
             {filteredTasks.length !== tasks.length && ` / 全部 ${tasks.length} 个`}
           </small>

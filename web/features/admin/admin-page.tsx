@@ -263,7 +263,6 @@ function JobsPanel() {
         loading={query.isLoading}
         error={query.error}
         emptyMessage="暂无符合条件的任务"
-        minWidth={1770}
         height="calc(100% - 92px)"
       />
       <footer className="admin-pagination">

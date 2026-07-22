@@ -4,11 +4,11 @@ import { cn } from "@/lib/utils";
 
 export function NativeSelect({ className, children, ...props }: ComponentProps<"select">) {
   return (
-    <span className="relative flex min-w-0 flex-1 items-center">
+    <span className="relative inline-flex max-w-full flex-none items-center">
       <select
         data-slot="native-select"
         className={cn(
-          "h-9 w-full min-w-0 appearance-none rounded-md border border-line bg-transparent px-3 py-1 pr-8 text-sm text-ink outline-none transition-colors disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20",
+          "h-9 w-auto max-w-full min-w-0 appearance-none rounded-md border border-line bg-transparent px-3 py-1 pr-8 text-sm text-ink outline-none transition-colors [field-sizing:content] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20",
           className,
         )}
         {...props}
