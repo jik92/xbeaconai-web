@@ -331,6 +331,10 @@
 .config-upload-box input {
   display: none;
 }
+.uploaded-video-list {
+  display: grid;
+  gap: 10px;
+}
 .uploaded-video-preview {
   overflow: hidden;
   border: 1px solid var(--remix-line);
@@ -370,6 +374,27 @@
 .uploaded-video-meta button {
   flex: none;
   color: var(--remix-blue);
+}
+.uploaded-video-meta button > svg {
+  width: 15px;
+  height: 15px;
+}
+.remix-project .append-video-button {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px dashed var(--remix-line);
+  border-radius: 8px;
+  color: var(--remix-blue);
+}
+.append-video-button:disabled {
+  color: #a8adb6;
+}
+.video-selection-count {
+  color: #8c929c;
+  text-align: right;
 }
 
 .remix-workspace {
@@ -500,20 +525,28 @@
 .source-strip {
   height: 108px;
   padding: 18px 18px 14px;
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
   background: #fff;
   border-bottom: 1px solid var(--remix-line);
 }
 .source-strip > button {
+  flex: none;
   width: 272px;
   height: 74px;
-  border: 1px solid var(--remix-blue);
-  background: #eef4ff;
+  border: 1px solid var(--remix-line);
+  background: #fff;
   border-radius: 8px;
   padding: 7px;
   display: grid;
   grid-template-columns: 45px minmax(0, 1fr);
   grid-template-rows: 1fr 22px;
   text-align: left;
+}
+.source-strip > button.active {
+  border-color: var(--remix-blue);
+  background: #eef4ff;
 }
 .source-mini {
   grid-row: 1 / 3;
@@ -553,6 +586,21 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+.prompt-toolbar > div button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.source-analysis-error {
+  height: 100%;
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  color: #9c3f42;
+  text-align: center;
+}
+.source-analysis-error span {
+  color: #8b6b6d;
 }
 .prompt-toolbar label {
   display: flex;
@@ -982,16 +1030,47 @@
 .timeline {
   height: 290px;
   padding-top: 8px;
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
 }
 .timeline article {
+  flex: none;
   width: 136px;
   border: 1px solid #dde2e8;
   border-radius: 6px;
   overflow: hidden;
   background: #fff;
 }
-.timeline article > .warehouse-scene {
+.timeline article.active {
+  border-color: var(--remix-blue);
+}
+.remix-project .timeline-preview-button {
+  width: 100%;
   height: 236px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: #9ca2ac;
+  background: #101113;
+}
+.timeline-preview-button video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.timeline-preview-button > b {
+  position: absolute;
+  left: 7px;
+  top: 7px;
+  min-width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: #1119;
 }
 .timeline article footer {
   height: 34px;
@@ -1002,15 +1081,25 @@
   color: #9198a3;
 }
 .timeline article footer span {
+  min-width: 0;
+  flex: 1;
   overflow: hidden;
   white-space: nowrap;
+  text-overflow: ellipsis;
 }
-.timeline article footer i {
-  color: #59bc36;
-  font-style: normal;
-  border: 1px solid #8dd864;
-  border-radius: 4px;
-  padding: 2px 4px;
+.timeline article footer > div {
+  flex: none;
+  display: flex;
+}
+.timeline article footer button {
+  width: 22px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  color: #68707c;
+}
+.timeline article footer button:disabled {
+  color: #c4c8ce;
 }
 .compose-preview {
   height: 370px;
@@ -1031,6 +1120,14 @@
   gap: 7px;
   align-items: center;
 }
+.compose-preview > header > span {
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  color: #8c929c;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 .compose-preview > div {
   height: 252px;
   display: flex;
@@ -1044,8 +1141,12 @@
   height: 36px;
 }
 .compose-preview > div video {
+  width: 100%;
+  height: 100%;
   max-height: 100%;
   max-width: 100%;
+  object-fit: contain;
+  background: #101113;
 }
 .compose-preview > footer {
   height: 68px;

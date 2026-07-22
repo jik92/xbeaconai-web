@@ -5812,6 +5812,10 @@
                     "type": "string",
                     "format": "uuid"
                   },
+                  "sourceAssetId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
                   "prompt": {
                     "type": "string",
                     "minLength": 20,
@@ -5921,6 +5925,7 @@
                 },
                 "required": [
                   "sourceJobId",
+                  "sourceAssetId",
                   "prompt",
                   "tool",
                   "config"
@@ -5962,6 +5967,82 @@
           },
           "422": {
             "description": "Invalid prompt tool request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/video-remix/project/compose": {
+      "post": {
+        "operationId": "createVideoRemixComposeJob",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sourceJobId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "orderedAssetIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "minItems": 2,
+                    "maxItems": 20
+                  }
+                },
+                "required": [
+                  "sourceJobId",
+                  "orderedAssetIds"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Video compose job accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Source analysis not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Source analysis is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid ordered sources",
             "content": {
               "application/json": {
                 "schema": {

@@ -43,6 +43,7 @@ function job(moduleId: JobRecord["moduleId"], values: Record<string, string> = {
 describe("worker job registry", () => {
   test("routes each dedicated business flow to its own handler", () => {
     expect(findJobHandler(job("video-remix", { workflowPhase: "analysis" })).name).toBe("video-remix-analysis");
+    expect(findJobHandler(job("video-remix", { workflowPhase: "compose" })).name).toBe("video-remix-compose");
     expect(findJobHandler(job("video-remix", { workflowPhase: "prompt-rewrite" })).name).toBe(
       "video-remix-prompt-rewrite",
     );

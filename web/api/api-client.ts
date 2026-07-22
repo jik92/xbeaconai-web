@@ -11,6 +11,7 @@ import {
   createAdScriptProject,
   createJob,
   createVideoCreateProject,
+  createVideoRemixComposeJob,
   createVideoRemixPromptToolJob,
   deleteAdminCredential,
   deleteAsset as deleteAssetRequest,
@@ -576,8 +577,27 @@ export async function generateRemixProject(input: RemixProjectRequest, idempoten
   if (!data || !("status" in data)) throw new Error("视频解析响应无效");
   return data;
 }
+export async function composeRemixVideos(
+  input: { sourceJobId: string; orderedAssetIds: string[] },
+  idempotencyKey = randomUuid(),
+) {
+  configure();
+  const { data } = await createVideoRemixComposeJob({
+    body: input,
+    headers: { ...authHeaders(), "Idempotency-Key": idempotencyKey },
+    throwOnError: true,
+  });
+  if (!data) throw new Error("合并任务创建失败");
+  return data;
+}
 export async function runRemixPromptTool(
-  input: { sourceJobId: string; prompt: string; tool: RemixPromptTool; config: RemixPromptToolConfig },
+  input: {
+    sourceJobId: string;
+    sourceAssetId: string;
+    prompt: string;
+    tool: RemixPromptTool;
+    config: RemixPromptToolConfig;
+  },
   idempotencyKey = randomUuid(),
 ) {
   configure();

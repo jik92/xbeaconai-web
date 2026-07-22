@@ -17,6 +17,7 @@ import {
   remixRepairRules,
   remixVoiceModes,
 } from "../shared/video-remix/prompt-tools";
+import { parseRemixSources, remixMaxSources } from "../shared/video-remix/workflow";
 import { APP_CONFIG, isModuleOpen } from "../web/app/config";
 import type { ModuleId } from "../web/entities/types";
 import {
@@ -2668,9 +2669,14 @@ const RemixPromptToolConfigSchema = z.object({
 });
 const RemixPromptToolRequestSchema = z.object({
   sourceJobId: z.string().uuid(),
+  sourceAssetId: z.string().uuid(),
   prompt: z.string().trim().min(20).max(30_000),
   tool: z.enum(remixPromptTools),
   config: RemixPromptToolConfigSchema,
+});
+const RemixComposeRequestSchema = z.object({
+  sourceJobId: z.string().uuid(),
+  orderedAssetIds: z.array(z.string().uuid()).min(2).max(remixMaxSources),
 });
 
 app.post("/api/video-remix/project/generate", async (c) => {
@@ -2710,15 +2716,18 @@ app.post("/api/video-remix/project/generate", async (c) => {
       422,
     );
   const productAsset = assets[0];
-  const videoAsset = assets[productAssetIds.length];
-  if (!productAsset || !videoAsset)
+  const videoAssets = assets.slice(productAssetIds.length);
+  if (!productAsset || videoAssets.some((asset) => !asset))
     return c.json(
       { error: { code: "ASSET_NOT_AVAILABLE", message: "引用的商品或视频素材不存在", retryable: false, requestId } },
       422,
     );
   const values = {
     workflowPhase: "analysis",
-    source: `asset:${videoAsset.id}:${videoAsset.originalName}`,
+    source: `asset:${videoAssets[0]?.id}:${videoAssets[0]?.originalName}`,
+    sources: JSON.stringify(
+      videoAssets.map((asset) => ({ assetId: asset?.id || "", name: asset?.originalName || "source.mp4" })),
+    ),
     product: `asset:${productAsset.id}:${parsed.data.product.productName}`,
     productName: parsed.data.product.productName,
     productImageAssetIds: JSON.stringify(productAssetIds),
@@ -2809,10 +2818,16 @@ app.openapi(remixPromptToolRoute, async (c) => {
       { error: { code: "REMIX_SOURCE_NOT_FOUND", message: "原始解析任务不存在", retryable: false, requestId } },
       404,
     );
-  if (sourceJob.status !== "succeeded")
+  if (sourceJob.status !== "succeeded" && sourceJob.status !== "partially_succeeded")
     return c.json(
       { error: { code: "REMIX_SOURCE_NOT_READY", message: "原始解析任务尚未完成", retryable: true, requestId } },
       409,
+    );
+  const sourceIds = new Set(parseRemixSources(sourceJob.values.sources).map((source) => source.assetId));
+  if (!sourceIds.has(body.sourceAssetId))
+    return c.json(
+      { error: { code: "REMIX_SOURCE_NOT_FOUND", message: "当前分镜视频不属于解析任务", retryable: false, requestId } },
+      404,
     );
   const idempotencyKey = c.req.header("Idempotency-Key")?.trim().slice(0, 128);
   if (idempotencyKey) {
@@ -2832,6 +2847,7 @@ app.openapi(remixPromptToolRoute, async (c) => {
     values: {
       workflowPhase: "prompt-rewrite",
       sourceJobId: sourceJob.id,
+      sourceAssetId: body.sourceAssetId,
       promptTool: body.tool,
       promptToolConfig: JSON.stringify(body.config),
       originalPrompt: body.prompt,
@@ -2844,6 +2860,113 @@ app.openapi(remixPromptToolRoute, async (c) => {
         implementation: "aihubmix-chat-completions",
         provider: "aihubmix",
         model: "deepseek-v4-pro",
+        startedAt: "",
+      },
+    ],
+    provenance: [],
+    parentJobId: sourceJob.id,
+    idempotencyKey,
+    cancelRequested: false,
+    providerCancelState: "none",
+    stagingKeys: [],
+    jobSchemaVersion: 2,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  store.create(job);
+  await queue.enqueue(job.id);
+  return c.json(job, 202);
+});
+
+const remixComposeRoute = createRoute({
+  method: "post",
+  path: "/api/video-remix/project/compose",
+  operationId: "createVideoRemixComposeJob",
+  request: {
+    body: { required: true, content: { "application/json": { schema: RemixComposeRequestSchema } } },
+  },
+  responses: {
+    202: { description: "Video compose job accepted", content: { "application/json": { schema: JobSchema } } },
+    404: { description: "Source analysis not found", content: { "application/json": { schema: ErrorSchema } } },
+    409: { description: "Source analysis is not ready", content: { "application/json": { schema: ErrorSchema } } },
+    422: { description: "Invalid ordered sources", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(remixComposeRoute, async (c) => {
+  const ownerUserId = c.get("userId");
+  const body = c.req.valid("json");
+  const requestId = crypto.randomUUID();
+  const sourceJob = store.getOwned(body.sourceJobId, ownerUserId);
+  if (sourceJob?.moduleId !== "video-remix" || sourceJob.values.workflowPhase !== "analysis")
+    return c.json(
+      { error: { code: "REMIX_SOURCE_NOT_FOUND", message: "原始解析任务不存在", retryable: false, requestId } },
+      404,
+    );
+  if (sourceJob.status !== "succeeded" && sourceJob.status !== "partially_succeeded")
+    return c.json(
+      { error: { code: "REMIX_SOURCE_NOT_READY", message: "原始解析任务尚未完成", retryable: true, requestId } },
+      409,
+    );
+  const sources = parseRemixSources(sourceJob.values.sources);
+  const allowedIds = new Set(sources.map((source) => source.assetId));
+  const orderedIds = body.orderedAssetIds;
+  if (new Set(orderedIds).size !== orderedIds.length || orderedIds.length !== sources.length)
+    return c.json(
+      {
+        error: {
+          code: "INVALID_REMIX_ORDER",
+          message: "合并顺序必须包含全部视频且不能重复",
+          retryable: false,
+          requestId,
+        },
+      },
+      422,
+    );
+  if (orderedIds.some((assetId) => !allowedIds.has(assetId)))
+    return c.json(
+      { error: { code: "INVALID_REMIX_ORDER", message: "合并顺序包含无效视频", retryable: false, requestId } },
+      422,
+    );
+  const assets = orderedIds.map((assetId) => accounts.getOwnedAsset(ownerUserId, assetId));
+  if (assets.some((asset) => !asset?.mimeType.startsWith("video/")))
+    return c.json(
+      { error: { code: "INVALID_VIDEO_ASSET", message: "合并素材不存在或不是视频", retryable: false, requestId } },
+      422,
+    );
+  const idempotencyKey = c.req.header("Idempotency-Key")?.trim().slice(0, 128);
+  if (idempotencyKey) {
+    const existing = store.getByIdempotencyKey(ownerUserId, idempotencyKey);
+    if (existing) return c.json(existing, 202);
+  }
+  const timestamp = new Date().toISOString();
+  const job: JobRecord = {
+    id: crypto.randomUUID(),
+    ownerUserId,
+    moduleId: "video-remix",
+    title: `${sourceJob.title} · 合并成片`,
+    status: "queued",
+    progress: 0,
+    stage: "排队中",
+    overallExecutionMode: "local",
+    values: {
+      workflowPhase: "compose",
+      sourceJobId: sourceJob.id,
+      orderedAssetIds: JSON.stringify(orderedIds),
+      outputFolderId: accounts.getDefaultAssetFolderId(ownerUserId),
+    },
+    executionPlan: [
+      {
+        id: "plan:0:normalize",
+        capability: "video-normalize",
+        executionMode: "local",
+        implementation: "ffmpeg-local",
+        startedAt: "",
+      },
+      {
+        id: "plan:1:concat",
+        capability: "video-concat",
+        executionMode: "local",
+        implementation: "ffmpeg-concat",
         startedAt: "",
       },
     ],

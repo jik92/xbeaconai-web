@@ -17,7 +17,7 @@ function localAssetPath(uploadRoot: string, storageKey: string) {
   return local && !local.startsWith("..") && !local.startsWith("/") && existsSync(path) ? path : undefined;
 }
 
-async function materializeRemoteAsset({
+export async function materializeRemoteAsset({
   uploadRoot,
   tempDir,
   asset,
@@ -49,13 +49,22 @@ async function materializeRemoteAsset({
 }
 
 export async function materializeRemixAnalysisAssets(input: MaterializeRemixAssetsInput) {
-  const videoPath = await materializeRemoteAsset({
+  const videoPath = await materializeRemixVideoAsset(input);
+  const referencePaths = await materializeRemixReferenceAssets(input);
+  return { videoPath, referencePaths };
+}
+
+export async function materializeRemixVideoAsset(input: Omit<MaterializeRemixAssetsInput, "referenceAssets">) {
+  return materializeRemoteAsset({
     ...input,
     asset: input.videoAsset,
     targetName: `source${extname(input.videoAsset.originalName) || ".mp4"}`,
     label: "视频素材",
   });
-  const referencePaths = await Promise.all(
+}
+
+export async function materializeRemixReferenceAssets(input: Omit<MaterializeRemixAssetsInput, "videoAsset">) {
+  return Promise.all(
     input.referenceAssets.map((asset, index) =>
       materializeRemoteAsset({
         ...input,
@@ -65,5 +74,4 @@ export async function materializeRemixAnalysisAssets(input: MaterializeRemixAsse
       }),
     ),
   );
-  return { videoPath, referencePaths };
 }

@@ -17,6 +17,7 @@ describe("video remix prompt tools", () => {
     expect(route?.responses).toHaveProperty("422");
     expect(source).toContain('operationId: "createVideoRemixPromptToolJob"');
     expect(source).toContain("store.getOwned(body.sourceJobId, ownerUserId)");
+    expect(source).toContain("body.sourceAssetId");
     expect(source).toContain('workflowPhase: "prompt-rewrite"');
     expect(source).toContain("await queue.enqueue(job.id)");
     expect(source).toContain('model: "deepseek-v4-pro"');
@@ -36,6 +37,7 @@ describe("video remix prompt tools", () => {
     expect(modal).toContain("修正口播");
     expect(modal).toContain("换口播");
     expect(modal).toContain("runRemixPromptTool");
+    expect(modal).toContain("sourceAssetId");
   });
 
   test("replaces placeholder toolbar actions with modal entry points", () => {
@@ -43,8 +45,8 @@ describe("video remix prompt tools", () => {
     expect(page).toContain('setPromptTool("check")');
     expect(page).toContain('setPromptTool("modify")');
     expect(page).toContain('setPromptTool("voice")');
-    expect(page).toContain("setPrompt(rewrittenPrompt)");
-    expect(page).toContain("setPromptVersions((current)");
+    expect(page).toContain("patchPromptState(activeSourceId");
+    expect(page).toContain("prompt: rewrittenPrompt");
     expect(page).not.toContain("AI 优化：强化前三秒冲突");
     expect(page).not.toContain("智能检查通过：结构完整，未发现冲突");
   });

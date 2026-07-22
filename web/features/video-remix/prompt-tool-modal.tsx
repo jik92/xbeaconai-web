@@ -301,6 +301,7 @@ function VoiceControls({
 export function PromptToolModal({
   tool,
   sourceJobId,
+  sourceAssetId,
   prompt,
   fileName,
   onClose,
@@ -308,6 +309,7 @@ export function PromptToolModal({
 }: {
   tool: RemixPromptTool | null;
   sourceJobId?: string;
+  sourceAssetId?: string;
   prompt: string;
   fileName: string;
   onClose: () => void;
@@ -318,17 +320,18 @@ export function PromptToolModal({
   const [preview, setPreview] = useState(prompt);
   const [error, setError] = useState("");
   const completedJobs = useRef(new Set<string>());
-  const lastOpenedTool = useRef<RemixPromptTool | null>(null);
+  const lastOpenedKey = useRef("");
   const activeJobId = job && (job.status === "queued" || job.status === "processing") ? job.id : undefined;
 
   useEffect(() => {
-    if (!tool || lastOpenedTool.current === tool) return;
-    lastOpenedTool.current = tool;
+    const openKey = tool && sourceAssetId ? `${tool}:${sourceAssetId}` : "";
+    if (!openKey || lastOpenedKey.current === openKey) return;
+    lastOpenedKey.current = openKey;
     setConfig(copyDefaultConfig());
     setPreview(prompt);
     setError("");
     setJob((current) => (current && current.status !== "queued" && current.status !== "processing" ? null : current));
-  }, [prompt, tool]);
+  }, [prompt, sourceAssetId, tool]);
 
   useEffect(() => {
     if (!activeJobId) return;
@@ -369,17 +372,17 @@ export function PromptToolModal({
   }, [activeJobId, onApply]);
 
   const canSubmit = useMemo(() => {
-    if (!tool || !sourceJobId || !prompt.trim() || activeJobId) return false;
+    if (!tool || !sourceJobId || !sourceAssetId || !prompt.trim() || activeJobId) return false;
     if (tool === "check") return config.checkTypes.length > 0;
     if (tool === "modify") return Boolean(config.preset || config.customInstruction.trim());
     return config.voiceMode === "correct" || Boolean(config.customInstruction.trim());
-  }, [activeJobId, config, prompt, sourceJobId, tool]);
+  }, [activeJobId, config, prompt, sourceAssetId, sourceJobId, tool]);
 
   const submit = async () => {
-    if (!tool || !sourceJobId || !canSubmit) return;
+    if (!tool || !sourceJobId || !sourceAssetId || !canSubmit) return;
     setError("");
     try {
-      setJob(await runRemixPromptTool({ sourceJobId, prompt: preview, tool, config }));
+      setJob(await runRemixPromptTool({ sourceJobId, sourceAssetId, prompt: preview, tool, config }));
     } catch (reason) {
       setError(errorMessage(reason));
     }
@@ -390,7 +393,7 @@ export function PromptToolModal({
     setError("");
   };
   const close = () => {
-    lastOpenedTool.current = null;
+    lastOpenedKey.current = "";
     if (!activeJobId) setJob(null);
     onClose();
   };

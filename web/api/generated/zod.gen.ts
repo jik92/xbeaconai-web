@@ -1481,6 +1481,7 @@ export const zListJobsResponse = z.object({
 
 export const zCreateVideoRemixPromptToolJobBody = z.object({
     sourceJobId: z.uuid(),
+    sourceAssetId: z.uuid(),
     prompt: z.string().min(20).max(30000),
     tool: z.enum([
         'check',
@@ -1531,6 +1532,16 @@ export const zCreateVideoRemixPromptToolJobBody = z.object({
  * Prompt tool job accepted
  */
 export const zCreateVideoRemixPromptToolJobResponse = zJob;
+
+export const zCreateVideoRemixComposeJobBody = z.object({
+    sourceJobId: z.uuid(),
+    orderedAssetIds: z.array(z.uuid()).min(2).max(20)
+});
+
+/**
+ * Video compose job accepted
+ */
+export const zCreateVideoRemixComposeJobResponse = zJob;
 
 export const zParseAdScriptSourceBody = z.object({
     sourceScript: z.string().min(20).max(10000)

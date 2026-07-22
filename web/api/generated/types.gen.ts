@@ -1931,6 +1931,7 @@ export type ListJobsResponse = ListJobsResponses[keyof ListJobsResponses];
 export type CreateVideoRemixPromptToolJobData = {
     body: {
         sourceJobId: string;
+        sourceAssetId: string;
         prompt: string;
         tool: 'check' | 'modify' | 'voice';
         config: {
@@ -1973,6 +1974,42 @@ export type CreateVideoRemixPromptToolJobResponses = {
 };
 
 export type CreateVideoRemixPromptToolJobResponse = CreateVideoRemixPromptToolJobResponses[keyof CreateVideoRemixPromptToolJobResponses];
+
+export type CreateVideoRemixComposeJobData = {
+    body: {
+        sourceJobId: string;
+        orderedAssetIds: Array<string>;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/video-remix/project/compose';
+};
+
+export type CreateVideoRemixComposeJobErrors = {
+    /**
+     * Source analysis not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Source analysis is not ready
+     */
+    409: ApiErrorResponse;
+    /**
+     * Invalid ordered sources
+     */
+    422: ApiErrorResponse;
+};
+
+export type CreateVideoRemixComposeJobError = CreateVideoRemixComposeJobErrors[keyof CreateVideoRemixComposeJobErrors];
+
+export type CreateVideoRemixComposeJobResponses = {
+    /**
+     * Video compose job accepted
+     */
+    202: Job;
+};
+
+export type CreateVideoRemixComposeJobResponse = CreateVideoRemixComposeJobResponses[keyof CreateVideoRemixComposeJobResponses];
 
 export type ParseAdScriptSourceData = {
     body: {

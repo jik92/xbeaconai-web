@@ -17,8 +17,9 @@ describe("video remix source preview", () => {
     const page = readFileSync(resolve(import.meta.dir, "../../web/features/video-remix/remix-project.tsx"), "utf8");
 
     expect(page).toContain('className="uploaded-video-preview"');
-    expect(page).toContain('<button type="button" onClick={open}>');
-    expect(page).toContain("重新选择");
+    expect(page).toContain('className="append-video-button"');
+    expect(page).toContain("继续添加分镜视频");
+    expect(page).toContain("onRemoveSource(source.id)");
     expect(page).not.toContain('className="uploaded-video-card" onClick={open}');
   });
 });

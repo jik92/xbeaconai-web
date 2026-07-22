@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  composeRemixVideos,
   downloadAuthenticated,
   fetchJob,
   fetchLibraryAssets,
@@ -38,6 +39,12 @@ import { AuthenticatedMedia } from "@/components/domain/authenticated-media";
 import type { ApiJobResult, LibraryAsset, LibraryProduct } from "@/entities/types";
 import { fetchPortraits, type Portrait } from "@/features/portrait-library/portrait-data";
 import type { RemixPromptTool } from "../../../shared/video-remix/prompt-tools";
+import {
+  moveRemixSource,
+  parseRemixAnalysisEntries,
+  type RemixAnalysisEntry,
+  remixMaxSources,
+} from "../../../shared/video-remix/workflow";
 import { PromptToolModal } from "./prompt-tool-modal";
 import "./remix-project.css";
 
@@ -60,6 +67,12 @@ interface PromptVersion {
   id: string;
   label: string;
   prompt: string;
+}
+
+interface SourcePromptState {
+  prompt: string;
+  versions: PromptVersion[];
+  activeVersionId: string;
 }
 
 function PublicPreviewImage({ url, alt }: { url: string; alt: string }) {
@@ -129,8 +142,10 @@ function ConfigSidebar({
   selectedPortrait,
   selectedProduct,
   selectedVoice,
-  source,
-  onSelectAttachment,
+  sources,
+  sourcesLocked,
+  onSelectAttachments,
+  onRemoveSource,
   onPick,
 }: {
   mode: "product" | "talking";
@@ -142,12 +157,12 @@ function ConfigSidebar({
   selectedPortrait: SelectedPortrait | null;
   selectedProduct: LibraryProduct | null;
   selectedVoice: LibraryAsset | null;
-  source: string;
-  onSelectAttachment: (asset: AttachmentSelection) => void;
+  sources: AttachmentSelection[];
+  sourcesLocked: boolean;
+  onSelectAttachments: (assets: AttachmentSelection[]) => void;
+  onRemoveSource: (assetId: string) => void;
   onPick: (kind: "product" | "portrait" | "voice") => void;
 }) {
-  const fileName = source ? source.split(":").slice(2).join(":") : "";
-  const sourceAssetId = source.split(":", 3)[1] || "";
   return (
     <aside className="remix-config">
       <div className="remix-mode-tabs">
@@ -222,36 +237,64 @@ function ConfigSidebar({
       </div>
       <AttachmentPicker
         accept="video/*"
+        multiple
         trigger={(open) =>
-          sourceAssetId ? (
-            <div className="uploaded-video-preview">
-              <div className="uploaded-video-player">
-                <AuthenticatedMedia
-                  url={`/api/assets/${sourceAssetId}/content`}
-                  mimeType="video/mp4"
-                  alt={fileName}
-                  loadingText="正在载入原始片源…"
-                  errorText="原始片源预览失败"
-                />
-              </div>
-              <div className="uploaded-video-meta">
-                <b title={fileName}>{fileName}</b>
-                <button type="button" onClick={open}>
-                  重新选择
-                </button>
-              </div>
+          sources.length ? (
+            <div className="uploaded-video-list">
+              {sources.map((source, index) => (
+                <div className="uploaded-video-preview" key={source.id}>
+                  <div className="uploaded-video-player">
+                    <AuthenticatedMedia
+                      url={`/api/assets/${source.id}/content`}
+                      mimeType={source.mimeType}
+                      alt={source.name}
+                      loadingText="正在载入原始片源…"
+                      errorText="原始片源预览失败"
+                    />
+                  </div>
+                  <div className="uploaded-video-meta">
+                    <b title={source.name}>
+                      {index + 1}. {source.name}
+                    </b>
+                    <button
+                      type="button"
+                      aria-label={`删除 ${source.name}`}
+                      disabled={sourcesLocked}
+                      onClick={() => onRemoveSource(source.id)}
+                    >
+                      <X />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="append-video-button"
+                onClick={open}
+                disabled={sourcesLocked || sources.length >= remixMaxSources}
+              >
+                <Plus />
+                {sourcesLocked
+                  ? "解析后不可更换分镜"
+                  : sources.length >= remixMaxSources
+                    ? `最多 ${remixMaxSources} 条`
+                    : "继续添加分镜视频"}
+              </button>
+              <small className="video-selection-count">
+                已选 {sources.length}/{remixMaxSources} 条
+              </small>
             </div>
           ) : (
-            <button type="button" className="config-attachment-picker" onClick={open}>
+            <button type="button" className="config-attachment-picker" disabled={sourcesLocked} onClick={open}>
               <Upload />
               <span>
                 <b>选择分镜视频</b>
-                <small>从素材库选择或从本地上传</small>
+                <small>支持从素材库或本地多选，最多 {remixMaxSources} 条</small>
               </span>
             </button>
           )
         }
-        onSelect={([asset]) => asset && onSelectAttachment(asset)}
+        onSelect={onSelectAttachments}
       />
     </aside>
   );
@@ -597,17 +640,20 @@ export function RemixProject() {
   const [parsed, setParsed] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [prompt, setPrompt] = useState("");
-  const [promptVersions, setPromptVersions] = useState<PromptVersion[]>([]);
-  const [activePromptVersionId, setActivePromptVersionId] = useState("");
+  const [promptStates, setPromptStates] = useState<Record<string, SourcePromptState>>({});
   const [promptTool, setPromptTool] = useState<RemixPromptTool | null>(null);
-  const [source, setSource] = useState("");
+  const [sources, setSources] = useState<AttachmentSelection[]>([]);
+  const [activeSourceId, setActiveSourceId] = useState("");
+  const [composeOrder, setComposeOrder] = useState<string[]>([]);
+  const [composePreviewId, setComposePreviewId] = useState("");
+  const [draggingSourceId, setDraggingSourceId] = useState("");
   const [mode, setMode] = useState<"product" | "talking">("product");
   const [projectName, setProjectName] = useState("");
   const [description, setDescription] = useState("");
   const [compare, setCompare] = useState(false);
   const [notice, setNotice] = useState("");
   const [job, setJob] = useState<Job | null>(null);
+  const [composeJob, setComposeJob] = useState<Job | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [picker, setPicker] = useState<"product" | "portrait" | "voice" | null>(null);
   const [selectedPortrait, setSelectedPortrait] = useState<SelectedPortrait | null>(() => {
@@ -645,6 +691,54 @@ export function RemixProject() {
     }
   });
   const activeJobId = job && (job.status === "queued" || job.status === "processing") ? job.id : null;
+  const activePromptState = promptStates[activeSourceId] ?? { prompt: "", versions: [], activeVersionId: "" };
+  const prompt = activePromptState.prompt;
+  const promptVersions = activePromptState.versions;
+  const activePromptVersionId = activePromptState.activeVersionId;
+  const analysisEntries = useMemo(
+    () => parseRemixAnalysisEntries(job?.values.analysisEntries || job?.result?.data?.values.analysisEntries),
+    [job],
+  );
+  const activeAnalysisEntry = analysisEntries.find((entry) => entry.assetId === activeSourceId);
+
+  const patchPromptState = useCallback((assetId: string, update: (current: SourcePromptState) => SourcePromptState) => {
+    if (!assetId) return;
+    setPromptStates((current) => {
+      const existing = current[assetId] ?? { prompt: "", versions: [], activeVersionId: "" };
+      return { ...current, [assetId]: update(existing) };
+    });
+  }, []);
+  const setPrompt = useCallback(
+    (value: string) => patchPromptState(activeSourceId, (current) => ({ ...current, prompt: value })),
+    [activeSourceId, patchPromptState],
+  );
+  const setActivePromptVersionId = useCallback(
+    (value: string) => patchPromptState(activeSourceId, (current) => ({ ...current, activeVersionId: value })),
+    [activeSourceId, patchPromptState],
+  );
+
+  const hydrateAnalysisEntries = useCallback((sourceJobId: string, entries: RemixAnalysisEntry[]) => {
+    setPromptStates((current) => {
+      const next = { ...current };
+      for (const entry of entries) {
+        if (entry.status !== "succeeded" || !entry.prompt || next[entry.assetId]?.versions.length) continue;
+        const versionId = `${sourceJobId}:${entry.assetId}`;
+        next[entry.assetId] = {
+          prompt: entry.prompt,
+          versions: [{ id: versionId, label: "AI解析", prompt: entry.prompt }],
+          activeVersionId: versionId,
+        };
+      }
+      return next;
+    });
+    const firstSucceeded = entries.find((entry) => entry.status === "succeeded");
+    if (firstSucceeded)
+      setActiveSourceId((current) =>
+        entries.some((entry) => entry.assetId === current && entry.status === "succeeded")
+          ? current
+          : firstSucceeded.assetId,
+      );
+  }, []);
 
   useEffect(() => {
     if (!activeJobId) return;
@@ -652,21 +746,24 @@ export function RemixProject() {
       void fetchJob(activeJobId)
         .then((updated) => {
           setJob(updated);
-          const generatedPrompt =
-            updated.values.analysisPrompt ||
-            updated.result?.artifacts.find((artifact) => artifact.mimeType === "text/markdown" && artifact.text)?.text;
-          if (generatedPrompt) setPrompt(generatedPrompt);
+          const entries = parseRemixAnalysisEntries(
+            updated.values.analysisEntries || updated.result?.data?.values.analysisEntries,
+          );
+          if (entries.length) hydrateAnalysisEntries(updated.id, entries);
           if (updated.status === "failed") {
             setParsing(false);
             setNotice(updated.error?.message || "视频解析失败，请稍后重试");
             return;
           }
-          if (updated.status === "succeeded" && generatedPrompt && !parsed) {
-            setPromptVersions([{ id: updated.id, label: "AI解析", prompt: generatedPrompt }]);
-            setActivePromptVersionId(updated.id);
+          if (
+            (updated.status === "succeeded" || updated.status === "partially_succeeded") &&
+            entries.length &&
+            !parsed
+          ) {
             setParsed(true);
             setParsing(false);
             setStage(2);
+            setNotice(updated.status === "partially_succeeded" ? updated.result?.summary || "部分视频解析失败" : "");
           }
         })
         .catch(() => setNotice("任务状态刷新失败，将在 10 秒后重试"));
@@ -674,12 +771,30 @@ export function RemixProject() {
     refresh();
     const timer = window.setInterval(refresh, 10_000);
     return () => window.clearInterval(timer);
-  }, [activeJobId, parsed]);
+  }, [activeJobId, hydrateAnalysisEntries, parsed]);
+
+  const activeComposeJobId =
+    composeJob && (composeJob.status === "queued" || composeJob.status === "processing") ? composeJob.id : null;
+  useEffect(() => {
+    if (!activeComposeJobId) return;
+    const refresh = () => {
+      void fetchJob(activeComposeJobId)
+        .then((updated) => {
+          setComposeJob(updated);
+          if (updated.status === "failed") setNotice(updated.error?.message || "视频合并失败，请稍后重试");
+          if (updated.status === "succeeded") setNotice("合并成片已生成并保存到素材库");
+        })
+        .catch(() => setNotice("合并任务状态刷新失败，将自动重试"));
+    };
+    refresh();
+    const timer = window.setInterval(refresh, 2_000);
+    return () => window.clearInterval(timer);
+  }, [activeComposeJobId]);
 
   const parse = async () => {
     if (parsing) return;
-    if (!source || !selectedProduct) {
-      setNotice(source ? "请先从商品库选择商品" : "请先上传分镜视频并选择商品");
+    if (!sources.length || !selectedProduct) {
+      setNotice(sources.length ? "请先从商品库选择商品" : "请先上传分镜视频并选择商品");
       setStage(0);
       return;
     }
@@ -688,10 +803,6 @@ export function RemixProject() {
     setStage(1);
     setNotice("");
     try {
-      const sourceAssetId = source.split(":", 3)[1];
-      if (!sourceAssetId) throw new Error("视频素材标识无效，请重新上传");
-      const videoName = source.split(":").slice(2).join(":");
-      const videoUrl = `/api/assets/${sourceAssetId}/content`;
       const portraitAssetId = selectedPortrait?.source_url.match(/\/([^/]+)\.png(?:\?|$)/)?.[1] ?? null;
       const created = await generateRemixProject({
         projectName:
@@ -719,18 +830,19 @@ export function RemixProject() {
           productFormDesc: selectedProduct.description ?? null,
         },
         demand: description,
-        rawMaterialFiles: [
-          {
-            filename: videoName,
-            objectKey: sourceAssetId,
+        rawMaterialFiles: sources.map((source) => {
+          const videoUrl = `/api/assets/${source.id}/content`;
+          return {
+            filename: source.name,
+            objectKey: source.id,
             fileMd5: null,
             fileUrl: videoUrl,
             coverUrl: videoUrl,
             fileType: "VIDEO",
             duration: null,
             reasoningEffort: "high",
-          },
-        ],
+          };
+        }),
         portraitAssets: selectedPortrait
           ? [
               {
@@ -753,6 +865,9 @@ export function RemixProject() {
           : [],
       });
       setJob(created);
+      setComposeOrder(sources.map((source) => source.id));
+      setComposePreviewId(sources[0]?.id || "");
+      setActiveSourceId(sources[0]?.id || "");
     } catch (error) {
       setParsing(false);
       setNotice(error instanceof Error ? error.message : "解析任务提交失败");
@@ -771,39 +886,44 @@ export function RemixProject() {
     setParsed(false);
     setParsing(false);
     setEditing(false);
-    setSource("");
+    setSources([]);
+    setActiveSourceId("");
+    setComposeOrder([]);
+    setComposePreviewId("");
+    setDraggingSourceId("");
     setProjectName("");
     setDescription("");
-    setPrompt("");
-    setPromptVersions([]);
-    setActivePromptVersionId("");
+    setPromptStates({});
     setPromptTool(null);
     setJob(null);
+    setComposeJob(null);
     setNotice("");
   };
   const applyPromptTool = useCallback(
     (tool: RemixPromptTool, rewrittenPrompt: string, summary: string, findings: string[]) => {
       const nextVersionId = `${tool}-${Date.now()}`;
-      setPrompt(rewrittenPrompt);
-      setActivePromptVersionId(nextVersionId);
-      setPromptVersions((current) => {
-        const versions = current.some((version) => version.prompt === prompt)
-          ? current
-          : [...current, { id: `manual-${Date.now()}`, label: "手动修改", prompt }];
-        return [
-          ...versions,
-          {
-            id: nextVersionId,
-            label: tool === "check" ? "AI检查" : tool === "modify" ? "AI修改" : "换口播",
-            prompt: rewrittenPrompt,
-          },
-        ];
+      patchPromptState(activeSourceId, (current) => {
+        const versions = current.versions.some((version) => version.prompt === current.prompt)
+          ? current.versions
+          : [...current.versions, { id: `manual-${Date.now()}`, label: "手动修改", prompt: current.prompt }];
+        return {
+          prompt: rewrittenPrompt,
+          activeVersionId: nextVersionId,
+          versions: [
+            ...versions,
+            {
+              id: nextVersionId,
+              label: tool === "check" ? "AI检查" : tool === "modify" ? "AI修改" : "换口播",
+              prompt: rewrittenPrompt,
+            },
+          ],
+        };
       });
       setNotice(findings.length ? `${summary}（处理 ${findings.length} 项）` : summary);
     },
-    [prompt],
+    [activeSourceId, patchPromptState],
   );
-  const result = job?.result as ApiJobResult | undefined;
+  const result = composeJob?.result as ApiJobResult | undefined;
   const resultVideo = result?.artifacts.find((artifact) => artifact.mimeType.startsWith("video/") && artifact.url);
   const orderedPromptVersions = useMemo(
     () => promptVersions.map((version, index) => ({ ...version, sequence: index + 1 })).reverse(),
@@ -833,8 +953,31 @@ export function RemixProject() {
       .then(() => setNotice("已开始下载视频"))
       .catch(() => setNotice("下载失败，请稍后重试"));
   };
-  const sourceAssetId = source.split(":", 3)[1] || "";
-  const fileName = source ? source.split(":").slice(2).join(":") : "13428656243498662.mp4";
+  const activeSource = sources.find((source) => source.id === activeSourceId) ?? sources[0];
+  const sourceAssetId = activeSource?.id || "";
+  const fileName = activeSource?.name || "未选择视频";
+  const orderedSources = composeOrder
+    .map((assetId) => sources.find((source) => source.id === assetId))
+    .filter((source): source is AttachmentSelection => Boolean(source));
+  const composePreviewSource =
+    orderedSources.find((source) => source.id === composePreviewId) ?? orderedSources[0] ?? sources[0];
+  const moveComposeSource = (assetId: string, direction: -1 | 1) => {
+    setComposeOrder((current) => {
+      const fromIndex = current.indexOf(assetId);
+      const toIndex = fromIndex + direction;
+      return moveRemixSource(current, fromIndex, toIndex);
+    });
+    setComposeJob(null);
+  };
+  const startCompose = async () => {
+    if (!job?.id || composeOrder.length < 2 || activeComposeJobId) return;
+    setNotice("");
+    try {
+      setComposeJob(await composeRemixVideos({ sourceJobId: job.id, orderedAssetIds: composeOrder }));
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "合并任务提交失败");
+    }
+  };
 
   return (
     <div className="remix-project">
@@ -850,8 +993,34 @@ export function RemixProject() {
           selectedPortrait={selectedPortrait}
           selectedProduct={selectedProduct}
           selectedVoice={selectedVoice}
-          source={source}
-          onSelectAttachment={(asset) => setSource(`asset:${asset.id}:${asset.name}`)}
+          sources={sources}
+          sourcesLocked={Boolean(job) || parsing}
+          onSelectAttachments={(selected) => {
+            if (job || parsing) return;
+            setSources((current) => {
+              const seen = new Set(current.map((source) => source.id));
+              const additions = selected.filter((source) => !seen.has(source.id));
+              const nextSources = [...current, ...additions].slice(0, remixMaxSources);
+              setActiveSourceId((active) => active || nextSources[0]?.id || "");
+              return nextSources;
+            });
+          }}
+          onRemoveSource={(assetId) => {
+            if (job || parsing) return;
+            setSources((current) => {
+              const nextSources = current.filter((source) => source.id !== assetId);
+              setActiveSourceId((active) => (active === assetId ? nextSources[0]?.id || "" : active));
+              return nextSources;
+            });
+            setPromptStates((current) => {
+              const next = { ...current };
+              delete next[assetId];
+              return next;
+            });
+            setComposeOrder((current) => current.filter((id) => id !== assetId));
+            setComposePreviewId((current) => (current === assetId ? "" : current));
+            setComposeJob(null);
+          }}
           onPick={setPicker}
         />
         <section className="remix-workspace">
@@ -886,13 +1055,25 @@ export function RemixProject() {
           )}
           {stage >= 2 && (
             <div className="source-strip">
-              <button className="active">
-                <span className="source-mini">
-                  <Video />
-                </span>
-                <b>{fileName}</b>
-                <i>v1</i>
-              </button>
+              {sources.map((source, index) => {
+                const entry = analysisEntries.find((item) => item.assetId === source.id);
+                return (
+                  <button
+                    key={source.id}
+                    className={source.id === activeSourceId ? "active" : ""}
+                    onClick={() => {
+                      setActiveSourceId(source.id);
+                      setEditing(false);
+                    }}
+                  >
+                    <span className="source-mini">
+                      <Video />
+                    </span>
+                    <b>{source.name}</b>
+                    <i>{entry?.status === "failed" ? "失败" : `v${index + 1}`}</i>
+                  </button>
+                );
+              })}
             </div>
           )}
           {stage === 2 && (
@@ -903,15 +1084,15 @@ export function RemixProject() {
                   <button className={`toggle ${compare ? "active" : ""}`} onClick={() => setCompare(!compare)} />
                 </label>
                 <div>
-                  <button onClick={() => setPromptTool("check")}>
+                  <button disabled={!prompt} onClick={() => setPromptTool("check")}>
                     <CircleCheck />
                     智能检查
                   </button>
-                  <button className="purple" onClick={() => setPromptTool("modify")}>
+                  <button className="purple" disabled={!prompt} onClick={() => setPromptTool("modify")}>
                     <Pencil />
                     智能修改
                   </button>
-                  <button className="orange" onClick={() => setPromptTool("voice")}>
+                  <button className="orange" disabled={!prompt} onClick={() => setPromptTool("voice")}>
                     <Mic2 />
                     换口播
                   </button>
@@ -924,7 +1105,12 @@ export function RemixProject() {
                   {orderedPromptVersions.slice(1).map(promptVersionButton)}
                 </aside>
                 <div className="prompt-document">
-                  {editing ? (
+                  {activeAnalysisEntry?.status === "failed" ? (
+                    <div className="source-analysis-error">
+                      <b>该视频解析失败</b>
+                      <span>{activeAnalysisEntry.error || "请稍后重试"}</span>
+                    </div>
+                  ) : editing ? (
                     <textarea
                       value={prompt}
                       onChange={(event) => {
@@ -974,7 +1160,7 @@ export function RemixProject() {
                     {sourceAssetId ? (
                       <AuthenticatedMedia
                         url={`/api/assets/${sourceAssetId}/content`}
-                        mimeType="video/mp4"
+                        mimeType={activeSource?.mimeType || "video/mp4"}
                         alt={fileName}
                         loadingText="正在载入原始分镜视频…"
                         errorText="原始分镜视频加载失败"
@@ -1067,34 +1253,94 @@ export function RemixProject() {
                   <b>成片时间线</b>
                   <span>拖拽片段调整顺序</span>
                 </div>
-                <i>1/1 片段就绪</i>
+                <i>
+                  {orderedSources.length}/{sources.length} 片段就绪
+                </i>
               </div>
               <div className="timeline">
-                <article>
-                  <div className="warehouse-scene">
-                    <UserRound />
-                    <b>1</b>
-                  </div>
-                  <footer>
-                    <span>{fileName.slice(0, 10)}…</span>
-                    <i>就绪</i>
-                  </footer>
-                </article>
+                {orderedSources.map((source, index) => (
+                  <article
+                    key={source.id}
+                    className={source.id === composePreviewSource?.id ? "active" : ""}
+                    draggable
+                    onDragStart={() => setDraggingSourceId(source.id)}
+                    onDragEnd={() => setDraggingSourceId("")}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={() => {
+                      setComposeOrder((current) =>
+                        moveRemixSource(current, current.indexOf(draggingSourceId), current.indexOf(source.id)),
+                      );
+                      setComposeJob(null);
+                      setDraggingSourceId("");
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className="timeline-preview-button"
+                      onClick={() => setComposePreviewId(source.id)}
+                    >
+                      <AuthenticatedMedia
+                        url={`/api/assets/${source.id}/content`}
+                        mimeType={source.mimeType}
+                        alt={source.name}
+                        controls={false}
+                        loadingText="载入中…"
+                        errorText="预览失败"
+                      />
+                      <b>{index + 1}</b>
+                    </button>
+                    <footer>
+                      <span title={source.name}>{source.name}</span>
+                      <div>
+                        <button
+                          type="button"
+                          aria-label={`前移 ${source.name}`}
+                          disabled={index === 0}
+                          onClick={() => moveComposeSource(source.id, -1)}
+                        >
+                          <ChevronLeft />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`后移 ${source.name}`}
+                          disabled={index === orderedSources.length - 1}
+                          onClick={() => moveComposeSource(source.id, 1)}
+                        >
+                          <ChevronRight />
+                        </button>
+                      </div>
+                    </footer>
+                  </article>
+                ))}
               </div>
               <article className="compose-preview">
                 <header>
                   <b>
                     <Video />
-                    成片预览
+                    {resultVideo?.url ? "合并成片预览" : "待合并顺序预览"}
                   </b>
+                  {!resultVideo?.url && composePreviewSource && (
+                    <span>
+                      {orderedSources.findIndex((source) => source.id === composePreviewSource.id) + 1}/
+                      {orderedSources.length} · {composePreviewSource.name}
+                    </span>
+                  )}
                 </header>
                 <div>
                   {resultVideo?.url ? (
                     <AuthenticatedMedia url={resultVideo.url} mimeType={resultVideo.mimeType} alt={resultVideo.name} />
+                  ) : composePreviewSource ? (
+                    <AuthenticatedMedia
+                      url={`/api/assets/${composePreviewSource.id}/content`}
+                      mimeType={composePreviewSource.mimeType}
+                      alt={composePreviewSource.name}
+                      loadingText="正在载入待合并视频…"
+                      errorText="待合并视频预览失败"
+                    />
                   ) : (
                     <>
                       <Video />
-                      <p>点击下方「开始合并」生成成片</p>
+                      <p>暂无可预览的视频</p>
                     </>
                   )}
                 </div>
@@ -1102,10 +1348,11 @@ export function RemixProject() {
                   <button onClick={() => setStage(3)}>返回分镜</button>
                   <button
                     className="primary"
-                    onClick={() => setNotice(job?.status === "succeeded" ? "成片已生成" : "已提交合并任务")}
+                    disabled={composeOrder.length < 2 || Boolean(activeComposeJobId)}
+                    onClick={() => void startCompose()}
                   >
-                    <Video />
-                    开始合并
+                    {activeComposeJobId ? <LoaderCircle className="animate-spin" /> : <Video />}
+                    {activeComposeJobId ? composeJob?.stage || "正在合并" : resultVideo?.url ? "重新合并" : "开始合并"}
                   </button>
                 </footer>
               </article>
@@ -1114,15 +1361,20 @@ export function RemixProject() {
         </section>
       </div>
       {stage === 0 && (
-        <button className="parse-button" disabled={!source || !selectedProduct || parsing} onClick={() => void parse()}>
+        <button
+          className="parse-button"
+          disabled={!sources.length || !selectedProduct || parsing || Boolean(job)}
+          onClick={() => void parse()}
+        >
           <Sparkles />
-          {parsing ? "解析中" : "视频解析"}
+          {parsing ? "解析中" : job ? "已提交解析" : "视频解析"}
         </button>
       )}
       <ProjectHistoryDrawer open={historyOpen} job={job} onClose={() => setHistoryOpen(false)} />
       <PromptToolModal
         tool={promptTool}
         sourceJobId={job?.id}
+        sourceAssetId={sourceAssetId}
         prompt={prompt}
         fileName={fileName}
         onClose={() => setPromptTool(null)}
