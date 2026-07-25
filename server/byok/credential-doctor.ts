@@ -80,6 +80,41 @@ export const qwenAudioDoctorProvider: CredentialDoctorProvider = {
   },
 };
 
+export const volcSpeechDoctorProvider: CredentialDoctorProvider = {
+  providerId: "volc-speech",
+  provider: "火山语音",
+  credentials: ["VOLC_SPEECH_API_KEY_ID", "VOLC_SPEECH_API_KEY"],
+  probe: async (values, signal) => {
+    const response = await fetch(`${env.volcSpeech.baseUrl.replace(/\/$/, "")}/api/v3/tts/unidirectional`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "X-Api-Key": values.VOLC_SPEECH_API_KEY ?? "",
+        "X-Api-Resource-Id": env.volcSpeech.presetTtsResourceId,
+        "X-Api-Request-Id": crypto.randomUUID(),
+      },
+      body: JSON.stringify({
+        req_params: {
+          text: "你好",
+          speaker: "zh_female_vv_uranus_bigtts",
+          model: "seed-tts-2.0-standard",
+          audio_params: { format: "mp3", sample_rate: 24_000, speech_rate: 0 },
+        },
+      }),
+      signal,
+    });
+    const payload = await response.text();
+    if (
+      response.status === 401 ||
+      response.status === 403 ||
+      /invalid.+key|unauthorized|permission|forbidden|resource.+not.+granted/i.test(payload)
+    )
+      throw new InvalidCredentialError("鉴权失败，请检查 API Key、API Key ID 和语音资源权限");
+    if (response.ok && /"code"\s*:\s*0/.test(payload)) return "鉴权与预设语音合成可用";
+    throw new InvalidCredentialError("火山语音接口未通过可用性检查");
+  },
+};
+
 export const activeCredentialDoctorProviders: CredentialDoctorProvider[] = [
   {
     providerId: "aihubmix",
@@ -99,6 +134,7 @@ export const activeCredentialDoctorProviders: CredentialDoctorProvider[] = [
       return `鉴权通过，可读取 ${models.length} 个模型`;
     },
   },
+  volcSpeechDoctorProvider,
   qwenAudioDoctorProvider,
   {
     providerId: "tos",

@@ -408,7 +408,7 @@ export async function composeMedia(video: string, audio: string, output: string)
   return output;
 }
 
-export async function burnSubtitleFile(input: string, subtitleFile: string, output: string) {
+export async function burnSubtitleFile(input: string, subtitleFile: string, output: string, forceStyle?: string) {
   await requireFfmpegFilter("subtitles");
   if (!(await Bun.file(DOUYIN_SANS_FONT_PATH).exists())) {
     throw new Error(`DOUYIN_SANS_FONT_UNAVAILABLE:${DOUYIN_SANS_FONT_PATH}`);
@@ -421,7 +421,7 @@ export async function burnSubtitleFile(input: string, subtitleFile: string, outp
     "-i",
     input,
     "-vf",
-    `subtitles=filename='${escapedSubtitleFile}':fontsdir='${escapedFontDirectory}':force_style='FontName=${DOUYIN_SANS_FONT_NAME},FontSize=18,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=0,Alignment=2,MarginV=36'`,
+    `subtitles=filename='${escapedSubtitleFile}':fontsdir='${escapedFontDirectory}':force_style='${forceStyle ?? `FontName=${DOUYIN_SANS_FONT_NAME},FontSize=18,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=0,Alignment=2,MarginV=36`}'`,
     "-c:v",
     "libx264",
     "-preset",

@@ -16,6 +16,7 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  Settings2,
   Sparkles,
   Trash2,
   Upload,
@@ -27,6 +28,7 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 import {
   applyVideoCreateShotMaterialVersion,
   batchGenerateVideoCreateShotVideos,
+  batchGenerateVideoCreateVoices,
   clearVideoCreateScript,
   createVideoCreate,
   downloadAuthenticated,
@@ -39,6 +41,7 @@ import {
   regenerateVideoCreateScriptSection,
   replaceVideoCreateShotVideo,
   runVideoCreateProjectAction,
+  saveVideoCreateMediaSettings,
   saveVideoCreateScriptSection,
   updateAllVideoCreateShotOptions,
   updateVideoCreate,
@@ -59,9 +62,18 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { Switch } from "@/components/ui/switch";
 import { fetchPortraits } from "@/features/portrait-library/portrait-data";
 import { PortraitPickerDialog } from "@/features/portrait-library/portrait-picker-dialog";
+import { useProviderFeatures } from "@/features/provider/provider-features";
 import { cn } from "@/lib/utils";
+import {
+  defaultVideoCreateSubtitleStyleId,
+  defaultVideoCreateVoiceSettings,
+} from "../../../shared/video-create/media-settings";
 import { videoCreateActionAvailability } from "./video-create-actions";
 import { VideoCreateMaterialHistoryDialog } from "./video-create-material-history-dialog";
+import {
+  VideoCreateSubtitleSettingsDialog,
+  VideoCreateVoiceSettingsDialog,
+} from "./video-create-media-settings-dialogs";
 import { VideoCreateShotGenerationDialog } from "./video-create-shot-generation-dialog";
 
 const scenes = ["商城转化", "短视频带货", "引流直播间", "直播带货", "内容种草", "品牌曝光", "本地到店", "线索收集"];
@@ -174,6 +186,8 @@ const defaultInput: VideoCreateInput = {
   videoModel: "doubao-seedance-2-0-fast-260128",
   ratio: "9:16",
   subtitles: true,
+  voiceSettings: defaultVideoCreateVoiceSettings,
+  subtitleStyleId: defaultVideoCreateSubtitleStyleId,
 };
 
 function errorMessage(error: unknown) {
@@ -380,6 +394,8 @@ export function VideoCreatePage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [batchDialogOpen, setBatchDialogOpen] = useState(false);
   const [clearScriptDialogOpen, setClearScriptDialogOpen] = useState(false);
+  const [voiceSettingsOpen, setVoiceSettingsOpen] = useState(false);
+  const [subtitleSettingsOpen, setSubtitleSettingsOpen] = useState(false);
   const [shotGenerationOpen, setShotGenerationOpen] = useState(false);
   const [shotGenerationLoading, setShotGenerationLoading] = useState(false);
   const [shotGenerationShotId, setShotGenerationShotId] = useState("");
@@ -424,6 +440,8 @@ export function VideoCreatePage() {
     staleTime: 30_000,
     refetchInterval: 5_000,
   });
+  const providerFeatures = useProviderFeatures();
+  const voiceAvailability = providerFeatures.data?.operations.voiceSynthesis;
   const selectedPortraitKey = input.portraitReference
     ? input.portraitReference.type === "general"
       ? `general:${input.portraitReference.portraitId}`
@@ -1244,6 +1262,15 @@ export function VideoCreatePage() {
                   <span className="flex items-center gap-1.5">
                     <Mic className="size-4" />
                     配音
+                    <Button
+                      className="size-7 p-0"
+                      variant="ghost"
+                      size="icon"
+                      aria-label="配音设置"
+                      onClick={() => setVoiceSettingsOpen(true)}
+                    >
+                      <Settings2 />
+                    </Button>
                   </span>
                   <Switch
                     checked={project.shots.every((item) => item.audioEnabled)}
@@ -1263,6 +1290,15 @@ export function VideoCreatePage() {
                   <span className="flex items-center gap-1.5">
                     <Captions className="size-4" />
                     字幕
+                    <Button
+                      className="size-7 p-0"
+                      variant="ghost"
+                      size="icon"
+                      aria-label="字幕样式设置"
+                      onClick={() => setSubtitleSettingsOpen(true)}
+                    >
+                      <Settings2 />
+                    </Button>
                   </span>
                   <Switch
                     checked={project.shots.every((item) => item.subtitleEnabled)}
@@ -1414,12 +1450,15 @@ export function VideoCreatePage() {
                         />
                       </div>
                       {shot.audioArtifactId ? (
-                        <div className="w-full [&_audio]:h-9 [&_audio]:w-full">
+                        <div className="w-full space-y-2 [&_audio]:h-9 [&_audio]:w-full">
                           <AuthenticatedMedia
                             url={`/api/artifacts/${shot.audioArtifactId}`}
                             mimeType="audio/wav"
                             alt={`分镜 ${shot.ordinal} 配音`}
                           />
+                          {shot.audioStale && (
+                            <span className="block text-xs text-warning">配音配置已更新，待重新生成</span>
+                          )}
                         </div>
                       ) : (
                         <span className="text-xs text-muted">生成分镜视频后可试听配音</span>
@@ -1428,7 +1467,14 @@ export function VideoCreatePage() {
                         className="mt-3"
                         variant="outline"
                         size="sm"
-                        disabled={!shot.videoAssetId || !shot.audioArtifactId || generating || Boolean(busy)}
+                        disabled={
+                          !voiceAvailability?.enabled ||
+                          !shot.videoAssetId ||
+                          !shot.audioArtifactId ||
+                          generating ||
+                          Boolean(busy)
+                        }
+                        title={!voiceAvailability?.enabled ? voiceAvailability?.disabledReason : undefined}
                         onClick={() => void processShotMaterial(shot.id, "audio-replace")}
                       >
                         {busy === `audio-replace-${shot.id}` ? <LoaderCircle className="animate-spin" /> : <Mic />}
@@ -1472,7 +1518,7 @@ export function VideoCreatePage() {
                         variant="outline"
                         size="sm"
                         disabled={
-                          shot.subtitlesComposed ||
+                          (shot.subtitlesComposed && !shot.subtitleStyleStale) ||
                           !shot.videoAssetId ||
                           !shot.subtitleCues.length ||
                           generating ||
@@ -1485,7 +1531,7 @@ export function VideoCreatePage() {
                         ) : (
                           <Captions />
                         )}
-                        {shot.subtitlesComposed ? "字幕已合成" : "字幕合成"}
+                        {shot.subtitleStyleStale ? "按新样式合成" : shot.subtitlesComposed ? "字幕已合成" : "字幕合成"}
                       </Button>
                     </div>
                   </article>
@@ -1501,7 +1547,9 @@ export function VideoCreatePage() {
                         (shot) =>
                           !["succeeded", "replaced"].includes(shot.status) ||
                           (shot.audioEnabled && !shot.audioArtifactId) ||
-                          (shot.subtitleEnabled && !shot.subtitleCues.length),
+                          (shot.audioEnabled && shot.audioStale) ||
+                          (shot.subtitleEnabled && !shot.subtitleCues.length) ||
+                          (shot.subtitleEnabled && shot.subtitleStyleStale),
                       ).length
                     } 个分镜未就绪`}
               </span>
@@ -1675,6 +1723,58 @@ export function VideoCreatePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {project && (
+        <VideoCreateVoiceSettingsDialog
+          open={voiceSettingsOpen}
+          settings={project.project.input.voiceSettings ?? defaultVideoCreateVoiceSettings}
+          providerEnabled={voiceAvailability?.enabled ?? false}
+          disabledReason={voiceAvailability?.disabledReason}
+          busy={Boolean(busy)}
+          onOpenChange={setVoiceSettingsOpen}
+          onSave={(voiceSettings, generate) =>
+            execute(generate ? "batch-audio" : "save-voice-settings", async () => {
+              const next = await saveVideoCreateMediaSettings(project.project.id, {
+                voiceSettings,
+                subtitleStyleId: project.project.input.subtitleStyleId,
+              });
+              invalidate(next);
+              if (generate) {
+                const result = await batchGenerateVideoCreateVoices(project.project.id);
+                const submitted = new Set(result.submittedShotIds);
+                setProject((current) =>
+                  current
+                    ? {
+                        ...current,
+                        shots: current.shots.map((shot) =>
+                          submitted.has(shot.id) ? { ...shot, status: "queued" as const, error: undefined } : shot,
+                        ),
+                      }
+                    : current,
+                );
+              }
+              setVoiceSettingsOpen(false);
+            })
+          }
+        />
+      )}
+      {project && (
+        <VideoCreateSubtitleSettingsDialog
+          open={subtitleSettingsOpen}
+          value={project.project.input.subtitleStyleId ?? defaultVideoCreateSubtitleStyleId}
+          busy={Boolean(busy)}
+          onOpenChange={setSubtitleSettingsOpen}
+          onSave={(subtitleStyleId) =>
+            execute("save-subtitle-settings", async () => {
+              const next = await saveVideoCreateMediaSettings(project.project.id, {
+                voiceSettings: project.project.input.voiceSettings,
+                subtitleStyleId,
+              });
+              invalidate(next);
+              setSubtitleSettingsOpen(false);
+            })
+          }
+        />
+      )}
       <VideoCreateShotGenerationDialog
         open={shotGenerationOpen}
         draft={shotGenerationDraft}

@@ -63,6 +63,7 @@ export function allProviderFeatureAvailability(isVerified?: (providerId: Provide
       assetUpload: providerFeatureAvailability(["tos"], isVerified),
       shareImport: providerFeatureAvailability(["tos"], isVerified),
       portraitCreation: providerFeatureAvailability(["ark", "tos"], isVerified),
+      voiceSynthesis: providerFeatureAvailability(["volc-speech"], isVerified),
     },
   };
 }

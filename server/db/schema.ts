@@ -564,6 +564,7 @@ export const videoCreateShots = sqliteTable(
     videoAssetId: text("video_asset_id"),
     currentMaterialVersionId: text("current_material_version_id"),
     audioArtifactId: text("audio_artifact_id"),
+    audioSettingsKey: text("audio_settings_key"),
     subtitleCues: text("subtitle_cues_json", { mode: "json" })
       .$type<import("../video-create/types").VideoCreateSubtitleCue[]>()
       .notNull()
@@ -598,6 +599,8 @@ export const videoCreateMaterialVersions = sqliteTable(
     inputVersionId: text("input_version_id"),
     jobId: text("job_id").references(() => jobs.id),
     subtitlesComposed: integer("subtitles_composed", { mode: "boolean" }).notNull().default(false),
+    subtitleStyleId:
+      text("subtitle_style_id").$type<import("../../shared/video-create/media-settings").VideoCreateSubtitleStyleId>(),
     error: text("error_json", { mode: "json" }).$type<JobRecord["error"]>(),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),

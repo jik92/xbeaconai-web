@@ -1,5 +1,13 @@
 import { z } from "@hono/zod-openapi";
 import { seedanceModelIds } from "../models/video-models";
+import {
+  defaultVideoCreateSubtitleStyleId,
+  defaultVideoCreateVoiceSettings,
+  videoCreateSubtitlePresets,
+  videoCreateVoiceSpeeds,
+  videoCreateVoiceStyles,
+} from "../../shared/video-create/media-settings";
+import { voicePresetCatalog } from "../../shared/voice/preset-voices";
 
 export const PortraitReferenceSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("general"), portraitId: z.number().int().min(1) }),
@@ -102,6 +110,14 @@ export const VideoCreateSubtitleCueSchema = z.object({
   text: z.string().trim().min(1).max(200),
 });
 
+export const VideoCreateVoiceSettingsSchema = z.object({
+  presetVoiceId: z.enum(voicePresetCatalog.map((voice) => voice.id)),
+  speed: z.enum(videoCreateVoiceSpeeds),
+  style: z.enum(videoCreateVoiceStyles),
+});
+
+export const VideoCreateSubtitleStyleIdSchema = z.enum(videoCreateSubtitlePresets.map((preset) => preset.id));
+
 export const VideoCreateInputSchema = z
   .object({
     productAssetIds: z.array(z.string().uuid()).min(1).max(6),
@@ -135,6 +151,8 @@ export const VideoCreateInputSchema = z
     voiceAssetId: z.string().uuid().optional(),
     ratio: z.enum(["9:16", "16:9", "1:1"]).default("9:16"),
     subtitles: z.boolean().default(true),
+    voiceSettings: VideoCreateVoiceSettingsSchema.default(defaultVideoCreateVoiceSettings),
+    subtitleStyleId: VideoCreateSubtitleStyleIdSchema.default(defaultVideoCreateSubtitleStyleId),
   })
   .openapi("VideoCreateInput");
 
@@ -239,6 +257,7 @@ export type VideoCreateMaterialVersionSource = z.infer<typeof VideoCreateMateria
 export type VideoCreateMaterialVersionStatus = z.infer<typeof VideoCreateMaterialVersionStatusSchema>;
 export type VideoCreateMaterialStorageKind = z.infer<typeof VideoCreateMaterialStorageKindSchema>;
 export type VideoCreateSubtitleCue = z.infer<typeof VideoCreateSubtitleCueSchema>;
+export type VideoCreateVoiceSettings = z.infer<typeof VideoCreateVoiceSettingsSchema>;
 export type VideoCreateInput = z.infer<typeof VideoCreateInputSchema>;
 export type VideoCreateRecommendation = z.infer<typeof VideoCreateRecommendationSchema>;
 export type VideoCreateGeneratedScript = z.infer<typeof VideoCreateGeneratedScriptSchema>;

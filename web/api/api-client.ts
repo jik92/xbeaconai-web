@@ -6,6 +6,7 @@ import { apiBaseUrl, apiUrl } from "./base-url";
 import { client } from "./generated/client.gen";
 import {
   applyVideoCreateShotMaterialVersion as applyVideoCreateShotMaterialVersionRequest,
+  batchGenerateVideoCreateAudio as batchGenerateVideoCreateAudioRequest,
   batchGenerateVideoCreateShots,
   cancelJob,
   clearVideoCreateScript as clearVideoCreateScriptRequest,
@@ -45,9 +46,10 @@ import {
   listVideoRemixShotGenerationJobs,
   parseAdScriptSource,
   preflightQwenVoiceSample as preflightQwenVoiceSampleRequest,
+  previewVideoCreateVoice as previewVideoCreateVoiceRequest,
   processVideoCreateShotMaterial,
-  registerCustomPortrait,
   regenerateVideoCreateSection,
+  registerCustomPortrait,
   replaceVideoCreateShot,
   retryJob,
   runAdminCredentialDoctor as runAdminCredentialDoctorRequest,
@@ -58,6 +60,7 @@ import {
   updateAdminCredential,
   updateAdminUserStatus,
   updateAllVideoCreateShotSettings,
+  updateVideoCreateMediaSettings as updateVideoCreateMediaSettingsRequest,
   updateVideoCreateProject,
   updateVideoCreateShotSettings,
   updateVideoRemixProject,
@@ -76,8 +79,8 @@ import type {
   ListAdminProviderAuditsData,
   ListAdminProviderAuditsResponse,
   ListAdminUsersResponse,
-  ListVideoCreateShotMaterialVersionsResponse,
   ListCustomPortraitsResponse,
+  ListVideoCreateShotMaterialVersionsResponse,
   ListVideoRemixProjectsResponse,
   ModuleId,
   ProviderCredentialName,
@@ -484,6 +487,46 @@ export async function updateAllVideoCreateShotOptions(
     throwOnError: true,
   });
   if (!data) throw new Error("分镜批量设置保存失败");
+  return data;
+}
+
+export async function saveVideoCreateMediaSettings(
+  projectId: string,
+  settings: Pick<VideoCreateInput, "voiceSettings" | "subtitleStyleId">,
+) {
+  configure();
+  const { data } = await updateVideoCreateMediaSettingsRequest({
+    path: { projectId },
+    body: settings,
+    headers: authHeaders(),
+    throwOnError: true,
+  });
+  if (!data) throw new Error("媒体设置保存失败");
+  return data;
+}
+
+export async function previewVideoCreatePresetVoice(
+  voiceSettings: NonNullable<VideoCreateInput["voiceSettings"]>,
+  text = "让每一次表达，都更自然、更有感染力。",
+) {
+  configure();
+  const { data } = await previewVideoCreateVoiceRequest({
+    body: { voiceSettings, text },
+    headers: authHeaders(),
+    throwOnError: true,
+  });
+  if (!data) throw new Error("音色试听失败");
+  return data;
+}
+
+export async function batchGenerateVideoCreateVoices(projectId: string) {
+  configure();
+  const { data } = await batchGenerateVideoCreateAudioRequest({
+    path: { projectId },
+    headers: { ...authHeaders(), "Idempotency-Key": randomUuid() },
+    throwOnError: true,
+  });
+  if (!data) throw new Error("批量生成配音任务提交失败");
   return data;
 }
 export async function parseExistingAdScript(sourceScript: string, idempotencyKey = randomUuid()) {

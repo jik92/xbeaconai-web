@@ -23,6 +23,10 @@ import {
   videoCreateMinimumStoryboardCount,
   videoCreateShotNarration,
 } from "../../server/video-create/video-create-store";
+import {
+  defaultVideoCreateSubtitleStyleId,
+  defaultVideoCreateVoiceSettings,
+} from "../../shared/video-create/media-settings";
 import { JobProcessor } from "../../worker/job-processor";
 import { assertSeedanceDuration, SeedanceFlowError } from "../../worker/jobs/job-seedance-video";
 import {
@@ -73,6 +77,8 @@ const input: VideoCreateInput = {
   videoModel: "doubao-seedance-2-0-fast-260128",
   ratio: "9:16",
   subtitles: true,
+  voiceSettings: defaultVideoCreateVoiceSettings,
+  subtitleStyleId: defaultVideoCreateSubtitleStyleId,
 };
 
 function generationPlan(durationSec: number, prompt: string, narration: string) {
@@ -480,6 +486,7 @@ describe("video create domain", () => {
       status: "succeeded",
       videoAssetId: crypto.randomUUID(),
       audioArtifactId: crypto.randomUUID(),
+      audioSettingsKey: "zh_female_vv_uranus_bigtts:normal:marketing",
       subtitleCues: [{ startSec: 0, endSec: 4, text: "开场" }],
     });
     expect(store.get(projectId)?.canCompose).toBe(false);
@@ -487,6 +494,7 @@ describe("video create domain", () => {
       status: "replaced",
       videoAssetId: crypto.randomUUID(),
       audioArtifactId: crypto.randomUUID(),
+      audioSettingsKey: "zh_female_vv_uranus_bigtts:normal:marketing",
       subtitleCues: [{ startSec: 0, endSec: 11, text: "卖点" }],
     });
     expect(store.get(projectId)?.canCompose).toBe(true);
@@ -606,6 +614,11 @@ describe("video create domain", () => {
         ratio: "9:16",
         generateAudio: "true",
         subtitleEnabled: "true",
+        subtitleStyleId: "source-yellow",
+        voicePresetId: "zh_female_vv_uranus_bigtts",
+        voiceSpeed: "normal",
+        voiceStyle: "marketing",
+        voiceSettingsKey: "zh_female_vv_uranus_bigtts:normal:marketing",
         __mockAudio: "true",
       },
       videoModel: "doubao-seedance-2-0-fast-260128",
@@ -620,6 +633,7 @@ describe("video create domain", () => {
     };
     jobs.create(job);
     generatedFiles.push(resolve(env.dataDir, "results", `${job.id}-video-create.mp4`));
+    generatedFiles.push(resolve(env.dataDir, "results", `${job.id}-source-video-create.mp4`));
     generatedFiles.push(resolve(env.dataDir, "results", `${job.id}-${shot.id}-voice.wav`));
     const processor = new JobProcessor(jobs, accounts, undefined, projects);
     await processor.process(job.id);
@@ -653,6 +667,7 @@ describe("video create domain", () => {
           shotId: shot.id,
           inputMaterialVersionId: currentShot.currentMaterialVersionId,
           previousShotStatus: currentShot.status,
+          subtitleStyleId: "source-yellow",
         },
         videoModel: undefined,
         createdAt: new Date().toISOString(),
@@ -665,6 +680,7 @@ describe("video create domain", () => {
         source: operation === "audio-replace" ? "audio_replaced" : "subtitle_composed",
         inputVersionId: currentShot.currentMaterialVersionId,
         jobId: processJob.id,
+        subtitleStyleId: null,
       });
       generatedFiles.push(resolve(env.dataDir, "results", `${processJob.id}-video-create.mp4`));
       await processor.process(processJob.id);
@@ -674,10 +690,17 @@ describe("video create domain", () => {
         projects.getMaterialVersionByJobId(processJob.id)?.id,
       );
     }
-    expect(projects.listMaterialVersions(projectId, shot.id, owner.user.id)).toHaveLength(2);
+    expect(projects.listMaterialVersions(projectId, shot.id, owner.user.id)).toHaveLength(3);
 
     const currentShot = projects.get(projectId)?.shots[0];
     if (!currentShot?.currentMaterialVersionId) throw new Error("SHOT_MATERIAL_VERSION_NOT_CREATED");
+    const subtitleSource = projects.getSubtitleSourceMaterialVersion(
+      projectId,
+      shot.id,
+      currentShot.currentMaterialVersionId,
+    );
+    expect(subtitleSource?.subtitlesComposed).toBe(false);
+    expect(subtitleSource?.id).not.toBe(currentShot.currentMaterialVersionId);
     const duplicateSubtitleJob: JobRecord = {
       ...job,
       id: crypto.randomUUID(),
@@ -689,6 +712,7 @@ describe("video create domain", () => {
         shotId: shot.id,
         inputMaterialVersionId: currentShot.currentMaterialVersionId,
         previousShotStatus: currentShot.status,
+        subtitleStyleId: "source-yellow",
       },
       videoModel: undefined,
       createdAt: new Date().toISOString(),
@@ -701,6 +725,7 @@ describe("video create domain", () => {
       source: "subtitle_composed",
       inputVersionId: currentShot.currentMaterialVersionId,
       jobId: duplicateSubtitleJob.id,
+      subtitleStyleId: "source-yellow",
     });
     await processor.process(duplicateSubtitleJob.id);
     expect(jobs.get(duplicateSubtitleJob.id)?.error).toMatchObject({

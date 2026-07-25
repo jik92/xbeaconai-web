@@ -354,6 +354,9 @@ export type VideoCreateProject = {
         materialProcessing: boolean;
         subtitlesComposed: boolean;
         audioArtifactId: string;
+        audioSettingsKey: string;
+        audioStale: boolean;
+        subtitleStyleStale: boolean;
         subtitleCues: Array<{
             startSec: number;
             endSec: number;
@@ -411,6 +414,12 @@ export type VideoCreateInput = {
     voiceAssetId?: string;
     ratio?: '9:16' | '16:9' | '1:1';
     subtitles?: boolean;
+    voiceSettings?: {
+        presetVoiceId: 'zh_female_vv_uranus_bigtts' | 'zh_male_liufei_uranus_bigtts' | 'zh_male_m191_uranus_bigtts' | 'zh_male_xuanyijieshuo_uranus_bigtts';
+        speed: 'slow' | 'normal' | 'fast';
+        style: 'marketing' | 'news' | 'entertainment';
+    };
+    subtitleStyleId?: 'source-white' | 'source-yellow' | 'title-white' | 'title-yellow' | 'happy-white' | 'happy-orange';
 };
 
 export type VideoCreateRecommendation = {
@@ -1100,6 +1109,18 @@ export type GetProviderFeaturesResponses = {
                 disabledReason?: string;
             };
             shareImport: {
+                enabled: boolean;
+                requiredProviders: Array<ProviderId>;
+                unavailableProviders: Array<ProviderId>;
+                disabledReason?: string;
+            };
+            portraitCreation: {
+                enabled: boolean;
+                requiredProviders: Array<ProviderId>;
+                unavailableProviders: Array<ProviderId>;
+                disabledReason?: string;
+            };
+            voiceSynthesis: {
                 enabled: boolean;
                 requiredProviders: Array<ProviderId>;
                 unavailableProviders: Array<ProviderId>;
@@ -3448,6 +3469,7 @@ export type ListVideoCreateShotMaterialVersionsResponses = {
             inputVersionId: string;
             jobId: string;
             subtitlesComposed: boolean;
+            subtitleStyleId: 'source-white' | 'source-yellow' | 'title-white' | 'title-yellow' | 'happy-white' | 'happy-orange';
             generation: {
                 model: string;
                 durationSec: number;
@@ -3528,6 +3550,10 @@ export type ProcessVideoCreateShotMaterialErrors = {
      * Invalid state
      */
     409: ApiErrorResponse;
+    /**
+     * Provider unavailable
+     */
+    422: ApiErrorResponse;
 };
 
 export type ProcessVideoCreateShotMaterialError = ProcessVideoCreateShotMaterialErrors[keyof ProcessVideoCreateShotMaterialErrors];
@@ -3601,6 +3627,117 @@ export type UpdateAllVideoCreateShotSettingsResponses = {
 };
 
 export type UpdateAllVideoCreateShotSettingsResponse = UpdateAllVideoCreateShotSettingsResponses[keyof UpdateAllVideoCreateShotSettingsResponses];
+
+export type UpdateVideoCreateMediaSettingsData = {
+    body: {
+        voiceSettings?: {
+            presetVoiceId: 'zh_female_vv_uranus_bigtts' | 'zh_male_liufei_uranus_bigtts' | 'zh_male_m191_uranus_bigtts' | 'zh_male_xuanyijieshuo_uranus_bigtts';
+            speed: 'slow' | 'normal' | 'fast';
+            style: 'marketing' | 'news' | 'entertainment';
+        };
+        subtitleStyleId?: 'source-white' | 'source-yellow' | 'title-white' | 'title-yellow' | 'happy-white' | 'happy-orange';
+    };
+    path: {
+        projectId: string;
+    };
+    query?: never;
+    url: '/api/video-create/projects/{projectId}/media-settings';
+};
+
+export type UpdateVideoCreateMediaSettingsErrors = {
+    /**
+     * Not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Action in progress
+     */
+    409: ApiErrorResponse;
+};
+
+export type UpdateVideoCreateMediaSettingsError = UpdateVideoCreateMediaSettingsErrors[keyof UpdateVideoCreateMediaSettingsErrors];
+
+export type UpdateVideoCreateMediaSettingsResponses = {
+    /**
+     * Updated
+     */
+    200: VideoCreateProject;
+};
+
+export type UpdateVideoCreateMediaSettingsResponse = UpdateVideoCreateMediaSettingsResponses[keyof UpdateVideoCreateMediaSettingsResponses];
+
+export type PreviewVideoCreateVoiceData = {
+    body: {
+        voiceSettings: {
+            presetVoiceId: 'zh_female_vv_uranus_bigtts' | 'zh_male_liufei_uranus_bigtts' | 'zh_male_m191_uranus_bigtts' | 'zh_male_xuanyijieshuo_uranus_bigtts';
+            speed: 'slow' | 'normal' | 'fast';
+            style: 'marketing' | 'news' | 'entertainment';
+        };
+        text: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/video-create/voice-preview';
+};
+
+export type PreviewVideoCreateVoiceErrors = {
+    /**
+     * Provider unavailable
+     */
+    422: ApiErrorResponse;
+};
+
+export type PreviewVideoCreateVoiceError = PreviewVideoCreateVoiceErrors[keyof PreviewVideoCreateVoiceErrors];
+
+export type PreviewVideoCreateVoiceResponses = {
+    /**
+     * Voice preview
+     */
+    200: {
+        audioBase64: string;
+        mimeType: 'audio/mpeg';
+    };
+};
+
+export type PreviewVideoCreateVoiceResponse = PreviewVideoCreateVoiceResponses[keyof PreviewVideoCreateVoiceResponses];
+
+export type BatchGenerateVideoCreateAudioData = {
+    body?: never;
+    path: {
+        projectId: string;
+    };
+    query?: never;
+    url: '/api/video-create/projects/{projectId}/shots/batch-audio';
+};
+
+export type BatchGenerateVideoCreateAudioErrors = {
+    /**
+     * Not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Nothing to generate
+     */
+    409: ApiErrorResponse;
+    /**
+     * Provider unavailable
+     */
+    422: ApiErrorResponse;
+};
+
+export type BatchGenerateVideoCreateAudioError = BatchGenerateVideoCreateAudioErrors[keyof BatchGenerateVideoCreateAudioErrors];
+
+export type BatchGenerateVideoCreateAudioResponses = {
+    /**
+     * Accepted
+     */
+    202: {
+        jobs: Array<Job>;
+        submittedShotIds: Array<string>;
+    };
+};
+
+export type BatchGenerateVideoCreateAudioResponse = BatchGenerateVideoCreateAudioResponses[keyof BatchGenerateVideoCreateAudioResponses];
 
 export type PreflightQwenVoiceSampleData = {
     body: {

@@ -97,10 +97,8 @@ export const providerCredentialCatalog = [
   docsUrl: string;
 }>;
 
-export const managedProviderCredentialCatalog = providerCredentialCatalog.filter(
-  (credential) => credential.providerId !== "volc-speech",
-);
-export const managedProviderIds = providerIds.filter((providerId) => providerId !== "volc-speech");
+export const managedProviderCredentialCatalog = providerCredentialCatalog;
+export const managedProviderIds = providerIds;
 
 export function providerIdForCredential(name: ProviderCredentialName): ProviderId {
   const credential = providerCredentialCatalog.find((item) => item.name === name);
