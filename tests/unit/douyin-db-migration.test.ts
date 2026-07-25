@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, test } from "bun:test";
 import { Database } from "bun:sqlite";
+import { afterEach, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -138,5 +138,45 @@ describe("database migration", () => {
     expect(columns.has("duration_sec")).toBe(true);
     expect(conn.client.query("SELECT id FROM media_assets WHERE id = 'asset-1'").get()).toBeDefined();
     conn.client.close();
+  });
+
+  test("repairs the legacy user status constraint without losing accounts", () => {
+    const path = tempDbPath();
+    const initial = openDatabase(path);
+    initial.client.close();
+
+    const client = new Database(path, { strict: true });
+    client.run("PRAGMA foreign_keys=OFF");
+    client.run(`CREATE TABLE users__legacy_status (
+      id TEXT PRIMARY KEY NOT NULL,
+      phone TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      avatar_text TEXT NOT NULL,
+      credits INTEGER NOT NULL DEFAULT 2480,
+      status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','disabled')),
+      password_version INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )`);
+    client.run(
+      "INSERT INTO users__legacy_status (id, phone, password_hash, display_name, avatar_text, created_at, updated_at) VALUES ('user-1', '13800000001', 'hash', 'Existing user', '01', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+    );
+    client.run("DROP TABLE users");
+    client.run("ALTER TABLE users__legacy_status RENAME TO users");
+    client.run("CREATE UNIQUE INDEX users_phone_unique ON users (phone)");
+    client.run("CREATE UNIQUE INDEX users_phone_idx ON users (phone)");
+    client.close();
+
+    const repaired = openDatabase(path);
+    expect(repaired.client.query("SELECT phone FROM users WHERE id = 'user-1'").get()).toEqual({
+      phone: "13800000001",
+    });
+    expect(() =>
+      repaired.client.run(
+        "INSERT INTO users (id, phone, password_hash, display_name, avatar_text, status, created_at, updated_at) VALUES ('user-2', '13800000002', 'hash', 'Pending user', '02', 'pending_password', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+      ),
+    ).not.toThrow();
+    repaired.client.close();
   });
 });
