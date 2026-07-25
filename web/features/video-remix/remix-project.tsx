@@ -229,7 +229,7 @@ function ConfigSidebar({
       {selectedPortraits.length ? (
         <div className="portrait-cards-row">
           {selectedPortraits.map((portrait) => (
-            <div className="portrait-card" key={portrait.index}>
+            <div className="remix-portrait-card" key={portrait.index}>
               <ImagePreview
                 className="config-portrait"
                 src={
