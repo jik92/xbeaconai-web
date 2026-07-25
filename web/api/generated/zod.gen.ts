@@ -669,6 +669,26 @@ export const zVideoCreateProject = z.object({
         scriptSectionId: z.uuid(),
         ordinal: z.int().gte(1),
         prompt: z.string(),
+        narration: z.string(),
+        generationPlan: z.object({
+            characterAppearance: z.string().min(1).max(500),
+            cameraView: z.string().min(1).max(300),
+            background: z.string().min(1).max(500),
+            lighting: z.string().min(1).max(300),
+            voice: z.string().min(1).max(300),
+            quality: z.string().min(1).max(300),
+            subshots: z.array(z.object({
+                action: z.string().min(1).max(500),
+                narration: z.string().min(1).max(1000),
+                expression: z.string().min(1).max(300),
+                voiceTone: z.string().min(1).max(300),
+                durationSec: z.int().gte(1).lte(15),
+                shotSize: z.string().min(1).max(100),
+                composition: z.string().min(1).max(300),
+                background: z.string().min(1).max(300),
+                lighting: z.string().min(1).max(300)
+            })).min(2).max(3)
+        }),
         durationSec: z.int().gte(1),
         status: z.enum([
             'pending',
@@ -680,6 +700,8 @@ export const zVideoCreateProject = z.object({
         ]),
         jobId: z.uuid(),
         videoAssetId: z.uuid(),
+        currentMaterialVersionId: z.uuid(),
+        materialProcessing: z.boolean(),
         audioArtifactId: z.uuid(),
         subtitleCues: z.array(z.object({
             startSec: z.number().gte(0),
@@ -1960,6 +1982,15 @@ export const zUpdateVideoCreateProjectPath = z.object({
  */
 export const zUpdateVideoCreateProjectResponse = zVideoCreateProject;
 
+export const zClearVideoCreateScriptPath = z.object({
+    projectId: z.uuid()
+});
+
+/**
+ * Script cleared
+ */
+export const zClearVideoCreateScriptResponse = zVideoCreateProject;
+
 export const zSaveVideoCreateSectionBody = z.object({
     expectedVersionId: z.uuid(),
     text: z.string().min(1).max(1000),
@@ -2005,6 +2036,88 @@ export const zRegenerateVideoCreateSectionPath = z.object({
  */
 export const zRegenerateVideoCreateSectionResponse = zJob;
 
+export const zGetVideoCreateShotGenerationDraftPath = z.object({
+    projectId: z.uuid(),
+    shotId: z.uuid()
+});
+
+/**
+ * Resolved shot generation draft
+ */
+export const zGetVideoCreateShotGenerationDraftResponse = z.object({
+    shotId: z.uuid(),
+    ordinal: z.int().gte(1),
+    narration: z.string(),
+    duration: z.int().gte(4).lte(15),
+    prompt: z.string(),
+    generationPlan: z.object({
+        characterAppearance: z.string().min(1).max(500),
+        cameraView: z.string().min(1).max(300),
+        background: z.string().min(1).max(500),
+        lighting: z.string().min(1).max(300),
+        voice: z.string().min(1).max(300),
+        quality: z.string().min(1).max(300),
+        subshots: z.array(z.object({
+            action: z.string().min(1).max(500),
+            narration: z.string().min(1).max(1000),
+            expression: z.string().min(1).max(300),
+            voiceTone: z.string().min(1).max(300),
+            durationSec: z.int().gte(1).lte(15),
+            shotSize: z.string().min(1).max(100),
+            composition: z.string().min(1).max(300),
+            background: z.string().min(1).max(300),
+            lighting: z.string().min(1).max(300)
+        })).min(2).max(3)
+    }),
+    referenceMode: z.enum(['omni']),
+    attachments: z.array(z.object({
+        source: z.enum(['asset', 'portrait']),
+        assetId: z.uuid().optional(),
+        portraitId: z.int().gte(1).optional(),
+        label: z.string(),
+        name: z.string(),
+        mimeType: z.string(),
+        role: z.enum([
+            'reference_image',
+            'reference_video',
+            'reference_audio'
+        ]),
+        category: z.enum(['人物', '商品']).optional(),
+        url: z.string()
+    })),
+    executionMode: z.enum(['real', 'mock']),
+    postProcessAudio: z.object({
+        model: z.enum(['tts-1']),
+        voice: z.enum(['alloy']),
+        replacesNativeAudio: z.boolean()
+    })
+});
+
+export const zGenerateVideoCreateShotBody = z.object({
+    videoModel: zSeedanceModelId,
+    ratio: z.enum([
+        '9:16',
+        '16:9',
+        '1:1'
+    ]),
+    resolution: z.enum(['480p', '720p']),
+    generateAudio: z.boolean(),
+    prompt: z.string().min(20).max(10000),
+    duration: z.int().gte(4).lte(15),
+    referenceMode: z.enum(['omni']),
+    references: z.array(z.object({
+        assetId: z.uuid(),
+        label: z.string().min(1).max(20),
+        category: z.enum(['人物', '商品']).optional()
+    })).max(12),
+    usePortrait: z.boolean(),
+    portrait: z.object({
+        id: z.int().gte(1),
+        label: z.string().min(1).max(20),
+        category: z.enum(['人物'])
+    }).optional()
+});
+
 export const zGenerateVideoCreateShotPath = z.object({
     projectId: z.uuid(),
     shotId: z.uuid()
@@ -2023,7 +2136,7 @@ export const zBatchGenerateVideoCreateShotsBody = z.object({
         '1:1'
     ]),
     resolution: z.enum(['480p', '720p']),
-    generateAudio: z.literal(false)
+    generateAudio: z.boolean()
 });
 
 export const zBatchGenerateVideoCreateShotsPath = z.object({
@@ -2039,7 +2152,8 @@ export const zBatchGenerateVideoCreateShotsResponse = z.object({
 });
 
 export const zReplaceVideoCreateShotBody = z.object({
-    assetId: z.uuid()
+    assetId: z.uuid(),
+    source: z.enum(['library_replacement', 'upload_replacement'])
 });
 
 export const zReplaceVideoCreateShotPath = z.object({
@@ -2051,6 +2165,69 @@ export const zReplaceVideoCreateShotPath = z.object({
  * Replaced
  */
 export const zReplaceVideoCreateShotResponse = zVideoCreateProject;
+
+export const zListVideoCreateShotMaterialVersionsPath = z.object({
+    projectId: z.uuid(),
+    shotId: z.uuid()
+});
+
+/**
+ * Material version history
+ */
+export const zListVideoCreateShotMaterialVersionsResponse = z.object({
+    versions: z.array(z.object({
+        id: z.uuid(),
+        projectId: z.uuid(),
+        shotId: z.uuid(),
+        source: z.enum([
+            'ai_generated',
+            'library_replacement',
+            'upload_replacement',
+            'audio_replaced',
+            'subtitle_composed'
+        ]),
+        status: z.enum([
+            'pending',
+            'succeeded',
+            'failed'
+        ]),
+        storageKind: z.enum(['artifact', 'asset']),
+        contentId: z.uuid(),
+        inputVersionId: z.uuid(),
+        jobId: z.uuid(),
+        error: z.object({
+            code: z.string(),
+            message: z.string(),
+            retryable: z.boolean(),
+            requestId: z.string()
+        }).optional(),
+        available: z.boolean(),
+        createdAt: z.string(),
+        updatedAt: z.string()
+    }))
+});
+
+export const zApplyVideoCreateShotMaterialVersionPath = z.object({
+    projectId: z.uuid(),
+    shotId: z.uuid(),
+    versionId: z.uuid()
+});
+
+/**
+ * Applied
+ */
+export const zApplyVideoCreateShotMaterialVersionResponse = zVideoCreateProject;
+
+export const zProcessVideoCreateShotMaterialPath = z.object({
+    projectId: z.uuid(),
+    shotId: z.uuid(),
+    action: z.enum(['audio-replace', 'subtitle-compose'])
+});
+
+/**
+ * Accepted
+ */
+export const zProcessVideoCreateShotMaterialResponse = zJob;
 
 export const zUpdateVideoCreateShotSettingsBody = z.object({
     audioEnabled: z.boolean(),

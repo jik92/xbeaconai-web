@@ -79,6 +79,18 @@ export const VideoCreateShotStatusSchema = z.enum([
   "replaced",
 ]);
 
+export const VideoCreateMaterialVersionSourceSchema = z.enum([
+  "ai_generated",
+  "library_replacement",
+  "upload_replacement",
+  "audio_replaced",
+  "subtitle_composed",
+]);
+
+export const VideoCreateMaterialVersionStatusSchema = z.enum(["pending", "succeeded", "failed"]);
+
+export const VideoCreateMaterialStorageKindSchema = z.enum(["artifact", "asset"]);
+
 export const VideoCreateSubtitleCueSchema = z.object({
   startSec: z.number().nonnegative(),
   endSec: z.number().nonnegative(),
@@ -157,17 +169,59 @@ export const VideoCreateGeneratedScriptSchema = z.object({
         durationSec: z.number().int().min(1).max(180),
       }),
     )
-    .min(1)
+    .min(3)
     .max(12),
+});
+
+export const VideoCreateSubshotPlanSchema = z.object({
+  action: z.string().trim().min(1).max(500),
+  narration: z.string().trim().min(1).max(1_000),
+  expression: z.string().trim().min(1).max(300),
+  voiceTone: z.string().trim().min(1).max(300),
+  durationSec: z.number().int().min(1).max(15),
+  shotSize: z.string().trim().min(1).max(100),
+  composition: z.string().trim().min(1).max(300),
+  background: z.string().trim().min(1).max(300),
+  lighting: z.string().trim().min(1).max(300),
+});
+
+export const VideoCreateShotGenerationPlanSchema = z.object({
+  characterAppearance: z.string().trim().min(1).max(500),
+  cameraView: z.string().trim().min(1).max(300),
+  background: z.string().trim().min(1).max(500),
+  lighting: z.string().trim().min(1).max(300),
+  voice: z.string().trim().min(1).max(300),
+  quality: z.string().trim().min(1).max(300),
+  subshots: z.array(VideoCreateSubshotPlanSchema).min(2).max(3),
 });
 
 export const VideoCreateGeneratedStoryboardSchema = z.object({
   shots: z
     .array(
-      z.object({
-        prompt: z.string().trim().min(10).max(2_000),
-        durationSec: z.number().int().min(1).max(15),
-      }),
+      z
+        .object({
+          prompt: z.string().trim().min(10).max(2_000),
+          narration: z.string().trim().min(1).max(2_000),
+          durationSec: z.number().int().min(1).max(15),
+          generationPlan: VideoCreateShotGenerationPlanSchema,
+        })
+        .superRefine((shot, context) => {
+          const duration = shot.generationPlan.subshots.reduce((total, subshot) => total + subshot.durationSec, 0);
+          if (duration !== shot.durationSec)
+            context.addIssue({
+              code: "custom",
+              message: "子镜头时长之和必须等于当前分镜时长",
+              path: ["generationPlan", "subshots"],
+            });
+          const narration = shot.generationPlan.subshots.map((subshot) => subshot.narration).join("");
+          const normalize = (value: string) => value.replace(/\s/gu, "");
+          if (normalize(narration) !== normalize(shot.narration))
+            context.addIssue({
+              code: "custom",
+              message: "子镜头口播必须完整覆盖当前分镜口播",
+              path: ["generationPlan", "subshots"],
+            });
+        }),
     )
     .min(1)
     .max(12),
@@ -175,11 +229,16 @@ export const VideoCreateGeneratedStoryboardSchema = z.object({
 
 export type VideoCreateProjectStatus = z.infer<typeof VideoCreateProjectStatusSchema>;
 export type VideoCreateShotStatus = z.infer<typeof VideoCreateShotStatusSchema>;
+export type VideoCreateMaterialVersionSource = z.infer<typeof VideoCreateMaterialVersionSourceSchema>;
+export type VideoCreateMaterialVersionStatus = z.infer<typeof VideoCreateMaterialVersionStatusSchema>;
+export type VideoCreateMaterialStorageKind = z.infer<typeof VideoCreateMaterialStorageKindSchema>;
 export type VideoCreateSubtitleCue = z.infer<typeof VideoCreateSubtitleCueSchema>;
 export type VideoCreateInput = z.infer<typeof VideoCreateInputSchema>;
 export type VideoCreateRecommendation = z.infer<typeof VideoCreateRecommendationSchema>;
 export type VideoCreateGeneratedScript = z.infer<typeof VideoCreateGeneratedScriptSchema>;
 export type VideoCreateGeneratedStoryboard = z.infer<typeof VideoCreateGeneratedStoryboardSchema>;
+export type VideoCreateSubshotPlan = z.infer<typeof VideoCreateSubshotPlanSchema>;
+export type VideoCreateShotGenerationPlan = z.infer<typeof VideoCreateShotGenerationPlanSchema>;
 
 export const VIDEO_CREATE_TEXT_MODEL = "deepseek-v4-pro";
 export const VIDEO_CREATE_ANALYSIS_MODEL = "gpt-5.4-mini";

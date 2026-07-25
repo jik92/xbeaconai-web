@@ -21,7 +21,7 @@ import {
 } from "../../server/video-create/model";
 import type { VideoCreateSubtitleCue } from "../../server/video-create/types";
 import { VIDEO_CREATE_ANALYSIS_MODEL } from "../../server/video-create/types";
-import { videoCreateError } from "../../server/video-create/video-create-store";
+import { videoCreateError, videoCreateShotNarration } from "../../server/video-create/video-create-store";
 import { SeedanceVideoJob } from "./job-seedance-video";
 import type { JobHandlerContext, WorkerJobHandler } from "./types";
 
@@ -154,21 +154,31 @@ export const videoCreateJob: WorkerJobHandler = {
     if (!aggregate || aggregate.project.ownerUserId !== job.ownerUserId)
       throw new Error("VIDEO_CREATE_PROJECT_NOT_FOUND");
     const usesMockVideo = operation === "shot" && (job.values.__mockVideo === "true" || env.mockGenerateVideoApi);
-    const mode = usesMockVideo ? "mock" : operation === "compose" ? "local" : "real";
+    const localOperation = operation === "compose" || operation === "audio-replace" || operation === "subtitle-compose";
+    const mode = usesMockVideo ? "mock" : localOperation ? "local" : "real";
     const implementation =
       mode === "mock"
         ? env.mockGenerateVideoApi && job.values.__mockVideo !== "true"
           ? "ffmpeg-seedance-mock"
           : "video-create-test-mock"
         : mode === "local"
-          ? "ffmpeg-concat"
+          ? operation === "audio-replace"
+            ? "ffmpeg-audio-replace"
+            : operation === "subtitle-compose"
+              ? "ffmpeg-subtitle"
+              : "ffmpeg-concat"
           : operation === "analyze"
             ? "aihubmix-gpt-image-analysis"
             : operation === "shot"
               ? "aihubmix-video"
               : "aihubmix-text";
-    const model =
-      operation === "analyze" ? VIDEO_CREATE_ANALYSIS_MODEL : operation === "shot" ? job.videoModel : "deepseek-v4-pro";
+    const model = localOperation
+      ? undefined
+      : operation === "analyze"
+        ? VIDEO_CREATE_ANALYSIS_MODEL
+        : operation === "shot"
+          ? job.videoModel
+          : "deepseek-v4-pro";
     const currentStage = stage(job, operation, mode, implementation, model);
     context.change(job.id, {
       status: "processing",
@@ -181,9 +191,13 @@ export const videoCreateJob: WorkerJobHandler = {
               ? "生成分镜"
               : operation === "shot"
                 ? "生成分镜视频"
-                : operation === "compose"
-                  ? "合并视频"
-                  : "换一版",
+                : operation === "audio-replace"
+                  ? "替换配音"
+                  : operation === "subtitle-compose"
+                    ? "合成字幕"
+                    : operation === "compose"
+                      ? "合并视频"
+                      : "换一版",
       progress: 10,
       provenance: [currentStage],
       overallExecutionMode: mode,
@@ -227,9 +241,13 @@ export const videoCreateJob: WorkerJobHandler = {
         const shotId = job.values.shotId;
         const shot = aggregate.shots.find((item) => item.id === shotId);
         if (!shot) throw new Error("SHOT_NOT_FOUND");
-        projects.updateShot(shot.id, { status: "generating", jobId: job.id, attempts: shot.attempts + 1, error: null });
-        const section = aggregate.sections.find((item) => item.id === shot.scriptSectionId);
-        const narration = section?.currentVersion?.text.trim();
+        projects.updateShot(shot.id, {
+          ...(!shot.currentMaterialVersionId ? { status: "generating" as const } : {}),
+          jobId: job.id,
+          attempts: shot.attempts + 1,
+          error: null,
+        });
+        const narration = videoCreateShotNarration(aggregate, shot);
         if (!narration) throw new Error("SHOT_SCRIPT_NOT_AVAILABLE");
         const mockAudio = job.values.__mockAudio === "true";
         const audioStage = stage(
@@ -254,13 +272,19 @@ export const videoCreateJob: WorkerJobHandler = {
           currentStage.model = response.executionMode === "real" ? job.videoModel : undefined;
           artifact = await saveVideoArtifact(job, context, response.bytes, undefined, response.executionMode);
         }
-        projects.updateShot(shot.id, {
-          status: "succeeded",
-          videoAssetId: artifact.id,
-          audioArtifactId: audio.id,
-          subtitleCues,
-          error: null,
-        });
+        if (projects.getMaterialVersionByJobId(job.id))
+          projects.completePendingMaterialVersion({ jobId: job.id, storageKind: "artifact", contentId: artifact.id });
+        else
+          projects.createAndApplyMaterialVersion({
+            projectId,
+            shotId: shot.id,
+            source: "ai_generated",
+            storageKind: "artifact",
+            contentId: artifact.id,
+            inputVersionId: shot.currentMaterialVersionId,
+            jobId: job.id,
+          });
+        projects.updateShot(shot.id, { audioArtifactId: audio.id, subtitleCues, error: null });
         projects.setProject(projectId, { status: "storyboard_review", error: null });
         currentStage.completedAt = new Date().toISOString();
         context.change(job.id, {
@@ -272,6 +296,60 @@ export const videoCreateJob: WorkerJobHandler = {
           result: artifactResult(job, artifact, [audioStage, currentStage]),
         });
         return;
+      } else if (operation === "audio-replace" || operation === "subtitle-compose") {
+        if (!context.accounts) throw new Error("ACCOUNT_STORE_UNAVAILABLE");
+        const shotId = job.values.shotId;
+        const shot = aggregate.shots.find((item) => item.id === shotId);
+        const inputVersionId = job.values.inputMaterialVersionId;
+        if (!shot || !inputVersionId) throw new Error("SHOT_MATERIAL_VERSION_REQUIRED");
+        if (shot.currentMaterialVersionId !== inputVersionId) throw new Error("SHOT_MATERIAL_VERSION_CHANGED");
+        const version = projects.getMaterialVersion(projectId, shot.id, inputVersionId);
+        if (!version?.contentId || !version.storageKind || version.status !== "succeeded")
+          throw new Error("SHOT_VIDEO_NOT_AVAILABLE");
+        const inputPath =
+          version.storageKind === "artifact"
+            ? (() => {
+                const artifact = context.accounts?.getArtifact(job.ownerUserId, version.contentId ?? "");
+                if (!artifact) throw new Error("SHOT_VIDEO_NOT_AVAILABLE");
+                return resolve(env.dataDir, "results", artifact.storage_key);
+              })()
+            : (() => {
+                const asset = context.accounts?.getOwnedAsset(job.ownerUserId, version.contentId ?? "");
+                if (!asset?.mimeType.startsWith("video/")) throw new Error("SHOT_VIDEO_NOT_AVAILABLE");
+                return resolve(env.dataDir, "uploads", asset.storageKey);
+              })();
+        const temporaryFiles: string[] = [];
+        try {
+          const output = resolve(env.dataDir, "results", `${job.id}-${operation}.mp4`);
+          if (operation === "audio-replace") {
+            if (!shot.audioArtifactId) throw new Error("SHOT_AUDIO_NOT_AVAILABLE");
+            const audio = context.accounts.getArtifact(job.ownerUserId, shot.audioArtifactId);
+            if (!audio) throw new Error("SHOT_AUDIO_NOT_AVAILABLE");
+            await composeMedia(inputPath, resolve(env.dataDir, "results", audio.storage_key), output);
+          } else {
+            if (!shot.subtitleCues.length) throw new Error("SHOT_SUBTITLE_NOT_AVAILABLE");
+            const subtitlePath = resolve(env.dataDir, "results", `${job.id}.srt`);
+            await Bun.write(subtitlePath, cuesToSrt(shot.subtitleCues));
+            temporaryFiles.push(subtitlePath);
+            await burnSubtitleFile(inputPath, subtitlePath, output);
+          }
+          temporaryFiles.push(output);
+          const artifact = await saveVideoArtifact(job, context, undefined, output, "local");
+          projects.completePendingMaterialVersion({ jobId: job.id, storageKind: "artifact", contentId: artifact.id });
+          projects.setProject(projectId, { status: "storyboard_review", error: null });
+          currentStage.completedAt = new Date().toISOString();
+          context.change(job.id, {
+            status: "succeeded",
+            stage: "已完成",
+            progress: 100,
+            provenance: [currentStage],
+            overallExecutionMode: "local",
+            result: artifactResult(job, artifact, [currentStage]),
+          });
+          return;
+        } finally {
+          await Promise.all(temporaryFiles.map((file) => unlink(file).catch(() => undefined)));
+        }
       } else if (operation === "compose") {
         if (!aggregate.canCompose) throw new Error("SHOTS_NOT_READY");
         let artifact: Awaited<ReturnType<typeof saveVideoArtifact>>;
@@ -342,10 +420,28 @@ export const videoCreateJob: WorkerJobHandler = {
     } catch (error) {
       const apiError = videoCreateError(error);
       const shotId = job.values.shotId;
-      if (shotId) projects.updateShot(shotId, { status: "failed", error: apiError });
+      if (shotId) {
+        const previousShotStatus = job.values.previousShotStatus as
+          | "pending"
+          | "succeeded"
+          | "failed"
+          | "replaced"
+          | undefined;
+        if (projects.getMaterialVersionByJobId(job.id))
+          projects.failPendingMaterialVersion(
+            job.id,
+            apiError,
+            operation === "shot" && !job.values.inputMaterialVersionId ? "failed" : previousShotStatus,
+          );
+        else projects.updateShot(shotId, { status: "failed", error: apiError });
+      }
       projects.setProject(projectId, {
         status:
-          operation === "shot" ? "storyboard_review" : operation === "regenerate-section" ? "script_review" : "failed",
+          operation === "shot" || operation === "audio-replace" || operation === "subtitle-compose"
+            ? "storyboard_review"
+            : operation === "regenerate-section"
+              ? "script_review"
+              : "failed",
         error: apiError,
       });
       context.change(job.id, { status: "failed", stage: "生成失败", error: apiError });

@@ -64,6 +64,27 @@
       "when": 1784751559534,
       "tag": "0008_premium_proemial_gods",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1784984831655,
+      "tag": "0009_charming_donald_blake",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1784986162783,
+      "tag": "0010_chunky_moonstone",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1784988089213,
+      "tag": "0011_slow_whirlwind",
+      "breakpoints": true
     }
   ]
 }

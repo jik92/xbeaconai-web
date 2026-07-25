@@ -463,10 +463,15 @@ export const videoCreateShots = sqliteTable(
       .references(() => videoCreateScriptSections.id),
     ordinal: integer("ordinal").notNull(),
     prompt: text("prompt").notNull(),
+    narration: text("narration").notNull().default(""),
+    generationPlan: text("generation_plan_json", { mode: "json" }).$type<
+      import("../video-create/types").VideoCreateShotGenerationPlan
+    >(),
     durationSec: integer("duration_sec").notNull(),
     status: text("status").$type<import("../video-create/types").VideoCreateShotStatus>().notNull().default("pending"),
     jobId: text("job_id").references(() => jobs.id),
     videoAssetId: text("video_asset_id"),
+    currentMaterialVersionId: text("current_material_version_id"),
     audioArtifactId: text("audio_artifact_id"),
     subtitleCues: text("subtitle_cues_json", { mode: "json" })
       .$type<import("../video-create/types").VideoCreateSubtitleCue[]>()
@@ -482,6 +487,33 @@ export const videoCreateShots = sqliteTable(
   (table) => [
     uniqueIndex("video_create_shots_project_ordinal_idx").on(table.projectId, table.ordinal),
     index("video_create_shots_project_idx").on(table.projectId),
+  ],
+);
+
+export const videoCreateMaterialVersions = sqliteTable(
+  "video_create_material_versions",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => videoCreateProjects.id),
+    shotId: text("shot_id")
+      .notNull()
+      .references(() => videoCreateShots.id, { onDelete: "cascade" }),
+    source: text("source").$type<import("../video-create/types").VideoCreateMaterialVersionSource>().notNull(),
+    status: text("status").$type<import("../video-create/types").VideoCreateMaterialVersionStatus>().notNull(),
+    storageKind: text("storage_kind").$type<import("../video-create/types").VideoCreateMaterialStorageKind>(),
+    contentId: text("content_id"),
+    inputVersionId: text("input_version_id"),
+    jobId: text("job_id").references(() => jobs.id),
+    error: text("error_json", { mode: "json" }).$type<JobRecord["error"]>(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    index("video_create_material_versions_shot_created_idx").on(table.shotId, table.createdAt),
+    index("video_create_material_versions_project_idx").on(table.projectId),
+    uniqueIndex("video_create_material_versions_job_idx").on(table.jobId),
   ],
 );
 

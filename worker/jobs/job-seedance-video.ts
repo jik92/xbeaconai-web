@@ -89,8 +89,9 @@ export class SeedanceVideoJob {
         if (!kind)
           throw new SeedanceFlowError("UNSUPPORTED_REFERENCE_TYPE", `Seedance 不支持素材类型 ${asset.mimeType}`, false);
         counts.set(kind, (counts.get(kind) ?? 0) + 1);
-        if ((counts.get(kind) ?? 0) > 1)
-          throw new SeedanceFlowError("TOO_MANY_REFERENCES", `每类最多上传一个${kind}参考`, false);
+        const countLimit = kind === "image" ? 9 : 3;
+        if ((counts.get(kind) ?? 0) > countLimit)
+          throw new SeedanceFlowError("TOO_MANY_REFERENCES", `${kind}参考最多上传 ${countLimit} 个`, false);
         const limit = kind === "image" ? 10 * 1024 * 1024 : kind === "video" ? 200 * 1024 * 1024 : 50 * 1024 * 1024;
         if (asset.byteSize > limit)
           throw new SeedanceFlowError("REFERENCE_TOO_LARGE", `${kind}参考超过大小限制`, false);
@@ -122,17 +123,20 @@ export class SeedanceVideoJob {
           extension: extname(asset.storageKey),
         });
       }
-      if (prepared.length > 3 || totalBytes > 250 * 1024 * 1024)
+      if (prepared.length > 12 || totalBytes > 250 * 1024 * 1024)
         throw new SeedanceFlowError("REFERENCES_TOO_LARGE", "参考素材总量超过限制", false);
 
       const references: Array<{ kind: SeedanceReferenceKind; url: string }> = [];
       if (job.values.portraitId) {
         const portrait = getPortraitById(Number(job.values.portraitId));
         if (!portrait) throw new SeedanceFlowError("PORTRAIT_NOT_AVAILABLE", "所选人像不存在", false);
-        if ((counts.get("image") ?? 0) > 0)
-          throw new SeedanceFlowError("TOO_MANY_REFERENCES", "每类最多上传一个图片参考", false);
+        if ((counts.get("image") ?? 0) >= 9)
+          throw new SeedanceFlowError("TOO_MANY_REFERENCES", "image参考最多上传 9 个", false);
+        counts.set("image", (counts.get("image") ?? 0) + 1);
         references.push({ kind: "image", url: portrait.source_url });
       }
+      if (references.length + prepared.length > 12)
+        throw new SeedanceFlowError("TOO_MANY_REFERENCES", "参考素材总数最多 12 个", false);
       for (const item of prepared) {
         if (store.get(job.id)?.cancelRequested) throw new SeedanceFlowError("JOB_CANCELLED", "任务已取消", false);
         const uploaded = await ossutils.putStagedFile({
