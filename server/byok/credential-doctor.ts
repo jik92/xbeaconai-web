@@ -1,6 +1,7 @@
 import TosClient from "@volcengine/tos-sdk";
 import { env } from "../env";
 import { AihubmixClient } from "../providers/aihubmix";
+import { ArkSeedanceClient } from "../providers/ark-seedance";
 import {
   type ProviderCredentialName,
   type ProviderId,
@@ -86,6 +87,15 @@ export const activeCredentialDoctorProviders: CredentialDoctorProvider[] = [
     credentials: ["OPENAI_KEY"],
     probe: async (values, signal) => {
       const models = await new AihubmixClient(env.openaiBaseUrl, values.OPENAI_KEY).listModels(signal);
+      return `鉴权通过，可读取 ${models.length} 个模型`;
+    },
+  },
+  {
+    providerId: "ark",
+    provider: "火山方舟",
+    credentials: ["ARK_API_KEY"],
+    probe: async (values, signal) => {
+      const models = await new ArkSeedanceClient(undefined, values.ARK_API_KEY).listModels(signal);
       return `鉴权通过，可读取 ${models.length} 个模型`;
     },
   },

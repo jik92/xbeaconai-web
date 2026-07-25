@@ -1,6 +1,11 @@
 import { z } from "@hono/zod-openapi";
 import { seedanceModelIds } from "../models/video-models";
 
+export const PortraitReferenceSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("general"), portraitId: z.number().int().min(1) }),
+  z.object({ type: z.literal("custom"), assetId: z.string().uuid() }),
+]);
+
 export const videoCreateMarketingGoals = ["电商转化", "品牌曝光", "App下载", "门店到店", "直播引流"] as const;
 export const videoCreateTargetAudiences = [
   "18-24岁女性",
@@ -100,6 +105,8 @@ export const VideoCreateSubtitleCueSchema = z.object({
 export const VideoCreateInputSchema = z
   .object({
     productAssetIds: z.array(z.string().uuid()).min(1).max(6),
+    portraitReference: PortraitReferenceSchema.optional(),
+    /** @deprecated Kept only for projects persisted before explicit portrait references. */
     portraitId: z.number().int().min(1).optional(),
     scene: z.string().trim().min(1).max(40),
     productName: z.string().trim().max(60).default(""),

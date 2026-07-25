@@ -4,11 +4,12 @@ import { extname, resolve } from "node:path";
 import { env } from "../../server/env";
 import { generateNumberedMockVideo, type MockVideoRatio, probeMedia } from "../../server/media/ffmpeg";
 import type { SeedanceModelId, SeedanceReferenceKind } from "../../server/models/video-models";
-import { getPortraitById } from "../../server/portraits/catalog";
-import { aihubmix } from "../../server/providers/aihubmix";
+import { resolvePortraitReference } from "../../server/portraits/portrait-resolver";
+import { arkSeedance } from "../../server/providers/ark-seedance";
 import { ossutils } from "../../server/storage/ossutils";
 import type { JobRecord } from "../../server/types";
 import type { JobHandlerContext } from "./types";
+import { parsePortraitReference } from "../../shared/portraits/portrait-reference";
 import { assetIdsFromValues } from "./utils";
 import { materializeRemoteAsset } from "./video-remix-assets";
 
@@ -146,13 +147,21 @@ export class SeedanceVideoJob {
         throw new SeedanceFlowError("REFERENCES_TOO_LARGE", "参考素材总量超过限制", false);
 
       const references: Array<{ kind: SeedanceReferenceKind; url: string }> = [];
-      if (job.values.portraitId) {
-        const portrait = getPortraitById(Number(job.values.portraitId));
-        if (!portrait) throw new SeedanceFlowError("PORTRAIT_NOT_AVAILABLE", "所选人像不存在", false);
+      const portraitReference = parsePortraitReference(job.values.portraitReference, job.values.portraitId);
+      if (portraitReference) {
+        if (!this.context.customPortraits)
+          throw new SeedanceFlowError("PORTRAIT_STORE_UNAVAILABLE", "人像服务不可用", false);
+        const portrait = resolvePortraitReference({
+          ownerUserId: job.ownerUserId,
+          reference: portraitReference,
+          accounts,
+          customPortraits: this.context.customPortraits,
+        });
+        if (!portrait) throw new SeedanceFlowError("PORTRAIT_NOT_AVAILABLE", "所选人像不存在或尚未就绪", false);
         if ((counts.get("image") ?? 0) >= 9)
           throw new SeedanceFlowError("TOO_MANY_REFERENCES", "image参考最多上传 9 个", false);
         counts.set("image", (counts.get("image") ?? 0) + 1);
-        references.push({ kind: "image", url: portrait.source_url });
+        references.push({ kind: "image", url: portrait.arkAssetUri });
       }
       if (references.length + prepared.length > 12)
         throw new SeedanceFlowError("TOO_MANY_REFERENCES", "参考素材总数最多 12 个", false);
@@ -225,6 +234,12 @@ export class SeedanceVideoJob {
       }
     }
     let taskId = job.providerTaskId;
+    if (taskId && job.executionPlan.some((stage) => stage.implementation === "aihubmix-video"))
+      throw new SeedanceFlowError(
+        "LEGACY_VIDEO_PROVIDER_TASK_UNSUPPORTED",
+        "该任务由已移除的 AIHubMix 视频通道提交，无法使用 Ark 继续轮询，请重新生成",
+        false,
+      );
     let terminalConfirmed = false;
     let reconciliationReason: "cancel" | "timeout" | undefined;
     if (!taskId) {
@@ -241,7 +256,7 @@ export class SeedanceVideoJob {
       this.context.change(job.id, { providerStatus: "submitting" });
       try {
         const settings = seedanceVideoSettings(job.values);
-        const created = await aihubmix.createSeedanceVideo({
+        const created = await arkSeedance.createVideo({
           model,
           prompt:
             job.values.prompt ||
@@ -264,7 +279,7 @@ export class SeedanceVideoJob {
           providerDeadlineAt: new Date(submittedAt.getTime() + 20 * 60_000).toISOString(),
         });
       } catch (error) {
-        const definitelyRejected = error instanceof Error && /AIHUBMIX_4(00|01|03|04|13|22):/.test(error.message);
+        const definitelyRejected = error instanceof Error && /ARK_4(00|01|03|04|13|22):/.test(error.message);
         if (!definitelyRejected) {
           this.context.change(job.id, { providerStatus: "submission_unknown" });
           throw new SeedanceFlowError(
@@ -292,7 +307,7 @@ export class SeedanceVideoJob {
         if (reconciliationReason && !cancelAttempted) {
           cancelAttempted = true;
           try {
-            const state = await aihubmix.cancelVideo(taskId);
+            const state = await arkSeedance.cancelVideo(taskId);
             this.context.change(job.id, {
               providerCancelState: state,
               providerStatus: "reconciling",
@@ -306,9 +321,9 @@ export class SeedanceVideoJob {
             });
           }
         }
-        let task: Awaited<ReturnType<typeof aihubmix.getVideo>>;
+        let task: Awaited<ReturnType<typeof arkSeedance.getVideo>>;
         try {
-          task = await aihubmix.getVideo(taskId);
+          task = await arkSeedance.getVideo(taskId);
         } catch {
           this.context.change(job.id, {
             providerStatus: "reconciling",
@@ -323,15 +338,15 @@ export class SeedanceVideoJob {
           continue;
         }
         this.context.change(job.id, { providerStatus: reconciliationReason ? "reconciling" : task.status });
-        if (["completed", "succeeded"].includes(task.status)) {
+        if (task.status === "succeeded") {
           terminalConfirmed = true;
           if (reconciliationReason === "cancel") throw new SeedanceFlowError("JOB_CANCELLED", "任务已取消", false);
           if (reconciliationReason === "timeout")
             throw new SeedanceFlowError("UPSTREAM_COMPLETED_AFTER_TIMEOUT", "上游在本地超时后完成，结果已丢弃", true);
           const requestedDurationSec = seedanceVideoSettings(job.values).duration;
-          if (task.duration !== undefined)
-            assertSeedanceDuration(requestedDurationSec, Number(task.duration), "上游终态返回时长");
-          const downloaded = await aihubmix.downloadVideo(taskId);
+          const videoUrl = task.content?.video_url;
+          if (!videoUrl) throw new SeedanceFlowError("ARK_VIDEO_URL_MISSING", "Ark 视频任务成功但未返回下载地址", true);
+          const downloaded = await arkSeedance.downloadVideo(videoUrl);
           const tempDir = await mkdtemp(resolve(tmpdir(), "yaozuo-seedance-result-"));
           const output = resolve(tempDir, "result.mp4");
           try {
@@ -344,7 +359,7 @@ export class SeedanceVideoJob {
             return {
               ...downloaded,
               executionMode: "real" as const,
-              implementation: "aihubmix-video" as const,
+              implementation: "ark-seedance-video" as const,
               durationSec,
             };
           } finally {
@@ -354,7 +369,7 @@ export class SeedanceVideoJob {
         if (["failed", "cancelled", "expired"].includes(task.status)) {
           terminalConfirmed = true;
           if (reconciliationReason === "cancel") throw new SeedanceFlowError("JOB_CANCELLED", "任务已取消", false);
-          throw new SeedanceFlowError(`AIHUBMIX_VIDEO_${task.status.toUpperCase()}`, "视频生成上游任务失败", true);
+          throw new SeedanceFlowError(`ARK_VIDEO_${task.status.toUpperCase()}`, "视频生成上游任务失败", true);
         }
         await wait(reconciliationReason ? 60_000 : 5_000);
       }

@@ -136,9 +136,9 @@ export function VideoCreateShotGenerationDialog({
           ? [{ assetId: attachment.assetId, label: attachment.label, category: attachment.category }]
           : [],
       ),
-      usePortrait: Boolean(portrait?.portraitId),
-      ...(portrait?.portraitId
-        ? { portrait: { id: portrait.portraitId, label: portrait.label, category: "人物" as const } }
+      usePortrait: Boolean(portrait?.portraitReference),
+      ...(portrait?.portraitReference
+        ? { portrait: { reference: portrait.portraitReference, label: portrait.label, category: "人物" as const } }
         : {}),
     };
   }, [attachments, duration, generateAudio, model, prompt, ratio, resolution]);

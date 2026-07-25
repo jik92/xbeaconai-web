@@ -50,15 +50,15 @@ describe("video create action boundaries", () => {
     expect(source).not.toContain('mutateInput("priority"');
   });
 
-  test("defaults both the new-project form and AI template to three segments", () => {
+  test("defaults both the new-project form and AI template to one segment", () => {
     const pageSource = readFileSync(
       resolve(import.meta.dir, "../../web/features/video-create/video-create-page.tsx"),
       "utf8",
     );
     const modelSource = readFileSync(resolve(import.meta.dir, "../../server/video-create/model.ts"), "utf8");
-    expect(pageSource).toContain("segmentCount: 3");
-    expect(modelSource).toContain('"segmentCount":3');
-    expect(modelSource).not.toContain('"segmentCount":1');
+    expect(pageSource).toContain("segmentCount: 1");
+    expect(modelSource).toContain('"segmentCount":1');
+    expect(modelSource).not.toContain('"segmentCount":3');
   });
 
   test("keeps script semantics independent from the requested storyboard count", () => {

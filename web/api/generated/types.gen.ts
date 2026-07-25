@@ -62,7 +62,7 @@ export type RechargeOrder = {
     createdAt: string;
 };
 
-export type ProviderId = 'aihubmix' | 'volc-speech' | 'tos' | 'mediakit' | 'qwen-audio';
+export type ProviderId = 'aihubmix' | 'ark' | 'volc-speech' | 'tos' | 'mediakit' | 'qwen-audio';
 
 export type AssetKind = 'media' | 'product' | 'portrait' | 'voice';
 
@@ -78,9 +78,9 @@ export type AssetFolder = {
 
 export type AiToolModuleId = 'ai-generate' | 'video-cut' | 'media-understand' | 'video-mashup' | 'voice-clone' | 'video-renewal' | 'subtitle-erase' | 'video-enhancement' | 'kickart';
 
-export type ProviderCredentialName = 'OPENAI_KEY' | 'VOLC_SPEECH_API_KEY_ID' | 'VOLC_SPEECH_API_KEY' | 'TOS_ACCESS_KEY_ID' | 'TOS_SECRET_ACCESS_KEY' | 'MEDIAKIT_API_KEY' | 'QWEN_AUDIO_API_KEY' | 'QWEN_AUDIO_WORKSPACE_ID';
+export type ProviderCredentialName = 'OPENAI_KEY' | 'ARK_API_KEY' | 'VOLC_SPEECH_API_KEY_ID' | 'VOLC_SPEECH_API_KEY' | 'TOS_ACCESS_KEY_ID' | 'TOS_SECRET_ACCESS_KEY' | 'MEDIAKIT_API_KEY' | 'QWEN_AUDIO_API_KEY' | 'QWEN_AUDIO_WORKSPACE_ID';
 
-export type JobModuleId = 'video-remix' | 'video-create' | 'ad-script' | 'ai-generate' | 'video-cut' | 'media-understand' | 'video-mashup' | 'voice-clone' | 'video-renewal' | 'subtitle-erase' | 'video-enhancement' | 'video-extract' | 'video-editor' | 'kickart' | 'douyin-video-import' | 'share-content-import';
+export type JobModuleId = 'video-remix' | 'video-create' | 'ad-script' | 'ai-generate' | 'video-cut' | 'media-understand' | 'video-mashup' | 'voice-clone' | 'video-renewal' | 'subtitle-erase' | 'video-enhancement' | 'video-extract' | 'video-editor' | 'kickart' | 'douyin-video-import' | 'share-content-import' | 'portrait-asset-register';
 
 export type SeedanceModelId = 'doubao-seedance-2-0-260128' | 'doubao-seedance-2-0-mini-260615' | 'doubao-seedance-2-0-fast-260128';
 
@@ -376,6 +376,13 @@ export type VideoCreateProject = {
 
 export type VideoCreateInput = {
     productAssetIds: Array<string>;
+    portraitReference?: {
+        type: 'general';
+        portraitId: number;
+    } | {
+        type: 'custom';
+        assetId: string;
+    };
     portraitId?: number;
     scene: string;
     productName?: string;
@@ -1369,6 +1376,107 @@ export type UploadMediaResponses = {
 };
 
 export type UploadMediaResponse = UploadMediaResponses[keyof UploadMediaResponses];
+
+export type ListCustomPortraitsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/portraits/custom';
+};
+
+export type ListCustomPortraitsResponses = {
+    /**
+     * Current user's custom Ark virtual portraits
+     */
+    200: {
+        portraits: Array<{
+            type: 'custom';
+            assetId: string;
+            jobId?: string;
+            name: string;
+            description?: string;
+            imageUrl: string;
+            status: 'queued' | 'processing' | 'active' | 'failed';
+            errorCode?: string;
+            errorMessage?: string;
+            createdAt: string;
+            updatedAt: string;
+        }>;
+    };
+};
+
+export type ListCustomPortraitsResponse = ListCustomPortraitsResponses[keyof ListCustomPortraitsResponses];
+
+export type RegisterCustomPortraitData = {
+    body: {
+        assetId: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/portraits/custom';
+};
+
+export type RegisterCustomPortraitErrors = {
+    /**
+     * Portrait source asset not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Portrait source asset too large
+     */
+    413: ApiErrorResponse;
+    /**
+     * Portrait source asset invalid
+     */
+    415: ApiErrorResponse;
+    /**
+     * Ark portrait service unavailable
+     */
+    503: ApiErrorResponse;
+};
+
+export type RegisterCustomPortraitError = RegisterCustomPortraitErrors[keyof RegisterCustomPortraitErrors];
+
+export type RegisterCustomPortraitResponses = {
+    /**
+     * Custom portrait registration already exists
+     */
+    200: {
+        portrait: {
+            type: 'custom';
+            assetId: string;
+            jobId?: string;
+            name: string;
+            description?: string;
+            imageUrl: string;
+            status: 'queued' | 'processing' | 'active' | 'failed';
+            errorCode?: string;
+            errorMessage?: string;
+            createdAt: string;
+            updatedAt: string;
+        };
+    };
+    /**
+     * Custom portrait registration queued
+     */
+    202: {
+        portrait: {
+            type: 'custom';
+            assetId: string;
+            jobId?: string;
+            name: string;
+            description?: string;
+            imageUrl: string;
+            status: 'queued' | 'processing' | 'active' | 'failed';
+            errorCode?: string;
+            errorMessage?: string;
+            createdAt: string;
+            updatedAt: string;
+        };
+    };
+};
+
+export type RegisterCustomPortraitResponse = RegisterCustomPortraitResponses[keyof RegisterCustomPortraitResponses];
 
 export type ListAssetsData = {
     body?: never;
@@ -2382,6 +2490,13 @@ export type GetVideoRemixProjectResponses = {
             };
             portraitAssets?: Array<{
                 id?: number | string | unknown;
+                reference?: {
+                    type: 'general';
+                    portraitId: number;
+                } | {
+                    type: 'custom';
+                    assetId: string;
+                };
                 assetName: string;
                 fileInfo: Array<{
                     fileUrl: string;
@@ -3129,6 +3244,13 @@ export type GetVideoCreateShotGenerationDraftResponses = {
         attachments: Array<{
             source: 'asset' | 'portrait';
             assetId?: string;
+            portraitReference?: {
+                type: 'general';
+                portraitId: number;
+            } | {
+                type: 'custom';
+                assetId: string;
+            };
             portraitId?: number;
             label: string;
             name: string;
@@ -3164,7 +3286,13 @@ export type GenerateVideoCreateShotData = {
         }>;
         usePortrait: boolean;
         portrait?: {
-            id: number;
+            reference: {
+                type: 'general';
+                portraitId: number;
+            } | {
+                type: 'custom';
+                assetId: string;
+            };
             label: string;
             category: '人物';
         };

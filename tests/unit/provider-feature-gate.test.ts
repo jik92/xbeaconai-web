@@ -16,13 +16,14 @@ describe("Provider feature gate", () => {
     expect(moduleFeatureAvailability("voice-clone", isVerified).enabled).toBe(false);
     expect(moduleFeatureAvailability("video-remix", isVerified)).toMatchObject({
       enabled: false,
-      unavailableProviders: ["tos"],
+      unavailableProviders: ["ark", "tos"],
     });
     expect(moduleFeatureAvailability("subtitle-erase", isVerified)).toMatchObject({
       enabled: false,
       unavailableProviders: ["mediakit", "tos"],
     });
     expect(allProviderFeatureAvailability(isVerified).operations.assetUpload.enabled).toBe(false);
+    expect(allProviderFeatureAvailability(isVerified).operations.portraitCreation.enabled).toBe(false);
   });
 
   test("enables new voice-clone tasks only through verified Qwen with TOS", () => {
@@ -38,7 +39,7 @@ describe("Provider feature gate", () => {
 
   test("keeps static menuFeatures decisions separate from Provider verification", () => {
     expect(isModuleOpen("ai-generate")).toBe(false);
-    expect(moduleProviderRequirements["ai-generate"]).toEqual(["aihubmix"]);
+    expect(moduleProviderRequirements["ai-generate"]).toEqual(["aihubmix", "ark"]);
     expect(isModuleOpen("video-cut")).toBe(true);
   });
 });

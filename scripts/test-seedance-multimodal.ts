@@ -20,7 +20,7 @@ const capabilityReport = (await capabilitySource.json()) as {
 };
 await Bun.write(
   resolve(tempDir, "capabilities.json"),
-  `${JSON.stringify({ ...capabilityReport, entries: (capabilityReport.entries ?? []).filter((entry) => entry.id.startsWith("aihubmix-seedance-")) }, null, 2)}\n`,
+  `${JSON.stringify({ ...capabilityReport, entries: (capabilityReport.entries ?? []).filter((entry) => entry.id.startsWith("ark-seedance-")) }, null, 2)}\n`,
 );
 const [{ accounts, app, queue, store }, { env }, { JobProcessor }, { createWorkerRedisConnection }] = await Promise.all(
   [import("../server/app"), import("../server/env"), import("../worker/job-processor"), import("../worker/redis")],
@@ -42,6 +42,14 @@ await generateSampleVideo(fixtureVideo);
 await extractFrame(fixtureVideo, fixtureImage);
 await extractAudio(fixtureVideo, fixtureAudio);
 const request = (path: string, init: RequestInit = {}) => app.request(`http://${env.host}:${env.port}${path}`, init);
+interface MatrixJob {
+  id: string;
+  status: string;
+  providerTaskId?: string;
+  stagingKeys?: string[];
+  error?: unknown;
+  result?: { artifacts?: Array<{ mimeType?: string; url?: string }> };
+}
 const password = "SeedanceMatrix12345";
 const phone = `139${Date.now().toString().slice(-8)}`;
 const smsCode = await request("/api/auth/sms-code", {
@@ -124,17 +132,18 @@ try {
           }),
         });
         if (response.status !== 202) throw new Error(`CREATE_JOB_${response.status}:${await response.text()}`);
-        let job = (await response.json()) as any;
+        let job = (await response.json()) as MatrixJob;
         const deadline = Date.now() + 25 * 60_000;
         while (!["succeeded", "failed", "cancelled"].includes(job.status) && Date.now() < deadline) {
           await Bun.sleep(5_000);
           const status = await request(`/api/jobs/${job.id}`, { headers: auth });
-          job = await status.json();
+          job = (await status.json()) as MatrixJob;
         }
         if (job.status !== "succeeded") throw new Error(`JOB_${job.status}:${JSON.stringify(job.error ?? {})}`);
-        const artifact = job.result?.artifacts?.find((item: any) => item.mimeType?.startsWith("video/") && item.url);
-        if (!artifact) throw new Error("VIDEO_ARTIFACT_MISSING");
-        const artifactResponse = await request(artifact.url, { headers: auth });
+        const artifact = job.result?.artifacts?.find((item) => item.mimeType?.startsWith("video/") && item.url);
+        const artifactUrl = artifact?.url;
+        if (!artifactUrl) throw new Error("VIDEO_ARTIFACT_MISSING");
+        const artifactResponse = await request(artifactUrl, { headers: auth });
         if (!artifactResponse.ok) throw new Error(`ARTIFACT_${artifactResponse.status}`);
         const path = resolve(outputDir, `${model}-${scenario.id}.mp4`);
         await Bun.write(path, new Uint8Array(await artifactResponse.arrayBuffer()));

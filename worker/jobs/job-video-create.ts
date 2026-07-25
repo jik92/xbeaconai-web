@@ -10,9 +10,11 @@ import {
   probeMedia,
 } from "../../server/media/ffmpeg";
 import { isSeedanceModelId } from "../../server/models/video-models";
-import { getPortraitById } from "../../server/portraits/catalog";
+import { resolvePortraitReference } from "../../server/portraits/portrait-resolver";
 import { aihubmix } from "../../server/providers/aihubmix";
+import { ossutils } from "../../server/storage/ossutils";
 import type { JobRecord, StageProvenance } from "../../server/types";
+import { normalizePortraitReference } from "../../shared/portraits/portrait-reference";
 import {
   analyzeVideoCreateProduct,
   generateVideoCreateScript,
@@ -37,7 +39,7 @@ function stage(
     capability,
     executionMode,
     implementation,
-    provider: executionMode === "real" ? "aihubmix" : undefined,
+    provider: executionMode !== "real" ? undefined : implementation === "ark-seedance-video" ? "ark" : "aihubmix",
     model: executionMode === "real" ? model : undefined,
     startedAt: new Date().toISOString(),
   };
@@ -218,7 +220,7 @@ export const videoCreateJob: WorkerJobHandler = {
           : operation === "analyze"
             ? "aihubmix-gpt-image-analysis"
             : operation === "shot"
-              ? "aihubmix-video"
+              ? "ark-seedance-video"
               : "aihubmix-text";
     const model = localOperation
       ? undefined
@@ -258,11 +260,35 @@ export const videoCreateJob: WorkerJobHandler = {
         );
         if (assets.some((asset) => !asset?.mimeType.startsWith("image/")))
           throw new Error("PRODUCT_IMAGE_NOT_AVAILABLE");
-        const portrait = getPortraitById(aggregate.project.input.portraitId);
-        if (aggregate.project.input.portraitId && !portrait) throw new Error("PORTRAIT_NOT_AVAILABLE");
+        const portraitReference = normalizePortraitReference(
+          aggregate.project.input.portraitReference,
+          aggregate.project.input.portraitId,
+        );
+        if (portraitReference && !context.customPortraits) throw new Error("PORTRAIT_STORE_UNAVAILABLE");
+        const portrait =
+          portraitReference && context.customPortraits
+            ? resolvePortraitReference({
+                ownerUserId: job.ownerUserId,
+                reference: portraitReference,
+                accounts: context.accounts,
+                customPortraits: context.customPortraits,
+              })
+            : undefined;
+        if (portraitReference && !portrait) throw new Error("PORTRAIT_NOT_AVAILABLE");
+        const portraitAnalysisInput = portrait
+          ? {
+              name: portrait.name,
+              source_url:
+                portraitReference?.type === "custom"
+                  ? ossutils.createSignedReadUrl(
+                      context.accounts.getOwnedAsset(job.ownerUserId, portraitReference.assetId)!.storageKey,
+                    )
+                  : portrait.imageUrl,
+            }
+          : undefined;
         const recommendation = await analyzeVideoCreateProduct(
           assets.filter((asset): asset is NonNullable<typeof asset> => Boolean(asset)),
-          portrait,
+          portraitAnalysisInput,
         );
         projects.setRecommendation(projectId, recommendation);
       } else if (operation === "script") {
@@ -283,7 +309,20 @@ export const videoCreateJob: WorkerJobHandler = {
         });
         projects.setProject(projectId, { status: "script_review" });
       } else if (operation === "storyboard") {
-        const generated = await generateVideoCreateStoryboard(aggregate);
+        const portraitReference = normalizePortraitReference(
+          aggregate.project.input.portraitReference,
+          aggregate.project.input.portraitId,
+        );
+        const portrait =
+          portraitReference && context.accounts && context.customPortraits
+            ? resolvePortraitReference({
+                ownerUserId: job.ownerUserId,
+                reference: portraitReference,
+                accounts: context.accounts,
+                customPortraits: context.customPortraits,
+              })
+            : undefined;
+        const generated = await generateVideoCreateStoryboard(aggregate, portrait?.name);
         projects.replaceShots(projectId, generated);
       } else if (operation === "shot") {
         const shotId = job.values.shotId;
@@ -341,7 +380,7 @@ export const videoCreateJob: WorkerJobHandler = {
           const subtitleCues = buildSubtitleCues(narration, subtitleDurationSec);
           currentStage.executionMode = response.executionMode;
           currentStage.implementation = response.implementation;
-          currentStage.provider = response.executionMode === "real" ? "aihubmix" : undefined;
+          currentStage.provider = response.executionMode === "real" ? "ark" : undefined;
           currentStage.model = response.executionMode === "real" ? job.videoModel : undefined;
           artifact = await saveVideoArtifact(
             job,

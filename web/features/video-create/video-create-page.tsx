@@ -152,7 +152,7 @@ const defaultInput: VideoCreateInput = {
   productName: "",
   sellingPoints: [],
   durationSec: 15,
-  segmentCount: 3,
+  segmentCount: 1,
   speechRate: "medium",
   requirements: "",
   scriptStyle: "自然种草",
@@ -421,9 +421,17 @@ export function VideoCreatePage() {
   const { data: portraits = [], isLoading: portraitsLoading } = useQuery({
     queryKey: ["portrait-library"],
     queryFn: fetchPortraits,
-    staleTime: Infinity,
+    staleTime: 30_000,
+    refetchInterval: 5_000,
   });
-  const selectedPortrait = portraits.find((portrait) => portrait.index === input.portraitId);
+  const selectedPortraitKey = input.portraitReference
+    ? input.portraitReference.type === "general"
+      ? `general:${input.portraitReference.portraitId}`
+      : `custom:${input.portraitReference.assetId}`
+    : input.portraitId
+      ? `general:${input.portraitId}`
+      : undefined;
+  const selectedPortrait = portraits.find((portrait) => portrait.key === selectedPortraitKey);
   const { data: refreshed } = useQuery({
     queryKey: ["video-create-project", projectId],
     queryFn: () => fetchVideoCreateProject(projectId ?? ""),
@@ -640,9 +648,24 @@ export function VideoCreatePage() {
             </div>
             {selectedPortrait ? (
               <div className="flex items-center gap-2 rounded-lg border border-line p-2 [&_img]:h-12 [&_img]:w-9 [&_img]:rounded-md [&_img]:object-cover">
-                <ImagePreview src={selectedPortrait.display_url} alt={selectedPortrait.name} />
+                {selectedPortrait.type === "custom" ? (
+                  <AuthenticatedMedia
+                    url={selectedPortrait.display_url}
+                    mimeType="image/jpeg"
+                    alt={selectedPortrait.name}
+                    previewable={false}
+                  />
+                ) : (
+                  <ImagePreview src={selectedPortrait.display_url} alt={selectedPortrait.name} />
+                )}
                 <span className="min-w-0 flex-1 truncate text-xs text-muted">{selectedPortrait.name}</span>
-                <Button variant="ghost" size="sm" onClick={() => mutateInput("portraitId", undefined)}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    setInput((current) => ({ ...current, portraitReference: undefined, portraitId: undefined }))
+                  }
+                >
                   移除
                 </Button>
               </div>
@@ -1723,10 +1746,10 @@ export function VideoCreatePage() {
         open={portraitPickerOpen}
         portraits={portraits}
         loading={portraitsLoading}
-        selectedId={input.portraitId}
+        selectedKey={selectedPortraitKey}
         onClose={() => setPortraitPickerOpen(false)}
         onSelect={(portrait) => {
-          mutateInput("portraitId", portrait.index);
+          setInput((current) => ({ ...current, portraitReference: portrait.reference, portraitId: undefined }));
           setPortraitPickerOpen(false);
         }}
       />

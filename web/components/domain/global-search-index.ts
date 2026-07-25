@@ -129,12 +129,15 @@ export function buildGlobalSearchResults(sources: GlobalSearchSources, rawQuery:
     )
     .slice(0, limitPerSection)
     .map((portrait) => ({
-      id: `portrait:${portrait.index}`,
+      id: `portrait:${portrait.key}`,
       kind: "portrait",
       section: "人像",
       label: portrait.name,
       meta: `${portrait.age} 岁 · ${portrait.gender}性 · ${portrait.profession}`,
-      href: `/assets/portraits?portraitId=${portrait.index}`,
+      href:
+        portrait.type === "general"
+          ? `/assets/portraits?portraitId=${portrait.index}`
+          : `/assets/portraits?portraitAssetId=${encodeURIComponent(portrait.assetId)}`,
     }));
 
   return [pageResults, taskResults, materialResults, productResults, voiceResults, portraitResults].flat();

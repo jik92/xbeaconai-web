@@ -1,5 +1,6 @@
 export const providerCredentialNames = [
   "OPENAI_KEY",
+  "ARK_API_KEY",
   "VOLC_SPEECH_API_KEY_ID",
   "VOLC_SPEECH_API_KEY",
   "TOS_ACCESS_KEY_ID",
@@ -11,7 +12,7 @@ export const providerCredentialNames = [
 
 export type ProviderCredentialName = (typeof providerCredentialNames)[number];
 
-export const providerIds = ["aihubmix", "volc-speech", "tos", "mediakit", "qwen-audio"] as const;
+export const providerIds = ["aihubmix", "ark", "volc-speech", "tos", "mediakit", "qwen-audio"] as const;
 export type ProviderId = (typeof providerIds)[number];
 
 export const providerCredentialCatalog = [
@@ -22,6 +23,14 @@ export const providerCredentialCatalog = [
     label: "OpenAI-compatible API Key",
     secret: true,
     docsUrl: "https://aihubmix.mintlify.app/cn/api/Models-API",
+  },
+  {
+    name: "ARK_API_KEY",
+    providerId: "ark",
+    provider: "火山方舟",
+    label: "API Key",
+    secret: true,
+    docsUrl: "https://www.volcengine.com/docs/82379/1541595?lang=zh",
   },
   {
     name: "VOLC_SPEECH_API_KEY_ID",

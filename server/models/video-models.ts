@@ -12,7 +12,7 @@ export interface VideoModelDefinition {
   name: string;
   description: string;
   tags: string[];
-  provider: "aihubmix";
+  provider: "ark";
   capability: "video-generate";
   referenceCapabilities: SeedanceReferenceKind[];
   defaults: { resolution: "720p"; ratio: "16:9"; duration: 5; generateAudio: true; watermark: false };
@@ -25,7 +25,7 @@ export const videoModels: readonly VideoModelDefinition[] = [
     name: "字节 Seedance 2.0 多模态参考",
     description: "音视图文均可参考，强调超强参考一致性和极致拟真的视听稳定性。",
     tags: ["高一致性", "视听稳定"],
-    provider: "aihubmix",
+    provider: "ark",
     capability: "video-generate",
     referenceCapabilities: ["image", "video", "audio"],
     defaults: { resolution: "720p", ratio: "16:9", duration: 5, generateAudio: true, watermark: false },
@@ -36,7 +36,7 @@ export const videoModels: readonly VideoModelDefinition[] = [
     name: "字节 Seedance 2.0 Mini",
     description: "音视图文均可参考，新一代高性价比视频生成模型。",
     tags: ["高性价比", "规模生成"],
-    provider: "aihubmix",
+    provider: "ark",
     capability: "video-generate",
     referenceCapabilities: ["image", "video", "audio"],
     defaults: { resolution: "720p", ratio: "16:9", duration: 5, generateAudio: true, watermark: false },
@@ -47,7 +47,7 @@ export const videoModels: readonly VideoModelDefinition[] = [
     name: "字节 Seedance 2.0 Fast",
     description: "音视图文均可参考，速度更快，并继承 Seedance 2.0 的核心优势。",
     tags: ["速度更快", "默认推荐"],
-    provider: "aihubmix",
+    provider: "ark",
     capability: "video-generate",
     referenceCapabilities: ["image", "video", "audio"],
     defaults: { resolution: "720p", ratio: "16:9", duration: 5, generateAudio: true, watermark: false },

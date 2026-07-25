@@ -9,10 +9,10 @@ export interface FeatureAvailability {
 }
 
 export const moduleProviderRequirements: Record<ModuleId, ProviderId[]> = {
-  "video-remix": ["aihubmix", "tos"],
-  "video-create": ["aihubmix", "tos"],
+  "video-remix": ["aihubmix", "ark", "tos"],
+  "video-create": ["aihubmix", "ark", "tos"],
   "ad-script": ["aihubmix"],
-  "ai-generate": ["aihubmix"],
+  "ai-generate": ["aihubmix", "ark"],
   "video-cut": ["tos"],
   "media-understand": ["aihubmix"],
   "video-mashup": ["tos"],
@@ -62,6 +62,7 @@ export function allProviderFeatureAvailability(isVerified?: (providerId: Provide
     operations: {
       assetUpload: providerFeatureAvailability(["tos"], isVerified),
       shareImport: providerFeatureAvailability(["tos"], isVerified),
+      portraitCreation: providerFeatureAvailability(["ark", "tos"], isVerified),
     },
   };
 }

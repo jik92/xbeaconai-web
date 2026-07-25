@@ -25,8 +25,8 @@ export const videoRemixShotGenerationJob: WorkerJobHandler = {
       id: `${job.id}:video-generate`,
       capability: "video-generate",
       executionMode: job.overallExecutionMode === "mock" ? "mock" : "real",
-      implementation: job.overallExecutionMode === "mock" ? "ffmpeg-seedance-mock" : "aihubmix-video",
-      provider: job.overallExecutionMode === "mock" ? undefined : "aihubmix",
+      implementation: job.overallExecutionMode === "mock" ? "ffmpeg-seedance-mock" : "ark-seedance-video",
+      provider: job.overallExecutionMode === "mock" ? undefined : "ark",
       model: job.overallExecutionMode === "mock" ? undefined : job.videoModel,
       startedAt: new Date().toISOString(),
     };
@@ -47,7 +47,7 @@ export const videoRemixShotGenerationJob: WorkerJobHandler = {
       }
       stage.executionMode = generated.executionMode;
       stage.implementation = generated.implementation;
-      stage.provider = generated.executionMode === "real" ? "aihubmix" : undefined;
+      stage.provider = generated.executionMode === "real" ? "ark" : undefined;
       stage.model = generated.executionMode === "real" ? job.videoModel : undefined;
       const outputPath = resolve(tempDir, "generated-shot.mp4");
       await Bun.write(outputPath, generated.bytes);

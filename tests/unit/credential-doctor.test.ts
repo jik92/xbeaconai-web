@@ -42,6 +42,7 @@ describe("credential doctor", () => {
   test("checks Qwen and TOS but omits Volc Speech from the active Provider list", () => {
     const providerIds = activeCredentialDoctorProviders.map((provider) => provider.providerId);
     expect(providerIds).toContain("qwen-audio");
+    expect(providerIds).toContain("ark");
     expect(providerIds).toContain("tos");
     expect(providerIds).not.toContain("volc-speech");
   });

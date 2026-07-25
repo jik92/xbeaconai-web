@@ -234,7 +234,9 @@ describe("video create domain", () => {
   });
 
   test("resolves only portraits from the controlled catalog", () => {
-    expect(getPortraitById(1)).toMatchObject({ index: 1, source_url: expect.stringMatching(/^https:\/\//) });
+    const portrait = getPortraitById(1);
+    expect(portrait?.index).toBe(1);
+    expect(portrait?.source_url.startsWith("https://")).toBe(true);
     expect(getPortraitById(999_999)).toBeUndefined();
   });
 

@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { probeMedia } from "../server/media/ffmpeg";
 import { isSeedanceModelId, seedanceModelIds } from "../server/models/video-models";
 import { aihubmix } from "../server/providers/aihubmix";
+import { arkSeedance } from "../server/providers/ark-seedance";
 import { auditSdkRegistry } from "../server/sdk-registry";
 import { APP_CONFIG } from "../web/app/config";
 
@@ -47,10 +48,10 @@ const selected = only ? entries.filter((entry) => entry.capability === only || e
 const evidence: Evidence[] = [];
 const reuseVerified = process.argv.includes("--reuse-verified");
 const catalogStartedAt = new Date().toISOString();
-const liveCatalog = await aihubmix.listModels();
+const liveCatalog = await arkSeedance.listModels();
 const catalogEvidence = seedanceModelIds.map((model) => {
-  const item = liveCatalog.find((candidate) => candidate.model_id === model);
-  return { model, present: Boolean(item), types: item?.types, inputModalities: item?.input_modalities };
+  const item = liveCatalog.find((candidate) => candidate.id === model);
+  return { model, present: Boolean(item) };
 });
 if (catalogEvidence.some((item) => !item.present))
   throw new Error(
@@ -79,7 +80,11 @@ for (const entry of selected) {
       );
       const bytes = response.b64_json
         ? decodeBase64(response.b64_json)
-        : await fetch(response.url!).then((item) => item.bytes());
+        : response.url
+          ? await fetch(response.url).then((item) => item.bytes())
+          : (() => {
+              throw new Error("IMAGE_RESULT_URL_MISSING");
+            })();
       const path = resolve(outputDir, `${entry.id}.png`);
       await Bun.write(path, bytes);
       const media = await probeMedia(path);
@@ -107,11 +112,11 @@ for (const entry of selected) {
         watermark: false,
         references: [],
       };
-      const created = await aihubmix.createSeedanceVideo(request);
-      const completed = await aihubmix.waitForVideo(created.id);
-      if (completed.duration !== undefined && Math.abs(Number(completed.duration) - requestedDuration) > 1)
-        throw new Error(`VIDEO_PROVIDER_DURATION_MISMATCH:${completed.duration}`);
-      const response = await aihubmix.downloadVideo(completed.id);
+      const created = await arkSeedance.createVideo(request);
+      const completed = await arkSeedance.waitForVideo(created.id);
+      const videoUrl = completed.content?.video_url;
+      if (!videoUrl) throw new Error("ARK_VIDEO_URL_MISSING");
+      const response = await arkSeedance.downloadVideo(videoUrl);
       const path = resolve(outputDir, `${entry.id}.mp4`);
       await Bun.write(path, response.bytes);
       const media = await probeMedia(path);
@@ -137,7 +142,7 @@ for (const entry of selected) {
           watermark: request.watermark,
           references: [],
         },
-        providerDuration: completed.duration,
+        providerTaskId: completed.id,
       };
     } else throw new Error(`No test adapter for ${entry.capability}`);
     evidence.push({
@@ -188,11 +193,33 @@ const report = {
 if (!(report.registered === report.attempted && report.attempted === report.reported))
   throw new Error("Model SDK registry coverage mismatch");
 await Bun.write(resolve(outputDir, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
-if (!only && report.registered === entries.length) {
-  await mkdir(resolve(".data"), { recursive: true });
-  await Bun.write(
-    resolve(".data/capabilities.json"),
-    `${JSON.stringify({ generatedAt: report.generatedAt, runId: report.runId, entries: evidence.map((item) => ({ id: item.id, status: item.status, model: item.model, provider: item.provider })) }, null, 2)}\n`,
-  );
-}
+await mkdir(resolve(".data"), { recursive: true });
+let retainedCapabilities: Array<{ id: string; status: string; model?: string; provider?: string }> = [];
+if (only)
+  try {
+    const previous = (await Bun.file(resolve(".data/capabilities.json")).json()) as {
+      entries?: typeof retainedCapabilities;
+    };
+    const replacedIds = new Set(evidence.map((item) => item.id));
+    retainedCapabilities = (previous.entries ?? []).filter(
+      (item) => !replacedIds.has(item.id) && !item.id.startsWith("aihubmix-seedance-"),
+    );
+  } catch {
+    /* first partial capability run */
+  }
+await Bun.write(
+  resolve(".data/capabilities.json"),
+  `${JSON.stringify(
+    {
+      generatedAt: report.generatedAt,
+      runId: report.runId,
+      entries: [
+        ...retainedCapabilities,
+        ...evidence.map((item) => ({ id: item.id, status: item.status, model: item.model, provider: item.provider })),
+      ],
+    },
+    null,
+    2,
+  )}\n`,
+);
 console.log(JSON.stringify(report, null, 2));

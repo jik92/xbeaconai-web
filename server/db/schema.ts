@@ -238,6 +238,43 @@ export const mediaAssets = sqliteTable(
   ],
 );
 
+export const arkPortraitGroups = sqliteTable("ark_portrait_groups", {
+  ownerUserId: text("owner_user_id")
+    .primaryKey()
+    .references(() => users.id),
+  groupId: text("group_id"),
+  projectName: text("project_name").notNull().default("default"),
+  status: text("status", { enum: ["creating", "active", "failed"] }).notNull(),
+  claimToken: text("claim_token").notNull(),
+  errorMessage: text("error_message"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const customPortraits = sqliteTable(
+  "custom_portraits",
+  {
+    assetId: text("asset_id")
+      .primaryKey()
+      .references(() => mediaAssets.id),
+    jobId: text("job_id").references(() => jobs.id),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id),
+    groupId: text("group_id"),
+    arkAssetId: text("ark_asset_id").unique(),
+    status: text("status", { enum: ["queued", "processing", "active", "failed"] }).notNull(),
+    errorCode: text("error_code"),
+    errorMessage: text("error_message"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    index("custom_portraits_owner_created_idx").on(table.ownerUserId, table.createdAt),
+    index("custom_portraits_owner_status_idx").on(table.ownerUserId, table.status),
+  ],
+);
+
 export const jobs = sqliteTable(
   "jobs",
   {

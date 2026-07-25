@@ -37,6 +37,7 @@ import {
   listAdminJobs,
   listAdminProviderAudits,
   listAdminUsers,
+  listCustomPortraits,
   listJobs,
   listVideoCreateProjects,
   listVideoCreateShotMaterialVersions,
@@ -45,6 +46,7 @@ import {
   parseAdScriptSource,
   preflightQwenVoiceSample as preflightQwenVoiceSampleRequest,
   processVideoCreateShotMaterial,
+  registerCustomPortrait,
   regenerateVideoCreateSection,
   replaceVideoCreateShot,
   retryJob,
@@ -75,6 +77,7 @@ import type {
   ListAdminProviderAuditsResponse,
   ListAdminUsersResponse,
   ListVideoCreateShotMaterialVersionsResponse,
+  ListCustomPortraitsResponse,
   ListVideoRemixProjectsResponse,
   ModuleId,
   ProviderCredentialName,
@@ -96,6 +99,7 @@ export type AdminStopAllJobsResult = StopAllAdminJobsResponse;
 export type RemixProjectSummary = ListVideoRemixProjectsResponse["projects"][number];
 export type RemixProjectDetail = GetVideoRemixProjectResponse;
 export type VideoCreateMaterialVersion = ListVideoCreateShotMaterialVersionsResponse["versions"][number];
+export type CustomPortrait = ListCustomPortraitsResponse["portraits"][number];
 
 const configure = () =>
   client.setConfig({
@@ -614,6 +618,22 @@ export async function fetchLibraryAssets(kind: Exclude<AssetKind, "product">, fo
   const data = (await response.json()) as { assets: LibraryAsset[] };
   return data.assets;
 }
+export async function fetchCustomPortraits() {
+  configure();
+  const { data } = await listCustomPortraits({ headers: authHeaders(), throwOnError: true });
+  return data?.portraits ?? [];
+}
+export async function createCustomPortrait(file: File, displayName: string, description = "") {
+  const asset = await uploadLibraryAsset(file, "portrait", displayName, description);
+  configure();
+  const { data } = await registerCustomPortrait({
+    body: { assetId: asset.id },
+    headers: authHeaders(),
+    throwOnError: true,
+  });
+  if (!data) throw new Error("自建虚拟人像创建失败");
+  return data.portrait;
+}
 export async function deleteLibraryAsset(assetId: string) {
   configure();
   await deleteAssetRequest({ path: { assetId }, headers: authHeaders(), throwOnError: true });
@@ -691,6 +711,7 @@ export interface RemixProjectRequest {
   voiceAsset?: RemixMaterialFile | null;
   portraitAssets: Array<{
     id?: number | string | null;
+    reference?: { type: "general"; portraitId: number } | { type: "custom"; assetId: string };
     assetName: string;
     fileInfo: Array<{
       fileUrl: string;

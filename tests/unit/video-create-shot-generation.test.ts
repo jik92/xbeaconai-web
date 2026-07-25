@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { buildSeedanceReferenceContent } from "../../server/providers/aihubmix";
+import { buildArkSeedanceReferenceContent } from "../../server/providers/ark-seedance";
 import {
   allocateVideoCreateSubshotDurations,
   buildVideoCreateShotGenerationPrompt,
@@ -21,16 +21,19 @@ describe("video create shot generation review", () => {
       narration,
     });
     plan.characterAppearance = "年轻女性，淡妆，自然黑发，身穿白色衬衫";
+    plan.voice = "年轻女性，亲切自然，语速适中";
+    plan.quality = "高清电影感，年轻女性肤色自然";
     plan.subshots[0] = {
       ...plan.subshots[0],
       action: "23岁的女生对镜头摊手，随后她拿起草帽，其他行人从背景经过",
       composition: "年轻女性位于画面中心",
+      voiceTone: "甜美女声，轻松自然",
     };
     const prompt = buildVideoCreateShotGenerationPrompt({
       durationSec: 15,
       plan,
       references: [
-        { label: "Image1", name: "夏日模特", role: "reference_image", category: "人物" },
+        { label: "Image1", name: "中国 22岁 男 牙医", role: "reference_image", category: "人物" },
         { label: "Image2", name: "复古草帽", role: "reference_image", category: "商品" },
       ],
     });
@@ -39,13 +42,19 @@ describe("video create shot generation review", () => {
     expect(plan.subshots.map((subshot) => subshot.narration).join("")).toBe(narration);
     expect(plan.subshots.reduce((total, subshot) => total + subshot.durationSec, 0)).toBe(15);
     expect(prompt.startsWith("### 第一部分：全局基础设定\n约束条件：")).toBe(true);
-    expect(prompt).toContain("人物主体必须使用 @Image1（人物）");
+    expect(prompt).toContain("画面中唯一出镜人物必须使用 @Image1（人物）");
+    expect(prompt).toContain("人物标签为 中国 22岁 男性 牙医");
+    expect(prompt).toContain("禁止生成女性、女生、女孩或女人");
     expect(prompt).toContain("保持其性别、年龄、脸型、五官、肤色、发型和身份特征一致");
     expect(prompt).toContain("人物动作描述：人物对镜头摊手，随后人物拿起草帽，其他行人从背景经过");
     expect(prompt).toContain("画面构图：人物位于画面中心");
     expect(prompt).not.toContain("年轻女性");
     expect(prompt).not.toContain("23岁的女生");
     expect(prompt).not.toContain("淡妆");
+    expect(prompt).not.toContain("甜美女声");
+    expect(prompt).toContain("音色语气设定：甜美人物音色，轻松自然");
+    expect(prompt).toContain("画质要求：高清电影感，人物肤色自然");
+    expect(prompt).toContain("音色设定：22岁男性音色，声音年龄与性别必须与 @Image1（人物） 一致");
     expect(prompt).toContain("商品外观严格参考 @Image2（商品）");
     expect(prompt).toContain("### 第二部分：分镜内容（按播放顺序逐条输出分镜，每条独立成段，并标注序号）");
     expect(prompt.match(/^分镜 \d{2}$/gmu)).toHaveLength(3);
@@ -61,6 +70,31 @@ describe("video create shot generation review", () => {
         portraitCategory: "人物",
       }),
     ).toBeUndefined();
+  });
+
+  test("uses female portrait tags instead of a conflicting male plan and limits audio references to style", () => {
+    const plan = createFallbackVideoCreateShotPlan({
+      durationSec: 6,
+      shotPrompt: "年轻男性在街景中展示商品",
+      narration: "自然展示这款商品。",
+    });
+    plan.characterAppearance = "年轻男性，短发，身穿衬衫";
+    plan.voice = "低沉男声";
+    const prompt = buildVideoCreateShotGenerationPrompt({
+      durationSec: 6,
+      plan,
+      references: [
+        { label: "Image1", name: "中国 32岁 女 律师", role: "reference_image", category: "人物" },
+        { label: "Audio1", name: "参考音色", role: "reference_audio" },
+      ],
+    });
+
+    expect(prompt).toContain("人物标签为 中国 32岁 女性 律师");
+    expect(prompt).toContain("禁止生成男性、男生、男孩或男人");
+    expect(prompt).toContain("音色设定：32岁女性音色");
+    expect(prompt).toContain("@Audio1 仅用于参考音色质感、语速和情绪，不得改变人物性别、年龄或身份");
+    expect(prompt).not.toContain("低沉男声");
+    expect(prompt).not.toContain("年轻男性");
   });
 
   test("keeps the planned appearance when no portrait reference is selected", () => {
@@ -170,7 +204,7 @@ describe("video create shot generation review", () => {
 
   test("keeps multiple Seedance images in provider content order", () => {
     expect(
-      buildSeedanceReferenceContent([
+      buildArkSeedanceReferenceContent([
         { kind: "image", url: "https://example.test/portrait.jpg" },
         { kind: "image", url: "https://example.test/product-front.jpg" },
         { kind: "image", url: "https://example.test/product-side.jpg" },

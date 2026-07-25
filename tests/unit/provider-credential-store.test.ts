@@ -42,6 +42,7 @@ describe("ProviderCredentialStore", () => {
 
     expect(documentation).toMatchObject({
       aihubmix: "https://aihubmix.mintlify.app/cn/api/Models-API",
+      ark: "https://www.volcengine.com/docs/82379/1541595?lang=zh",
       tos: "https://www.volcengine.com/docs/6349/163211?lang=zh",
       mediakit: "https://www.volcengine.com/docs/6448/2373721",
       "qwen-audio": "https://help.aliyun.com/zh/model-studio/speech-synthesis-api-reference/",

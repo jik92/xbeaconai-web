@@ -1,7 +1,6 @@
 import { Buffer } from "node:buffer";
 import { providerCredentials } from "../byok/credential-store";
 import { env } from "../env";
-import type { SeedanceModelId, SeedanceReferenceKind } from "../models/video-models";
 
 export interface AihubmixModel {
   model_id: string;
@@ -9,31 +8,6 @@ export interface AihubmixModel {
   input_modalities?: string;
   features?: string;
   pricing?: Record<string, number>;
-}
-
-export interface VideoTask {
-  id: string;
-  status: string;
-  model?: string;
-  duration?: number;
-  url?: string | null;
-  error?: unknown;
-}
-
-export interface SeedanceReference {
-  kind: SeedanceReferenceKind;
-  url: string;
-}
-
-export interface SeedanceVideoInput {
-  model: SeedanceModelId;
-  prompt: string;
-  resolution?: "480p" | "720p";
-  ratio?: "adaptive" | "16:9" | "9:16" | "1:1" | "4:3" | "3:4" | "21:9";
-  duration?: -1 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
-  generateAudio?: boolean;
-  watermark?: boolean;
-  references?: SeedanceReference[];
 }
 
 export interface GptImageAnalysisInput {
@@ -59,35 +33,6 @@ export function buildGptImageAnalysisRequest(input: GptImageAnalysisInput) {
     messages: [{ role: "user" as const, content: buildGptImageAnalysisContent(input) }],
     response_format: { type: "json_object" as const },
     max_completion_tokens: input.maxTokens ?? 4_096,
-  };
-}
-
-export function buildSeedanceReferenceContent(references: SeedanceReference[] = []) {
-  return references.map((reference) =>
-    reference.kind === "image"
-      ? { type: "image_url" as const, image_url: { url: reference.url }, role: "reference_image" as const }
-      : reference.kind === "video"
-        ? { type: "video_url" as const, video_url: { url: reference.url }, role: "reference_video" as const }
-        : { type: "audio_url" as const, audio_url: { url: reference.url }, role: "reference_audio" as const },
-  );
-}
-
-export function buildSeedanceVideoRequest(input: SeedanceVideoInput) {
-  const content = buildSeedanceReferenceContent(input.references);
-  const duration = input.duration ?? 5;
-  const isMini = input.model === "doubao-seedance-2-0-mini-260615";
-  return {
-    model: input.model,
-    prompt: input.prompt,
-    seconds: String(duration),
-    extra_body: {
-      ...(content.length ? { content } : {}),
-      resolution: input.resolution ?? "720p",
-      ratio: input.ratio ?? "16:9",
-      ...(!isMini ? { duration } : {}),
-      generate_audio: input.generateAudio ?? true,
-      watermark: input.watermark ?? false,
-    },
   };
 }
 
@@ -219,54 +164,6 @@ export class AihubmixClient {
     const bytes = new Uint8Array(await response.arrayBuffer());
     if (bytes.byteLength < 256) throw new Error("AIHUBMIX_INVALID_AUDIO_RESULT");
     return { bytes, mimeType: response.headers.get("content-type") ?? "audio/wav" };
-  }
-
-  async createSeedanceVideo(input: SeedanceVideoInput) {
-    const task = (await this.request("/v1/videos", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(buildSeedanceVideoRequest(input)),
-      signal: AbortSignal.timeout(180_000),
-    }).then((response) => response.json())) as VideoTask;
-    if (!task.id) throw new Error("AIHUBMIX_INVALID_VIDEO_TASK");
-    return task;
-  }
-
-  async getVideo(id: string) {
-    return this.request(`/v1/videos/${encodeURIComponent(id)}`).then((response) =>
-      response.json(),
-    ) as Promise<VideoTask>;
-  }
-
-  async cancelVideo(id: string) {
-    try {
-      await this.request(`/v1/videos/${encodeURIComponent(id)}`, { method: "DELETE" });
-      return "requested" as const;
-    } catch (error) {
-      if (error instanceof Error && /AIHUBMIX_(404|405|501)/.test(error.message)) return "unsupported" as const;
-      throw error;
-    }
-  }
-
-  async waitForVideo(id: string, timeoutMs = 15 * 60_000) {
-    const started = Date.now();
-    while (Date.now() - started < timeoutMs) {
-      const task = await this.getVideo(id);
-      if (["completed", "succeeded"].includes(task.status)) return task;
-      if (["failed", "cancelled", "expired"].includes(task.status))
-        throw new Error(`AIHUBMIX_VIDEO_${task.status}: ${JSON.stringify(task.error ?? {})}`);
-      await Bun.sleep(5_000);
-    }
-    throw new Error("AIHUBMIX_VIDEO_TIMEOUT");
-  }
-
-  async downloadVideo(id: string, timeoutMs = 10 * 60_000) {
-    const response = await this.request(`/v1/videos/${encodeURIComponent(id)}/content`, {
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    const bytes = new Uint8Array(await response.arrayBuffer());
-    if (bytes.byteLength < 1024) throw new Error("AIHUBMIX_INVALID_VIDEO_RESULT");
-    return { bytes, mimeType: response.headers.get("content-type") ?? "video/mp4" };
   }
 }
 

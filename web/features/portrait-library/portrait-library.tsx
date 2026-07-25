@@ -1,40 +1,55 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Check, Download, Images, Shuffle, UserRound } from "lucide-react";
+import { Check, Download, Images, LoaderCircle, Shuffle, UserRound } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AssetPageShell, AssetPageToolbar } from "@/components/domain/asset-page-shell";
 import { ImagePreview, MediaPreview } from "@/components/domain/media-preview";
 import { ToolCreatorModal } from "@/components/domain/tool-creator-modal";
 import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/native-select";
+import { Input } from "@/components/ui/input";
+import { createCustomPortrait } from "@/api/api-client";
 import { fetchPortraits, type Portrait } from "./portrait-data";
 
 const getPortraitColumns = () =>
   window.innerWidth > 1600 ? 6 : window.innerWidth > 1250 ? 5 : window.innerWidth > 800 ? 4 : 2;
 
 export function PortraitLibrary() {
+  const queryClient = useQueryClient();
   const requestedPortraitId = Number(new URLSearchParams(window.location.search).get("portraitId"));
+  const requestedPortraitAssetId = new URLSearchParams(window.location.search).get("portraitAssetId");
   const { data = [], isLoading } = useQuery({
     queryKey: ["portrait-library"],
     queryFn: fetchPortraits,
-    staleTime: Infinity,
+    staleTime: 30_000,
+    refetchInterval: 5_000,
   });
+  const [source, setSource] = useState<"general" | "custom">("general");
   const [query, setQuery] = useState("");
   const [gender, setGender] = useState("全部");
   const [age, setAge] = useState("全部年龄");
   const [profession, setProfession] = useState("全部职业");
   const [selected, setSelected] = useState<Portrait | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [portraitFile, setPortraitFile] = useState<File | null>(null);
+  const [portraitName, setPortraitName] = useState("");
+  const [portraitDescription, setPortraitDescription] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
   const [columns, setColumns] = useState(getPortraitColumns);
   const viewport = useRef<HTMLDivElement>(null);
   const requestedPortraitLocated = useRef(false);
   useEffect(() => {
-    if (!requestedPortraitId || requestedPortraitLocated.current) return;
-    const portrait = data.find((item) => item.index === requestedPortraitId);
+    if ((!requestedPortraitId && !requestedPortraitAssetId) || requestedPortraitLocated.current) return;
+    const portrait = data.find((item) =>
+      item.type === "general" ? item.index === requestedPortraitId : item.assetId === requestedPortraitAssetId,
+    );
     if (portrait) {
       requestedPortraitLocated.current = true;
+      setSource(portrait.type);
       setSelected(portrait);
     }
-  }, [data, requestedPortraitId]);
+  }, [data, requestedPortraitAssetId, requestedPortraitId]);
   useEffect(() => {
     const resize = () => setColumns(getPortraitColumns());
     window.addEventListener("resize", resize);
@@ -43,13 +58,16 @@ export function PortraitLibrary() {
   const professions = useMemo(
     () => [
       "全部职业",
-      ...Array.from(new Set(data.map((item) => item.profession))).sort((a, b) => a.localeCompare(b, "zh-CN")),
+      ...Array.from(new Set(data.filter((item) => item.type === source).map((item) => item.profession))).sort((a, b) =>
+        a.localeCompare(b, "zh-CN"),
+      ),
     ],
-    [data],
+    [data, source],
   );
   const filtered = useMemo(
     () =>
       data.filter((item) => {
+        if (item.type !== source) return false;
         const text = `${item.name} ${item.description}`.toLowerCase();
         const ageMatch =
           age === "全部年龄" ||
@@ -63,7 +81,7 @@ export function PortraitLibrary() {
           (profession === "全部职业" || item.profession === profession)
         );
       }),
-    [age, data, gender, profession, query],
+    [age, data, gender, profession, query, source],
   );
   const rows = Math.ceil(filtered.length / columns);
   const virtualizer = useVirtualizer({
@@ -81,7 +99,9 @@ export function PortraitLibrary() {
         name: selected.name,
         profession: selected.profession,
         source_url: selected.source_url,
-        index: selected.index,
+        key: selected.key,
+        reference: selected.reference,
+        ...(selected.type === "general" ? { index: selected.index } : {}),
         description: selected.description,
         gender: selected.gender,
         age: selected.age,
@@ -101,7 +121,10 @@ export function PortraitLibrary() {
               placeholder="搜索职业、年龄或人物描述"
               actionLabel="新建人像"
               actionIcon={<UserRound />}
-              onAction={() => undefined}
+              onAction={() => {
+                setCreateError("");
+                setCreateOpen(true);
+              }}
               secondaryActions={
                 <Button size="sm" variant="outline" onClick={random}>
                   <Shuffle />
@@ -110,6 +133,19 @@ export function PortraitLibrary() {
               }
             />
             <div className="flex flex-wrap items-center gap-2">
+              {(["general", "custom"] as const).map((value) => (
+                <Button
+                  key={value}
+                  size="sm"
+                  variant={source === value ? "default" : "outline"}
+                  onClick={() => {
+                    setSource(value);
+                    setProfession("全部职业");
+                  }}
+                >
+                  {value === "general" ? "通用虚拟人像" : "自建虚拟人像"}
+                </Button>
+              ))}
               {["全部", "女", "男"].map((item) => (
                 <Button
                   key={item}
@@ -159,16 +195,29 @@ export function PortraitLibrary() {
                 }}
               >
                 {filtered.slice(row.index * columns, row.index * columns + columns).map((item) => (
-                  <button type="button" className="portrait-card" key={item.index} onClick={() => setSelected(item)}>
+                  <button type="button" className="portrait-card" key={item.key} onClick={() => setSelected(item)}>
                     <div className="portrait-image">
-                      <ImagePreview src={item.display_url} alt={item.name} imageLoading="lazy" />
-                      <span>NO. {String(item.index).padStart(4, "0")}</span>
-                      <i>选择人像</i>
+                      <MediaPreview
+                        url={item.display_url}
+                        mimeType="image/jpeg"
+                        alt={item.name}
+                        imageLoading="lazy"
+                        authenticated={item.type === "custom"}
+                        previewable={false}
+                      />
+                      <span>{item.type === "general" ? `NO. ${String(item.index).padStart(4, "0")}` : "自建"}</span>
+                      <i>{item.status === "active" ? "选择人像" : "处理中"}</i>
                     </div>
                     <div className="portrait-copy">
                       <h3>{item.profession}</h3>
                       <p>
-                        {item.age} 岁 · {item.gender}性 · 第 {item.page} 页
+                        {item.type === "general"
+                          ? `${item.age} 岁 · ${item.gender}性 · 第 ${item.page} 页`
+                          : item.status === "active"
+                            ? "可用于创作"
+                            : item.status === "failed"
+                              ? "创建失败"
+                              : "Ark 处理中"}
                       </p>
                     </div>
                   </button>
@@ -192,49 +241,113 @@ export function PortraitLibrary() {
                 url={selected.display_url}
                 mimeType="image/jpeg"
                 alt={selected.name}
-                authenticated={false}
+                authenticated={selected.type === "custom"}
               />
               <span>
-                <Check />
-                可用于创作
+                {selected.status === "active" ? <Check /> : <LoaderCircle className="animate-spin" />}
+                {selected.status === "active" ? "可用于创作" : selected.status === "failed" ? "创建失败" : "处理中"}
               </span>
             </div>
             <div className="detail-info">
               <div className="detail-tags">
-                <span>{selected.age} 岁</span>
-                <span>{selected.gender}性</span>
+                {selected.age > 0 && <span>{selected.age} 岁</span>}
+                {selected.gender !== "未知" && <span>{selected.gender}性</span>}
                 <span>{selected.profession}</span>
               </div>
               <p>{selected.description}</p>
               <dl>
                 <div>
-                  <dt>来源页码</dt>
-                  <dd>第 {selected.page} 页</dd>
+                  <dt>来源</dt>
+                  <dd>{selected.type === "general" ? `通用虚拟人像 · 第 ${selected.page} 页` : "自建虚拟人像"}</dd>
                 </div>
                 <div>
                   <dt>资产编号</dt>
-                  <dd>XY-{String(selected.index).padStart(4, "0")}</dd>
+                  <dd>
+                    {selected.type === "general" ? `XY-${String(selected.index).padStart(4, "0")}` : selected.assetId}
+                  </dd>
                 </div>
               </dl>
               <div className="detail-actions">
-                <Button size="sm" onClick={useForCreation}>
+                <Button size="sm" disabled={selected.status !== "active"} onClick={useForCreation}>
                   <UserRound />
                   用于创作
                 </Button>
-                <a
-                  className="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-line bg-white px-3 text-xs font-medium text-ink hover:bg-surface-muted"
-                  href={selected.source_url}
-                  download
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <Download />
-                  下载原图
-                </a>
+                {selected.type === "general" && (
+                  <a
+                    className="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-line bg-white px-3 text-xs font-medium text-ink hover:bg-surface-muted"
+                    href={selected.source_url}
+                    download
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <Download />
+                    下载原图
+                  </a>
+                )}
               </div>
             </div>
           </div>
         )}
+      </ToolCreatorModal>
+      <ToolCreatorModal open={createOpen} title="新建人像" onClose={() => !creating && setCreateOpen(false)}>
+        <form
+          className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!portraitFile || !portraitName.trim() || creating) return;
+            setCreating(true);
+            setCreateError("");
+            void createCustomPortrait(portraitFile, portraitName.trim(), portraitDescription.trim())
+              .then(async () => {
+                await queryClient.invalidateQueries({ queryKey: ["portrait-library"] });
+                setSource("custom");
+                setPortraitFile(null);
+                setPortraitName("");
+                setPortraitDescription("");
+                setCreateOpen(false);
+              })
+              .catch((error) => setCreateError(error instanceof Error ? error.message : "自建虚拟人像创建失败"))
+              .finally(() => setCreating(false));
+          }}
+        >
+          <label className="grid gap-1 text-xs text-muted">
+            人像图片
+            <Input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              disabled={creating}
+              onChange={(event) => setPortraitFile(event.target.files?.[0] ?? null)}
+            />
+          </label>
+          <label className="grid gap-1 text-xs text-muted">
+            人像名称
+            <Input
+              value={portraitName}
+              maxLength={80}
+              disabled={creating}
+              onChange={(event) => setPortraitName(event.target.value)}
+            />
+          </label>
+          <label className="grid gap-1 text-xs text-muted">
+            描述
+            <Input
+              value={portraitDescription}
+              maxLength={300}
+              disabled={creating}
+              onChange={(event) => setPortraitDescription(event.target.value)}
+            />
+          </label>
+          {createError && <p className="text-xs text-danger">{createError}</p>}
+          <div className="mt-auto flex justify-end gap-2 border-t border-line pt-3">
+            <Button type="button" size="sm" variant="outline" disabled={creating} onClick={() => setCreateOpen(false)}>
+              取消
+            </Button>
+            <Button type="submit" size="sm" disabled={!portraitFile || !portraitName.trim() || creating}>
+              {creating && <LoaderCircle className="animate-spin" />}
+              创建
+            </Button>
+          </div>
+        </form>
       </ToolCreatorModal>
     </>
   );

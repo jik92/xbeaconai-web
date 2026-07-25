@@ -20,6 +20,8 @@
     "db:studio": "drizzle-kit studio",
     "test:models": "bun scripts/test-model-sdks.ts",
     "test:seedance:multimodal": "bun scripts/test-seedance-multimodal.ts",
+    "test:ark:virtual-portrait": "bun scripts/test-ark-virtual-portrait.ts",
+    "test:ark:private-portrait": "bun scripts/test-ark-private-virtual-portrait.ts",
     "test:video-analysis": "bun scripts/test-video-analysis.ts",
     "test:tos": "bun scripts/test-tos-sdk.ts",
     "test:ffmpeg": "bun scripts/test-ffmpeg-sdk.ts",

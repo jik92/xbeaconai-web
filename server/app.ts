@@ -7,6 +7,11 @@ import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
 import { aiToolModuleIds, isAiToolModuleId } from "../shared/jobs/ai-tool-modules";
 import { parseVideoMashupConfig, type VideoMashupConfig } from "../shared/video-mashup/config";
+import {
+  normalizePortraitReference,
+  serializePortraitReference,
+  type PortraitReference,
+} from "../shared/portraits/portrait-reference";
 import { parseRemixWorkspace, remixProjectStages } from "../shared/video-remix/project-records";
 import {
   defaultRemixPromptToolConfig,
@@ -71,6 +76,8 @@ import { BullJobQueue } from "./jobs/bull-job-queue";
 import { InsufficientCreditsError, SqliteJobStore } from "./jobs/sqlite-job-store";
 import { seedanceModelIds, videoModels } from "./models/video-models";
 import { getPortraitById } from "./portraits/catalog";
+import { CustomPortraitStore, type CustomPortraitRecord } from "./portraits/custom-portrait-store";
+import { resolvePortraitReference } from "./portraits/portrait-resolver";
 import { auditSdkRegistry } from "./sdk-registry";
 import { ossutils } from "./storage/ossutils";
 import { rollbackUploadedObjects, uploadFilesStrictly } from "./storage/strict-library-upload";
@@ -133,7 +140,7 @@ const moduleIds = [
   "video-editor",
   "kickart",
 ] as const;
-const backgroundJobTypes = ["douyin-video-import", "share-content-import"] as const;
+const backgroundJobTypes = ["douyin-video-import", "share-content-import", "portrait-asset-register"] as const;
 const jobModuleIds = [...moduleIds, ...backgroundJobTypes] as const;
 const ModuleSchema = z.enum(moduleIds).openapi("ModuleId");
 const AiToolModuleSchema = z.enum(aiToolModuleIds).openapi("AiToolModuleId");
@@ -398,6 +405,7 @@ export const accounts = new AccountStore(env.databasePath, { smsSender: createAp
 export const adScripts = new AdScriptStore();
 export const videoCreates = new VideoCreateStore();
 export const providerAudits = new ProviderGenerationAuditStore();
+export const customPortraits = new CustomPortraitStore();
 export const queue = new BullJobQueue();
 function adminUser(userId: string) {
   const user = accounts.getUser(userId);
@@ -1882,6 +1890,165 @@ app.openapi(uploadRoute, async (c) => {
   );
 });
 
+const CustomPortraitStatusSchema = z.enum(["queued", "processing", "active", "failed"]);
+const CustomPortraitSchema = z.object({
+  type: z.literal("custom"),
+  assetId: z.string().uuid(),
+  jobId: z.string().uuid().optional(),
+  name: z.string(),
+  description: z.string().optional(),
+  imageUrl: z.string(),
+  status: CustomPortraitStatusSchema,
+  errorCode: z.string().optional(),
+  errorMessage: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+function customPortraitResponse(record: CustomPortraitRecord) {
+  const asset = accounts.getOwnedAsset(record.ownerUserId, record.assetId);
+  if (!asset || asset.kind !== "portrait") return undefined;
+  return {
+    type: "custom" as const,
+    assetId: record.assetId,
+    jobId: record.jobId,
+    name: asset.displayName,
+    description: asset.description,
+    imageUrl: `/api/assets/${asset.id}/content`,
+    status: record.status,
+    errorCode: record.errorCode,
+    errorMessage: record.errorMessage,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+  };
+}
+
+const listCustomPortraitsRoute = createRoute({
+  method: "get",
+  path: "/api/portraits/custom",
+  operationId: "listCustomPortraits",
+  responses: {
+    200: {
+      description: "Current user's custom Ark virtual portraits",
+      content: { "application/json": { schema: z.object({ portraits: z.array(CustomPortraitSchema) }) } },
+    },
+  },
+});
+app.openapi(listCustomPortraitsRoute, (c) =>
+  c.json(
+    {
+      portraits: customPortraits
+        .listOwned(c.get("userId"))
+        .map(customPortraitResponse)
+        .filter((portrait): portrait is NonNullable<typeof portrait> => Boolean(portrait)),
+    },
+    200,
+  ),
+);
+
+const registerCustomPortraitRoute = createRoute({
+  method: "post",
+  path: "/api/portraits/custom",
+  operationId: "registerCustomPortrait",
+  request: {
+    body: {
+      required: true,
+      content: { "application/json": { schema: z.object({ assetId: z.string().uuid() }) } },
+    },
+  },
+  responses: {
+    200: {
+      description: "Custom portrait registration already exists",
+      content: { "application/json": { schema: z.object({ portrait: CustomPortraitSchema }) } },
+    },
+    202: {
+      description: "Custom portrait registration queued",
+      content: { "application/json": { schema: z.object({ portrait: CustomPortraitSchema }) } },
+    },
+    404: { description: "Portrait source asset not found", content: { "application/json": { schema: ErrorSchema } } },
+    413: { description: "Portrait source asset too large", content: { "application/json": { schema: ErrorSchema } } },
+    415: { description: "Portrait source asset invalid", content: { "application/json": { schema: ErrorSchema } } },
+    503: { description: "Ark portrait service unavailable", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(registerCustomPortraitRoute, async (c) => {
+  const requestId = crypto.randomUUID();
+  const ownerUserId = c.get("userId");
+  const asset = accounts.getOwnedAsset(ownerUserId, c.req.valid("json").assetId);
+  if (!asset || asset.kind !== "portrait")
+    return c.json(
+      { error: { code: "PORTRAIT_ASSET_NOT_FOUND", message: "人像素材不存在", retryable: false, requestId } },
+      404,
+    );
+  if (!asset.mimeType.startsWith("image/"))
+    return c.json(
+      { error: { code: "INVALID_PORTRAIT_IMAGE", message: "自建虚拟人像仅支持图片", retryable: false, requestId } },
+      415,
+    );
+  if (asset.byteSize > 30 * 1024 * 1024)
+    return c.json(
+      { error: { code: "PORTRAIT_IMAGE_TOO_LARGE", message: "人像图片不能超过 30MB", retryable: false, requestId } },
+      413,
+    );
+  if (!ossutils.configured)
+    return c.json(
+      { error: { code: "TOS_NOT_CONFIGURED", message: "自建虚拟人像素材中转未配置", retryable: false, requestId } },
+      503,
+    );
+  const existing = customPortraits.getOwned(ownerUserId, asset.id);
+  if (existing) return c.json({ portrait: customPortraitResponse(existing)! }, 200);
+
+  const timestamp = new Date().toISOString();
+  const jobId = crypto.randomUUID();
+  const job: JobRecord = {
+    id: jobId,
+    ownerUserId,
+    moduleId: "portrait-asset-register",
+    title: `创建虚拟人像：${asset.displayName}`,
+    status: "queued",
+    progress: 0,
+    stage: "排队中",
+    overallExecutionMode: "real",
+    values: { assetId: asset.id },
+    executionPlan: [
+      {
+        id: "plan:0:portrait-asset-register",
+        capability: "portrait-asset-register",
+        executionMode: "real",
+        implementation: "ark-assets",
+        provider: "ark",
+        startedAt: "",
+      },
+    ],
+    provenance: [],
+    cancelRequested: false,
+    providerCancelState: "none",
+    stagingKeys: [],
+    jobSchemaVersion: 2,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  store.create(job);
+  const record = customPortraits.create({ assetId: asset.id, jobId, ownerUserId, createdAt: timestamp });
+  if (!record) throw new Error("CUSTOM_PORTRAIT_CREATE_FAILED");
+  try {
+    await queue.enqueue(jobId);
+  } catch (error) {
+    customPortraits.update(asset.id, {
+      status: "failed",
+      errorCode: "QUEUE_UNAVAILABLE",
+      errorMessage: error instanceof Error ? error.message : "任务队列不可用",
+    });
+    store.update(jobId, {
+      status: "failed",
+      stage: "排队失败",
+      error: { code: "QUEUE_UNAVAILABLE", message: "任务队列不可用", retryable: true, requestId },
+    });
+    throw error;
+  }
+  return c.json({ portrait: customPortraitResponse(record)! }, 202);
+});
+
 const assetListRoute = createRoute({
   method: "get",
   path: "/api/assets",
@@ -2062,6 +2229,18 @@ const deleteAssetRoute = createRoute({
 
 app.openapi(deleteAssetRoute, async (c) => {
   try {
+    if (customPortraits.getOwned(c.get("userId"), c.req.valid("param").assetId))
+      return c.json(
+        {
+          error: {
+            code: "CUSTOM_PORTRAIT_DELETE_UNSUPPORTED",
+            message: "自建虚拟人像暂不支持从素材库直接删除",
+            retryable: false,
+            requestId: crypto.randomUUID(),
+          },
+        },
+        409,
+      );
     const asset = accounts.deleteOwnedAsset(c.get("userId"), c.req.valid("param").assetId);
     await removeAssetFiles([asset]);
     return c.body(null, 204);
@@ -3083,11 +3262,17 @@ const remixProjectRequestSchema = z.object({
     .array(
       z.object({
         id: z.union([z.number(), z.string()]).nullable().optional(),
+        reference: z
+          .discriminatedUnion("type", [
+            z.object({ type: z.literal("general"), portraitId: z.number().int().min(1) }),
+            z.object({ type: z.literal("custom"), assetId: z.string().uuid() }),
+          ])
+          .optional(),
         assetName: z.string().min(1).max(100),
         fileInfo: z.array(
           z.object({
-            fileUrl: z.string().url(),
-            coverUrl: z.string().url(),
+            fileUrl: z.string().min(1),
+            coverUrl: z.string().min(1),
             fileType: z.literal("IMAGE"),
             assetId: z.string().nullable().optional(),
           }),
@@ -3495,6 +3680,22 @@ app.post("/api/video-remix/project/generate", async (c) => {
       { error: { code: "ASSET_NOT_AVAILABLE", message: "引用的商品或视频素材不存在", retryable: false, requestId } },
       422,
     );
+  const portraitReference = parsed.data.portraitAssets[0]?.reference;
+  if (
+    portraitReference &&
+    !resolvePortraitReference({ ownerUserId, reference: portraitReference, accounts, customPortraits })
+  )
+    return c.json(
+      {
+        error: {
+          code: "PORTRAIT_NOT_AVAILABLE",
+          message: "所选人像不存在或尚未就绪",
+          retryable: false,
+          requestId,
+        },
+      },
+      422,
+    );
   const values = {
     workflowPhase: "analysis",
     source: `asset:${videoAssets[0]?.id}:${videoAssets[0]?.originalName}`,
@@ -3507,6 +3708,7 @@ app.post("/api/video-remix/project/generate", async (c) => {
     description: parsed.data.demand,
     prompt: parsed.data.demand,
     portrait: parsed.data.portraitAssets[0]?.assetName ?? "",
+    ...(portraitReference ? { portraitReference: serializePortraitReference(portraitReference)! } : {}),
     voiceAssetId: voiceAssetId ?? "",
     projectRequest: JSON.stringify(parsed.data),
   };
@@ -3789,6 +3991,7 @@ app.openapi(remixShotGenerationRoute, async (c) => {
       )}`,
       referenceAssetIds: JSON.stringify(referenceIds),
       generateAudio: String(body.generateAudio),
+      ...(sourceJob.values.portraitReference ? { portraitReference: sourceJob.values.portraitReference } : {}),
       outputFolderId: accounts.getDefaultAssetFolderId(ownerUserId),
     },
     videoModel: body.modelId,
@@ -4320,9 +4523,9 @@ function videoCreateJobRecord(input: {
             : operation === "analyze"
               ? "aihubmix-gpt-image-analysis"
               : operation === "shot"
-                ? "aihubmix-video"
+                ? "ark-seedance-video"
                 : "aihubmix-text",
-        provider: local || mockVideo ? undefined : "aihubmix",
+        provider: local || mockVideo ? undefined : operation === "shot" ? "ark" : "aihubmix",
         model: mockVideo
           ? undefined
           : operation === "analyze"
@@ -4349,7 +4552,12 @@ function videoCreateJobRecord(input: {
 function videoCreateAssetsAvailable(ownerUserId: string, input: z.infer<typeof VideoCreateInputSchema>) {
   const productAssets = input.productAssetIds.map((id) => accounts.getOwnedAsset(ownerUserId, id));
   if (productAssets.some((asset) => !asset?.mimeType.startsWith("image/"))) return false;
-  if (input.portraitId && !getPortraitById(input.portraitId)) return false;
+  const portraitReference = normalizePortraitReference(input.portraitReference, input.portraitId);
+  if (
+    portraitReference &&
+    !resolvePortraitReference({ ownerUserId, reference: portraitReference, accounts, customPortraits })
+  )
+    return false;
   if (input.voiceAssetId && !accounts.getOwnedAsset(ownerUserId, input.voiceAssetId)?.mimeType.startsWith("audio/"))
     return false;
   return true;
@@ -4629,7 +4837,7 @@ async function enqueueVideoCreateOperation(input: {
     duration?: number;
     referenceMode?: "omni";
     references?: Array<{ assetId: string; label: string; category?: "人物" | "商品" }>;
-    portrait?: { id: number; label: string; category: "人物" } | null;
+    portrait?: { reference: PortraitReference; label: string; category: "人物" } | null;
   };
 }) {
   if (input.idempotencyKey) {
@@ -4672,10 +4880,20 @@ async function enqueueVideoCreateOperation(input: {
               : {}),
           ...(explicitPortrait !== undefined
             ? explicitPortrait
-              ? { portraitId: String(explicitPortrait.id), portraitLabel: explicitPortrait.label }
+              ? {
+                  portraitReference: serializePortraitReference(explicitPortrait.reference)!,
+                  portraitLabel: explicitPortrait.label,
+                }
               : {}
-            : aggregate.project.input.portraitId
-              ? { portraitId: String(aggregate.project.input.portraitId) }
+            : normalizePortraitReference(aggregate.project.input.portraitReference, aggregate.project.input.portraitId)
+              ? {
+                  portraitReference: serializePortraitReference(
+                    normalizePortraitReference(
+                      aggregate.project.input.portraitReference,
+                      aggregate.project.input.portraitId,
+                    ),
+                  )!,
+                }
               : explicitReferences === undefined && referenceId
                 ? { reference: `asset:${referenceId}:reference` }
                 : {}),
@@ -4874,7 +5092,10 @@ const VideoCreateShotGenerationReferenceInputSchema = z.object({
   category: z.enum(["人物", "商品"]).optional(),
 });
 const VideoCreateShotGenerationPortraitInputSchema = z.object({
-  id: z.number().int().min(1),
+  reference: z.discriminatedUnion("type", [
+    z.object({ type: z.literal("general"), portraitId: z.number().int().min(1) }),
+    z.object({ type: z.literal("custom"), assetId: z.string().uuid() }),
+  ]),
   label: z.string().trim().min(1).max(20),
   category: z.literal("人物"),
 });
@@ -4889,6 +5110,13 @@ const VideoCreateShotGenerationSubmitSchema = VideoCreateShotGenerationOptionsSc
 const VideoCreateShotGenerationAttachmentSchema = z.object({
   source: z.enum(["asset", "portrait"]),
   assetId: z.string().uuid().optional(),
+  portraitReference: z
+    .discriminatedUnion("type", [
+      z.object({ type: z.literal("general"), portraitId: z.number().int().min(1) }),
+      z.object({ type: z.literal("custom"), assetId: z.string().uuid() }),
+    ])
+    .optional(),
+  /** @deprecated Legacy draft compatibility. */
   portraitId: z.number().int().min(1).optional(),
   label: z.string(),
   name: z.string(),
@@ -4921,19 +5149,25 @@ function getVideoCreateShotGenerationDraft(projectId: string, shotId: string, ow
   if (!aggregate || !shot || !narration) return undefined;
   const attachments: Array<z.infer<typeof VideoCreateShotGenerationAttachmentSchema>> = [];
   const labels: string[] = [];
-  const portrait = getPortraitById(aggregate.project.input.portraitId);
+  const projectPortraitReference = normalizePortraitReference(
+    aggregate.project.input.portraitReference,
+    aggregate.project.input.portraitId,
+  );
+  const portrait = projectPortraitReference
+    ? resolvePortraitReference({ ownerUserId, reference: projectPortraitReference, accounts, customPortraits })
+    : undefined;
   if (portrait) {
     const label = nextVideoCreateReferenceLabel("image", labels);
     labels.push(label);
     attachments.push({
       source: "portrait",
-      portraitId: portrait.index,
+      portraitReference: projectPortraitReference,
       label,
       name: portrait.name,
-      mimeType: "image/jpeg",
+      mimeType: portrait.mimeType,
       role: "reference_image",
       category: "人物",
-      url: `/api/portraits/${portrait.index}/content`,
+      url: portrait.imageUrl,
     });
   }
   for (const productId of aggregate.project.input.productAssetIds) {
@@ -5070,7 +5304,15 @@ app.openapi(generateVideoCreateShotRoute, async (c) => {
     asset: accounts.getOwnedAsset(c.get("userId"), reference.assetId),
   }));
   const missing = references.find((reference) => !reference.asset);
-  const portrait = options.usePortrait && options.portrait ? getPortraitById(options.portrait.id) : undefined;
+  const portrait =
+    options.usePortrait && options.portrait
+      ? resolvePortraitReference({
+          ownerUserId: c.get("userId"),
+          reference: options.portrait.reference,
+          accounts,
+          customPortraits,
+        })
+      : undefined;
   if (missing || (options.usePortrait && !portrait))
     return c.json(
       {
@@ -5218,7 +5460,9 @@ app.openapi(batchGenerateVideoCreateShotsRoute, async (c) => {
               ? [{ assetId: attachment.assetId, label: attachment.label, category: attachment.category }]
               : [],
           ),
-          portrait: portrait?.portraitId ? { id: portrait.portraitId, label: portrait.label, category: "人物" } : null,
+          portrait: portrait?.portraitReference
+            ? { reference: portrait.portraitReference, label: portrait.label, category: "人物" }
+            : null,
         },
         idempotencyKey: `${batchKey}:${shot.id}`,
       }),

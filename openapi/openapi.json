@@ -235,6 +235,7 @@
         "type": "string",
         "enum": [
           "aihubmix",
+          "ark",
           "volc-speech",
           "tos",
           "mediakit",
@@ -303,6 +304,7 @@
         "type": "string",
         "enum": [
           "OPENAI_KEY",
+          "ARK_API_KEY",
           "VOLC_SPEECH_API_KEY_ID",
           "VOLC_SPEECH_API_KEY",
           "TOS_ACCESS_KEY_ID",
@@ -330,7 +332,8 @@
           "video-editor",
           "kickart",
           "douyin-video-import",
-          "share-content-import"
+          "share-content-import",
+          "portrait-asset-register"
         ]
       },
       "SeedanceModelId": {
@@ -1741,6 +1744,48 @@
             },
             "minItems": 1,
             "maxItems": 6
+          },
+          "portraitReference": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "general"
+                    ]
+                  },
+                  "portraitId": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": [
+                  "type",
+                  "portraitId"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "custom"
+                    ]
+                  },
+                  "assetId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "type",
+                  "assetId"
+                ]
+              }
+            ]
           },
           "portraitId": {
             "type": "integer",
@@ -4575,6 +4620,299 @@
         }
       }
     },
+    "/api/portraits/custom": {
+      "get": {
+        "operationId": "listCustomPortraits",
+        "responses": {
+          "200": {
+            "description": "Current user's custom Ark virtual portraits",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "portraits": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "custom"
+                            ]
+                          },
+                          "assetId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "jobId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "imageUrl": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "queued",
+                              "processing",
+                              "active",
+                              "failed"
+                            ]
+                          },
+                          "errorCode": {
+                            "type": "string"
+                          },
+                          "errorMessage": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string"
+                          },
+                          "updatedAt": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "assetId",
+                          "name",
+                          "imageUrl",
+                          "status",
+                          "createdAt",
+                          "updatedAt"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "portraits"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "registerCustomPortrait",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "assetId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "assetId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Custom portrait registration already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "portrait": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "custom"
+                          ]
+                        },
+                        "assetId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "jobId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "imageUrl": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "queued",
+                            "processing",
+                            "active",
+                            "failed"
+                          ]
+                        },
+                        "errorCode": {
+                          "type": "string"
+                        },
+                        "errorMessage": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "assetId",
+                        "name",
+                        "imageUrl",
+                        "status",
+                        "createdAt",
+                        "updatedAt"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "portrait"
+                  ]
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Custom portrait registration queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "portrait": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "custom"
+                          ]
+                        },
+                        "assetId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "jobId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "imageUrl": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "queued",
+                            "processing",
+                            "active",
+                            "failed"
+                          ]
+                        },
+                        "errorCode": {
+                          "type": "string"
+                        },
+                        "errorMessage": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "assetId",
+                        "name",
+                        "imageUrl",
+                        "status",
+                        "createdAt",
+                        "updatedAt"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "portrait"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Portrait source asset not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Portrait source asset too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Portrait source asset invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Ark portrait service unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/assets": {
       "get": {
         "operationId": "listAssets",
@@ -7246,6 +7584,48 @@
                                   }
                                 ]
                               },
+                              "reference": {
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
+                                        "enum": [
+                                          "general"
+                                        ]
+                                      },
+                                      "portraitId": {
+                                        "type": "integer",
+                                        "minimum": 1
+                                      }
+                                    },
+                                    "required": [
+                                      "type",
+                                      "portraitId"
+                                    ]
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
+                                        "enum": [
+                                          "custom"
+                                        ]
+                                      },
+                                      "assetId": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      }
+                                    },
+                                    "required": [
+                                      "type",
+                                      "assetId"
+                                    ]
+                                  }
+                                ]
+                              },
                               "assetName": {
                                 "type": "string",
                                 "minLength": 1,
@@ -7258,11 +7638,11 @@
                                   "properties": {
                                     "fileUrl": {
                                       "type": "string",
-                                      "format": "uri"
+                                      "minLength": 1
                                     },
                                     "coverUrl": {
                                       "type": "string",
-                                      "format": "uri"
+                                      "minLength": 1
                                     },
                                     "fileType": {
                                       "type": "string",
@@ -9097,6 +9477,48 @@
                             "type": "string",
                             "format": "uuid"
                           },
+                          "portraitReference": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "general"
+                                    ]
+                                  },
+                                  "portraitId": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  }
+                                },
+                                "required": [
+                                  "type",
+                                  "portraitId"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "custom"
+                                    ]
+                                  },
+                                  "assetId": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  }
+                                },
+                                "required": [
+                                  "type",
+                                  "assetId"
+                                ]
+                              }
+                            ]
+                          },
                           "portraitId": {
                             "type": "integer",
                             "minimum": 1
@@ -9303,9 +9725,47 @@
                   "portrait": {
                     "type": "object",
                     "properties": {
-                      "id": {
-                        "type": "integer",
-                        "minimum": 1
+                      "reference": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "general"
+                                ]
+                              },
+                              "portraitId": {
+                                "type": "integer",
+                                "minimum": 1
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "portraitId"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "custom"
+                                ]
+                              },
+                              "assetId": {
+                                "type": "string",
+                                "format": "uuid"
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "assetId"
+                            ]
+                          }
+                        ]
                       },
                       "label": {
                         "type": "string",
@@ -9320,7 +9780,7 @@
                       }
                     },
                     "required": [
-                      "id",
+                      "reference",
                       "label",
                       "category"
                     ]

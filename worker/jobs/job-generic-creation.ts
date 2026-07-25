@@ -4,6 +4,7 @@ import { env } from "../../server/env";
 import { extractAudio, extractFrame, generateSampleVideo, probeMedia } from "../../server/media/ffmpeg";
 import { isSeedanceModelId, type SeedanceModelId } from "../../server/models/video-models";
 import { aihubmix } from "../../server/providers/aihubmix";
+import { arkSeedance } from "../../server/providers/ark-seedance";
 import type { JobRecord, JobResult, StageProvenance } from "../../server/types";
 import { APP_CONFIG } from "../../web/app/config";
 import { jobDefinitions } from "./definitions";
@@ -128,20 +129,25 @@ export function buildExecutionPlan(
       executionMode = "real";
       implementation = "aihubmix-audio";
       model = "tts-1";
-    } else if (!env.forceMock && aihubmix.configured && videoModel && capability === "video-generate") {
+    } else if (!env.forceMock && arkSeedance.configured && videoModel && capability === "video-generate") {
       executionMode = "real";
-      implementation = "aihubmix-video";
+      implementation = "ark-seedance-video";
       model = videoModel;
-    } else if (!env.forceMock && aihubmix.configured && capability === "multimodal-generate") {
+    } else if (!env.forceMock && capability === "multimodal-generate") {
       const type = values.type ?? "营销文案";
       executionMode = "real";
-      if (type === "图片" && values.modelId === "gpt-image-1-mini" && verifiedSdkIds.has("aihubmix-image")) {
+      if (
+        type === "图片" &&
+        aihubmix.configured &&
+        values.modelId === "gpt-image-1-mini" &&
+        verifiedSdkIds.has("aihubmix-image")
+      ) {
         implementation = "aihubmix-image";
         model = "gpt-image-1-mini";
-      } else if (type === "视频" && videoModel) {
-        implementation = "aihubmix-video";
+      } else if (type === "视频" && arkSeedance.configured && videoModel) {
+        implementation = "ark-seedance-video";
         model = videoModel;
-      } else if (type !== "图片" && type !== "视频" && verifiedSdkIds.has("aihubmix-text")) {
+      } else if (type !== "图片" && type !== "视频" && aihubmix.configured && verifiedSdkIds.has("aihubmix-text")) {
         implementation = "aihubmix-text";
         model = "gpt-4.1-nano-free";
       } else {
@@ -155,7 +161,7 @@ export function buildExecutionPlan(
       capability,
       executionMode,
       implementation,
-      provider: executionMode === "real" ? "aihubmix" : undefined,
+      provider: executionMode !== "real" ? undefined : implementation === "ark-seedance-video" ? "ark" : "aihubmix",
       model,
       fallbackReason: executionMode === "mock" ? "真实接口尚未映射或测试环境强制 Mock" : undefined,
       startedAt: "",
@@ -203,7 +209,7 @@ export const genericCreationJob: WorkerJobHandler = {
       : [];
     const produced: ArtifactDraft[] = [];
     const resumedVideoIndex = job.providerTaskId
-      ? plan.findIndex((stage) => stage.implementation === "aihubmix-video")
+      ? plan.findIndex((stage) => stage.implementation === "ark-seedance-video")
       : -1;
     for (let index = resumedVideoIndex >= 0 ? resumedVideoIndex : 0; index < stages.length; index += 1) {
       const latest = context.store.get(id);
@@ -284,7 +290,7 @@ export const genericCreationJob: WorkerJobHandler = {
             url: `/api/artifacts/${name}`,
             executionMode: "real",
           });
-        } else if (stage.implementation === "aihubmix-video" || stage.implementation === "ffmpeg-seedance-mock") {
+        } else if (stage.implementation === "ark-seedance-video" || stage.implementation === "ffmpeg-seedance-mock") {
           const videoModel = stage.implementation === "ffmpeg-seedance-mock" ? job.videoModel : stage.model;
           if (!isSeedanceModelId(videoModel)) throw new SeedanceFlowError("INVALID_VIDEO_MODEL", "视频模型无效", false);
           const response = await new SeedanceVideoJob(context).execute(job, videoModel);
@@ -293,7 +299,7 @@ export const genericCreationJob: WorkerJobHandler = {
           await probeMedia(resolve(env.dataDir, "results", name));
           stage.executionMode = response.executionMode;
           stage.implementation = response.implementation;
-          stage.provider = response.executionMode === "real" ? "aihubmix" : undefined;
+          stage.provider = response.executionMode === "real" ? "ark" : undefined;
           stage.model = response.executionMode === "real" ? videoModel : undefined;
           produced.push({
             id: crypto.randomUUID(),
@@ -309,7 +315,7 @@ export const genericCreationJob: WorkerJobHandler = {
           return;
         }
         if (
-          stage.implementation === "aihubmix-video" ||
+          stage.implementation === "ark-seedance-video" ||
           stage.implementation === "ffmpeg-seedance-mock" ||
           !env.allowMockFallback
         ) {

@@ -19,7 +19,9 @@ describe("video remix storyboard media preview", () => {
     expect(storyboard).toContain("selectedProduct?.images.slice(0, 4).map");
     expect(storyboard).toContain("url={image.url}");
     expect(storyboard).toContain("selectedPortraits.map");
-    expect(storyboard).toContain("url={portrait.display_url || portraitDisplayUrl(portrait.index)}");
+    expect(storyboard).toContain('portrait.reference.type === "custom"');
+    expect(storyboard).toContain("<AuthenticatedMedia url={portrait.display_url}");
+    expect(storyboard).toContain("<PublicPreviewImage url={portrait.display_url}");
     expect(storyboard).not.toContain("<span />");
   });
 

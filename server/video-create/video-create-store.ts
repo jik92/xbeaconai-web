@@ -201,6 +201,7 @@ export class VideoCreateStore {
     const normalized = recommendation;
     const input: VideoCreateInput = {
       productAssetIds: aggregate.project.input.productAssetIds,
+      portraitReference: aggregate.project.input.portraitReference,
       portraitId: aggregate.project.input.portraitId,
       voiceAssetId: aggregate.project.input.voiceAssetId,
       videoModel: aggregate.project.input.videoModel,

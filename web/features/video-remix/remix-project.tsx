@@ -58,14 +58,15 @@ import { PromptToolModal } from "./prompt-tool-modal";
 import "./remix-project.css";
 
 const stages = ["上传配置", "AI 解析", "提示词校对", "分镜校对", "合并成片"];
-const fallbackPortrait = portraitDisplayUrl(1);
 
 interface SelectedPortrait {
+  key: string;
+  reference: Portrait["reference"];
   name: string;
   profession: string;
   source_url: string;
-  display_url?: string;
-  index: number;
+  display_url: string;
+  index?: number;
   description?: string;
   gender?: string;
   age?: number;
@@ -181,7 +182,7 @@ function ConfigSidebar({
   onSelectAttachments: (assets: AttachmentSelection[]) => void;
   onRemoveSource: (assetId: string) => void;
   onPick: (kind: "product" | "portrait" | "voice") => void;
-  onRemovePortrait: (index: number) => void;
+  onRemovePortrait: (key: string) => void;
 }) {
   return (
     <aside className="remix-config">
@@ -229,19 +230,23 @@ function ConfigSidebar({
       {selectedPortraits.length ? (
         <div className="portrait-cards-row">
           {selectedPortraits.map((portrait) => (
-            <div className="remix-portrait-card" key={portrait.index}>
-              <ImagePreview
-                className="config-portrait"
-                src={
-                  portrait.display_url || (portrait.index > 0 ? portraitDisplayUrl(portrait.index) : fallbackPortrait)
-                }
-                alt={portrait.name}
-              />
+            <div className="remix-portrait-card" key={portrait.key}>
+              {portrait.reference.type === "custom" ? (
+                <AuthenticatedMedia
+                  className="config-portrait"
+                  url={portrait.display_url}
+                  mimeType="image/jpeg"
+                  alt={portrait.name}
+                  previewable={false}
+                />
+              ) : (
+                <ImagePreview className="config-portrait" src={portrait.display_url} alt={portrait.name} />
+              )}
               <button
                 type="button"
                 className="portrait-card-remove"
                 aria-label={`移除人像 ${portrait.name}`}
-                onClick={() => onRemovePortrait(portrait.index)}
+                onClick={() => onRemovePortrait(portrait.key)}
               >
                 <X />
               </button>
@@ -649,20 +654,23 @@ function PortraitPickerModal({
     });
   }, [data, gender, query]);
 
-  const isSelected = (index: number) => pending.some((p) => p.index === index);
+  const isSelected = (key: string) => pending.some((item) => item.key === key);
   const togglePortrait = (portrait: Portrait) => {
+    if (portrait.status !== "active") return;
     setPending((current) => {
-      const exists = current.find((p) => p.index === portrait.index);
-      if (exists) return current.filter((p) => p.index !== portrait.index);
+      const exists = current.find((item) => item.key === portrait.key);
+      if (exists) return current.filter((item) => item.key !== portrait.key);
       if (current.length >= maxSelect) return current;
       return [
         ...current,
         {
+          key: portrait.key,
+          reference: portrait.reference,
           name: portrait.name,
           profession: portrait.profession,
           source_url: portrait.source_url,
           display_url: portrait.display_url,
-          index: portrait.index,
+          ...(portrait.type === "general" ? { index: portrait.index } : {}),
           description: portrait.description,
           gender: portrait.gender,
           age: portrait.age,
@@ -709,16 +717,29 @@ function PortraitPickerModal({
         )}
         <div className="remix-picker-grid portrait-picker-grid">
           {filtered.slice(0, visibleCount).map((portrait) => {
-            const active = isSelected(portrait.index);
+            const active = isSelected(portrait.key);
             return (
               <button
-                key={portrait.index}
+                key={portrait.key}
                 className={active ? "selected" : ""}
                 aria-label={`${active ? "已选择，" : ""}${portrait.name}`}
+                disabled={portrait.status !== "active"}
                 onClick={() => togglePortrait(portrait)}
               >
                 <span className="portrait">
-                  <ImagePreview src={portrait.display_url} alt={portrait.name} imageLoading="lazy" />
+                  {portrait.type === "custom" ? (
+                    <AuthenticatedMedia
+                      url={portrait.display_url}
+                      mimeType="image/jpeg"
+                      alt={portrait.name}
+                      controls={false}
+                      loadingText=""
+                      errorText="预览失败"
+                      previewable={false}
+                    />
+                  ) : (
+                    <ImagePreview src={portrait.display_url} alt={portrait.name} imageLoading="lazy" />
+                  )}
                   {active && (
                     <i>
                       <CircleCheck /> 已选择
@@ -728,7 +749,9 @@ function PortraitPickerModal({
                 <b>{portrait.profession}</b>
                 <small>
                   {portrait.age ? `${portrait.age} 岁 · ` : ""}
-                  {portrait.gender}性 · NO. {String(portrait.index).padStart(4, "0")}
+                  {portrait.type === "general"
+                    ? `${portrait.gender}性 · NO. ${String(portrait.index).padStart(4, "0")}`
+                    : "自建虚拟人像"}
                 </small>
               </button>
             );
@@ -1243,7 +1266,6 @@ export function RemixProject() {
     setStage(1);
     setNotice("");
     try {
-      const portraitAssetId = selectedPortraits[0]?.source_url.match(/\/([^/]+)\.png(?:\?|$)/)?.[1] ?? null;
       const created = await generateRemixProject({
         projectName:
           projectName.trim() ||
@@ -1295,9 +1317,13 @@ export function RemixProject() {
             }
           : null,
         portraitAssets: selectedPortraits.map((portrait) => {
-          const assetId = portrait.source_url.match(/\/([^/]+)\.png(?:\?|$)/)?.[1] ?? null;
+          const assetId =
+            portrait.reference.type === "custom"
+              ? portrait.reference.assetId
+              : (portrait.source_url.match(/\/([^/]+)\.png(?:\?|$)/)?.[1] ?? null);
           return {
-            id: portrait.index,
+            id: portrait.index ?? (portrait.reference.type === "custom" ? portrait.reference.assetId : null),
+            reference: portrait.reference,
             assetName: portrait.name,
             fileInfo: [
               {
@@ -1396,11 +1422,19 @@ export function RemixProject() {
         const portraitFile = portrait.fileInfo[0];
         if (!portraitFile) continue;
         restoredPortraits.push({
+          key:
+            portrait.reference?.type === "custom"
+              ? `custom:${portrait.reference.assetId}`
+              : `general:${portrait.reference?.portraitId ?? (Number(portrait.id) || 0)}`,
+          reference: portrait.reference ?? { type: "general", portraitId: Number(portrait.id) || 0 },
           name: portrait.assetName,
           profession: portrait.occupation || "",
           source_url: portraitFile.fileUrl,
-          display_url: Number(portrait.id) > 0 ? portraitDisplayUrl(Number(portrait.id)) : fallbackPortrait,
-          index: Number(portrait.id) || 0,
+          display_url:
+            portrait.reference?.type === "custom"
+              ? portraitFile.fileUrl
+              : portraitDisplayUrl(portrait.reference?.portraitId ?? (Number(portrait.id) || 0)),
+          ...(portrait.reference?.type === "custom" ? {} : { index: Number(portrait.id) || 0 }),
           description: portrait.description ?? undefined,
           gender: portrait.gender ?? undefined,
           age: portrait.age ?? undefined,
@@ -1684,8 +1718,8 @@ export function RemixProject() {
             setComposeJob(null);
           }}
           onPick={setPicker}
-          onRemovePortrait={(index) =>
-            setSelectedPortraits((current) => current.filter((portrait) => portrait.index !== index))
+          onRemovePortrait={(key) =>
+            setSelectedPortraits((current) => current.filter((portrait) => portrait.key !== key))
           }
         />
         <section className="remix-workspace">
@@ -1877,11 +1911,12 @@ export function RemixProject() {
                         </span>
                       ))}
                       {selectedPortraits.map((portrait) => (
-                        <span className="result-asset" key={portrait.index}>
-                          <PublicPreviewImage
-                            url={portrait.display_url || portraitDisplayUrl(portrait.index)}
-                            alt={portrait.name}
-                          />
+                        <span className="result-asset" key={portrait.key}>
+                          {portrait.reference.type === "custom" ? (
+                            <AuthenticatedMedia url={portrait.display_url} mimeType="image/jpeg" alt={portrait.name} />
+                          ) : (
+                            <PublicPreviewImage url={portrait.display_url} alt={portrait.name} />
+                          )}
                         </span>
                       ))}
                       {!selectedProduct?.images.length && !selectedPortraits.length && (

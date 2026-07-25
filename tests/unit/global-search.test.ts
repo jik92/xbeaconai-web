@@ -42,6 +42,10 @@ const product: LibraryProduct = {
   createdAt: "2026-07-23T00:00:00.000Z",
 };
 const portrait = {
+  key: "general:8",
+  type: "general",
+  reference: { type: "general", portraitId: 8 },
+  status: "active",
   index: 8,
   category: "女性",
   page: 1,

@@ -1,3 +1,5 @@
+import { formatPortraitIdentity, parsePortraitTags } from "../portraits/portrait-tags";
+
 export type VideoCreateReferenceKind = "image" | "video" | "audio";
 export type VideoCreateImageCategory = "人物" | "商品";
 
@@ -184,6 +186,24 @@ function portraitBoundVisualDescription(value: string, hasPortraitReference: boo
   return hasPortraitReference ? neutralizeVisualPersonDescription(value) : value;
 }
 
+function portraitBoundVoiceDescription(value: string, hasPortraitReference: boolean) {
+  if (!hasPortraitReference) return value;
+  return value.replace(
+    /(?:(?:\d{1,3}\s*岁(?:左右)?|年轻|青春靓丽|中年|年长|老年)的?\s*)?(?:女性|男性|女生|男生|女孩|男孩|女人|男人|女士|先生|女声|男声)(?:音色|声音|嗓音)?/gu,
+    "人物音色",
+  );
+}
+
+function portraitIdentityConstraint(reference: VideoCreatePromptReference) {
+  const tags = parsePortraitTags(reference.name);
+  if (!tags) return undefined;
+  const oppositeGender = tags.gender === "男" ? "女性、女生、女孩或女人" : "男性、男生、男孩或男人";
+  return {
+    tags,
+    description: `${formatPortraitIdentity(tags)}；禁止生成${oppositeGender}，禁止改成其他年龄或职业`,
+  };
+}
+
 export function buildVideoCreateShotGenerationPrompt(input: {
   durationSec: number;
   plan: VideoCreateShotGenerationPlan;
@@ -193,13 +213,20 @@ export function buildVideoCreateShotGenerationPrompt(input: {
   const products = input.references.filter((reference) => reference.category === "商品").map(referenceToken);
   const audio = input.references.filter((reference) => reference.role === "reference_audio").map(referenceToken);
   const videos = input.references.filter((reference) => reference.role === "reference_video").map(referenceToken);
+  const portraitReference = input.references.find((reference) => reference.category === "人物");
+  const portraitToken = portraitReference ? referenceToken(portraitReference) : undefined;
+  const portraitIdentity = portraitReference ? portraitIdentityConstraint(portraitReference) : undefined;
   const constraints = products.length
     ? `${globalConstraints} 商品外观严格参考 ${products.join("、")}。`
     : globalConstraints;
   const characterAppearance = people.length
-    ? `人物主体必须使用 ${people.join("、")}；人物形象严格参考人物图片，保持其性别、年龄、脸型、五官、肤色、发型和身份特征一致，禁止替换为其他人物`
+    ? `画面中唯一出镜人物必须使用 ${people.join("、")}；${portraitIdentity ? `人物标签为 ${portraitIdentity.description}；` : ""}人物形象严格参考人物图片，保持其性别、年龄、脸型、五官、肤色、发型和身份特征一致，禁止替换为其他人物；商品、目标受众和音色不得改变人物身份`
     : input.plan.characterAppearance;
-  const voice = audio.length ? `${input.plan.voice}，音色严格参考 ${audio.join("、")}` : input.plan.voice;
+  const voice = portraitIdentity
+    ? `${portraitIdentity.tags.age}岁${portraitIdentity.tags.gender}性音色，声音年龄与性别必须与 ${portraitToken} 一致，语气自然亲切，语速适中${audio.length ? `；${audio.join("、")} 仅用于参考音色质感、语速和情绪，不得改变人物性别、年龄或身份` : ""}`
+    : audio.length
+      ? `${input.plan.voice}，音色严格参考 ${audio.join("、")}`
+      : input.plan.voice;
   const hasPortraitReference = people.length > 0;
   const global = [
     "### 第一部分：全局基础设定",
@@ -210,7 +237,7 @@ export function buildVideoCreateShotGenerationPrompt(input: {
     `背景描述：${portraitBoundVisualDescription(input.plan.background, hasPortraitReference)}`,
     `光线分析：${portraitBoundVisualDescription(input.plan.lighting, hasPortraitReference)}`,
     `音色设定：${voice}`,
-    `画质要求：${input.plan.quality}`,
+    `画质要求：${portraitBoundVisualDescription(input.plan.quality, hasPortraitReference)}`,
     `视频总时长：${input.durationSec}秒。`,
   ];
   const subshots = input.plan.subshots.map((subshot, index) =>
@@ -219,7 +246,7 @@ export function buildVideoCreateShotGenerationPrompt(input: {
       `人物动作描述：${portraitBoundVisualDescription(subshot.action, hasPortraitReference)}`,
       `画面口播文案：${subshot.narration}`,
       `人物说话神态：${portraitBoundVisualDescription(subshot.expression, hasPortraitReference)}`,
-      `音色语气设定：${subshot.voiceTone}`,
+      `音色语气设定：${portraitBoundVoiceDescription(subshot.voiceTone, hasPortraitReference)}`,
       `分镜时长：${subshot.durationSec}秒`,
       `景别：${portraitBoundVisualDescription(subshot.shotSize, hasPortraitReference)}`,
       `画面构图：${portraitBoundVisualDescription(subshot.composition, hasPortraitReference)}`,

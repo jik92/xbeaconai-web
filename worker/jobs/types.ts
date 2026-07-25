@@ -2,6 +2,7 @@ import type { AccountStore } from "../../server/accounts/account-store";
 import type { AdScriptStore } from "../../server/ad-script/ad-script-store";
 import type { ProviderGenerationAuditStore } from "../../server/audit/provider-generation-audit-store";
 import type { SqliteJobStore } from "../../server/jobs/sqlite-job-store";
+import type { CustomPortraitStore } from "../../server/portraits/custom-portrait-store";
 import type { JobRecord } from "../../server/types";
 import type { VideoCreateStore } from "../../server/video-create/video-create-store";
 
@@ -11,6 +12,7 @@ export interface JobHandlerContext {
   readonly adScripts?: AdScriptStore;
   readonly videoCreates?: VideoCreateStore;
   readonly providerAudits?: ProviderGenerationAuditStore;
+  readonly customPortraits?: CustomPortraitStore;
   /** Injectable download function for integration testing. */
   readonly downloadFn?: (
     platformId: string,

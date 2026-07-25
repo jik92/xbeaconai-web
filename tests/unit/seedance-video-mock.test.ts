@@ -10,7 +10,7 @@ import {
   probeMedia,
   randomTwoDigitNumber,
 } from "../../server/media/ffmpeg";
-import { aihubmix } from "../../server/providers/aihubmix";
+import { arkSeedance } from "../../server/providers/ark-seedance";
 import type { JobRecord } from "../../server/types";
 import { JobProcessor } from "../../worker/job-processor";
 import { buildExecutionPlan } from "../../worker/jobs/job-generic-creation";
@@ -85,8 +85,8 @@ describe("Seedance FFmpeg mock", () => {
     expect(() => assertSeedanceDuration(15, Number.NaN, "下载视频")).toThrow("未返回有效的视频时长");
   });
 
-  test("rejects a completed provider task before download when its terminal duration is wrong", async () => {
-    const directory = await mkdtemp(resolve(tmpdir(), "seedance-terminal-duration-"));
+  test("rejects an in-flight task created by the removed AIHubMix video provider", async () => {
+    const directory = await mkdtemp(resolve(tmpdir(), "seedance-legacy-provider-"));
     directories.push(directory);
     const store = new SqliteJobStore(resolve(directory, "jobs.sqlite"));
     const job = {
@@ -95,27 +95,27 @@ describe("Seedance FFmpeg mock", () => {
       providerTaskId: "provider-task",
       providerStatus: "processing",
       providerDeadlineAt: new Date(Date.now() + 60_000).toISOString(),
+      executionPlan: [
+        {
+          id: "legacy-video",
+          capability: "video-generate",
+          executionMode: "real" as const,
+          implementation: "aihubmix-video",
+          provider: "aihubmix",
+          model: "doubao-seedance-2-0-mini-260615",
+          startedAt: new Date().toISOString(),
+        },
+      ],
     };
     store.create(job);
-    const originalGetVideo = aihubmix.getVideo;
-    const originalDownloadVideo = aihubmix.downloadVideo;
-    let downloaded = false;
-    aihubmix.getVideo = async () => ({ id: "provider-task", status: "completed", duration: 5 });
-    aihubmix.downloadVideo = async () => {
-      downloaded = true;
-      return { bytes: new Uint8Array(), mimeType: "video/mp4" };
-    };
     try {
       await expect(
         new SeedanceVideoJob({ store, change: (id, patch) => store.update(id, patch) }).execute(
           job,
           "doubao-seedance-2-0-mini-260615",
         ),
-      ).rejects.toMatchObject({ code: "VIDEO_DURATION_MISMATCH", retryable: true });
-      expect(downloaded).toBeFalse();
+      ).rejects.toMatchObject({ code: "LEGACY_VIDEO_PROVIDER_TASK_UNSUPPORTED", retryable: false });
     } finally {
-      aihubmix.getVideo = originalGetVideo;
-      aihubmix.downloadVideo = originalDownloadVideo;
       store.close();
     }
   });
@@ -137,10 +137,14 @@ describe("Seedance FFmpeg mock", () => {
         providerDeadlineAt: new Date(Date.now() + 60_000).toISOString(),
       };
       store.create(job);
-      const originalGetVideo = aihubmix.getVideo;
-      const originalDownloadVideo = aihubmix.downloadVideo;
-      aihubmix.getVideo = async () => ({ id: "provider-task", status: "completed", duration: 15 });
-      aihubmix.downloadVideo = async () => ({
+      const originalGetVideo = arkSeedance.getVideo;
+      const originalDownloadVideo = arkSeedance.downloadVideo;
+      arkSeedance.getVideo = async () => ({
+        id: "provider-task",
+        status: "succeeded",
+        content: { video_url: "https://example.test/video.mp4" },
+      });
+      arkSeedance.downloadVideo = async () => ({
         bytes: new Uint8Array(await Bun.file(source).arrayBuffer()),
         mimeType: "video/mp4",
       });
@@ -152,8 +156,8 @@ describe("Seedance FFmpeg mock", () => {
           ),
         ).rejects.toMatchObject({ code: "VIDEO_DURATION_MISMATCH", retryable: true });
       } finally {
-        aihubmix.getVideo = originalGetVideo;
-        aihubmix.downloadVideo = originalDownloadVideo;
+        arkSeedance.getVideo = originalGetVideo;
+        arkSeedance.downloadVideo = originalDownloadVideo;
         store.close();
       }
     },

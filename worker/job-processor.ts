@@ -2,6 +2,7 @@ import type { AccountStore } from "../server/accounts/account-store";
 import type { AdScriptStore } from "../server/ad-script/ad-script-store";
 import type { ProviderGenerationAuditStore } from "../server/audit/provider-generation-audit-store";
 import type { SqliteJobStore } from "../server/jobs/sqlite-job-store";
+import type { CustomPortraitStore } from "../server/portraits/custom-portrait-store";
 import { ossutils } from "../server/storage/ossutils";
 import type { JobRecord } from "../server/types";
 import type { VideoCreateStore } from "../server/video-create/video-create-store";
@@ -21,6 +22,7 @@ export class JobProcessor {
     readonly adScripts?: AdScriptStore,
     readonly videoCreates?: VideoCreateStore,
     readonly providerAudits?: ProviderGenerationAuditStore,
+    readonly customPortraits?: CustomPortraitStore,
   ) {
     this.context = {
       store,
@@ -28,6 +30,7 @@ export class JobProcessor {
       adScripts,
       videoCreates,
       providerAudits,
+      customPortraits,
       change: (id, patch) => this.change(id, patch),
     };
   }

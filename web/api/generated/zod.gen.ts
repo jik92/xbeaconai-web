@@ -66,6 +66,7 @@ export const zRechargeOrder = z.object({
 
 export const zProviderId = z.enum([
     'aihubmix',
+    'ark',
     'volc-speech',
     'tos',
     'mediakit',
@@ -103,6 +104,7 @@ export const zAiToolModuleId = z.enum([
 
 export const zProviderCredentialName = z.enum([
     'OPENAI_KEY',
+    'ARK_API_KEY',
     'VOLC_SPEECH_API_KEY_ID',
     'VOLC_SPEECH_API_KEY',
     'TOS_ACCESS_KEY_ID',
@@ -128,7 +130,8 @@ export const zJobModuleId = z.enum([
     'video-editor',
     'kickart',
     'douyin-video-import',
-    'share-content-import'
+    'share-content-import',
+    'portrait-asset-register'
 ]);
 
 export const zSeedanceModelId = z.enum([
@@ -396,6 +399,16 @@ export const zAdScriptProject = z.object({
 
 export const zVideoCreateInput = z.object({
     productAssetIds: z.array(z.uuid()).min(1).max(6),
+    portraitReference: z.union([
+        z.object({
+            type: z.enum(['general']),
+            portraitId: z.int().gte(1)
+        }),
+        z.object({
+            type: z.enum(['custom']),
+            assetId: z.uuid()
+        })
+    ]).optional(),
     portraitId: z.int().gte(1).optional(),
     scene: z.string().min(1).max(40),
     productName: z.string().max(60).optional().default(''),
@@ -1215,6 +1228,77 @@ export const zUploadMediaResponse = z.object({
     })
 });
 
+/**
+ * Current user's custom Ark virtual portraits
+ */
+export const zListCustomPortraitsResponse = z.object({
+    portraits: z.array(z.object({
+        type: z.enum(['custom']),
+        assetId: z.uuid(),
+        jobId: z.uuid().optional(),
+        name: z.string(),
+        description: z.string().optional(),
+        imageUrl: z.string(),
+        status: z.enum([
+            'queued',
+            'processing',
+            'active',
+            'failed'
+        ]),
+        errorCode: z.string().optional(),
+        errorMessage: z.string().optional(),
+        createdAt: z.string(),
+        updatedAt: z.string()
+    }))
+});
+
+export const zRegisterCustomPortraitBody = z.object({
+    assetId: z.uuid()
+});
+
+export const zRegisterCustomPortraitResponse = z.union([
+    z.object({
+        portrait: z.object({
+            type: z.enum(['custom']),
+            assetId: z.uuid(),
+            jobId: z.uuid().optional(),
+            name: z.string(),
+            description: z.string().optional(),
+            imageUrl: z.string(),
+            status: z.enum([
+                'queued',
+                'processing',
+                'active',
+                'failed'
+            ]),
+            errorCode: z.string().optional(),
+            errorMessage: z.string().optional(),
+            createdAt: z.string(),
+            updatedAt: z.string()
+        })
+    }),
+    z.object({
+        portrait: z.object({
+            type: z.enum(['custom']),
+            assetId: z.uuid(),
+            jobId: z.uuid().optional(),
+            name: z.string(),
+            description: z.string().optional(),
+            imageUrl: z.string(),
+            status: z.enum([
+                'queued',
+                'processing',
+                'active',
+                'failed'
+            ]),
+            errorCode: z.string().optional(),
+            errorMessage: z.string().optional(),
+            createdAt: z.string(),
+            updatedAt: z.string()
+        })
+    })
+]);
+
 export const zListAssetsQuery = z.object({
     kind: zAssetKind.optional(),
     folderId: z.uuid().optional()
@@ -1868,10 +1952,20 @@ export const zGetVideoRemixProjectResponse = z.object({
                 z.string(),
                 z.unknown()
             ]).optional(),
+            reference: z.union([
+                z.object({
+                    type: z.enum(['general']),
+                    portraitId: z.int().gte(1)
+                }),
+                z.object({
+                    type: z.enum(['custom']),
+                    assetId: z.uuid()
+                })
+            ]).optional(),
             assetName: z.string().min(1).max(100),
             fileInfo: z.array(z.object({
-                fileUrl: z.url(),
-                coverUrl: z.url(),
+                fileUrl: z.string().min(1),
+                coverUrl: z.string().min(1),
                 fileType: z.enum(['IMAGE']),
                 assetId: z.string().optional()
             })),
@@ -2237,6 +2331,16 @@ export const zGetVideoCreateShotGenerationDraftResponse = z.object({
     attachments: z.array(z.object({
         source: z.enum(['asset', 'portrait']),
         assetId: z.uuid().optional(),
+        portraitReference: z.union([
+            z.object({
+                type: z.enum(['general']),
+                portraitId: z.int().gte(1)
+            }),
+            z.object({
+                type: z.enum(['custom']),
+                assetId: z.uuid()
+            })
+        ]).optional(),
         portraitId: z.int().gte(1).optional(),
         label: z.string(),
         name: z.string(),
@@ -2276,7 +2380,16 @@ export const zGenerateVideoCreateShotBody = z.object({
     })).max(12),
     usePortrait: z.boolean(),
     portrait: z.object({
-        id: z.int().gte(1),
+        reference: z.union([
+            z.object({
+                type: z.enum(['general']),
+                portraitId: z.int().gte(1)
+            }),
+            z.object({
+                type: z.enum(['custom']),
+                assetId: z.uuid()
+            })
+        ]),
         label: z.string().min(1).max(20),
         category: z.enum(['人物'])
     }).optional()
