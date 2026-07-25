@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AccountStore } from "../../server/accounts/account-store";
-import type { ImportLogEvent, ImportStage } from "../../server/imports/import-logger";
+import { importLogPrefix, type ImportLogEvent, type ImportStage } from "../../server/imports/import-logger";
 import { SqliteJobStore } from "../../server/jobs/sqlite-job-store";
 import { userPreferences, users } from "../../server/db/schema";
 import type { JobRecord } from "../../server/types";
@@ -98,10 +98,10 @@ function mockDownload(bytes = 4096) {
 beforeAll(() => {
   originalConsoleLog = console.log;
   console.log = (line: string) => {
-    const prefix = "[douyin-import] ";
+    const prefix = `${importLogPrefix} `;
     if (typeof line === "string" && line.startsWith(prefix)) {
       try {
-        capturedLogs.push(JSON.parse(line.slice(prefix.length)));
+        capturedLogs.push(JSON.parse(line.slice(line.indexOf("{"))));
       } catch {
         /* ok */
       }
@@ -188,9 +188,12 @@ describe("import logger integration", () => {
     expect(stages).toContain("asset_created");
     expect(stages).toContain("success");
     expect(stages).toContain("cleanup");
+    expect(stages).toContain("task_started");
+    expect(stages).toContain("validation_complete");
 
     for (const log of capturedLogs) {
       expect(log.jobId).toBe(job.id);
+      expect(log.message.length).toBeGreaterThan(0);
     }
 
     const dlLog = capturedLogs.find((l) => l.stage === "download_complete");
@@ -291,6 +294,35 @@ describe("import logger integration", () => {
 
   test("all log stages are valid ImportStage values", () => {
     const validStages: ImportStage[] = [
+      "task_queued",
+      "task_started",
+      "validation_start",
+      "validation_complete",
+      "validation_failure",
+      "cancel_check",
+      "link_validation_start",
+      "link_validated",
+      "temp_dir_created",
+      "playwright_loading",
+      "browser_start",
+      "browser_ready",
+      "page_open_start",
+      "page_open_complete",
+      "debug_pause_start",
+      "debug_pause_complete",
+      "login_guidance_wait",
+      "login_guidance_closed",
+      "login_guidance_absent",
+      "page_settled",
+      "playback_trigger_start",
+      "playback_triggered",
+      "playback_control_absent",
+      "video_existence_check",
+      "media_capture_start",
+      "media_capture_complete",
+      "file_download_start",
+      "file_download_complete",
+      "browser_cleanup",
       "download_start",
       "download_complete",
       "download_failure",
@@ -343,6 +375,8 @@ describe("import logger integration", () => {
       expect(log.stage.length).toBeGreaterThan(0);
       expect(["ok", "error"]).toContain(log.result);
       expect(typeof log.durationMs).toBe("number");
+      expect(typeof log.message).toBe("string");
+      expect(log.message.length).toBeGreaterThan(0);
     }
   });
 });

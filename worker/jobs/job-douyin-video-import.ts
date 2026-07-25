@@ -3,7 +3,14 @@ import { rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { env } from "../../server/env";
 import { cleanupDownloadDir, DouyinDownloadError } from "../../server/imports/douyin-video";
-import { emitLog, logFailure, sanitizeError, stageComplete, stageStart } from "../../server/imports/import-logger";
+import {
+  emitLog,
+  logFailure,
+  sanitizeError,
+  stageComplete,
+  stageStart,
+  type ImportStage,
+} from "../../server/imports/import-logger";
 import { platformAdapters, ShareContentParser } from "../../server/imports/share-content";
 import { probeMedia } from "../../server/media/ffmpeg";
 import { ossutils } from "../../server/storage/ossutils";
@@ -24,21 +31,39 @@ export const douyinVideoImportJob: WorkerJobHandler = {
   supports: (job) => job.moduleId === "douyin-video-import" || job.moduleId === "share-content-import",
   async execute(job, context) {
     const { accounts, store } = context;
-    if (!accounts) throw new Error("素材所有权服务不可用");
-
     const importStartMs = stageStart();
+    emitLog({ jobId: job.id, stage: "task_started", result: "ok", durationMs: 0 });
+    if (!accounts) {
+      logFailure(job.id, "validation_failure", importStartMs, "ACCOUNT_STORE_UNAVAILABLE", "素材所有权服务不可用");
+      throw new Error("素材所有权服务不可用");
+    }
 
+    emitLog({ jobId: job.id, stage: "validation_start", result: "ok", durationMs: Date.now() - importStartMs });
     const folderId = job.values.folderId;
-    if (!folderId) throw new Error("缺少目标文件夹");
+    if (!folderId) {
+      logFailure(job.id, "validation_failure", importStartMs, "FOLDER_ID_MISSING", "缺少目标文件夹");
+      throw new Error("缺少目标文件夹");
+    }
     const folder = accounts.getAssetFolder(job.ownerUserId, folderId);
-    if (!folder) throw new Error("目标文件夹不存在或不属于当前账号");
+    if (!folder) {
+      logFailure(job.id, "validation_failure", importStartMs, "FOLDER_NOT_FOUND", "目标文件夹不存在或无权访问");
+      throw new Error("目标文件夹不存在或无权访问");
+    }
 
     const platformId = job.values.platformId ?? "douyin";
     const normalizedUrl = job.values.normalizedUrl ?? job.values.shareUrl;
-    if (!normalizedUrl) throw new Error("缺少分享链接");
+    if (!normalizedUrl) {
+      logFailure(job.id, "validation_failure", importStartMs, "SHARE_URL_MISSING", "缺少分享链接");
+      throw new Error("缺少分享链接");
+    }
 
     const adapter = shareParser.adapterFor(platformId);
-    if (!adapter) throw new Error(`不支持的平台: ${platformId}`);
+    if (!adapter) {
+      logFailure(job.id, "validation_failure", importStartMs, "PLATFORM_NOT_SUPPORTED", "不支持的平台");
+      throw new Error(`不支持的平台: ${platformId}`);
+    }
+
+    stageComplete(job.id, "validation_complete", importStartMs);
 
     if (!adapter.supportsDownload) {
       logFailure(job.id, "failure", importStartMs, "DOWNLOAD_NOT_SUPPORTED", `${adapter.displayName} 下载尚未实现`);
@@ -84,6 +109,7 @@ export const douyinVideoImportJob: WorkerJobHandler = {
     try {
       // ── Cancel check ──────────────────────────────────────────
       const precheck = store.get(job.id);
+      emitLog({ jobId: job.id, stage: "cancel_check", result: "ok", durationMs: Date.now() - importStartMs });
       if (!precheck || precheck.cancelRequested) {
         context.change(job.id, { status: "cancelled", stage: "已取消" });
         logFailure(job.id, "cancel", importStartMs, "CANCELLED", "任务在下载前被取消");
@@ -101,11 +127,13 @@ export const douyinVideoImportJob: WorkerJobHandler = {
       emitLog({ jobId: job.id, stage: "download_start", result: "ok", durationMs: Date.now() - importStartMs });
       const dlStart = stageStart();
       const isMocked = !!context.downloadFn;
+      const reportDownloadProgress = (stage: ImportStage) =>
+        emitLog({ jobId: job.id, stage, result: "ok", durationMs: Date.now() - importStartMs });
       try {
         if (context.downloadFn) {
           downloadResult = await context.downloadFn(platformId, normalizedUrl);
         } else {
-          downloadResult = await adapter.download(normalizedUrl);
+          downloadResult = await adapter.download(normalizedUrl, undefined, reportDownloadProgress);
         }
       } catch (dlErr) {
         const s = sanitizeError(dlErr);
@@ -116,6 +144,7 @@ export const douyinVideoImportJob: WorkerJobHandler = {
 
       // ── Cancel check ──────────────────────────────────────────
       const midcheck = store.get(job.id);
+      emitLog({ jobId: job.id, stage: "cancel_check", result: "ok", durationMs: Date.now() - importStartMs });
       if (!midcheck || midcheck.cancelRequested) {
         context.change(job.id, { status: "cancelled", stage: "已取消" });
         logFailure(job.id, "cancel", importStartMs, "CANCELLED", "任务在下载后被取消");

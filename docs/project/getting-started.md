@@ -25,6 +25,8 @@ make run-worker
 
 也可运行 `make run-dev`。Web 为 `http://127.0.0.1:5173`，API 与 OpenAPI 为 `http://127.0.0.1:8787` 和 `/openapi.json`。Worker 必须独立运行才会消费任务。
 
+`make run-dev` 会保留终端输出，并分别追加到 `logs/web.log`、`logs/api.log`、`logs/worker.log`。日志目录默认不提交 Git；如需放在其他本地目录，设置 `YAOZUO_LOG_DIR`。
+
 生产先执行 `bun run build`，再分别启动 `bun run start` 和 `bun run worker`。Server 从 `dist/` 提供静态资源、API 与 SPA fallback。
 
 ## 常用命令

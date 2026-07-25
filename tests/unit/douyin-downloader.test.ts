@@ -115,10 +115,11 @@ describe("cleanupDownloadDir", () => {
 describe("downloadDouyinVideo failure cleanup", () => {
   test("cleans up temp directory on invalid URL without leaving artifacts", async () => {
     const before = readdirSync(tmpdir()).filter((d) => d.startsWith("dy-import-")).length;
+    const progress: string[] = [];
 
     // URL validation happens before playwright import — should fail fast
     try {
-      await downloadDouyinVideo("not-a-valid-url", 1_000);
+      await downloadDouyinVideo("not-a-valid-url", 1_000, (stage) => progress.push(stage));
     } catch (err) {
       expect(err).toBeInstanceOf(DouyinDownloadError);
       expect((err as DouyinDownloadError).reason).toBe("invalid_url");
@@ -126,6 +127,7 @@ describe("downloadDouyinVideo failure cleanup", () => {
 
     const after = readdirSync(tmpdir()).filter((d) => d.startsWith("dy-import-")).length;
     expect(after).toBe(before);
+    expect(progress).toEqual(["link_validation_start"]);
   });
 
   test("cleans up temp directory when playwright browser fails", async () => {

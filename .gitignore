@@ -10,3 +10,4 @@ test-results
 *.local
 *.tsbuildinfo
 /task_records/
+/logs/

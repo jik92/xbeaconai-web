@@ -1,6 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import type { ImportLogEvent, ImportStage } from "../../server/imports/import-logger";
-import { emitLog, logFailure, sanitizeError, stageComplete, stageStart } from "../../server/imports/import-logger";
+import {
+  emitLog,
+  importLogPrefix,
+  logFailure,
+  sanitizeError,
+  stageComplete,
+  stageStart,
+} from "../../server/imports/import-logger";
 
 describe("import-logger", () => {
   test("stageStart returns a timestamp", () => {
@@ -19,13 +26,15 @@ describe("import-logger", () => {
       stageComplete("job-123", "download_complete", Date.now() - 500, 1024000);
 
       expect(lines.length).toBe(1);
-      const parsed = JSON.parse(lines[0].replace("[douyin-import] ", "")) as ImportLogEvent;
+      expect(lines[0]).toStartWith(`${importLogPrefix} 视频下载完成 `);
+      const parsed = JSON.parse(lines[0].slice(lines[0].indexOf("{"))) as ImportLogEvent;
 
       expect(parsed.jobId).toBe("job-123");
       expect(parsed.stage).toBe("download_complete");
       expect(parsed.result).toBe("ok");
       expect(parsed.durationMs).toBeGreaterThanOrEqual(0);
       expect(parsed.fileSizeBytes).toBe(1024000);
+      expect(parsed.message).toBe("视频下载完成");
       // Must NOT contain any sensitive fields
       expect(JSON.stringify(parsed)).not.toContain("url");
       expect(JSON.stringify(parsed)).not.toContain("cookie");
@@ -45,13 +54,15 @@ describe("import-logger", () => {
       logFailure("job-456", "failure", Date.now() - 1000, "DOWNLOAD_FAILED", "Connection refused");
 
       expect(lines.length).toBe(1);
-      const parsed = JSON.parse(lines[0].replace("[douyin-import] ", "")) as ImportLogEvent;
+      expect(lines[0]).toStartWith(`${importLogPrefix} 任务处理失败 `);
+      const parsed = JSON.parse(lines[0].slice(lines[0].indexOf("{"))) as ImportLogEvent;
 
       expect(parsed.jobId).toBe("job-456");
       expect(parsed.stage).toBe("failure");
       expect(parsed.result).toBe("error");
       expect(parsed.errorCode).toBe("DOWNLOAD_FAILED");
       expect(parsed.errorSummary).toBe("Connection refused");
+      expect(parsed.message).toBe("任务处理失败");
       // Must NOT leak any URL-like content
       expect(JSON.stringify(parsed)).not.toContain("http");
     } finally {
@@ -114,6 +125,7 @@ describe("import-logger", () => {
       expect(raw).toContain('"result"');
       expect(raw).toContain('"durationMs"');
       expect(raw).toContain('"fileSizeBytes"');
+      expect(raw).toContain('"message":"任务处理完成"');
     } finally {
       console.log = orig;
     }
@@ -121,6 +133,35 @@ describe("import-logger", () => {
 
   test("all defined stages are valid ImportStage values", () => {
     const stages: ImportStage[] = [
+      "task_queued",
+      "task_started",
+      "validation_start",
+      "validation_complete",
+      "validation_failure",
+      "cancel_check",
+      "link_validation_start",
+      "link_validated",
+      "temp_dir_created",
+      "playwright_loading",
+      "browser_start",
+      "browser_ready",
+      "page_open_start",
+      "page_open_complete",
+      "debug_pause_start",
+      "debug_pause_complete",
+      "login_guidance_wait",
+      "login_guidance_closed",
+      "login_guidance_absent",
+      "page_settled",
+      "playback_trigger_start",
+      "playback_triggered",
+      "playback_control_absent",
+      "video_existence_check",
+      "media_capture_start",
+      "media_capture_complete",
+      "file_download_start",
+      "file_download_complete",
+      "browser_cleanup",
       "download_start",
       "download_complete",
       "download_failure",
@@ -147,6 +188,7 @@ describe("import-logger", () => {
         stage,
         result: "ok",
         durationMs: 100,
+        message: "测试日志",
       };
       expect(event.stage).toBe(stage);
     }

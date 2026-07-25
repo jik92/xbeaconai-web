@@ -13,4 +13,4 @@ export const platformAdapters: readonly SharePlatformAdapter[] = [
 ];
 
 export { ShareContentParser } from "./parser";
-export type { ShareCandidate, ShareDownloadResult, SharePlatformAdapter } from "./types";
+export type { ShareCandidate, ShareDownloadProgress, ShareDownloadResult, SharePlatformAdapter } from "./types";

@@ -29,6 +29,41 @@ export interface DouyinDownloadResult {
   byteSize: number;
 }
 
+export type DouyinDownloadProgressStage =
+  | "link_validation_start"
+  | "link_validated"
+  | "temp_dir_created"
+  | "playwright_loading"
+  | "browser_start"
+  | "browser_ready"
+  | "page_open_start"
+  | "page_open_complete"
+  | "debug_pause_start"
+  | "debug_pause_complete"
+  | "login_guidance_wait"
+  | "login_guidance_closed"
+  | "login_guidance_absent"
+  | "page_settled"
+  | "playback_trigger_start"
+  | "playback_triggered"
+  | "playback_control_absent"
+  | "video_existence_check"
+  | "media_capture_start"
+  | "media_capture_complete"
+  | "file_download_start"
+  | "file_download_complete"
+  | "browser_cleanup";
+
+export type DouyinDownloadProgress = (stage: DouyinDownloadProgressStage) => void;
+
+function reportProgress(onProgress: DouyinDownloadProgress | undefined, stage: DouyinDownloadProgressStage) {
+  try {
+    onProgress?.(stage);
+  } catch {
+    // Observability must never interrupt a download.
+  }
+}
+
 export class DouyinDownloadError extends Error {
   constructor(
     message: string,
@@ -80,14 +115,22 @@ async function dismissLoginGuidance(page: import("playwright").Page): Promise<bo
  * Temporary CDN URLs, cookies, and browser sessions are never
  * returned to the caller or persisted to the database.
  */
-export async function downloadDouyinVideo(shareUrl: string, timeoutMs = 30_000): Promise<DouyinDownloadResult> {
+export async function downloadDouyinVideo(
+  shareUrl: string,
+  timeoutMs = 30_000,
+  onProgress?: DouyinDownloadProgress,
+): Promise<DouyinDownloadResult> {
+  reportProgress(onProgress, "link_validation_start");
   const validatedUrl = validateDouyinUrl(shareUrl);
+  reportProgress(onProgress, "link_validated");
 
   let playwright: typeof import("playwright") | undefined;
   const tempDir = mkdtempSync(join(tmpdir(), "dy-import-"));
+  reportProgress(onProgress, "temp_dir_created");
   let returned = false;
 
   try {
+    reportProgress(onProgress, "playwright_loading");
     playwright = await import("playwright");
   } catch {
     rmSync(tempDir, { recursive: true, force: true });
@@ -99,6 +142,7 @@ export async function downloadDouyinVideo(shareUrl: string, timeoutMs = 30_000):
   let page: import("playwright").Page | undefined;
 
   try {
+    reportProgress(onProgress, "browser_start");
     browser = await playwright.chromium.launch({
       headless: env.douyinBrowserHeadless,
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
@@ -106,6 +150,7 @@ export async function downloadDouyinVideo(shareUrl: string, timeoutMs = 30_000):
       // automation marker. This does not bypass authentication or CAPTCHA.
       ignoreDefaultArgs: ["--enable-automation"],
     });
+    reportProgress(onProgress, "browser_ready");
     context = await browser.newContext({
       acceptDownloads: true,
       userAgent:
@@ -133,34 +178,46 @@ export async function downloadDouyinVideo(shareUrl: string, timeoutMs = 30_000):
 
     // Navigate to the share page — domcontentloaded is sufficient;
     // networkidle can hang indefinitely due to analytics/beacon requests.
+    reportProgress(onProgress, "page_open_start");
     await page.goto(validatedUrl, {
       waitUntil: "domcontentloaded",
       timeout: timeoutMs,
     });
+    reportProgress(onProgress, "page_open_complete");
 
     // Gives a local operator time to inspect the visible page or sign in.
     // The session is ephemeral and is discarded after this job finishes.
-    if (!env.douyinBrowserHeadless && env.douyinBrowserDebugPauseMs > 0)
+    if (!env.douyinBrowserHeadless && env.douyinBrowserDebugPauseMs > 0) {
+      reportProgress(onProgress, "debug_pause_start");
       await page.waitForTimeout(env.douyinBrowserDebugPauseMs);
+      reportProgress(onProgress, "debug_pause_complete");
+    }
 
     // Public share pages may show a dismissible login guidance overlay. Close
     // it only after the page has had time to render it; missing controls are normal.
+    reportProgress(onProgress, "login_guidance_wait");
     await page.waitForTimeout(env.douyinLoginGuidanceWaitMs);
-    await dismissLoginGuidance(page);
+    if (await dismissLoginGuidance(page)) reportProgress(onProgress, "login_guidance_closed");
+    else reportProgress(onProgress, "login_guidance_absent");
 
     // Wait for the page to settle and video requests to fire
     await page.waitForTimeout(3_000);
+    reportProgress(onProgress, "page_settled");
 
     // The Python prototype clicks this page control before checking the
     // unavailable-video message. On current Douyin pages it can also trigger
     // the first media request, so preserve that behavior when the control is present.
+    reportProgress(onProgress, "playback_trigger_start");
     try {
       await page.locator(".wSyUzWHW").click({ timeout: 2_000 });
+      reportProgress(onProgress, "playback_triggered");
     } catch {
       // The selector is absent on many valid pages; continue normally.
+      reportProgress(onProgress, "playback_control_absent");
     }
 
     // Check for "video not found" indicator
+    reportProgress(onProgress, "video_existence_check");
     try {
       const text = await page.locator(".IODnWoHY").textContent({ timeout: 2_000 });
       if (text === "你要观看的视频不存在") {
@@ -177,6 +234,7 @@ export async function downloadDouyinVideo(shareUrl: string, timeoutMs = 30_000):
     }
 
     // Poll for video capture (up to 10 seconds)
+    reportProgress(onProgress, "media_capture_start");
     const pollStart = Date.now();
     while (!capturedVideoUrl && Date.now() - pollStart < 10_000) {
       await page.waitForTimeout(500);
@@ -185,10 +243,12 @@ export async function downloadDouyinVideo(shareUrl: string, timeoutMs = 30_000):
     if (!capturedVideoUrl) {
       throw new DouyinDownloadError("未能捕获视频地址，该视频可能需要登录或存在访问限制", false, "access_restricted");
     }
+    reportProgress(onProgress, "media_capture_complete");
 
     // Fetch + blob download with Content-Type validation
     const filePath = join(tempDir, "video.mp4");
 
+    reportProgress(onProgress, "file_download_start");
     const downloadPromise = page.waitForEvent("download", {
       timeout: timeoutMs,
     });
@@ -229,6 +289,7 @@ export async function downloadDouyinVideo(shareUrl: string, timeoutMs = 30_000):
     if (byteSize === 0) {
       throw new DouyinDownloadError("下载的视频文件为空", false, "download_failed");
     }
+    reportProgress(onProgress, "file_download_complete");
 
     returned = true;
     return { filePath, tempDir, mimeType: "video/mp4", byteSize };
@@ -241,6 +302,7 @@ export async function downloadDouyinVideo(shareUrl: string, timeoutMs = 30_000):
     await page?.close().catch(() => {});
     await context?.close().catch(() => {});
     await browser?.close().catch(() => {});
+    reportProgress(onProgress, "browser_cleanup");
 
     // Clean up tempDir on any exception path where we didn't return to caller.
     // If `returned` is true, the caller owns tempDir and must call cleanupDownloadDir().

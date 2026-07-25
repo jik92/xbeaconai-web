@@ -71,13 +71,13 @@ DOUYIN_BROWSER_DEBUG_PAUSE_MS=60000
 
 ## 服务端日志
 
-Worker 在执行过程中输出结构化 JSON 日志，前缀为 `[douyin-import]`。
+API 与 Worker 在执行过程中输出结构化 JSON 日志，前缀为 `【抖音下载】`；前缀后紧跟简短中文说明，再附 JSON。API 记录入队，Worker 记录实际下载、存储和入库。
 
 ### 查询方式
 
 ```bash
 # 按 jobId 查询一条任务的完整日志
-grep '\[douyin-import\]' server.log | grep '"jobId":"<job-id>"'
+grep '【抖音下载】' logs/api.log logs/worker.log | grep '"jobId":"<job-id>"'
 ```
 
 ### 日志阶段
@@ -85,6 +85,8 @@ grep '\[douyin-import\]' server.log | grep '"jobId":"<job-id>"'
 | 阶段 | 含义 |
 | --- | --- |
 | `download_start` / `download_complete` / `download_failure` | 浏览器下载 |
+| `link_validation_start` 至 `browser_cleanup` | 链接校验、浏览器启动、页面打开、登录引导处理、媒体捕获、文件保存和浏览器关闭等下载子步骤 |
+| `task_queued` / `task_started` / `validation_*` / `cancel_check` | API 入队、Worker 接收、任务参数校验与取消检查 |
 | `probe_start` / `probe_complete` / `probe_failure` | ffprobe 视频校验（仅生产路径） |
 | `save_local_start` / `save_local_complete` / `save_local_failure` | 本地文件写入 `.data/uploads/` |
 | `tos_upload_start` / `tos_upload_complete` / `tos_upload_failure` | TOS 对象存储上传 |

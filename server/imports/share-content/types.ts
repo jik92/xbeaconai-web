@@ -1,4 +1,4 @@
-// import type { DouyinDownloadResult } from "../douyin-video";
+import type { ImportStage } from "../import-logger";
 
 /** A candidate URL or share code extracted from free text. */
 export interface ShareCandidate {
@@ -19,6 +19,9 @@ export interface ShareDownloadResult {
   mimeType: string;
   byteSize: number;
 }
+
+/** Reports a non-sensitive downloader sub-step to the owning Worker Job. */
+export type ShareDownloadProgress = (stage: ImportStage) => void;
 
 /**
  * Platform adapter interface.
@@ -49,5 +52,5 @@ export interface SharePlatformAdapter {
    * Download the video from a normalized URL.
    * Must throw if `supportsDownload` is false.
    */
-  download(normalizedUrl: string, timeoutMs?: number): Promise<ShareDownloadResult>;
+  download(normalizedUrl: string, timeoutMs?: number, onProgress?: ShareDownloadProgress): Promise<ShareDownloadResult>;
 }

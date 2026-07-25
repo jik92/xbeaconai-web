@@ -156,7 +156,7 @@ describe("Seedance FFmpeg mock", () => {
       const completed = store.get(job.id);
 
       expect(completed?.status).toBe("succeeded");
-      expect(completed?.overallExecutionMode).toBe("mixed");
+      expect(completed?.overallExecutionMode).toBe("mock");
       const videoStage = completed?.provenance.find((stage) => stage.capability === "multimodal-generate");
       expect(videoStage).toMatchObject({
         executionMode: "mock",

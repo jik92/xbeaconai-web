@@ -1,5 +1,5 @@
 import { downloadDouyinVideo } from "../../douyin-video";
-import type { ShareCandidate, SharePlatformAdapter } from "../types";
+import type { ShareCandidate, ShareDownloadProgress, SharePlatformAdapter } from "../types";
 
 /**
  * Douyin share code pattern.
@@ -84,8 +84,8 @@ export const douyinAdapter: SharePlatformAdapter = {
     }
   },
 
-  async download(normalizedUrl: string, timeoutMs?: number) {
-    const result = await downloadDouyinVideo(normalizedUrl, timeoutMs);
+  async download(normalizedUrl: string, timeoutMs?: number, onProgress?: ShareDownloadProgress) {
+    const result = await downloadDouyinVideo(normalizedUrl, timeoutMs, onProgress);
     return {
       filePath: result.filePath,
       tempDir: result.tempDir,

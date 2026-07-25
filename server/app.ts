@@ -54,6 +54,7 @@ import { maxEnvKeyBytes, parseEnvKey } from "./byok/env-key";
 import { allProviderFeatureAvailability, moduleFeatureAvailability } from "./byok/provider-feature-gate";
 import { creationCapabilities, quoteCreation, validateCreationValues } from "./creation/capabilities";
 import { env } from "./env";
+import { emitLog } from "./imports/import-logger";
 import type { ShareCandidate } from "./imports/share-content";
 import { platformAdapters, ShareContentParser } from "./imports/share-content";
 
@@ -5294,8 +5295,12 @@ app.openapi(createShareImportRoute, async (c) => {
   };
 
   const created = store.createShareContentImport(job, replaceSucceededJobId);
-  if (!created.created) return c.json(created.job, 202);
+  if (!created.created) {
+    emitLog({ jobId: created.job.id, stage: "task_queued", result: "ok", durationMs: 0, message: "复用已有任务" });
+    return c.json(created.job, 202);
+  }
   await queue.enqueue(jobId);
+  emitLog({ jobId, stage: "task_queued", result: "ok", durationMs: 0 });
   return c.json(job, 202);
 });
 
