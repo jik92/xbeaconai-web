@@ -17,6 +17,7 @@ import {
   deleteAdminCredential,
   deleteAsset as deleteAssetRequest,
   deleteProduct as deleteProductRequest,
+  exportAdminEnvKey,
   exportAdScriptVersion,
   generateVideoCreateShot,
   getAdminCredentialDoctorResults,
@@ -144,6 +145,13 @@ export async function uploadAdminEnvKey(file: File) {
   configure();
   const { data } = await importAdminEnvKey({ body: { file }, headers: authHeaders(), throwOnError: true });
   if (!data) throw new Error(".env.key 导入失败");
+  return data;
+}
+
+export async function fetchAdminEnvKeyExport() {
+  configure();
+  const { data } = await exportAdminEnvKey({ headers: authHeaders(), throwOnError: true });
+  if (typeof data !== "string") throw new Error(".env.key 导出失败");
   return data;
 }
 

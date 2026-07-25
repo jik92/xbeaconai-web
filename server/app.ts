@@ -50,7 +50,7 @@ import {
   providerCredentials,
   providerIds,
 } from "./byok/credential-store";
-import { maxEnvKeyBytes, parseEnvKey } from "./byok/env-key";
+import { maxEnvKeyBytes, parseEnvKey, serializeEnvKey } from "./byok/env-key";
 import { allProviderFeatureAvailability, moduleFeatureAvailability } from "./byok/provider-feature-gate";
 import { creationCapabilities, quoteCreation, validateCreationValues } from "./creation/capabilities";
 import { env } from "./env";
@@ -2261,6 +2261,41 @@ app.openapi(deleteAdminCredentialRoute, (c) => {
   return c.json(credential, 200);
 });
 
+const exportAdminEnvKeyRoute = createRoute({
+  method: "get",
+  path: "/api/admin/credentials/export",
+  operationId: "exportAdminEnvKey",
+  responses: {
+    200: { description: "Exported env key", content: { "text/plain": { schema: z.string() } } },
+    403: { description: "Admin required", content: { "application/json": { schema: ErrorSchema } } },
+    503: { description: "BYOK unavailable", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(exportAdminEnvKeyRoute, (c) => {
+  if (!adminUser(c.get("userId")))
+    return c.json(
+      {
+        error: { code: "ADMIN_REQUIRED", message: "仅管理员可访问", retryable: false, requestId: crypto.randomUUID() },
+      },
+      403,
+    );
+  if (!providerCredentials.available)
+    return c.json(
+      {
+        error: {
+          code: "BYOK_UNAVAILABLE",
+          message: "BYOK_ENCRYPTION_KEY 未配置",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      503,
+    );
+  c.header("Content-Disposition", 'attachment; filename=".env.key"');
+  c.header("Cache-Control", "no-store");
+  return c.text(serializeEnvKey(providerCredentials.exportValues()), 200);
+});
+
 const importAdminEnvKeyRoute = createRoute({
   method: "post",
   path: "/api/admin/credentials/import",
@@ -2318,12 +2353,13 @@ app.openapi(importAdminEnvKeyRoute, async (c) => {
     );
   try {
     const parsed = parseEnvKey(await file.text());
-    const updated = providerCredentials.setMany(parsed.values, c.get("userId"));
+    const updated = providerCredentials.setMissing(parsed.values, c.get("userId"));
     const updatedSet = new Set(updated);
+    const provided = providerCredentialNames.filter((name) => Boolean(parsed.values[name]));
     return c.json(
       {
         updated,
-        skipped: providerCredentialNames.filter((name) => !updatedSet.has(name)),
+        skipped: provided.filter((name) => !updatedSet.has(name)),
         ignored: parsed.ignored,
       },
       200,

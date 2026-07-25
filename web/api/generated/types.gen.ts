@@ -1590,6 +1590,35 @@ export type UpdateAdminCredentialResponses = {
 
 export type UpdateAdminCredentialResponse = UpdateAdminCredentialResponses[keyof UpdateAdminCredentialResponses];
 
+export type ExportAdminEnvKeyData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/credentials/export';
+};
+
+export type ExportAdminEnvKeyErrors = {
+    /**
+     * Admin required
+     */
+    403: ApiErrorResponse;
+    /**
+     * BYOK unavailable
+     */
+    503: ApiErrorResponse;
+};
+
+export type ExportAdminEnvKeyError = ExportAdminEnvKeyErrors[keyof ExportAdminEnvKeyErrors];
+
+export type ExportAdminEnvKeyResponses = {
+    /**
+     * Exported env key
+     */
+    200: string;
+};
+
+export type ExportAdminEnvKeyResponse = ExportAdminEnvKeyResponses[keyof ExportAdminEnvKeyResponses];
+
 export type ImportAdminEnvKeyData = {
     body: {
         file: Blob | File;

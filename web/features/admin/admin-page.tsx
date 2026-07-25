@@ -6,6 +6,7 @@ import {
   CircleAlert,
   Clock3,
   Coins,
+  Download,
   LoaderCircle,
   RefreshCw,
   Stethoscope,
@@ -22,6 +23,7 @@ import {
   type AdminUser,
   fetchAdminCredentials,
   fetchAdminCredentialDoctorResults,
+  fetchAdminEnvKeyExport,
   fetchAdminJobs,
   fetchAdminUsers,
   grantCreditsToAdminUser,
@@ -107,6 +109,7 @@ function CredentialsPanel() {
   const [deleting, setDeleting] = useState<ProviderCredentialName>();
   const [doctorBusy, setDoctorBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const { data = [], isLoading, error } = useQuery({ queryKey: ["admin-credentials"], queryFn: fetchAdminCredentials });
   const { data: doctorResults = [] } = useQuery({
     queryKey: ["admin-credential-doctor-results"],
@@ -180,6 +183,26 @@ function CredentialsPanel() {
     } finally {
       setUploading(false);
       if (fileInput.current) fileInput.current.value = "";
+    }
+  };
+
+  const exportFile = async () => {
+    setExporting(true);
+    try {
+      const contents = await fetchAdminEnvKeyExport();
+      const url = URL.createObjectURL(new Blob([contents], { type: "text/plain;charset=utf-8" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = ".env.key";
+      document.body.append(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast.success("密钥已导出");
+    } catch (reason) {
+      toast.error(apiErrorMessage(reason, ".env.key 导出失败"));
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -288,6 +311,9 @@ function CredentialsPanel() {
           />
           <Button variant="outline" size="sm" disabled={uploading} onClick={() => fileInput.current?.click()}>
             {uploading ? <LoaderCircle className="animate-spin" /> : <Upload />} 导入 .env.key
+          </Button>
+          <Button variant="outline" size="sm" disabled={exporting} onClick={() => void exportFile()}>
+            {exporting ? <LoaderCircle className="animate-spin" /> : <Download />} 导出 .env.key
           </Button>
           <Button size="sm" disabled={doctorBusy} onClick={() => void doctor()}>
             {doctorBusy ? <LoaderCircle className="animate-spin" /> : <Stethoscope />} 检测全部

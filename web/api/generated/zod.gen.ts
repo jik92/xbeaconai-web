@@ -1299,6 +1299,11 @@ export const zUpdateAdminCredentialResponse = z.object({
     updatedAt: z.string().optional()
 });
 
+/**
+ * Exported env key
+ */
+export const zExportAdminEnvKeyResponse = z.string();
+
 export const zImportAdminEnvKeyBody = z.object({
     file: z.string()
 });

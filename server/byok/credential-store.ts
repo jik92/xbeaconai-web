@@ -91,6 +91,14 @@ export class ProviderCredentialStore {
     return row ? decrypt(row, this.masterKey) : undefined;
   }
 
+  exportValues() {
+    if (!this.available) throw new Error("BYOK_ENCRYPTION_KEY 未配置");
+    const values: Partial<Record<ProviderCredentialName, string>> = {};
+    for (const row of this.db.select().from(credentialTable).all())
+      values[row.name as ProviderCredentialName] = decrypt(row, this.masterKey);
+    return values;
+  }
+
   listMasked(): MaskedProviderCredential[] {
     const rows = new Map(
       this.db
@@ -187,6 +195,41 @@ export class ProviderCredentialStore {
       );
     });
     return entries.map(([name]) => name);
+  }
+
+  setMissing(values: Partial<Record<ProviderCredentialName, string>>, updatedByUserId?: string) {
+    if (!this.available) throw new Error("BYOK_ENCRYPTION_KEY 未配置");
+    const entries = providerCredentialNames
+      .map((name) => [name, values[name]?.trim()] as const)
+      .filter((entry): entry is readonly [ProviderCredentialName, string] => Boolean(entry[1]));
+    if (!entries.length) return [];
+    const inserted: ProviderCredentialName[] = [];
+    const timestamp = new Date().toISOString();
+    this.db.transaction((tx) => {
+      const existing = new Set(
+        tx
+          .select({ name: credentialTable.name })
+          .from(credentialTable)
+          .all()
+          .map((row) => row.name),
+      );
+      for (const [name, normalized] of entries) {
+        if (existing.has(name)) continue;
+        const encrypted = encrypt(normalized, this.masterKey);
+        tx.insert(credentialTable)
+          .values({
+            name,
+            ...encrypted,
+            lastFour: normalized.slice(-4),
+            updatedByUserId,
+            updatedAt: timestamp,
+          })
+          .run();
+        inserted.push(name);
+      }
+      this.invalidateChecks(tx as AppDatabase, inserted);
+    });
+    return inserted;
   }
 
   delete(name: ProviderCredentialName) {

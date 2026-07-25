@@ -6,6 +6,9 @@ describe("compact admin page", () => {
     const source = await Bun.file(resolve(import.meta.dir, "../../web/features/admin/admin-page.tsx")).text();
 
     expect(source).toContain("检测全部");
+    expect(source).toContain("导入 .env.key");
+    expect(source).toContain("导出 .env.key");
+    expect(source).toContain("fetchAdminEnvKeyExport");
     expect(source).toContain("用户管理");
     expect(source).toContain("充值创作点");
     expect(source).toContain("setAdminUserStatus");

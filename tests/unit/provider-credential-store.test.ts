@@ -58,6 +58,25 @@ describe("ProviderCredentialStore", () => {
     store.close();
   });
 
+  test("imports only missing credentials and exports configured plaintext values", () => {
+    const path = temporaryDatabase("byok-fill-missing-");
+    const store = new ProviderCredentialStore(path, masterKey);
+    store.set("OPENAI_KEY", "existing-openai-key");
+
+    const inserted = store.setMissing({
+      OPENAI_KEY: "replacement-must-be-skipped",
+      MEDIAKIT_API_KEY: "new-mediakit-key",
+    });
+
+    expect(inserted).toEqual(["MEDIAKIT_API_KEY"]);
+    expect(store.get("OPENAI_KEY")).toBe("existing-openai-key");
+    expect(store.exportValues()).toEqual({
+      OPENAI_KEY: "existing-openai-key",
+      MEDIAKIT_API_KEY: "new-mediakit-key",
+    });
+    store.close();
+  });
+
   test("persists Doctor results and invalidates the affected Provider when credentials change", () => {
     const path = temporaryDatabase("byok-doctor-state-");
     const store = new ProviderCredentialStore(path, masterKey);

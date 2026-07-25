@@ -4938,6 +4938,43 @@
         }
       }
     },
+    "/api/admin/credentials/export": {
+      "get": {
+        "operationId": "exportAdminEnvKey",
+        "responses": {
+          "200": {
+            "description": "Exported env key",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "BYOK unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/credentials/import": {
       "post": {
         "operationId": "importAdminEnvKey",
