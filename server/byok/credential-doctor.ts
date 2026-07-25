@@ -1,6 +1,6 @@
 import TosClient from "@volcengine/tos-sdk";
-import { AihubmixClient } from "../providers/aihubmix";
 import { env } from "../env";
+import { AihubmixClient } from "../providers/aihubmix";
 import {
   type ProviderCredentialName,
   type ProviderId,
@@ -31,6 +31,7 @@ export interface CredentialDoctorProvider {
 
 class InvalidCredentialError extends Error {}
 class DoctorTimeoutError extends Error {}
+export const PROVIDER_DOCTOR_TIMEOUT_MS = 30_000;
 
 const safeJson = async (response: Response) => {
   try {
@@ -51,10 +52,7 @@ const defaultProviders: CredentialDoctorProvider[] = [
     provider: "AIHubMix",
     credentials: ["OPENAI_KEY"],
     probe: async (values, signal) => {
-      const models = await new AihubmixClient(env.openaiBaseUrl, values.OPENAI_KEY).listModels(8_000).then((result) => {
-        if (signal.aborted) throw new DoctorTimeoutError("检测超时");
-        return result;
-      });
+      const models = await new AihubmixClient(env.openaiBaseUrl, values.OPENAI_KEY).listModels(signal);
       return `鉴权通过，可读取 ${models.length} 个模型`;
     },
   },
@@ -144,7 +142,7 @@ export class CredentialDoctor {
     private readonly getCredential: (name: ProviderCredentialName) => string | undefined = (name) =>
       providerCredentials.get(name),
     private readonly providers: CredentialDoctorProvider[] = defaultProviders,
-    private readonly timeoutMs = 10_000,
+    private readonly timeoutMs = PROVIDER_DOCTOR_TIMEOUT_MS,
     private readonly persistResults: (results: StoredCredentialCheck[]) => void = () => {},
   ) {}
 
@@ -215,6 +213,6 @@ export class CredentialDoctor {
 export const credentialDoctor = new CredentialDoctor(
   (name) => providerCredentials.get(name),
   defaultProviders,
-  10_000,
+  PROVIDER_DOCTOR_TIMEOUT_MS,
   (results) => providerCredentials.saveChecks(results),
 );

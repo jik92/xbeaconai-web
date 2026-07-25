@@ -3,6 +3,7 @@ import {
   CredentialDoctor,
   type CredentialDoctorProvider,
   type CredentialValues,
+  PROVIDER_DOCTOR_TIMEOUT_MS,
 } from "../../server/byok/credential-doctor";
 import type { ProviderCredentialName } from "../../server/byok/credential-store";
 
@@ -46,9 +47,24 @@ describe("credential doctor", () => {
       VOLC_SPEECH_API_KEY: "speech-secret",
     };
     let persisted: Awaited<ReturnType<CredentialDoctor["runAll"]>> = [];
+    let timeoutSignalAborted = false;
+    const timeoutProvider = providers[3];
+    if (!timeoutProvider) throw new Error("Timeout provider fixture is missing");
+    const providersWithAbortTracking = [
+      ...providers.slice(0, 3),
+      {
+        ...timeoutProvider,
+        probe: async (providerValues: CredentialValues, signal: AbortSignal) => {
+          signal.addEventListener("abort", () => {
+            timeoutSignalAborted = true;
+          });
+          return timeoutProvider.probe(providerValues, signal);
+        },
+      },
+    ];
     const doctor = new CredentialDoctor(
       (name) => values[name],
-      providers,
+      providersWithAbortTracking,
       5,
       (results) => {
         persisted = results;
@@ -61,8 +77,14 @@ describe("credential doctor", () => {
     expect(results[0]?.message).toBe("鉴权通过");
     expect(results[1]?.message).toContain("TOS_SECRET_ACCESS_KEY");
     expect(results[2]?.message).toBe("Provider 连接或鉴权失败");
+    expect(results[3]?.message).toBe("检测超过 1 秒");
+    expect(timeoutSignalAborted).toBe(true);
     expect(JSON.stringify(results)).not.toContain("upstream secret");
     expect(JSON.stringify(results)).not.toContain("openai-secret");
     expect(persisted).toEqual(results);
+  });
+
+  test("uses a 30 second timeout for live provider checks", () => {
+    expect(PROVIDER_DOCTOR_TIMEOUT_MS).toBe(30_000);
   });
 });

@@ -112,9 +112,9 @@ export class AihubmixClient {
     throw lastError;
   }
 
-  async listModels(timeoutMs?: number) {
+  async listModels(timeout?: number | AbortSignal) {
     const body = (await this.request("/api/v1/models", {
-      signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined,
+      signal: typeof timeout === "number" ? AbortSignal.timeout(timeout) : timeout,
     }).then((response) => response.json())) as {
       data?: AihubmixModel[];
     };
