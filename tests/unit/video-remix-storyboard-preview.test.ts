@@ -15,10 +15,11 @@ describe("video remix storyboard media preview", () => {
     expect(storyboard).not.toContain('<div className="warehouse-scene">');
   });
 
-  test("renders selected product images and portrait instead of empty placeholders", () => {
+  test("renders selected product images and portraits instead of empty placeholders", () => {
     expect(storyboard).toContain("selectedProduct?.images.slice(0, 4).map");
     expect(storyboard).toContain("url={image.url}");
-    expect(storyboard).toContain("url={selectedPortrait.source_url}");
+    expect(storyboard).toContain("selectedPortraits.map");
+    expect(storyboard).toContain("url={portrait.source_url}");
     expect(storyboard).not.toContain("<span />");
   });
 

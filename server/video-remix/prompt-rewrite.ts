@@ -7,7 +7,7 @@ import {
 } from "../../shared/video-remix/prompt-tools";
 import { aihubmix } from "../providers/aihubmix";
 
-export const VIDEO_REMIX_PROMPT_MODEL = "deepseek-v4-pro";
+export const VIDEO_REMIX_PROMPT_MODEL = "gemini-3.6-flash";
 
 const RewriteResultSchema = z.object({
   prompt: z.string().trim().min(20).max(30_000),

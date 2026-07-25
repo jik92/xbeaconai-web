@@ -91,7 +91,6 @@ export class SeedanceVideoJob {
     const ids = assetIdsFromValues(job.values);
     if (ids.length && !ossutils.configured)
       throw new SeedanceFlowError("TOS_NOT_CONFIGURED", "TOS 素材中转未配置", false);
-    const uploadRoot = resolve(env.dataDir, "uploads");
     const tempDir = await mkdtemp(resolve(tmpdir(), "yaozuo-seedance-references-"));
     try {
       const counts = new Map<SeedanceReferenceKind, number>();
@@ -118,7 +117,6 @@ export class SeedanceVideoJob {
           throw new SeedanceFlowError("REFERENCE_TOO_LARGE", `${kind}参考超过大小限制`, false);
         totalBytes += asset.byteSize;
         const path = await materializeRemoteAsset({
-          uploadRoot,
           tempDir,
           asset,
           targetName: `${id}${extname(asset.originalName) || ".bin"}`,

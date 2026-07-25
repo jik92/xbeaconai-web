@@ -95,7 +95,7 @@ export function GlobalSearch({ pages }: GlobalSearchProps) {
   );
   const loading = query.trim() && [jobs, materials, products, voices, portraits].some((item) => item.isFetching);
   const partialError = [jobs, materials, products, voices, portraits].some((item) => item.isError);
-  const shortcut = /Mac|iPhone|iPad|iPod/.test(navigator.platform) ? "⌘ K" : "Ctrl K";
+  const shortcut = "⌘ K / Ctrl K";
   const currentIndex = Math.min(activeIndex, Math.max(0, results.length - 1));
 
   const openSearch = useCallback(() => {

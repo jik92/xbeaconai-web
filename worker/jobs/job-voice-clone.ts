@@ -1,7 +1,6 @@
-import { existsSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { extname, relative, resolve } from "node:path";
+import { extname, resolve } from "node:path";
 import { env } from "../../server/env";
 import { probeMedia } from "../../server/media/ffmpeg";
 import { VolcSpeechError, volcSpeech } from "../../server/providers/volc-speech";
@@ -252,17 +251,9 @@ export const voiceCloneJob: WorkerJobHandler = {
 
       const tempDir = await mkdtemp(resolve(tmpdir(), "yaozuo-voice-clone-"));
       try {
-        const uploadRoot = resolve(env.dataDir, "uploads");
-        const localPath = resolve(uploadRoot, asset.storageKey);
-        const localRelative = relative(uploadRoot, localPath);
-        const samplePath =
-          localRelative && !localRelative.startsWith("..") && !localRelative.startsWith("/") && existsSync(localPath)
-            ? localPath
-            : resolve(tempDir, `sample${extname(asset.originalName) || ".wav"}`);
-        if (samplePath !== localPath) {
-          if (!ossutils.configured) throw new Error("录音文件不在本机且 TOS 未配置");
-          await ossutils.downloadLibraryFile(asset.storageKey, samplePath);
-        }
+        if (!ossutils.configured) throw new Error("TOS_NOT_CONFIGURED: 录音样本必须从 TOS 读取");
+        const samplePath = resolve(tempDir, `sample${extname(asset.originalName) || ".wav"}`);
+        await ossutils.downloadLibraryFile(asset.storageKey, samplePath);
         const media = await probeMedia(samplePath);
         const duration = Number(media.format.duration ?? 0);
         if (!Number.isFinite(duration) || duration < 5 || duration > 60)

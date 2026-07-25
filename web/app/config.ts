@@ -39,7 +39,7 @@ export const APP_CONFIG = {
   providerDefaults: {
     openai: {
       baseUrl: "https://aihubmix.com",
-      videoAnalysisModel: "gemini-3.5-flash",
+      videoAnalysisModel: "gemini-3.6-flash",
     },
     volcSpeech: {
       baseUrl: "https://openspeech.bytedance.com",

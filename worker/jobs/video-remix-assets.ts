@@ -1,9 +1,8 @@
 import { existsSync } from "node:fs";
-import { extname, relative, resolve } from "node:path";
+import { extname, resolve } from "node:path";
 import type { MediaAsset } from "../../server/accounts/account-store";
 
 interface MaterializeRemixAssetsInput {
-  uploadRoot: string;
   tempDir: string;
   videoAsset: MediaAsset;
   referenceAssets: MediaAsset[];
@@ -11,14 +10,7 @@ interface MaterializeRemixAssetsInput {
   download: (storageKey: string, filePath: string) => Promise<void>;
 }
 
-function localAssetPath(uploadRoot: string, storageKey: string) {
-  const path = resolve(uploadRoot, storageKey);
-  const local = relative(uploadRoot, path);
-  return local && !local.startsWith("..") && !local.startsWith("/") && existsSync(path) ? path : undefined;
-}
-
 export async function materializeRemoteAsset({
-  uploadRoot,
   tempDir,
   asset,
   targetName,
@@ -26,7 +18,6 @@ export async function materializeRemoteAsset({
   tosConfigured,
   download,
 }: {
-  uploadRoot: string;
   tempDir: string;
   asset: MediaAsset;
   targetName: string;
@@ -34,8 +25,6 @@ export async function materializeRemoteAsset({
   tosConfigured: boolean;
   download: (storageKey: string, filePath: string) => Promise<void>;
 }) {
-  const localPath = localAssetPath(uploadRoot, asset.storageKey);
-  if (localPath) return localPath;
   if (!tosConfigured) throw new Error(`${label}不在本机且 TOS 未配置`);
 
   const remotePath = resolve(tempDir, targetName);

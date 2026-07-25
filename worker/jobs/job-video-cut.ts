@@ -1,8 +1,6 @@
-import { existsSync } from "node:fs";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { extname, relative, resolve } from "node:path";
-import { env } from "../../server/env";
+import { extname, resolve } from "node:path";
 import { probeMedia, splitFixed } from "../../server/media/ffmpeg";
 import { ossutils } from "../../server/storage/ossutils";
 import type { JobResult, StageProvenance } from "../../server/types";
@@ -50,14 +48,8 @@ export const videoCutJob: WorkerJobHandler = {
 
     const tempDir = await mkdtemp(resolve(tmpdir(), "yaozuo-video-cut-"));
     try {
-      const uploadRoot = resolve(env.dataDir, "uploads");
-      const localSourcePath = resolve(uploadRoot, sourceAsset.storageKey);
-      const local = relative(uploadRoot, localSourcePath);
-      const sourcePath =
-        local && !local.startsWith("..") && !local.startsWith("/") && existsSync(localSourcePath)
-          ? localSourcePath
-          : resolve(tempDir, `source${extname(sourceAsset.originalName) || ".mp4"}`);
-      if (sourcePath !== localSourcePath) await ossutils.downloadLibraryFile(sourceAsset.storageKey, sourcePath);
+      const sourcePath = resolve(tempDir, `source${extname(sourceAsset.originalName) || ".mp4"}`);
+      await ossutils.downloadLibraryFile(sourceAsset.storageKey, sourcePath);
       await probeMedia(sourcePath);
       plan[0].completedAt = new Date().toISOString();
       plan[1].startedAt = new Date().toISOString();

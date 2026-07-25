@@ -2,8 +2,8 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { env } from "../../server/env";
-import { extractCompressedAudio, normalizeReferenceImage, probeMedia } from "../../server/media/ffmpeg";
-import { analyzeVideoWithGemini, transcribeMediaWithAihubmix } from "../../server/providers/gemini-video-analysis";
+import { normalizeReferenceImage, probeMedia } from "../../server/media/ffmpeg";
+import { analyzeVideoWithGemini, GeminiVideoAnalysisError } from "../../server/providers/gemini-video-analysis";
 import { ossutils } from "../../server/storage/ossutils";
 import type { JobResult, StageProvenance } from "../../server/types";
 import { parseRemixSources, type RemixAnalysisEntry, type RemixSourceRef } from "../../shared/video-remix/workflow";
@@ -45,9 +45,7 @@ export const videoRemixAnalysisJob: WorkerJobHandler = {
         throw new Error("商品参考图不存在或不属于当前账号");
 
       taskTempDir = await mkdtemp(resolve(tmpdir(), "yaozuo-remix-analysis-"));
-      const uploadRoot = resolve(env.dataDir, "uploads");
       const referencePaths = await materializeRemixReferenceAssets({
-        uploadRoot,
         tempDir: taskTempDir,
         referenceAssets: referenceAssets.filter((reference) => reference !== undefined),
         tosConfigured: ossutils.configured,
@@ -82,9 +80,9 @@ export const videoRemixAnalysisJob: WorkerJobHandler = {
         await mkdir(sourceDir, { recursive: true });
         const progress = (fraction: number) => Math.round(5 + ((index + fraction) / sourceRefs.length) * 90);
         const sourceLineage: StageProvenance[] = [];
+        let analysisStage: StageProvenance | undefined;
         try {
           const videoPath = await materializeRemixVideoAsset({
-            uploadRoot,
             tempDir: sourceDir,
             videoAsset: asset,
             tosConfigured: ossutils.configured,
@@ -107,32 +105,7 @@ export const videoRemixAnalysisJob: WorkerJobHandler = {
           probeStage.completedAt = new Date().toISOString();
           sourceLineage.push(probeStage);
 
-          const transcriptionStage: StageProvenance = {
-            id: `${job.id}:${source.assetId}:transcription`,
-            capability: "speech-transcribe",
-            executionMode: "real",
-            implementation: "aihubmix-transcription",
-            provider: "aihubmix",
-            model: "gpt-4o-transcribe-diarize",
-            startedAt: new Date().toISOString(),
-          };
-          context.change(job.id, {
-            stage: `识别原声口播 ${index + 1}/${sourceRefs.length}`,
-            progress: progress(0.35),
-            provenance: [...provenance, ...sourceLineage, transcriptionStage],
-          });
-          let transcript = "";
-          try {
-            const audioPath = resolve(sourceDir, "source.mp3");
-            await extractCompressedAudio(videoPath, audioPath);
-            transcript = (await transcribeMediaWithAihubmix({ mediaPath: audioPath, mimeType: "audio/mpeg" })).text;
-          } catch (error) {
-            transcriptionStage.fallbackReason = `独立转写不可用，改由视频模型直接理解原声：${error instanceof Error ? error.message.slice(0, 160) : "未知错误"}`;
-          }
-          transcriptionStage.completedAt = new Date().toISOString();
-          sourceLineage.push(transcriptionStage);
-
-          const analysisStage: StageProvenance = {
+          analysisStage = {
             id: `${job.id}:${source.assetId}:video-analysis`,
             capability: "video-understand",
             executionMode: "real",
@@ -142,13 +115,13 @@ export const videoRemixAnalysisJob: WorkerJobHandler = {
             startedAt: new Date().toISOString(),
           };
           context.change(job.id, {
-            stage: `生成分镜提示词 ${index + 1}/${sourceRefs.length}`,
-            progress: progress(0.65),
+            stage: `Gemini 分析视频并生成分镜提示词 ${index + 1}/${sourceRefs.length}`,
+            progress: progress(0.4),
             provenance: [...provenance, ...sourceLineage, analysisStage],
           });
           const prompt = buildVideoAnalysisPrompt({
             durationSeconds,
-            speechTranscript: transcript,
+            speechTranscript: "",
             productName: job.values.productName,
             productImageCount: productImages.length,
             demand: job.values.description,
@@ -162,7 +135,7 @@ export const videoRemixAnalysisJob: WorkerJobHandler = {
           analysisStage.completedAt = new Date().toISOString();
           sourceLineage.push(analysisStage);
           provenance.push(...sourceLineage);
-          entries.push({ ...source, status: "succeeded", prompt: analysis.text, transcript });
+          entries.push({ ...source, status: "succeeded", prompt: analysis.text, transcript: "" });
           artifacts.push({
             id: `${job.id}:${source.assetId}:analysis`,
             name: `${source.name}.analysis.md`,
@@ -178,10 +151,22 @@ export const videoRemixAnalysisJob: WorkerJobHandler = {
             provenance,
           });
         } catch (error) {
+          if (analysisStage && !sourceLineage.includes(analysisStage)) {
+            analysisStage.completedAt = new Date().toISOString();
+            if (error instanceof GeminiVideoAnalysisError) analysisStage.failure = error.failure;
+            sourceLineage.push(analysisStage);
+          }
+          const errorMessage = error instanceof Error ? error.message : "视频解析失败";
+          console.warn("[video-remix-analysis] source analysis failed", {
+            jobId: job.id,
+            assetId: source.assetId,
+            failure: analysisStage?.failure,
+            message: errorMessage,
+          });
           entries.push({
             ...source,
             status: "failed",
-            error: error instanceof Error ? error.message : "视频解析失败",
+            error: errorMessage,
           });
           provenance.push(...sourceLineage);
           context.change(job.id, {
@@ -237,6 +222,11 @@ export const videoRemixAnalysisJob: WorkerJobHandler = {
         overallExecutionMode: "real",
       });
     } catch (error) {
+      const current = context.store.get(job.id);
+      if (current?.cancelRequested || current?.status === "cancelled") {
+        context.change(job.id, { status: "cancelled", stage: "已取消", progress: current.progress });
+        return;
+      }
       context.change(job.id, {
         status: "failed",
         stage: "AI 解析失败",

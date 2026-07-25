@@ -17,6 +17,16 @@ export interface StageProvenance {
   provider?: string;
   model?: string;
   fallbackReason?: string;
+  /** 已脱敏的上游调用失败诊断，用于任务详情与 Worker 日志排障。 */
+  failure?: {
+    code: string;
+    errorType: string;
+    message: string;
+    durationMs?: number;
+    httpStatus?: number;
+    upstreamRequestId?: string;
+    responseBody?: string;
+  };
   startedAt: string;
   completedAt?: string;
 }

@@ -75,7 +75,7 @@ describe("video remix remote assets", () => {
     expect(await Bun.file(result.videoPath).text()).toBe("owner/materials/video.mp4");
   });
 
-  test("prefers safe local files without downloading from TOS", async () => {
+  test("ignores legacy local files and always downloads from TOS", async () => {
     const paths = await directories();
     const videoStorageKey = "owner/materials/local.mp4";
     const imageStorageKey = "owner/products/local.jpg";
@@ -106,12 +106,14 @@ describe("video remix remote assets", () => {
           kind: "product",
         }),
       ],
-      tosConfigured: false,
-      download: () => Promise.reject(new Error("download must not run")),
+      tosConfigured: true,
+      download: async (storageKey, filePath) => {
+        await Bun.write(filePath, storageKey);
+      },
     });
 
-    expect(result.videoPath).toBe(resolve(paths.uploadRoot, videoStorageKey));
-    expect(result.referencePaths).toEqual([resolve(paths.uploadRoot, imageStorageKey)]);
+    expect(result.videoPath).toBe(resolve(paths.tempDir, "source.mp4"));
+    expect(result.referencePaths).toEqual([resolve(paths.tempDir, "product-1.jpg")]);
   });
 
   test("fails clearly when a remote video has no available TOS backend", async () => {

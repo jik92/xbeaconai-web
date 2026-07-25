@@ -1,7 +1,6 @@
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { env } from "../../server/env";
 import { concatVideos, normalizeMashupVideo, probeMedia } from "../../server/media/ffmpeg";
 import { ossutils } from "../../server/storage/ossutils";
 import type { StageProvenance } from "../../server/types";
@@ -56,7 +55,6 @@ export const videoRemixComposeJob: WorkerJobHandler = {
 
     const tempDir = await mkdtemp(resolve(tmpdir(), "yaozuo-remix-compose-"));
     try {
-      const uploadRoot = resolve(env.dataDir, "uploads");
       const prepared: Array<{ path: string; hasAudio: boolean; width?: number; height?: number }> = [];
       for (const [index, asset] of assets.entries()) {
         if (!asset) throw new Error("合并素材不存在");
@@ -67,7 +65,6 @@ export const videoRemixComposeJob: WorkerJobHandler = {
         const sourceDir = resolve(tempDir, `source-${index + 1}`);
         await mkdir(sourceDir, { recursive: true });
         const path = await materializeRemixVideoAsset({
-          uploadRoot,
           tempDir: sourceDir,
           videoAsset: asset,
           tosConfigured: ossutils.configured,

@@ -1,7 +1,5 @@
-import { isAbsolute, relative, resolve } from "node:path";
 import type { MediaAsset } from "../accounts/account-store";
 import { generateStructured, parseAdScriptModelJson } from "../ad-script/model";
-import { env } from "../env";
 import type { PortraitCatalogEntry } from "../portraits/catalog";
 import { aihubmix } from "../providers/aihubmix";
 import { ossutils } from "../storage/ossutils";
@@ -97,13 +95,6 @@ async function responseImage(url: string, missingCode: string) {
 }
 
 async function productImage(asset: MediaAsset) {
-  const uploadRoot = resolve(env.dataDir, "uploads");
-  const path = resolve(uploadRoot, asset.storageKey);
-  const relativePath = relative(uploadRoot, path);
-  if (!relativePath || relativePath.startsWith("..") || isAbsolute(relativePath))
-    throw new Error("INVALID_PRODUCT_IMAGE_PATH");
-  const file = Bun.file(path);
-  if (await file.exists()) return { bytes: new Uint8Array(await file.arrayBuffer()), mimeType: asset.mimeType };
   if (!ossutils.configured) throw new Error("PRODUCT_REFERENCE_FILE_NOT_FOUND");
   return responseImage(ossutils.createSignedReadUrl(asset.storageKey), "PRODUCT_REFERENCE_DOWNLOAD_FAILED");
 }

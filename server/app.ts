@@ -74,7 +74,6 @@ import { auditSdkRegistry } from "./sdk-registry";
 import { ossutils } from "./storage/ossutils";
 import { rollbackUploadedObjects, uploadFilesStrictly } from "./storage/strict-library-upload";
 import type { JobModuleId, JobRecord } from "./types";
-import { inlineUtf8ContentDisposition } from "./uploads/content-disposition";
 import {
   directUploadExtensions,
   issueDirectUploadTicket,
@@ -1675,6 +1674,7 @@ const uploadRoute = createRoute({
     400: { description: "Invalid upload", content: { "application/json": { schema: ErrorSchema } } },
     413: { description: "Upload too large", content: { "application/json": { schema: ErrorSchema } } },
     415: { description: "Unsupported media type", content: { "application/json": { schema: ErrorSchema } } },
+    503: { description: "TOS storage unavailable", content: { "application/json": { schema: ErrorSchema } } },
   },
 });
 app.openapi(uploadRoute, async (c) => {
@@ -1743,11 +1743,17 @@ app.openapi(uploadRoute, async (c) => {
   const description =
     typeof rawDescription === "string" && rawDescription.trim() ? rawDescription.trim().slice(0, 300) : undefined;
   const createdAt = new Date().toISOString();
-  const localPath = resolve(env.dataDir, "uploads", storageKey);
-  mkdirSync(dirname(localPath), { recursive: true, mode: 0o700 });
-  await Bun.write(localPath, file);
-  if (folder && ossutils.configured)
-    await ossutils.putLibraryFile({ filePath: localPath, key: storageKey, mimeType: file.type, sizeBytes: file.size });
+  if (!ossutils.configured)
+    return c.json(
+      { error: { code: "TOS_NOT_CONFIGURED", message: "TOS 未配置，素材无法上传", retryable: true, requestId } },
+      503,
+    );
+  // 素材库以 TOS 为唯一持久化存储；这里不再在 .data/uploads 留副本。
+  await ossutils.putLibraryBytes({
+    bytes: new Uint8Array(await file.arrayBuffer()),
+    key: storageKey,
+    mimeType: file.type,
+  });
   accounts.createAsset({
     id,
     ownerUserId: c.get("userId"),
@@ -2141,23 +2147,13 @@ const assetContentRoute = createRoute({
 app.openapi(assetContentRoute, async (c) => {
   const asset = accounts.getOwnedAsset(c.get("userId"), c.req.valid("param").assetId);
   if (!asset) return new Response("Not found", { status: 404 });
-  const file = Bun.file(resolve(env.dataDir, "uploads", asset.storageKey));
-  if (!(await file.exists())) {
-    if (!ossutils.configured) return new Response("Not found", { status: 404 });
-    try {
-      await ossutils.headObject(asset.storageKey);
-      return Response.redirect(ossutils.createSignedReadUrl(asset.storageKey), 302);
-    } catch {
-      return new Response("Not found", { status: 404 });
-    }
+  if (!ossutils.configured) return new Response("Not found", { status: 404 });
+  try {
+    await ossutils.headObject(asset.storageKey);
+    return Response.redirect(ossutils.createSignedReadUrl(asset.storageKey), 302);
+  } catch {
+    return new Response("Not found", { status: 404 });
   }
-  return new Response(file, {
-    headers: {
-      "Content-Type": asset.mimeType || "application/octet-stream",
-      "Content-Disposition": inlineUtf8ContentDisposition(asset.originalName),
-      "Cache-Control": "private, max-age=300",
-    },
-  });
 });
 
 const AdminCredentialSchema = z.object({
@@ -3372,16 +3368,7 @@ app.post("/api/video-remix/project/generate", async (c) => {
         startedAt: "",
       },
       {
-        id: "plan:1:speech-transcribe",
-        capability: "speech-transcribe",
-        executionMode: "real",
-        implementation: "aihubmix-transcription",
-        provider: "aihubmix",
-        model: "gpt-4o-transcribe-diarize",
-        startedAt: "",
-      },
-      {
-        id: "plan:2:video-understand",
+        id: "plan:1:video-understand",
         capability: "video-understand",
         executionMode: "real",
         implementation: "gemini-video-analysis",

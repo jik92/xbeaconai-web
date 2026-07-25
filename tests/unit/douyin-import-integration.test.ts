@@ -3,7 +3,6 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AccountStore } from "../../server/accounts/account-store";
-import { env } from "../../server/env";
 import { SqliteJobStore } from "../../server/jobs/sqlite-job-store";
 import { userPreferences, users } from "../../server/db/schema";
 import type { JobRecord } from "../../server/types";
@@ -98,9 +97,9 @@ function makeContext(
     accounts,
     change: (id, patch) => store.update(id, patch),
     downloadFn,
-    // This suite exercises local Asset persistence. It must never inherit
-    // host TOS credentials or attempt a real network upload.
-    tosConfigured: false,
+    // 素材库以 TOS 为唯一持久化存储；上传函数是离线替身，绝不访问真实网络。
+    tosConfigured: true,
+    tosUploadFn: async () => undefined,
   };
 }
 
@@ -184,10 +183,7 @@ describe("douyin import integration", () => {
     expect(asset?.byteSize).toBe(2048);
     expect(asset?.kind).toBe("media");
 
-    // Verify local file exists
-    const localPath = join(env.dataDir, "uploads", asset!.storageKey);
-    const file = Bun.file(localPath);
-    expect(await file.exists()).toBe(true);
+    // 导入完成后不在本地 uploads 目录保留素材副本。
   });
 
   test("job cancellation before download stops execution", async () => {

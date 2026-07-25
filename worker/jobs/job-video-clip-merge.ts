@@ -1,8 +1,6 @@
-import { existsSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { extname, relative, resolve } from "node:path";
-import { env } from "../../server/env";
+import { extname, resolve } from "node:path";
 import { concatVideos, probeMedia } from "../../server/media/ffmpeg";
 import { ossutils } from "../../server/storage/ossutils";
 import type { StageProvenance } from "../../server/types";
@@ -43,17 +41,14 @@ export const videoClipMergeJob: WorkerJobHandler = {
 
     const tempDir = await mkdtemp(resolve(tmpdir(), "yaozuo-video-merge-"));
     try {
-      const uploadRoot = resolve(env.dataDir, "uploads");
       const inputPaths: string[] = [];
       for (const [index, asset] of assets.entries()) {
         if (!asset) throw new Error("合并素材不存在");
-        const localPath = resolve(uploadRoot, asset.storageKey);
-        const local = relative(uploadRoot, localPath);
-        const inputPath =
-          local && !local.startsWith("..") && !local.startsWith("/") && existsSync(localPath)
-            ? localPath
-            : resolve(tempDir, `input-${String(index + 1).padStart(3, "0")}${extname(asset.originalName) || ".mp4"}`);
-        if (inputPath !== localPath) await ossutils.downloadLibraryFile(asset.storageKey, inputPath);
+        const inputPath = resolve(
+          tempDir,
+          `input-${String(index + 1).padStart(3, "0")}${extname(asset.originalName) || ".mp4"}`,
+        );
+        await ossutils.downloadLibraryFile(asset.storageKey, inputPath);
         const media = await probeMedia(inputPath);
         if (!media.streams.some((stream) => stream.codec_type === "video"))
           throw new Error(`${asset.originalName} 无法解码`);

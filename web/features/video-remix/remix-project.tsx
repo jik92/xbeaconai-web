@@ -157,7 +157,7 @@ function ConfigSidebar({
   setDescription,
   projectName,
   setProjectName,
-  selectedPortrait,
+  selectedPortraits,
   selectedProduct,
   selectedVoice,
   sources,
@@ -165,6 +165,7 @@ function ConfigSidebar({
   onSelectAttachments,
   onRemoveSource,
   onPick,
+  onRemovePortrait,
 }: {
   mode: "product" | "talking";
   setMode: (mode: "product" | "talking") => void;
@@ -172,7 +173,7 @@ function ConfigSidebar({
   setDescription: (value: string) => void;
   projectName: string;
   setProjectName: (value: string) => void;
-  selectedPortrait: SelectedPortrait | null;
+  selectedPortraits: SelectedPortrait[];
   selectedProduct: LibraryProduct | null;
   selectedVoice: LibraryAsset | null;
   sources: AttachmentSelection[];
@@ -180,6 +181,7 @@ function ConfigSidebar({
   onSelectAttachments: (assets: AttachmentSelection[]) => void;
   onRemoveSource: (assetId: string) => void;
   onPick: (kind: "product" | "portrait" | "voice") => void;
+  onRemovePortrait: (index: number) => void;
 }) {
   return (
     <aside className="remix-config">
@@ -222,14 +224,28 @@ function ConfigSidebar({
       </button>
       <div className="config-field-title">
         <b>人像</b>
-        <button onClick={() => onPick("portrait")}>{selectedPortrait ? "更换" : "+ 添加"}</button>
+        <button onClick={() => onPick("portrait")}>{selectedPortraits.length ? "更换" : "+ 添加"}</button>
       </div>
-      {selectedPortrait ? (
-        <ImagePreview
-          className="config-portrait"
-          src={selectedPortrait?.source_url || fallbackPortrait}
-          alt="已选人像"
-        />
+      {selectedPortraits.length ? (
+        <div className="portrait-cards-row">
+          {selectedPortraits.map((portrait) => (
+            <div className="portrait-card" key={portrait.index}>
+              <ImagePreview
+                className="config-portrait"
+                src={portrait.source_url || fallbackPortrait}
+                alt={portrait.name}
+              />
+              <button
+                type="button"
+                className="portrait-card-remove"
+                aria-label={`移除人像 ${portrait.name}`}
+                onClick={() => onRemovePortrait(portrait.index)}
+              >
+                <X />
+              </button>
+            </div>
+          ))}
+        </div>
       ) : (
         <span className="config-empty">未添加人像</span>
       )}
@@ -382,9 +398,11 @@ function AssetPickerModal({
 }
 
 function ProductPickerModal({
+  current,
   onClose,
   onSelect,
 }: {
+  current: LibraryProduct | null;
   onClose: () => void;
   onSelect: (product: LibraryProduct) => void;
 }) {
@@ -395,42 +413,191 @@ function ProductPickerModal({
   } = useQuery({
     queryKey: ["product-library"],
     queryFn: fetchProducts,
+    staleTime: 120_000,
   });
+  const [query, setQuery] = useState("");
+  const [appliedQuery, setAppliedQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(12);
+  const [pendingId, setPendingId] = useState<string>(current?.id ?? "");
+
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [onClose]);
+
+  const filtered = useMemo(() => {
+    const keyword = appliedQuery.trim().toLowerCase();
+    if (!keyword) return data;
+    return data.filter(
+      (product) =>
+        product.name.toLowerCase().includes(keyword) || (product.description ?? "").toLowerCase().includes(keyword),
+    );
+  }, [data, appliedQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const pending = data.find((product) => product.id === pendingId);
+
+  const doSearch = () => {
+    setAppliedQuery(query.trim());
+    setPage(1);
+  };
+
+  const doReset = () => {
+    setQuery("");
+    setAppliedQuery("");
+    setPage(1);
+  };
+
+  const pageButtons = useMemo(() => {
+    const buttons: number[] = [];
+    const start = Math.max(1, page - 2);
+    const end = Math.min(totalPages, page + 2);
+    for (let i = start; i <= end; i++) buttons.push(i);
+    return buttons;
+  }, [page, totalPages]);
+
   return (
     <div className="remix-picker-layer" role="presentation" onMouseDown={onClose}>
-      <aside className="remix-picker" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
+      <aside
+        className="remix-picker product-picker-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="选择商品"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
         <header>
           <h2 className="text-ink">选择商品</h2>
           <button aria-label="关闭" onClick={onClose}>
             <X />
           </button>
         </header>
-        <div className="remix-picker-grid">
-          {data.map((product) => (
-            <button key={product.id} onClick={() => onSelect(product)}>
-              <span className="product">
-                <AuthenticatedMedia
-                  url={product.images[0]?.url || ""}
-                  mimeType={product.images[0]?.mimeType || "image/png"}
-                  alt={product.name}
-                  previewable={false}
-                />
-              </span>
-              <b>{product.name}</b>
-              <small>
-                {product.images.length} 张商品图 · {product.description || "暂无形态描述"}
-              </small>
-            </button>
-          ))}
+        <div className="portrait-picker-controls product-picker-controls">
+          <label>
+            <Search />
+            <input
+              autoFocus
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") doSearch();
+              }}
+              placeholder="搜索商品名称或描述…"
+            />
+          </label>
+          <button className="product-search-button" onClick={doSearch}>
+            查询
+          </button>
+          <button className="product-reset-button" onClick={doReset}>
+            重置
+          </button>
+        </div>
+        <div className="remix-picker-grid product-picker-grid">
+          {paged.map((product) => {
+            const isSelected = product.id === pendingId;
+            return (
+              <button
+                key={product.id}
+                className={isSelected ? "selected" : ""}
+                aria-pressed={isSelected}
+                onClick={() => setPendingId(product.id)}
+              >
+                <span className="product">
+                  <AuthenticatedMedia
+                    url={product.images[0]?.url || ""}
+                    mimeType={product.images[0]?.mimeType || "image/png"}
+                    alt={product.name}
+                  />
+                  {isSelected && (
+                    <i>
+                      <CircleCheck /> 已选择
+                    </i>
+                  )}
+                </span>
+                <b>{product.name}</b>
+                <small>
+                  {product.images.length} 张商品图 · {product.description || "暂无形态描述"}
+                </small>
+              </button>
+            );
+          })}
           {isLoading && <p>正在加载商品…</p>}
           {error && <p>{error instanceof Error ? error.message : "商品加载失败"}</p>}
-          {!isLoading && !error && !data.length && <p>商品库还是空的，请先创建商品并上传图片。</p>}
+          {!isLoading && !error && !filtered.length && (
+            <p>{appliedQuery ? "没有匹配的商品，请调整搜索条件。" : "商品库还是空的，请先创建商品并上传图片。"}</p>
+          )}
         </div>
-        <footer>
-          <button onClick={() => window.location.assign("/assets/products")}>
-            <Upload />
-            管理并上传商品
-          </button>
+        <footer className="product-picker-footer">
+          <div>
+            <span>共 {filtered.length.toLocaleString()} 个商品</span>
+            <span className="product-page-size">
+              每页
+              <select
+                aria-label="每页显示数量"
+                value={pageSize}
+                onChange={(event) => {
+                  setPageSize(Number(event.target.value));
+                  setPage(1);
+                }}
+              >
+                <option value={12}>12</option>
+                <option value={24}>24</option>
+                <option value={48}>48</option>
+              </select>
+              个
+            </span>
+          </div>
+          <div className="product-pagination">
+            <button aria-label="上一页" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+              <ChevronLeft />
+            </button>
+            {pageButtons[0] > 1 && (
+              <>
+                <button onClick={() => setPage(1)}>1</button>
+                {pageButtons[0] > 2 && <span className="page-ellipsis">…</span>}
+              </>
+            )}
+            {pageButtons.map((p) => (
+              <button key={p} className={p === page ? "active" : ""} onClick={() => setPage(p)}>
+                {p}
+              </button>
+            ))}
+            {pageButtons[pageButtons.length - 1] < totalPages && (
+              <>
+                {pageButtons[pageButtons.length - 1] < totalPages - 1 && <span className="page-ellipsis">…</span>}
+                <button onClick={() => setPage(totalPages)}>{totalPages}</button>
+              </>
+            )}
+            <button
+              aria-label="下一页"
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            >
+              <ChevronRight />
+            </button>
+          </div>
+          <div className="product-footer-actions">
+            <button className="product-manage" onClick={() => window.location.assign("/assets/products")}>
+              <Upload />
+              管理商品
+            </button>
+            <button className="product-cancel" onClick={onClose}>
+              取消
+            </button>
+            <button
+              className="product-confirm"
+              disabled={!pending}
+              onClick={() => {
+                if (pending) onSelect(pending);
+              }}
+            >
+              确定
+            </button>
+          </div>
         </footer>
       </aside>
     </div>
@@ -440,11 +607,11 @@ function ProductPickerModal({
 function PortraitPickerModal({
   selected,
   onClose,
-  onSelect,
+  onConfirm,
 }: {
-  selected: SelectedPortrait | null;
+  selected: SelectedPortrait[];
   onClose: () => void;
-  onSelect: (portrait: Portrait) => void;
+  onConfirm: (portraits: SelectedPortrait[]) => void;
 }) {
   const {
     data = [],
@@ -458,6 +625,18 @@ function PortraitPickerModal({
   const [query, setQuery] = useState("");
   const [gender, setGender] = useState("全部");
   const [visibleCount, setVisibleCount] = useState(48);
+  const maxSelect = 3;
+  const [pending, setPending] = useState<SelectedPortrait[]>(() => selected.slice(0, maxSelect));
+
+  useEffect(() => setVisibleCount(48), [gender, query]);
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [onClose]);
+
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return data.filter((portrait) => {
@@ -468,14 +647,26 @@ function PortraitPickerModal({
     });
   }, [data, gender, query]);
 
-  useEffect(() => setVisibleCount(48), [gender, query]);
-  useEffect(() => {
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [onClose]);
+  const isSelected = (index: number) => pending.some((p) => p.index === index);
+  const togglePortrait = (portrait: Portrait) => {
+    setPending((current) => {
+      const exists = current.find((p) => p.index === portrait.index);
+      if (exists) return current.filter((p) => p.index !== portrait.index);
+      if (current.length >= maxSelect) return current;
+      return [
+        ...current,
+        {
+          name: portrait.name,
+          profession: portrait.profession,
+          source_url: portrait.source_url,
+          index: portrait.index,
+          description: portrait.description,
+          gender: portrait.gender,
+          age: portrait.age,
+        },
+      ];
+    });
+  };
 
   return (
     <div className="remix-picker-layer" role="presentation" onMouseDown={onClose}>
@@ -487,7 +678,7 @@ function PortraitPickerModal({
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header>
-          <h2 className="text-ink">选择人像</h2>
+          <h2 className="text-ink">选择人像（最多 {maxSelect} 个）</h2>
           <button aria-label="关闭" onClick={onClose}>
             <X />
           </button>
@@ -510,21 +701,24 @@ function PortraitPickerModal({
             ))}
           </div>
         </div>
+        {pending.length >= maxSelect && (
+          <div className="portrait-limit-notice">已选择 {maxSelect} 个人像，如需更换请先取消已有选择。</div>
+        )}
         <div className="remix-picker-grid portrait-picker-grid">
           {filtered.slice(0, visibleCount).map((portrait) => {
-            const isCurrent = selected?.index === portrait.index;
+            const active = isSelected(portrait.index);
             return (
               <button
                 key={portrait.index}
-                className={isCurrent ? "current" : ""}
-                aria-label={`${isCurrent ? "当前人像，" : ""}选择${portrait.name}`}
-                onClick={() => onSelect(portrait)}
+                className={active ? "selected" : ""}
+                aria-label={`${active ? "已选择，" : ""}${portrait.name}`}
+                onClick={() => togglePortrait(portrait)}
               >
                 <span className="portrait">
                   <ImagePreview src={portrait.source_url} alt={portrait.name} imageLoading="lazy" />
-                  {isCurrent && (
+                  {active && (
                     <i>
-                      <CircleCheck /> 当前使用
+                      <CircleCheck /> 已选择
                     </i>
                   )}
                 </span>
@@ -544,12 +738,18 @@ function PortraitPickerModal({
           <span>
             共 {filtered.length.toLocaleString()} 个人像
             {filtered.length > visibleCount && `，已显示 ${visibleCount} 个`}
+            {pending.length > 0 && ` · 已选 ${pending.length}/${maxSelect}`}
           </span>
           <div>
             {filtered.length > visibleCount && (
               <button onClick={() => setVisibleCount((count) => count + 48)}>加载更多</button>
             )}
-            <button onClick={onClose}>取消</button>
+            <button className="product-cancel" onClick={onClose}>
+              取消
+            </button>
+            <button className="product-confirm" disabled={!pending.length} onClick={() => onConfirm(pending)}>
+              确定
+            </button>
           </div>
         </footer>
       </aside>
@@ -785,33 +985,8 @@ export function RemixProject() {
   const [composeJob, setComposeJob] = useState<Job | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [picker, setPicker] = useState<"product" | "portrait" | "voice" | null>(null);
-  const [selectedPortrait, setSelectedPortrait] = useState<SelectedPortrait | null>(() => {
-    try {
-      return JSON.parse(localStorage.getItem("studio:selectedPortrait") || "null");
-    } catch {
-      return null;
-    }
-  });
-  const [selectedProduct, setSelectedProduct] = useState<LibraryProduct | null>(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem("studio:selectedProduct") || "null") as
-        | LibraryProduct
-        | LibraryAsset
-        | null;
-      if (!stored) return null;
-      if ("images" in stored) return stored;
-      return {
-        id: stored.id,
-        name: stored.name,
-        description: stored.description,
-        sharingScope: "private",
-        images: [stored],
-        createdAt: stored.createdAt,
-      };
-    } catch {
-      return null;
-    }
-  });
+  const [selectedPortraits, setSelectedPortraits] = useState<SelectedPortrait[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<LibraryProduct | null>(null);
   const [selectedVoice, setSelectedVoice] = useState<LibraryAsset | null>(() => {
     try {
       return JSON.parse(localStorage.getItem("studio:selectedVoice") || "null");
@@ -1033,7 +1208,7 @@ export function RemixProject() {
     setStage(1);
     setNotice("");
     try {
-      const portraitAssetId = selectedPortrait?.source_url.match(/\/([^/]+)\.png(?:\?|$)/)?.[1] ?? null;
+      const portraitAssetId = selectedPortraits[0]?.source_url.match(/\/([^/]+)\.png(?:\?|$)/)?.[1] ?? null;
       const created = await generateRemixProject({
         projectName:
           projectName.trim() ||
@@ -1084,26 +1259,25 @@ export function RemixProject() {
               durationSec: selectedVoice.durationSec ?? null,
             }
           : null,
-        portraitAssets: selectedPortrait
-          ? [
+        portraitAssets: selectedPortraits.map((portrait) => {
+          const assetId = portrait.source_url.match(/\/([^/]+)\.png(?:\?|$)/)?.[1] ?? null;
+          return {
+            id: portrait.index,
+            assetName: portrait.name,
+            fileInfo: [
               {
-                id: selectedPortrait.index,
-                assetName: selectedPortrait.name,
-                fileInfo: [
-                  {
-                    fileUrl: selectedPortrait.source_url,
-                    coverUrl: selectedPortrait.source_url,
-                    fileType: "IMAGE",
-                    assetId: portraitAssetId,
-                  },
-                ],
-                description: selectedPortrait.description ?? "",
-                gender: selectedPortrait.gender ?? "",
-                age: selectedPortrait.age,
-                occupation: selectedPortrait.profession,
+                fileUrl: portrait.source_url,
+                coverUrl: portrait.source_url,
+                fileType: "IMAGE" as const,
+                assetId,
               },
-            ]
-          : [],
+            ],
+            description: portrait.description ?? "",
+            gender: portrait.gender ?? "",
+            age: portrait.age,
+            occupation: portrait.profession,
+          };
+        }),
       });
       setJob(created);
       setComposeOrder(sources.map((source) => source.id));
@@ -1182,21 +1356,21 @@ export function RemixProject() {
         images: productImages,
         createdAt: detail.rootJob.createdAt,
       });
-      const portrait = request.portraitAssets?.[0];
-      const portraitFile = portrait?.fileInfo[0];
-      setSelectedPortrait(
-        portrait && portraitFile
-          ? {
-              name: portrait.assetName,
-              profession: portrait.occupation || "",
-              source_url: portraitFile.fileUrl,
-              index: Number(portrait.id) || 0,
-              description: portrait.description,
-              gender: portrait.gender,
-              age: portrait.age,
-            }
-          : null,
-      );
+      const restoredPortraits: SelectedPortrait[] = [];
+      for (const portrait of request.portraitAssets ?? []) {
+        const portraitFile = portrait.fileInfo[0];
+        if (!portraitFile) continue;
+        restoredPortraits.push({
+          name: portrait.assetName,
+          profession: portrait.occupation || "",
+          source_url: portraitFile.fileUrl,
+          index: Number(portrait.id) || 0,
+          description: portrait.description ?? undefined,
+          gender: portrait.gender ?? undefined,
+          age: portrait.age ?? undefined,
+        });
+      }
+      setSelectedPortraits(restoredPortraits);
       const voice = request.voiceAsset;
       setSelectedVoice(
         voice
@@ -1441,7 +1615,7 @@ export function RemixProject() {
           setDescription={setDescription}
           projectName={projectName}
           setProjectName={setProjectName}
-          selectedPortrait={selectedPortrait}
+          selectedPortraits={selectedPortraits}
           selectedProduct={selectedProduct}
           selectedVoice={selectedVoice}
           sources={sources}
@@ -1473,6 +1647,9 @@ export function RemixProject() {
             setComposeJob(null);
           }}
           onPick={setPicker}
+          onRemovePortrait={(index) =>
+            setSelectedPortraits((current) => current.filter((portrait) => portrait.index !== index))
+          }
         />
         <section className="remix-workspace">
           {notice && (
@@ -1662,16 +1839,12 @@ export function RemixProject() {
                           />
                         </span>
                       ))}
-                      {selectedPortrait && (
-                        <span className="result-asset">
-                          <PublicPreviewImage
-                            key={selectedPortrait.source_url}
-                            url={selectedPortrait.source_url}
-                            alt={selectedPortrait.name}
-                          />
+                      {selectedPortraits.map((portrait) => (
+                        <span className="result-asset" key={portrait.index}>
+                          <PublicPreviewImage url={portrait.source_url} alt={portrait.name} />
                         </span>
-                      )}
-                      {!selectedProduct?.images.length && !selectedPortrait && (
+                      ))}
+                      {!selectedProduct?.images.length && !selectedPortraits.length && (
                         <span className="result-assets-empty">未选择图片素材</span>
                       )}
                     </div>
@@ -2003,10 +2176,10 @@ export function RemixProject() {
       />
       {picker === "product" && (
         <ProductPickerModal
+          current={selectedProduct}
           onClose={() => setPicker(null)}
           onSelect={(product) => {
             setSelectedProduct(product);
-            localStorage.setItem("studio:selectedProduct", JSON.stringify(product));
             setPicker(null);
           }}
         />
@@ -2024,20 +2197,10 @@ export function RemixProject() {
       )}
       {picker === "portrait" && (
         <PortraitPickerModal
-          selected={selectedPortrait}
+          selected={selectedPortraits}
           onClose={() => setPicker(null)}
-          onSelect={(portrait) => {
-            const selected = {
-              name: portrait.name,
-              profession: portrait.profession,
-              source_url: portrait.source_url,
-              index: portrait.index,
-              description: portrait.description,
-              gender: portrait.gender,
-              age: portrait.age,
-            };
-            setSelectedPortrait(selected);
-            localStorage.setItem("studio:selectedPortrait", JSON.stringify(selected));
+          onConfirm={(portraits) => {
+            setSelectedPortraits(portraits);
             setPicker(null);
           }}
         />

@@ -166,14 +166,13 @@ describe("import logger integration", () => {
       store,
       accounts,
       change: (id, p) => store.update(id, p),
-      tosConfigured: false, // default: TOS not configured
+      tosConfigured: true,
+      tosUploadFn: async () => undefined,
       ...overrides,
     };
   }
 
-  // ── TOS not configured ────────────────────────────────────────
-
-  test("success path with TOS not configured emits tos_skip", async () => {
+  test("success path uploads directly to TOS without a local persistence stage", async () => {
     await douyinVideoImportJob.execute(job, context({ downloadFn: mockDownload(2048) }));
 
     expect(store.get(job.id)?.status).toBe("succeeded");
@@ -181,10 +180,10 @@ describe("import logger integration", () => {
     const stages = capturedLogs.map((l) => l.stage);
     expect(stages).toContain("download_start");
     expect(stages).toContain("download_complete");
-    expect(stages).toContain("save_local_start");
-    expect(stages).toContain("save_local_complete");
-    expect(stages).toContain("tos_skip");
-    expect(stages).not.toContain("tos_upload_start");
+    expect(stages).not.toContain("save_local_start");
+    expect(stages).not.toContain("save_local_complete");
+    expect(stages).toContain("tos_upload_start");
+    expect(stages).toContain("tos_upload_complete");
     expect(stages).toContain("asset_created");
     expect(stages).toContain("success");
     expect(stages).toContain("cleanup");

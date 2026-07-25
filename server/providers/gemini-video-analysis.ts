@@ -21,6 +21,35 @@ export interface VideoAnalysisResult {
   usage?: GeminiGenerateContentResponse["usageMetadata"];
 }
 
+export interface GeminiVideoAnalysisFailure {
+  code: "GEMINI_VIDEO_NETWORK_ERROR" | "GEMINI_VIDEO_UPSTREAM_ERROR" | "GEMINI_VIDEO_INVALID_RESPONSE";
+  errorType: string;
+  message: string;
+  durationMs: number;
+  httpStatus?: number;
+  upstreamRequestId?: string;
+  responseBody?: string;
+}
+
+/**
+ * 仅保留可用于排障的上游信息；不能把 Key、签名 URL 或内联素材写入任务记录。
+ */
+function sanitizeDiagnostic(value: string, limit = 1_000) {
+  return value
+    .replace(/(?:sk|AIza)[A-Za-z0-9_-]{12,}/g, "[REDACTED_SECRET]")
+    .replace(/https?:\/\/[^\s"']+/gi, "[REDACTED_URL]")
+    .replace(/"data"\s*:\s*"[^"]+"/gi, '"data":"[REDACTED_INLINE_DATA]"')
+    .replace(/\s+/g, " ")
+    .slice(0, limit);
+}
+
+export class GeminiVideoAnalysisError extends Error {
+  constructor(readonly failure: GeminiVideoAnalysisFailure) {
+    super(failure.message);
+    this.name = "GeminiVideoAnalysisError";
+  }
+}
+
 export async function analyzeImagesWithGemini(input: {
   images: Array<{ path: string; mimeType: string }>;
   prompt: string;
@@ -102,10 +131,11 @@ export async function analyzeVideoWithGemini(input: {
   model?: string;
   productImages?: Array<{ path: string; mimeType: string }>;
 }): Promise<VideoAnalysisResult> {
+  const startedAt = Date.now();
   const apiKey = openAiKey();
   if (!apiKey) throw new Error("AIHUBMIX_NOT_CONFIGURED");
   if (env.blockAiOutbound) throw new Error("AI_OUTBOUND_BLOCKED:video-analysis");
-  const model = input.model ?? "gemini-3.1-pro-preview";
+  const model = input.model ?? "gemini-3.6-flash";
   const file = Bun.file(input.videoPath);
   if (!(await file.exists())) throw new Error("VIDEO_ANALYSIS_FILE_NOT_FOUND");
   const referenceFiles = await Promise.all(
@@ -135,31 +165,92 @@ export async function analyzeVideoWithGemini(input: {
   }
   const baseUrl = env.openaiBaseUrl || "https://aihubmix.com";
   const origin = new URL(baseUrl).origin;
-  const response = await fetch(`${origin}/gemini/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-    body: JSON.stringify({
-      contents: [
-        {
-          role: "user",
-          parts: [...parts, { text: input.prompt }],
+  let response: Response;
+  try {
+    response = await fetch(`${origin}/gemini/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [...parts, { text: input.prompt }],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 8_192,
+          responseMimeType: "text/plain",
         },
-      ],
-      generationConfig: {
-        temperature: 0.1,
-        maxOutputTokens: 8_192,
-        responseMimeType: "text/plain",
-      },
-    }),
-    signal: AbortSignal.timeout(240_000),
-  });
-  const raw = await response.text();
-  if (!response.ok) throw new Error(`GEMINI_VIDEO_ANALYSIS_${response.status}: ${raw.slice(0, 1_000)}`);
-  const body = JSON.parse(raw) as GeminiGenerateContentResponse;
+      }),
+      signal: AbortSignal.timeout(240_000),
+    });
+  } catch (error) {
+    const errorType = error instanceof Error ? error.name : typeof error;
+    const message = sanitizeDiagnostic(error instanceof Error ? error.message : String(error), 500);
+    throw new GeminiVideoAnalysisError({
+      code: "GEMINI_VIDEO_NETWORK_ERROR",
+      errorType,
+      message: `AIHubMix Gemini 请求未建立连接：${message}`,
+      durationMs: Date.now() - startedAt,
+    });
+  }
+  const upstreamRequestId = response.headers.get("x-request-id") ?? response.headers.get("request-id") ?? undefined;
+  let raw: string;
+  try {
+    raw = await response.text();
+  } catch (error) {
+    const errorType = error instanceof Error ? error.name : typeof error;
+    const message = sanitizeDiagnostic(error instanceof Error ? error.message : String(error), 500);
+    throw new GeminiVideoAnalysisError({
+      code: "GEMINI_VIDEO_NETWORK_ERROR",
+      errorType,
+      message: `AIHubMix Gemini 响应读取失败：${message}`,
+      durationMs: Date.now() - startedAt,
+      httpStatus: response.status,
+      upstreamRequestId,
+    });
+  }
+  if (!response.ok) {
+    const responseBody = sanitizeDiagnostic(raw);
+    throw new GeminiVideoAnalysisError({
+      code: "GEMINI_VIDEO_UPSTREAM_ERROR",
+      errorType: "HttpError",
+      message: `AIHubMix Gemini 返回 HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ""}`,
+      durationMs: Date.now() - startedAt,
+      httpStatus: response.status,
+      upstreamRequestId,
+      responseBody,
+    });
+  }
+  let body: GeminiGenerateContentResponse;
+  try {
+    body = JSON.parse(raw) as GeminiGenerateContentResponse;
+  } catch {
+    throw new GeminiVideoAnalysisError({
+      code: "GEMINI_VIDEO_INVALID_RESPONSE",
+      errorType: "SyntaxError",
+      message: "AIHubMix Gemini 返回了无法解析的响应",
+      durationMs: Date.now() - startedAt,
+      httpStatus: response.status,
+      upstreamRequestId,
+      responseBody: sanitizeDiagnostic(raw),
+    });
+  }
   const text = body.candidates?.[0]?.content?.parts
     ?.map((part) => part.text ?? "")
     .join("")
     .trim();
-  if (!text) throw new Error(`GEMINI_VIDEO_ANALYSIS_EMPTY:${body.candidates?.[0]?.finishReason ?? "unknown"}`);
+  if (!text) {
+    throw new GeminiVideoAnalysisError({
+      code: "GEMINI_VIDEO_INVALID_RESPONSE",
+      errorType: "EmptyResponse",
+      message: `AIHubMix Gemini 未返回分析文本（finishReason: ${body.candidates?.[0]?.finishReason ?? "unknown"}）`,
+      durationMs: Date.now() - startedAt,
+      httpStatus: response.status,
+      upstreamRequestId,
+      responseBody: sanitizeDiagnostic(raw),
+    });
+  }
   return { text, model: body.modelVersion ?? model, usage: body.usageMetadata };
 }

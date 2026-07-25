@@ -1,7 +1,3 @@
-import { mkdirSync } from "node:fs";
-import { rm } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { env } from "../../server/env";
 import { cleanupDownloadDir, DouyinDownloadError } from "../../server/imports/douyin-video";
 import {
   emitLog,
@@ -102,9 +98,9 @@ export const douyinVideoImportJob: WorkerJobHandler = {
     let downloadResult: Awaited<ReturnType<typeof adapter.download>> | undefined;
     let storageKey: string | undefined;
     let assetId: string | undefined;
-    let destPath: string | undefined;
     let tosUploaded = false;
     const tosConfigured = context.tosConfigured ?? ossutils.configured;
+    if (!tosConfigured) throw new Error("TOS_NOT_CONFIGURED: 导入素材必须保存到 TOS");
 
     try {
       // ── Cancel check ──────────────────────────────────────────
@@ -172,31 +168,14 @@ export const douyinVideoImportJob: WorkerJobHandler = {
 
       context.change(job.id, { stage: "正在保存视频", progress: 60 });
 
-      const file = Bun.file(downloadResult.filePath);
       const byteSize = downloadResult.byteSize;
       const ext = ".mp4";
       const sanitizedName = `${platformId}_import`;
 
       assetId = crypto.randomUUID();
       storageKey = `${folder.storagePrefix}${assetId}${ext}`;
-      const uploadRoot = resolve(env.dataDir, "uploads");
-      destPath = resolve(uploadRoot, storageKey);
-
-      // ── Local save ────────────────────────────────────────────
-      emitLog({ jobId: job.id, stage: "save_local_start", result: "ok", durationMs: Date.now() - importStartMs });
-      const localStart = stageStart();
-      try {
-        mkdirSync(dirname(destPath), { recursive: true, mode: 0o700 });
-        await Bun.write(destPath, file);
-      } catch (saveErr) {
-        const s = sanitizeError(saveErr);
-        logFailure(job.id, "save_local_failure", localStart, s.code, s.summary);
-        throw saveErr;
-      }
-      stageComplete(job.id, "save_local_complete", localStart, byteSize);
-
       // ── TOS upload ────────────────────────────────────────────
-      if (tosConfigured) {
+      {
         emitLog({ jobId: job.id, stage: "tos_upload_start", result: "ok", durationMs: Date.now() - importStartMs });
         const tosStart = stageStart();
         const uploadFn =
@@ -211,19 +190,10 @@ export const douyinVideoImportJob: WorkerJobHandler = {
           const s = sanitizeError(tosErr);
           logFailure(job.id, "tos_upload_failure", tosStart, s.code, s.summary);
           // TOS upload failure is fatal when TOS is configured
-          if (destPath) await rm(destPath, { force: true }).catch(() => {});
           const delFn = context.tosDeleteFn ?? ((key: string) => ossutils.deleteObject(key));
           await delFn(storageKey).catch(() => {});
           throw new DouyinDownloadError(`TOS 上传失败: ${s.summary}`, true, "download_failed");
         }
-      } else {
-        emitLog({
-          jobId: job.id,
-          stage: "tos_skip",
-          result: "ok",
-          durationMs: 0,
-          errorSummary: "TOS not configured",
-        });
       }
 
       // ── Create asset ──────────────────────────────────────────
@@ -303,7 +273,6 @@ export const douyinVideoImportJob: WorkerJobHandler = {
       logFailure(job.id, "failure", importStartMs, sanitized.code, sanitized.summary);
 
       // ── Clean up orphaned artifacts ───────────────────────────
-      if (destPath) await rm(destPath, { force: true }).catch(() => {});
       if (tosUploaded && storageKey && tosConfigured) {
         const delFn2 = context.tosDeleteFn ?? ((key: string) => ossutils.deleteObject(key));
         await delFn2(storageKey).catch(() => {});
