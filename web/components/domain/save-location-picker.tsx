@@ -9,6 +9,7 @@ import { Input } from "../ui/input";
 import { NativeSelect } from "../ui/native-select";
 
 export interface SaveLocationPickerProps {
+  id?: string;
   value: string;
   onChange: (folderId: string) => void;
   required?: boolean;
@@ -36,6 +37,7 @@ export function orderAssetFolders(folders: AssetFolder[]) {
 }
 
 export function SaveLocationPicker({
+  id,
   value,
   onChange,
   required,
@@ -96,6 +98,7 @@ export function SaveLocationPicker({
     <div className={cn("flex min-w-0 flex-col gap-1.5", className)}>
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <NativeSelect
+          id={id}
           aria-label="保存位置"
           className={cn("h-8", invalid && "border-red-500")}
           required={required}

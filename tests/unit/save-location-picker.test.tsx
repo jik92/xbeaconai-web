@@ -120,4 +120,30 @@ describe("SaveLocationPicker", () => {
     expect(onChange).toHaveBeenCalledWith("folder-created");
     expect(setDefaultAssetFolder).toHaveBeenCalledWith("folder-created");
   });
+
+  test("keeps the creation error visible without closing the inline form", async () => {
+    createAssetFolder.mockImplementationOnce(async () => {
+      throw new Error("同级目录下已存在同名文件夹");
+    });
+    const { container } = await renderPicker("folder-default");
+    const createButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "新建文件夹",
+    );
+    act(() => createButton?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    const input = container.querySelector('input[placeholder="输入文件夹名称"]') as HTMLInputElement;
+    act(() => {
+      Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set?.call(input, "重复名称");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const confirmButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "创建并设为默认",
+    );
+    await act(async () => {
+      confirmButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe("同级目录下已存在同名文件夹");
+    expect(container.querySelector('input[placeholder="输入文件夹名称"]')).not.toBeNull();
+  });
 });

@@ -2,9 +2,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
 import { Download, Film, FolderOpen, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { downloadAuthenticated, fetchAssetFolders, fetchJobs, submitJob } from "@/api/api-client";
+import { downloadAuthenticated, fetchJobs, submitJob } from "@/api/api-client";
+import type { Job } from "@/api/generated/types.gen";
 import { AttachmentPicker, type AttachmentSelection } from "@/components/domain/attachment-picker";
 import { AuthenticatedMedia } from "@/components/domain/authenticated-media";
+import { SaveLocationPicker } from "@/components/domain/save-location-picker";
 import type { TaskSearchFilterValue } from "@/components/domain/task-search-filters";
 import { ToolCreatorModal } from "@/components/domain/tool-creator-modal";
 import { createToolTaskLabel, ToolTaskPage } from "@/components/domain/tool-task-page";
@@ -12,8 +14,6 @@ import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
-import type { Job } from "@/api/generated/types.gen";
 import type { ApiJobResult } from "@/entities/types";
 import { randomUuid } from "@/lib/random-id";
 import {
@@ -36,7 +36,6 @@ const emptyFilters: TaskSearchFilterValue = { name: "", status: "", from: "", to
 export function VideoMashupPage() {
   const newTaskLabel = createToolTaskLabel("视频混剪");
   const queryClient = useQueryClient();
-  const { data: folders = [] } = useQuery({ queryKey: ["asset-folders"], queryFn: fetchAssetFolders });
   const { data: jobs = [], refetch } = useQuery({
     queryKey: ["jobs", "video-mashup"],
     queryFn: () => fetchJobs("video-mashup"),
@@ -53,10 +52,6 @@ export function VideoMashupPage() {
   const [selectedJobId, setSelectedJobId] = useState("");
   const [resultOpen, setResultOpen] = useState(false);
   const [filters, setFilters] = useState(emptyFilters);
-  useEffect(() => {
-    if (!outputFolderId && folders.length)
-      setOutputFolderId(folders.find((folder) => folder.isDefault)?.id ?? folders[0]?.id ?? "");
-  }, [folders, outputFolderId]);
   useEffect(() => {
     if (!jobs.some((job) => activeStatuses.has(job.status))) return;
     const timer = window.setInterval(() => void refetch(), 2_000);
@@ -326,14 +321,7 @@ export function VideoMashupPage() {
           </Label>
           <Label className="flex-col items-start text-xs text-muted">
             保存位置
-            <NativeSelect value={outputFolderId} onChange={(event) => setOutputFolderId(event.target.value)}>
-              {folders.map((folder) => (
-                <option key={folder.id} value={folder.id}>
-                  {folder.name}
-                  {folder.isDefault ? "（默认）" : ""}
-                </option>
-              ))}
-            </NativeSelect>
+            <SaveLocationPicker required value={outputFolderId} onChange={setOutputFolderId} />
           </Label>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
             <span>视频组 {groups.length}</span>

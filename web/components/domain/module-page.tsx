@@ -24,13 +24,11 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   downloadAuthenticated,
-  fetchAssetFolders,
   fetchJob,
   fetchJobs,
   fetchModels,
   requestCancel,
   requestRetry,
-  setDefaultAssetFolder,
   submitJob,
   watchJob,
 } from "@/api/api-client";
@@ -42,12 +40,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Slider } from "@/components/ui/slider";
-import type { ApiJobResult, AssetFolder } from "@/entities/types";
+import type { ApiJobResult } from "@/entities/types";
 import { QwenVoiceCloneModal } from "@/features/voice-clone/qwen-voice-clone-modal";
 import { db } from "@/lib/db";
 import { cn } from "@/lib/utils";
 import { AttachmentPicker } from "./attachment-picker";
 import { AuthenticatedMedia } from "./authenticated-media";
+import { SaveLocationPicker } from "./save-location-picker";
 import { ToolCreatorModal } from "./tool-creator-modal";
 import { createToolTaskLabel, ToolTaskPage } from "./tool-task-page";
 
@@ -363,9 +362,6 @@ function ToolboxCreatorForm({
   submitted,
   running,
   hydrated,
-  assetFolders,
-  foldersLoading,
-  onSetDefaultFolder,
   onCancel,
   onSubmit,
   error,
@@ -376,9 +372,6 @@ function ToolboxCreatorForm({
   submitted: boolean;
   running: boolean;
   hydrated: boolean;
-  assetFolders: AssetFolder[];
-  foldersLoading: boolean;
-  onSetDefaultFolder: (folderId: string) => Promise<void>;
   onCancel: () => void;
   onSubmit: () => void;
   error?: string;
@@ -430,18 +423,6 @@ function ToolboxCreatorForm({
   const voiceFieldRequired = (id: string) => id === "synthesisText";
   const invalid = (id: string) =>
     submitted && (config.id === "voice-clone" ? voiceFieldRequired(id) : field(id).required) && !values[id];
-  const orderedFolders = useMemo(() => {
-    const result: Array<{ folder: AssetFolder; depth: number }> = [];
-    const append = (parentId: string | undefined, depth: number) => {
-      for (const folder of assetFolders.filter((item) => item.parentId === parentId)) {
-        result.push({ folder, depth });
-        append(folder.id, depth + 1);
-      }
-    };
-    append(undefined, 0);
-    return result;
-  }, [assetFolders]);
-  const selectedFolder = assetFolders.find((folder) => folder.id === values.saveLocation);
   const compactLabel = (text: string, required = false) => (
     <Label className="text-xs text-muted sm:justify-end">
       {required && <span className="text-red-500">*</span>}
@@ -476,31 +457,12 @@ function ToolboxCreatorForm({
         </div>
         <div className="grid items-start gap-2 sm:grid-cols-[96px_minmax(0,1fr)]">
           {compactLabel("保存位置", true)}
-          <div className="flex min-w-0 items-center gap-2">
-            <NativeSelect
-              className={cn("h-8", invalid("saveLocation") && "border-red-500")}
-              value={values.saveLocation ?? ""}
-              onChange={(event) => setValue("saveLocation", event.target.value)}
-            >
-              <option value="" disabled>
-                {foldersLoading ? "正在加载我的文件夹…" : "请选择我的文件夹"}
-              </option>
-              {orderedFolders.map(({ folder, depth }) => (
-                <option key={folder.id} value={folder.id}>
-                  {`${"　".repeat(depth)}${folder.name}${folder.isDefault ? "（默认）" : ""}`}
-                </option>
-              ))}
-            </NativeSelect>
-            <Button
-              className="h-7 px-2 text-xs"
-              size="sm"
-              variant="ghost"
-              disabled={!selectedFolder || selectedFolder.isDefault}
-              onClick={() => selectedFolder && void onSetDefaultFolder(selectedFolder.id)}
-            >
-              {selectedFolder?.isDefault ? "当前默认" : "设为默认"}
-            </Button>
-          </div>
+          <SaveLocationPicker
+            required
+            invalid={invalid("saveLocation")}
+            value={values.saveLocation ?? ""}
+            onChange={(folderId) => setValue("saveLocation", folderId)}
+          />
         </div>
         <div
           className={cn(
@@ -552,7 +514,12 @@ function ToolboxCreatorForm({
         </div>
         <div className={`tool-form-row ${invalid("saveLocation") ? "invalid" : ""}`}>
           {requiredLabel("保存位置", true)}
-          {select("saveLocation")}
+          <SaveLocationPicker
+            required
+            invalid={invalid("saveLocation")}
+            value={values.saveLocation ?? ""}
+            onChange={(folderId) => setValue("saveLocation", folderId)}
+          />
         </div>
         <div className="tool-form-row">
           {requiredLabel("自动采纳")}
@@ -1012,15 +979,6 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
     refetchInterval: 5000,
   });
   const { data: modelCatalog = [] } = useQuery({ queryKey: ["api-models"], queryFn: fetchModels, staleTime: 60_000 });
-  const {
-    data: assetFolders = [],
-    isLoading: foldersLoading,
-    refetch: refetchAssetFolders,
-  } = useQuery({
-    queryKey: ["asset-folders"],
-    queryFn: fetchAssetFolders,
-    enabled: config.id === "video-cut",
-  });
   useEffect(() => setTasks(restored), [restored]);
   useEffect(() => {
     const result = selectedTask?.result as ApiJobResult | undefined;
@@ -1028,14 +986,6 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
       config.id === "video-cut" ? resultMediaArtifacts(result).map((artifact) => artifact.id) : [],
     );
   }, [config.id, selectedTask?.id]);
-  useEffect(() => {
-    if (config.id !== "video-cut" || !hydrated || !assetFolders.length) return;
-    setValues((current) => {
-      if (assetFolders.some((folder) => folder.id === current.saveLocation)) return current;
-      const preferred = assetFolders.find((folder) => folder.isDefault) ?? assetFolders[0];
-      return { ...current, saveLocation: preferred.id };
-    });
-  }, [assetFolders, config.id, hydrated]);
   useEffect(() => {
     const cleanups = tasks
       .filter((task) => task.status === "queued" || task.status === "processing")
@@ -1138,16 +1088,6 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
       setApiError(error instanceof Error ? error.message : "任务提交失败");
     } finally {
       setRunning(false);
-    }
-  };
-  const setDefaultOutputFolder = async (folderId: string) => {
-    setApiError("");
-    try {
-      await setDefaultAssetFolder(folderId);
-      await refetchAssetFolders();
-      setActionNotice("默认保存文件夹已更新");
-    } catch (error) {
-      setApiError(error instanceof Error ? error.message : "默认文件夹设置失败");
     }
   };
   const retry = (task: Job) => {
@@ -1305,9 +1245,6 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
             submitted={submitted}
             running={running}
             hydrated={hydrated}
-            assetFolders={assetFolders}
-            foldersLoading={foldersLoading}
-            onSetDefaultFolder={setDefaultOutputFolder}
             onCancel={() => setCreatorOpen(false)}
             onSubmit={() => void submit()}
             error={apiError}

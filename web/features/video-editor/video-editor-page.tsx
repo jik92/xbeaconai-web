@@ -1,8 +1,8 @@
 import { Player, type PlayerRef } from "@remotion/player";
-import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Download, Merge, Plus, Scissors, Trash2, X } from "lucide-react";
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
-import { authenticatedBlobUrl, fetchAssetFolders, submitJob, uploadMediaFile } from "@/api/api-client";
+import { authenticatedBlobUrl, submitJob, uploadMediaFile } from "@/api/api-client";
+import { SaveLocationPicker } from "@/components/domain/save-location-picker";
 import { randomUuid } from "@/lib/random-id";
 import {
   clipDuration,
@@ -10,9 +10,8 @@ import {
   removeVideoEditorSource,
   timelineDuration,
   VIDEO_EDITOR_FPS,
-  videoEditorAssetUrl,
-  type VideoEditorClip,
   type VideoEditorTimeline,
+  videoEditorAssetUrl,
 } from "../../../shared/video-editor/timeline";
 import { VideoComposition } from "./video-composition";
 
@@ -40,7 +39,6 @@ async function mediaMetadata(url: string) {
 export function VideoEditorPage() {
   const player = useRef<PlayerRef>(null);
   const fileInput = useRef<HTMLInputElement>(null);
-  const folders = useQuery({ queryKey: ["asset-folders"], queryFn: fetchAssetFolders });
   const [timeline, setTimeline] = useState<VideoEditorTimeline>(() => {
     try {
       const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "null") as VideoEditorTimeline | null;
@@ -59,10 +57,6 @@ export function VideoEditorPage() {
   const [exportFolderId, setExportFolderId] = useState("");
   const [outputName, setOutputName] = useState("剪辑成片.mp4");
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
-  useEffect(() => {
-    if (!exportFolderId && folders.data?.length)
-      setExportFolderId(folders.data.find((folder) => folder.isDefault)?.id ?? folders.data[0]!.id);
-  }, [exportFolderId, folders.data]);
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(timeline));
   }, [timeline]);
@@ -479,15 +473,14 @@ export function VideoEditorPage() {
               文件名
               <input required value={outputName} onChange={(event) => setOutputName(event.target.value)} />
             </label>
-            <label>
+            <label htmlFor="video-editor-export-folder">
               目标存储文件夹
-              <select required value={exportFolderId} onChange={(event) => setExportFolderId(event.target.value)}>
-                {folders.data?.map((folder) => (
-                  <option key={folder.id} value={folder.id}>
-                    {folder.name}
-                  </option>
-                ))}
-              </select>
+              <SaveLocationPicker
+                id="video-editor-export-folder"
+                required
+                value={exportFolderId}
+                onChange={setExportFolderId}
+              />
             </label>
             <footer>
               <button type="button" onClick={() => setExportOpen(false)}>

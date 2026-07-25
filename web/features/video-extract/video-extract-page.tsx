@@ -1,22 +1,22 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
 import { Download, FolderOpen, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { createShareImport, fetchAssetFolders, fetchJobs, parseShareContent, submitJob } from "@/api/api-client";
 import type { ShareCandidate } from "@/api/api-client";
+import { createShareImport, fetchJobs, parseShareContent, submitJob } from "@/api/api-client";
 import { listJobs } from "@/api/generated/sdk.gen";
 import type { Job } from "@/api/generated/types.gen";
+import { SaveLocationPicker } from "@/components/domain/save-location-picker";
+import type { TaskSearchFilterValue } from "@/components/domain/task-search-filters";
+import { ToolCreatorModal } from "@/components/domain/tool-creator-modal";
+import { createToolTaskLabel, ToolTaskPage } from "@/components/domain/tool-task-page";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
-import { ToolCreatorModal } from "@/components/domain/tool-creator-modal";
-import { createToolTaskLabel, ToolTaskPage } from "@/components/domain/tool-task-page";
-import type { TaskSearchFilterValue } from "@/components/domain/task-search-filters";
 import { getAuthToken } from "@/features/account/auth-context";
 import { cn } from "@/lib/utils";
-import { classifyInput } from "./route-input";
 import type { RouteDecision } from "./route-input";
+import { classifyInput } from "./route-input";
 
 const PLATFORM_LABELS: Record<string, string> = {
   douyin: "抖音",
@@ -40,8 +40,6 @@ function isShareImport(job: Job): boolean {
 
 export function VideoExtractPage() {
   const newTaskLabel = createToolTaskLabel("视频提取");
-  const queryClient = useQueryClient();
-  const folders = useQuery({ queryKey: ["asset-folders"], queryFn: fetchAssetFolders });
   const [folderId, setFolderId] = useState("");
 
   // ── Dual job queries ────────────────────────────────────────────────
@@ -77,11 +75,6 @@ export function VideoExtractPage() {
   const [candidates, setCandidates] = useState<ShareCandidate[]>([]);
   const [selectedCandidate, setSelectedCandidate] = useState<ShareCandidate | null>(null);
   const [filters, setFilters] = useState(emptyFilters);
-
-  useEffect(() => {
-    if (!folderId && folders.data?.length)
-      setFolderId(folders.data.find((folder) => folder.isDefault)?.id ?? folders.data[0]!.id);
-  }, [folderId, folders.data]);
 
   // Poll both job lists
   useEffect(() => {
@@ -346,13 +339,7 @@ export function VideoExtractPage() {
               </Label>
               <Label className="flex-col items-start text-xs text-muted">
                 目标存储文件夹
-                <NativeSelect required value={folderId} onChange={(event) => setFolderId(event.target.value)}>
-                  {folders.data?.map((folder) => (
-                    <option key={folder.id} value={folder.id}>
-                      {folder.name}
-                    </option>
-                  ))}
-                </NativeSelect>
+                <SaveLocationPicker required value={folderId} onChange={setFolderId} />
               </Label>
               {error && <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
             </div>
@@ -403,13 +390,7 @@ export function VideoExtractPage() {
               </Label>
               <Label className="flex-col items-start text-xs text-muted">
                 保存到文件夹
-                <NativeSelect value={folderId} onChange={(event) => setFolderId(event.target.value)}>
-                  {folders.data?.map((folder) => (
-                    <option key={folder.id} value={folder.id}>
-                      {folder.name}
-                    </option>
-                  ))}
-                </NativeSelect>
+                <SaveLocationPicker required value={folderId} onChange={setFolderId} />
               </Label>
               {error && <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
             </div>
