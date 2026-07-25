@@ -161,7 +161,7 @@ export function PortraitLibrary() {
                 {filtered.slice(row.index * columns, row.index * columns + columns).map((item) => (
                   <button type="button" className="portrait-card" key={item.index} onClick={() => setSelected(item)}>
                     <div className="portrait-image">
-                      <ImagePreview src={item.source_url} alt={item.name} imageLoading="lazy" />
+                      <ImagePreview src={item.display_url} alt={item.name} imageLoading="lazy" />
                       <span>NO. {String(item.index).padStart(4, "0")}</span>
                       <i>选择人像</i>
                     </div>
@@ -188,7 +188,12 @@ export function PortraitLibrary() {
         {selected && (
           <div className="grid min-h-0 flex-1 gap-3 overflow-y-auto p-4 sm:grid-cols-[180px_minmax(0,1fr)]">
             <div className="detail-photo">
-              <MediaPreview url={selected.source_url} mimeType="image/jpeg" alt={selected.name} authenticated={false} />
+              <MediaPreview
+                url={selected.display_url}
+                mimeType="image/jpeg"
+                alt={selected.name}
+                authenticated={false}
+              />
               <span>
                 <Check />
                 可用于创作

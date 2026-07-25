@@ -13,6 +13,11 @@ describe("portrait library data", () => {
         source_url: "/portrait.png",
         file: "portrait.png",
       }),
-    ).toMatchObject({ age: 32, gender: "女", profession: "主播" });
+    ).toMatchObject({
+      age: 32,
+      gender: "女",
+      profession: "主播",
+      display_url: "/api/portraits/18/content",
+    });
   });
 });

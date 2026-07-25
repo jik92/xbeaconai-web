@@ -445,6 +445,37 @@ export type ShareImportJob = Job & {
     [key: string]: unknown;
 };
 
+export type GetPortraitContentData = {
+    body?: never;
+    path: {
+        portraitId: number;
+    };
+    query?: never;
+    url: '/api/portraits/{portraitId}/content';
+};
+
+export type GetPortraitContentErrors = {
+    /**
+     * Portrait not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Portrait source unavailable
+     */
+    502: ApiErrorResponse;
+};
+
+export type GetPortraitContentError = GetPortraitContentErrors[keyof GetPortraitContentErrors];
+
+export type GetPortraitContentResponses = {
+    /**
+     * Inline portrait image
+     */
+    200: Blob | File;
+};
+
+export type GetPortraitContentResponse = GetPortraitContentResponses[keyof GetPortraitContentResponses];
+
 export type GetHealthData = {
     body?: never;
     path?: never;

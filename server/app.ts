@@ -418,6 +418,7 @@ const publicApiPaths = new Set([
   "/api/auth/login",
   "/api/auth/logout",
 ]);
+const isPublicApiPath = (path: string) => publicApiPaths.has(path) || /^\/api\/portraits\/\d+\/content$/.test(path);
 
 function referencedAssetIds(values: Record<string, string>) {
   const ids = new Set<string>();
@@ -494,7 +495,7 @@ app.use("/api/*", async (c, next) => {
       },
       403,
     );
-  if (c.req.method === "OPTIONS" || publicApiPaths.has(c.req.path)) return next();
+  if (c.req.method === "OPTIONS" || isPublicApiPath(c.req.path)) return next();
   const identity = await authenticate(accounts, c.req.header("Authorization"));
   if (!identity)
     return c.json(
@@ -511,6 +512,98 @@ app.use("/api/*", async (c, next) => {
   c.set("userId", identity.user.id);
   c.set("sessionId", identity.sessionId);
   await next();
+});
+
+const portraitContentRoute = createRoute({
+  method: "get",
+  path: "/api/portraits/{portraitId}/content",
+  operationId: "getPortraitContent",
+  request: { params: z.object({ portraitId: z.coerce.number().int().min(1) }) },
+  responses: {
+    200: {
+      description: "Inline portrait image",
+      content: { "application/octet-stream": { schema: z.string().openapi({ format: "binary" }) } },
+    },
+    404: { description: "Portrait not found", content: { "application/json": { schema: ErrorSchema } } },
+    502: { description: "Portrait source unavailable", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+
+function imageMimeType(bytes: Uint8Array) {
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return "image/png";
+  const signature = new TextDecoder().decode(bytes.subarray(0, 12));
+  if (signature.startsWith("GIF87a") || signature.startsWith("GIF89a")) return "image/gif";
+  if (signature.startsWith("RIFF") && signature.slice(8, 12) === "WEBP") return "image/webp";
+  if (signature.slice(4, 12) === "ftypavif" || signature.slice(4, 12) === "ftypavis") return "image/avif";
+  return undefined;
+}
+
+app.openapi(portraitContentRoute, async (c) => {
+  const requestId = crypto.randomUUID();
+  const portrait = getPortraitById(c.req.valid("param").portraitId);
+  if (!portrait)
+    return c.json(
+      {
+        error: {
+          code: "PORTRAIT_NOT_FOUND",
+          message: "人像不存在",
+          retryable: false,
+          requestId,
+        },
+      },
+      404,
+    );
+  try {
+    const upstream = await fetch(portrait.source_url, { signal: AbortSignal.timeout(15_000) });
+    const declaredMimeType = upstream.headers.get("Content-Type")?.split(";", 1)[0]?.trim().toLowerCase();
+    if (!upstream.ok || !declaredMimeType?.startsWith("image/"))
+      return c.json(
+        {
+          error: {
+            code: "PORTRAIT_SOURCE_INVALID",
+            message: "人像图片源不可用",
+            retryable: upstream.status >= 500,
+            requestId,
+          },
+        },
+        502,
+      );
+    const bytes = new Uint8Array(await upstream.arrayBuffer());
+    const mimeType = imageMimeType(bytes);
+    if (!mimeType)
+      return c.json(
+        {
+          error: {
+            code: "PORTRAIT_SOURCE_INVALID",
+            message: "人像图片源不可用",
+            retryable: false,
+            requestId,
+          },
+        },
+        502,
+      );
+    return new Response(bytes, {
+      status: 200,
+      headers: {
+        "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+        "Content-Disposition": "inline",
+        "Content-Type": mimeType,
+      },
+    });
+  } catch {
+    return c.json(
+      {
+        error: {
+          code: "PORTRAIT_SOURCE_UNAVAILABLE",
+          message: "人像图片加载失败",
+          retryable: true,
+          requestId,
+        },
+      },
+      502,
+    );
+  }
 });
 
 function providerGuard(moduleId: ModuleId): MiddlewareHandler<AppEnv> {
@@ -4840,7 +4933,7 @@ function getVideoCreateShotGenerationDraft(projectId: string, shotId: string, ow
       mimeType: "image/jpeg",
       role: "reference_image",
       category: "人物",
-      url: portrait.source_url,
+      url: `/api/portraits/${portrait.index}/content`,
     });
   }
   for (const productId of aggregate.project.input.productAssetIds) {

@@ -12,7 +12,10 @@ export interface Portrait extends PortraitRecord {
   age: number;
   gender: string;
   profession: string;
+  display_url: string;
 }
+
+export const portraitDisplayUrl = (portraitId: number) => `/api/portraits/${portraitId}/content`;
 
 export function parsePortrait(record: PortraitRecord): Portrait {
   const normalized = record.name.replace(/女性/g, "女").replace(/男性/g, "男");
@@ -22,6 +25,7 @@ export function parsePortrait(record: PortraitRecord): Portrait {
     age: Number(match?.[1] || 0),
     gender: match?.[2] || "未知",
     profession: match?.[3] || normalized,
+    display_url: portraitDisplayUrl(record.index),
   };
 }
 

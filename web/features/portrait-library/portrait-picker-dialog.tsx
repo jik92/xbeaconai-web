@@ -1,7 +1,7 @@
 import { Check, LoaderCircle, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { ToolCreatorModal } from "@/components/domain/tool-creator-modal";
 import { ImagePreview } from "@/components/domain/media-preview";
+import { ToolCreatorModal } from "@/components/domain/tool-creator-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { Portrait } from "./portrait-data";
@@ -95,7 +95,7 @@ export function PortraitPickerDialog({
                 >
                   <ImagePreview
                     className="aspect-[3/4] w-full object-cover"
-                    src={portrait.source_url}
+                    src={portrait.display_url}
                     alt={portrait.name}
                   />
                   {selected && (
@@ -122,7 +122,7 @@ export function PortraitPickerDialog({
       <footer className="flex h-16 shrink-0 items-center gap-3 border-t border-line px-3">
         {pending ? (
           <>
-            <ImagePreview className="h-11 w-9 rounded-md object-cover" src={pending.source_url} alt="" />
+            <ImagePreview className="h-11 w-9 rounded-md object-cover" src={pending.display_url} alt="" />
             <span className="min-w-0 flex-1 truncate text-sm text-ink">{pending.name}</span>
           </>
         ) : (

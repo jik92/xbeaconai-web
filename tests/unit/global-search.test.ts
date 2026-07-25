@@ -48,6 +48,7 @@ const portrait = {
   name: "都市女性",
   description: "夏季穿搭模特",
   source_url: "/portraits/8.png",
+  display_url: "/api/portraits/8/content",
   file: "8.png",
   age: 28,
   gender: "女",

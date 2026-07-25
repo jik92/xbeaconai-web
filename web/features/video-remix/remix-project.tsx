@@ -46,7 +46,7 @@ import { ImagePreview } from "@/components/domain/media-preview";
 import { type PromptReference, PromptWorkbench } from "@/components/domain/prompt-workbench";
 import type { ApiJobResult, LibraryAsset, LibraryProduct } from "@/entities/types";
 import type { CreationModelCapability } from "@/features/ai-creation/ai-creation-composer";
-import { fetchPortraits, type Portrait } from "@/features/portrait-library/portrait-data";
+import { fetchPortraits, type Portrait, portraitDisplayUrl } from "@/features/portrait-library/portrait-data";
 import type { RemixPromptTool } from "../../../shared/video-remix/prompt-tools";
 import {
   moveRemixSource,
@@ -58,13 +58,13 @@ import { PromptToolModal } from "./prompt-tool-modal";
 import "./remix-project.css";
 
 const stages = ["上传配置", "AI 解析", "提示词校对", "分镜校对", "合并成片"];
-const fallbackPortrait =
-  "https://omni-agent.tos-cn-beijing.volces.com/resource/virtual-person/asset-20260224201926-kq66z.png";
+const fallbackPortrait = portraitDisplayUrl(1);
 
 interface SelectedPortrait {
   name: string;
   profession: string;
   source_url: string;
+  display_url?: string;
   index: number;
   description?: string;
   gender?: string;
@@ -232,7 +232,9 @@ function ConfigSidebar({
             <div className="portrait-card" key={portrait.index}>
               <ImagePreview
                 className="config-portrait"
-                src={portrait.source_url || fallbackPortrait}
+                src={
+                  portrait.display_url || (portrait.index > 0 ? portraitDisplayUrl(portrait.index) : fallbackPortrait)
+                }
                 alt={portrait.name}
               />
               <button
@@ -659,6 +661,7 @@ function PortraitPickerModal({
           name: portrait.name,
           profession: portrait.profession,
           source_url: portrait.source_url,
+          display_url: portrait.display_url,
           index: portrait.index,
           description: portrait.description,
           gender: portrait.gender,
@@ -715,7 +718,7 @@ function PortraitPickerModal({
                 onClick={() => togglePortrait(portrait)}
               >
                 <span className="portrait">
-                  <ImagePreview src={portrait.source_url} alt={portrait.name} imageLoading="lazy" />
+                  <ImagePreview src={portrait.display_url} alt={portrait.name} imageLoading="lazy" />
                   {active && (
                     <i>
                       <CircleCheck /> 已选择
@@ -1396,6 +1399,7 @@ export function RemixProject() {
           name: portrait.assetName,
           profession: portrait.occupation || "",
           source_url: portraitFile.fileUrl,
+          display_url: Number(portrait.id) > 0 ? portraitDisplayUrl(Number(portrait.id)) : fallbackPortrait,
           index: Number(portrait.id) || 0,
           description: portrait.description ?? undefined,
           gender: portrait.gender ?? undefined,
@@ -1874,7 +1878,10 @@ export function RemixProject() {
                       ))}
                       {selectedPortraits.map((portrait) => (
                         <span className="result-asset" key={portrait.index}>
-                          <PublicPreviewImage url={portrait.source_url} alt={portrait.name} />
+                          <PublicPreviewImage
+                            url={portrait.display_url || portraitDisplayUrl(portrait.index)}
+                            alt={portrait.name}
+                          />
                         </span>
                       ))}
                       {!selectedProduct?.images.length && !selectedPortraits.length && (

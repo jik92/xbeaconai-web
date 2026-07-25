@@ -760,6 +760,15 @@ export const zShareParseResult = z.object({
 
 export const zShareImportJob = zJob.and(z.record(z.string(), z.unknown()));
 
+export const zGetPortraitContentPath = z.object({
+    portraitId: z.int().gte(1)
+});
+
+/**
+ * Inline portrait image
+ */
+export const zGetPortraitContentResponse = z.string();
+
 /**
  * Service health
  */
