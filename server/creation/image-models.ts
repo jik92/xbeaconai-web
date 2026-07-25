@@ -151,7 +151,7 @@ export const imageModelDefinitions: ImageModelDefinition[] = [
     protocol: "gemini-interactions",
     capability: capability("nano-banana-2", "Nano Banana 2", "高效极速创作，兼顾性价比并覆盖多国场景", {
       resolutions: ["1k", "2k", "4k"],
-      maxReferences: 12,
+      maxReferences: 0,
     }),
   },
   {

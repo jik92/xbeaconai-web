@@ -43,6 +43,10 @@ describe("creation capabilities", () => {
       minReferences: 1,
       maxReferences: 1,
     });
+    expect(imageModels.find((model) => model.id === "nano-banana-2")).toMatchObject({
+      minReferences: 0,
+      maxReferences: 0,
+    });
     expect(videoModels.filter((model) => model.isDefault)).toHaveLength(1);
     expect(enabledVideoModel.executionMode).toBe("real");
     expect(disabledVideoModel.disabledReason).toBe("真实基线尚未验证");
