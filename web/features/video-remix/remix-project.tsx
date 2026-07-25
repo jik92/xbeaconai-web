@@ -42,6 +42,7 @@ import {
 import type { Job, SeedanceModelId } from "@/api/generated/types.gen";
 import { AttachmentPicker, type AttachmentSelection } from "@/components/domain/attachment-picker";
 import { AuthenticatedMedia } from "@/components/domain/authenticated-media";
+import { ImagePreview } from "@/components/domain/media-preview";
 import { type PromptReference, PromptWorkbench } from "@/components/domain/prompt-workbench";
 import type { ApiJobResult, LibraryAsset, LibraryProduct } from "@/entities/types";
 import type { CreationModelCapability } from "@/features/ai-creation/ai-creation-composer";
@@ -102,7 +103,7 @@ function PublicPreviewImage({ url, alt }: { url: string; alt: string }) {
       </span>
     );
 
-  return <img src={url} alt={alt} onError={() => setFailed(true)} />;
+  return <ImagePreview src={url} alt={alt} onImageError={() => setFailed(true)} />;
 }
 
 function WorkflowHeader({
@@ -211,6 +212,7 @@ function ConfigSidebar({
               url={selectedProduct.images[0]?.url || ""}
               mimeType={selectedProduct.images[0]?.mimeType || "image/png"}
               alt={selectedProduct.name}
+              previewable={false}
             />
           </span>
         ) : (
@@ -223,7 +225,11 @@ function ConfigSidebar({
         <button onClick={() => onPick("portrait")}>{selectedPortrait ? "更换" : "+ 添加"}</button>
       </div>
       {selectedPortrait ? (
-        <img className="config-portrait" src={selectedPortrait?.source_url || fallbackPortrait} alt="已选人像" />
+        <ImagePreview
+          className="config-portrait"
+          src={selectedPortrait?.source_url || fallbackPortrait}
+          alt="已选人像"
+        />
       ) : (
         <span className="config-empty">未添加人像</span>
       )}
@@ -349,7 +355,7 @@ function AssetPickerModal({
             <button key={asset.id} onClick={() => onSelect(asset)}>
               <span className={kind}>
                 {kind === "product" ? (
-                  <AuthenticatedMedia url={asset.url} mimeType={asset.mimeType} alt={asset.name} />
+                  <AuthenticatedMedia url={asset.url} mimeType={asset.mimeType} alt={asset.name} previewable={false} />
                 ) : (
                   <Mic2 />
                 )}
@@ -407,6 +413,7 @@ function ProductPickerModal({
                   url={product.images[0]?.url || ""}
                   mimeType={product.images[0]?.mimeType || "image/png"}
                   alt={product.name}
+                  previewable={false}
                 />
               </span>
               <b>{product.name}</b>
@@ -514,7 +521,7 @@ function PortraitPickerModal({
                 onClick={() => onSelect(portrait)}
               >
                 <span className="portrait">
-                  <img src={portrait.source_url} alt={portrait.name} loading="lazy" />
+                  <ImagePreview src={portrait.source_url} alt={portrait.name} imageLoading="lazy" />
                   {isCurrent && (
                     <i>
                       <CircleCheck /> 当前使用
@@ -1517,6 +1524,7 @@ export function RemixProject() {
                         mimeType="video/mp4"
                         alt={`${source.name}${selectedShotAssets[source.id] && selectedShotAssets[source.id] !== source.id ? "生成版本" : "原片"}`}
                         controls={false}
+                        previewable={false}
                         loadingText="载入中…"
                         errorText="预览失败"
                       />
@@ -1875,6 +1883,7 @@ export function RemixProject() {
                         mimeType="video/mp4"
                         alt={`${source.name}${selectedShotAssets[source.id] && selectedShotAssets[source.id] !== source.id ? "生成版本" : "原片"}`}
                         controls={false}
+                        previewable={false}
                         loadingText="载入中…"
                         errorText="预览失败"
                       />

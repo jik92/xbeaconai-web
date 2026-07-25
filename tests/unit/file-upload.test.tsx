@@ -1,6 +1,32 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, beforeAll, describe, expect, test } from "bun:test";
+import { Window } from "happy-dom";
+import { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { FileUpload, fileMatchesAccept } from "../../web/components/domain/file-upload";
+
+const window = new Window();
+const roots: Root[] = [];
+
+beforeAll(() => {
+  Object.assign(globalThis, {
+    window,
+    document: window.document,
+    navigator: window.navigator,
+    Element: window.Element,
+    HTMLElement: window.HTMLElement,
+    IS_REACT_ACT_ENVIRONMENT: true,
+  });
+  URL.createObjectURL = () => "blob:local-upload";
+  URL.revokeObjectURL = () => undefined;
+});
+
+afterEach(() => {
+  for (const root of roots.splice(0)) {
+    act(() => root.unmount());
+  }
+  document.body.replaceChildren();
+});
 
 describe("FileUpload", () => {
   test("renders a compact labelled file input with reusable constraints", () => {
@@ -46,5 +72,23 @@ describe("FileUpload", () => {
     expect(fileMatchesAccept({ name: "voice.wav", type: "audio/wav" }, "audio/wav")).toBe(true);
     expect(fileMatchesAccept({ name: "clip.MOV", type: "" }, ".mov")).toBe(true);
     expect(fileMatchesAccept({ name: "notes.txt", type: "text/plain" }, "image/*,.pdf")).toBe(false);
+  });
+
+  test("offers the shared full-screen interaction for a local media preview", () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    roots.push(root);
+
+    act(() => {
+      root.render(
+        <FileUpload
+          files={[new File(["image"], "cover.png", { type: "image/png" })]}
+          onFilesChange={() => undefined}
+        />,
+      );
+    });
+
+    expect(container.querySelector('button[aria-label="全屏预览cover.png"]')).not.toBeNull();
   });
 });

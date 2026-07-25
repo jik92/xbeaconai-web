@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "../ui/button";
 import { Label } from "../ui/label";
 import { AuthenticatedMedia } from "./authenticated-media";
+import { MediaPreview } from "./media-preview";
 
 export interface UploadPreviewFile {
   id?: string;
@@ -52,15 +53,6 @@ function formatBytes(bytes?: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
-}
-
-function LocalMediaPreview({ file, url }: { file: File; url: string }) {
-  if (file.type.startsWith("image/")) return <img src={url} alt={file.name} />;
-  // biome-ignore lint/a11y/useMediaCaption: Local user-selected previews do not have caption tracks yet.
-  if (file.type.startsWith("video/")) return <video src={url} controls preload="metadata" />;
-  // biome-ignore lint/a11y/useMediaCaption: Local user-selected previews do not have caption tracks yet.
-  if (file.type.startsWith("audio/")) return <audio src={url} controls preload="metadata" />;
-  return <FileText aria-hidden="true" />;
 }
 
 export function FileUpload({
@@ -255,7 +247,11 @@ export function FileUpload({
                   className="overflow-hidden rounded-md border border-line bg-surface-muted"
                 >
                   <div className="flex aspect-video items-center justify-center overflow-hidden [&_audio]:w-[calc(100%-12px)] [&_img]:h-full [&_img]:w-full [&_img]:object-contain [&_video]:h-full [&_video]:w-full [&_video]:object-contain">
-                    {localUrls[index] ? <LocalMediaPreview file={file} url={localUrls[index]} /> : null}
+                    {localUrls[index] && /^(image|video|audio)\//.test(file.type) ? (
+                      <MediaPreview url={localUrls[index]} mimeType={file.type} alt={file.name} authenticated={false} />
+                    ) : (
+                      <FileText className="size-7 text-muted" aria-hidden="true" />
+                    )}
                   </div>
                   <div className="px-2 py-1.5">
                     <b className="block truncate text-xs font-medium text-ink" title={file.name}>
