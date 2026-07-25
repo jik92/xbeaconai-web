@@ -50,6 +50,7 @@ import {
 import type { VideoCreateInput, VideoCreateProject } from "@/api/generated/types.gen";
 import { AttachmentPicker, type AttachmentSelection } from "@/components/domain/attachment-picker";
 import { AuthenticatedMedia } from "@/components/domain/authenticated-media";
+import { ImagePreview } from "@/components/domain/media-preview";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -640,7 +641,7 @@ export function VideoCreatePage() {
             </div>
             {selectedPortrait ? (
               <div className="flex items-center gap-2 rounded-lg border border-line p-2 [&_img]:h-12 [&_img]:w-9 [&_img]:rounded-md [&_img]:object-cover">
-                <img src={selectedPortrait.source_url} alt={selectedPortrait.name} />
+                <ImagePreview src={selectedPortrait.source_url} alt={selectedPortrait.name} />
                 <span className="min-w-0 flex-1 truncate text-xs text-muted">{selectedPortrait.name}</span>
                 <Button variant="ghost" size="sm" onClick={() => mutateInput("portraitId", undefined)}>
                   移除

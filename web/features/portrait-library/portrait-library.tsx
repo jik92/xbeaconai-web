@@ -3,6 +3,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { Check, Download, Images, Shuffle, UserRound } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AssetPageShell, AssetPageToolbar } from "@/components/domain/asset-page-shell";
+import { ImagePreview, MediaPreview } from "@/components/domain/media-preview";
 import { ToolCreatorModal } from "@/components/domain/tool-creator-modal";
 import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -160,7 +161,7 @@ export function PortraitLibrary() {
                 {filtered.slice(row.index * columns, row.index * columns + columns).map((item) => (
                   <button type="button" className="portrait-card" key={item.index} onClick={() => setSelected(item)}>
                     <div className="portrait-image">
-                      <img src={item.source_url} alt={item.name} loading="lazy" />
+                      <ImagePreview src={item.source_url} alt={item.name} imageLoading="lazy" />
                       <span>NO. {String(item.index).padStart(4, "0")}</span>
                       <i>选择人像</i>
                     </div>
@@ -187,7 +188,7 @@ export function PortraitLibrary() {
         {selected && (
           <div className="grid min-h-0 flex-1 gap-3 overflow-y-auto p-4 sm:grid-cols-[180px_minmax(0,1fr)]">
             <div className="detail-photo">
-              <img src={selected.source_url} alt={selected.name} />
+              <MediaPreview url={selected.source_url} mimeType="image/jpeg" alt={selected.name} authenticated={false} />
               <span>
                 <Check />
                 可用于创作

@@ -7,6 +7,7 @@ import type {
 } from "@/api/api-client";
 import { AttachmentPicker, type AttachmentSelection } from "@/components/domain/attachment-picker";
 import { AuthenticatedMedia } from "@/components/domain/authenticated-media";
+import { ImagePreview } from "@/components/domain/media-preview";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -73,7 +74,7 @@ export function normalizeVideoCreateAttachmentLabels(prompt: string, attachments
 
 function AttachmentPreview({ attachment }: { attachment: DraftAttachment }) {
   if (attachment.source === "portrait")
-    return <img className="size-full object-cover" src={attachment.url} alt={attachment.name} />;
+    return <ImagePreview className="size-full object-cover" src={attachment.url} alt={attachment.name} />;
   if (attachment.mimeType.startsWith("audio/"))
     return (
       <span className="grid size-full place-items-center bg-canvas-soft text-muted">
