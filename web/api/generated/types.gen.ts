@@ -338,6 +338,8 @@ export type VideoCreateProject = {
         status: 'pending' | 'queued' | 'generating' | 'succeeded' | 'failed' | 'replaced';
         jobId: string;
         videoAssetId: string;
+        currentMaterialVersionId: string;
+        materialProcessing: boolean;
         audioArtifactId: string;
         subtitleCues: Array<{
             startSec: number;
@@ -2982,6 +2984,7 @@ export type BatchGenerateVideoCreateShotsResponse = BatchGenerateVideoCreateShot
 export type ReplaceVideoCreateShotData = {
     body: {
         assetId: string;
+        source: 'library_replacement' | 'upload_replacement';
     };
     path: {
         projectId: string;
@@ -2996,6 +2999,10 @@ export type ReplaceVideoCreateShotErrors = {
      * Not found
      */
     404: ApiErrorResponse;
+    /**
+     * Already processing
+     */
+    409: ApiErrorResponse;
     /**
      * Invalid video
      */
@@ -3012,6 +3019,121 @@ export type ReplaceVideoCreateShotResponses = {
 };
 
 export type ReplaceVideoCreateShotResponse = ReplaceVideoCreateShotResponses[keyof ReplaceVideoCreateShotResponses];
+
+export type ListVideoCreateShotMaterialVersionsData = {
+    body?: never;
+    path: {
+        projectId: string;
+        shotId: string;
+    };
+    query?: never;
+    url: '/api/video-create/projects/{projectId}/shots/{shotId}/material-versions';
+};
+
+export type ListVideoCreateShotMaterialVersionsErrors = {
+    /**
+     * Not found
+     */
+    404: ApiErrorResponse;
+};
+
+export type ListVideoCreateShotMaterialVersionsError = ListVideoCreateShotMaterialVersionsErrors[keyof ListVideoCreateShotMaterialVersionsErrors];
+
+export type ListVideoCreateShotMaterialVersionsResponses = {
+    /**
+     * Material version history
+     */
+    200: {
+        versions: Array<{
+            id: string;
+            projectId: string;
+            shotId: string;
+            source: 'ai_generated' | 'library_replacement' | 'upload_replacement' | 'audio_replaced' | 'subtitle_composed';
+            status: 'pending' | 'succeeded' | 'failed';
+            storageKind: 'artifact' | 'asset';
+            contentId: string;
+            inputVersionId: string;
+            jobId: string;
+            error?: {
+                code: string;
+                message: string;
+                retryable: boolean;
+                requestId: string;
+            };
+            available: boolean;
+            createdAt: string;
+            updatedAt: string;
+        }>;
+    };
+};
+
+export type ListVideoCreateShotMaterialVersionsResponse = ListVideoCreateShotMaterialVersionsResponses[keyof ListVideoCreateShotMaterialVersionsResponses];
+
+export type ApplyVideoCreateShotMaterialVersionData = {
+    body?: never;
+    path: {
+        projectId: string;
+        shotId: string;
+        versionId: string;
+    };
+    query?: never;
+    url: '/api/video-create/projects/{projectId}/shots/{shotId}/material-versions/{versionId}/apply';
+};
+
+export type ApplyVideoCreateShotMaterialVersionErrors = {
+    /**
+     * Not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Not applicable
+     */
+    409: ApiErrorResponse;
+};
+
+export type ApplyVideoCreateShotMaterialVersionError = ApplyVideoCreateShotMaterialVersionErrors[keyof ApplyVideoCreateShotMaterialVersionErrors];
+
+export type ApplyVideoCreateShotMaterialVersionResponses = {
+    /**
+     * Applied
+     */
+    200: VideoCreateProject;
+};
+
+export type ApplyVideoCreateShotMaterialVersionResponse = ApplyVideoCreateShotMaterialVersionResponses[keyof ApplyVideoCreateShotMaterialVersionResponses];
+
+export type ProcessVideoCreateShotMaterialData = {
+    body?: never;
+    path: {
+        projectId: string;
+        shotId: string;
+        action: 'audio-replace' | 'subtitle-compose';
+    };
+    query?: never;
+    url: '/api/video-create/projects/{projectId}/shots/{shotId}/material-actions/{action}';
+};
+
+export type ProcessVideoCreateShotMaterialErrors = {
+    /**
+     * Not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Invalid state
+     */
+    409: ApiErrorResponse;
+};
+
+export type ProcessVideoCreateShotMaterialError = ProcessVideoCreateShotMaterialErrors[keyof ProcessVideoCreateShotMaterialErrors];
+
+export type ProcessVideoCreateShotMaterialResponses = {
+    /**
+     * Accepted
+     */
+    202: Job;
+};
+
+export type ProcessVideoCreateShotMaterialResponse = ProcessVideoCreateShotMaterialResponses[keyof ProcessVideoCreateShotMaterialResponses];
 
 export type UpdateVideoCreateShotSettingsData = {
     body: {

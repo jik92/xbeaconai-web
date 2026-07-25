@@ -350,6 +350,29 @@ describe("video create domain", () => {
       "上班穿搭总怕闷热又显得没精神？",
     );
     expect(storyboard.shots.every((shot) => shot.subtitleCues.length === 0)).toBe(true);
+    const firstMaterial = store.createAndApplyMaterialVersion({
+      projectId,
+      shotId: storyboard.shots[0].id,
+      source: "library_replacement",
+      storageKind: "asset",
+      contentId: crypto.randomUUID(),
+    });
+    const processedMaterial = store.createAndApplyMaterialVersion({
+      projectId,
+      shotId: storyboard.shots[0].id,
+      source: "audio_replaced",
+      storageKind: "artifact",
+      contentId: crypto.randomUUID(),
+      inputVersionId: firstMaterial.id,
+    });
+    expect(store.listMaterialVersions(projectId, storyboard.shots[0].id, other.user.id)).toBeUndefined();
+    const materialHistory = store.listMaterialVersions(projectId, storyboard.shots[0].id, owner.user.id) ?? [];
+    expect(materialHistory).toHaveLength(2);
+    expect(new Set(materialHistory.map((item) => item.id))).toEqual(new Set([processedMaterial.id, firstMaterial.id]));
+    expect(store.get(projectId)?.shots[0].currentMaterialVersionId).toBe(processedMaterial.id);
+    store.applyMaterialVersion(projectId, storyboard.shots[0].id, firstMaterial.id, owner.user.id);
+    expect(store.get(projectId)?.shots[0].currentMaterialVersionId).toBe(firstMaterial.id);
+    expect(store.listMaterialVersions(projectId, storyboard.shots[0].id, owner.user.id)).toHaveLength(2);
     store.updateAllShotSettings(projectId, { audioEnabled: false });
     expect(store.get(projectId)?.shots.every((shot) => !shot.audioEnabled)).toBe(true);
     store.updateAllShotSettings(projectId, { audioEnabled: true });
@@ -508,6 +531,46 @@ describe("video create domain", () => {
     expect(projects.get(projectId)?.shots[0].audioArtifactId).toBeTruthy();
     expect(projects.get(projectId)?.shots[0].subtitleCues.length).toBeGreaterThan(0);
     expect(projects.get(projectId)?.canCompose).toBe(true);
+
+    for (const operation of ["audio-replace", "subtitle-compose"] as const) {
+      const currentShot = projects.get(projectId)?.shots[0];
+      if (!currentShot?.currentMaterialVersionId) throw new Error("SHOT_MATERIAL_VERSION_NOT_CREATED");
+      const processJob: JobRecord = {
+        ...job,
+        id: crypto.randomUUID(),
+        title: operation,
+        status: "queued",
+        progress: 0,
+        stage: "排队中",
+        overallExecutionMode: "local",
+        values: {
+          operation,
+          projectId,
+          shotId: shot.id,
+          inputMaterialVersionId: currentShot.currentMaterialVersionId,
+          previousShotStatus: currentShot.status,
+        },
+        videoModel: undefined,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      jobs.create(processJob);
+      projects.createPendingMaterialVersion({
+        projectId,
+        shotId: shot.id,
+        source: operation === "audio-replace" ? "audio_replaced" : "subtitle_composed",
+        inputVersionId: currentShot.currentMaterialVersionId,
+        jobId: processJob.id,
+      });
+      generatedFiles.push(resolve(env.dataDir, "results", `${processJob.id}-video-create.mp4`));
+      await processor.process(processJob.id);
+      expect(jobs.get(processJob.id)?.status).toBe("succeeded");
+      expect(projects.getMaterialVersionByJobId(processJob.id)?.status).toBe("succeeded");
+      expect(projects.get(projectId)?.shots[0].currentMaterialVersionId).toBe(
+        projects.getMaterialVersionByJobId(processJob.id)?.id,
+      );
+    }
+    expect(projects.listMaterialVersions(projectId, shot.id, owner.user.id)).toHaveLength(3);
 
     jobs.close();
     projects.close();

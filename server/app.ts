@@ -87,6 +87,9 @@ import {
 import {
   VIDEO_CREATE_ANALYSIS_MODEL,
   VideoCreateInputSchema,
+  VideoCreateMaterialStorageKindSchema,
+  VideoCreateMaterialVersionSourceSchema,
+  VideoCreateMaterialVersionStatusSchema,
   VideoCreateProjectStatusSchema,
   VideoCreateRecommendationSchema,
   VideoCreateShotGenerationPlanSchema,
@@ -94,6 +97,7 @@ import {
 } from "./video-create/types";
 import {
   nextVideoCreateStatus,
+  VideoCreateMaterialBusyError,
   VideoCreateStateError,
   VideoCreateStore,
   VideoCreateVersionConflictError,
@@ -260,6 +264,21 @@ const VideoCreateSectionSchema = z.object({
   versions: z.array(VideoCreateVersionSchema),
   currentVersion: VideoCreateVersionSchema.optional(),
 });
+const VideoCreateMaterialVersionSchema = z.object({
+  id: z.string().uuid(),
+  projectId: z.string().uuid(),
+  shotId: z.string().uuid(),
+  source: VideoCreateMaterialVersionSourceSchema,
+  status: VideoCreateMaterialVersionStatusSchema,
+  storageKind: VideoCreateMaterialStorageKindSchema.nullable(),
+  contentId: z.string().uuid().nullable(),
+  inputVersionId: z.string().uuid().nullable(),
+  jobId: z.string().uuid().nullable(),
+  error: ApiErrorSchema.nullish(),
+  available: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
 const VideoCreateShotSchema = z.object({
   id: z.string().uuid(),
   projectId: z.string().uuid(),
@@ -272,6 +291,8 @@ const VideoCreateShotSchema = z.object({
   status: VideoCreateShotStatusSchema,
   jobId: z.string().uuid().nullable(),
   videoAssetId: z.string().uuid().nullable(),
+  currentMaterialVersionId: z.string().uuid().nullable(),
+  materialProcessing: z.boolean(),
   audioArtifactId: z.string().uuid().nullable(),
   subtitleCues: z.array(
     z.object({
@@ -3905,7 +3926,7 @@ function videoCreateJobRecord(input: {
 }): JobRecord {
   const timestamp = new Date().toISOString();
   const operation = input.values.operation;
-  const local = operation === "compose";
+  const local = operation === "compose" || operation === "audio-replace" || operation === "subtitle-compose";
   const mockVideo = operation === "shot" && env.mockGenerateVideoApi;
   return {
     id: crypto.randomUUID(),
@@ -3926,7 +3947,11 @@ function videoCreateJobRecord(input: {
         implementation: mockVideo
           ? "ffmpeg-seedance-mock"
           : local
-            ? "ffmpeg-concat"
+            ? operation === "audio-replace"
+              ? "ffmpeg-audio-replace"
+              : operation === "subtitle-compose"
+                ? "ffmpeg-subtitle"
+                : "ffmpeg-concat"
             : operation === "analyze"
               ? "aihubmix-gpt-image-analysis"
               : operation === "shot"
@@ -4217,7 +4242,15 @@ app.openapi(saveVideoCreateSectionRoute, (c) => {
 async function enqueueVideoCreateOperation(input: {
   ownerUserId: string;
   projectId: string;
-  operation: "analyze" | "script" | "regenerate-section" | "storyboard" | "shot" | "compose";
+  operation:
+    | "analyze"
+    | "script"
+    | "regenerate-section"
+    | "storyboard"
+    | "shot"
+    | "audio-replace"
+    | "subtitle-compose"
+    | "compose";
   idempotencyKey?: string;
   sectionId?: string;
   shotId?: string;
@@ -4241,11 +4274,19 @@ async function enqueueVideoCreateOperation(input: {
   const aggregate = videoCreates.getOwned(input.projectId, input.ownerUserId);
   if (!aggregate) throw new VideoCreateStateError("一键成片项目不存在");
   const shot = input.shotId ? aggregate.shots.find((item) => item.id === input.shotId) : undefined;
+  if (shot && (shot.status === "queued" || shot.status === "generating" || shot.materialProcessing))
+    throw new VideoCreateMaterialBusyError("该分镜正在处理中");
   const referenceId = aggregate.project.input.productAssetIds[0];
   const explicitReferences = input.shotOptions?.references;
   const explicitPortrait = input.shotOptions?.portrait;
   const values = {
     ...videoCreateJobValues(input),
+    ...(shot
+      ? {
+          previousShotStatus: shot.status,
+          ...(shot.currentMaterialVersionId ? { inputMaterialVersionId: shot.currentMaterialVersionId } : {}),
+        }
+      : {}),
     ...(shot
       ? {
           prompt: input.shotOptions?.prompt ?? shot.prompt,
@@ -4284,8 +4325,26 @@ async function enqueueVideoCreateOperation(input: {
       input.operation === "shot" ? (input.shotOptions?.videoModel ?? aggregate.project.input.videoModel) : undefined,
   });
   store.create(job);
-  if (shot) videoCreates.updateShot(shot.id, { status: "queued", jobId: job.id, error: null });
-  else
+  if (shot) {
+    const source =
+      input.operation === "audio-replace"
+        ? "audio_replaced"
+        : input.operation === "subtitle-compose"
+          ? "subtitle_composed"
+          : "ai_generated";
+    videoCreates.createPendingMaterialVersion({
+      projectId: input.projectId,
+      shotId: shot.id,
+      source,
+      inputVersionId: shot.currentMaterialVersionId,
+      jobId: job.id,
+    });
+    videoCreates.updateShot(shot.id, {
+      ...(input.operation === "shot" && !shot.currentMaterialVersionId ? { status: "queued" as const } : {}),
+      jobId: job.id,
+      error: null,
+    });
+  } else
     videoCreates.setProject(input.projectId, {
       status: nextVideoCreateStatus(input.operation),
       currentJobId: job.id,
@@ -4608,7 +4667,7 @@ app.openapi(generateVideoCreateShotRoute, async (c) => {
       { error: { code: "NOT_FOUND", message: "分镜不存在", retryable: false, requestId: crypto.randomUUID() } },
       404,
     );
-  if (shot.status === "queued" || shot.status === "generating")
+  if (shot.status === "queued" || shot.status === "generating" || shot.materialProcessing)
     return c.json(
       {
         error: {
@@ -4772,23 +4831,47 @@ const replaceVideoCreateShotRoute = createRoute({
   operationId: "replaceVideoCreateShot",
   request: {
     params: z.object({ projectId: z.string().uuid(), shotId: z.string().uuid() }),
-    body: { required: true, content: { "application/json": { schema: z.object({ assetId: z.string().uuid() }) } } },
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: z.object({
+            assetId: z.string().uuid(),
+            source: z.enum(["library_replacement", "upload_replacement"]),
+          }),
+        },
+      },
+    },
   },
   responses: {
     200: { description: "Replaced", content: { "application/json": { schema: VideoCreateProjectSchema } } },
     404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },
+    409: { description: "Already processing", content: { "application/json": { schema: ErrorSchema } } },
     422: { description: "Invalid video", content: { "application/json": { schema: ErrorSchema } } },
   },
 });
 app.openapi(replaceVideoCreateShotRoute, (c) => {
   const { projectId, shotId } = c.req.valid("param");
+  const body = c.req.valid("json");
   const shot = videoCreates.getOwnedShot(projectId, shotId, c.get("userId"));
   if (!shot)
     return c.json(
       { error: { code: "NOT_FOUND", message: "分镜不存在", retryable: false, requestId: crypto.randomUUID() } },
       404,
     );
-  const asset = accounts.getOwnedAsset(c.get("userId"), c.req.valid("json").assetId);
+  if (shot.status === "queued" || shot.status === "generating" || shot.materialProcessing)
+    return c.json(
+      {
+        error: {
+          code: "ACTION_IN_PROGRESS",
+          message: "该分镜正在处理中",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      409,
+    );
+  const asset = accounts.getOwnedAsset(c.get("userId"), body.assetId);
   if (!asset?.mimeType.startsWith("video/"))
     return c.json(
       {
@@ -4801,7 +4884,15 @@ app.openapi(replaceVideoCreateShotRoute, (c) => {
       },
       422,
     );
-  videoCreates.updateShot(shot.id, { status: "replaced", videoAssetId: asset.id, error: null });
+  videoCreates.createAndApplyMaterialVersion({
+    projectId,
+    shotId,
+    source: body.source,
+    storageKind: "asset",
+    contentId: asset.id,
+    inputVersionId: shot.currentMaterialVersionId,
+    status: "replaced",
+  });
   const updated = videoCreates.getOwned(projectId, c.get("userId"));
   return updated
     ? c.json(updated, 200)
@@ -4811,6 +4902,198 @@ app.openapi(replaceVideoCreateShotRoute, (c) => {
         },
         404,
       );
+});
+
+const listVideoCreateShotMaterialVersionsRoute = createRoute({
+  method: "get",
+  path: "/api/video-create/projects/{projectId}/shots/{shotId}/material-versions",
+  operationId: "listVideoCreateShotMaterialVersions",
+  request: { params: z.object({ projectId: z.string().uuid(), shotId: z.string().uuid() }) },
+  responses: {
+    200: {
+      description: "Material version history",
+      content: { "application/json": { schema: z.object({ versions: z.array(VideoCreateMaterialVersionSchema) }) } },
+    },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(listVideoCreateShotMaterialVersionsRoute, (c) => {
+  const { projectId, shotId } = c.req.valid("param");
+  const versions = videoCreates.listMaterialVersions(projectId, shotId, c.get("userId"));
+  return versions
+    ? c.json(
+        {
+          versions: versions.map((version) => ({
+            ...version,
+            available: Boolean(
+              version.status === "succeeded" &&
+                version.contentId &&
+                (version.storageKind === "artifact"
+                  ? accounts.getArtifact(c.get("userId"), version.contentId)
+                  : accounts.getOwnedAsset(c.get("userId"), version.contentId)?.mimeType.startsWith("video/")),
+            ),
+          })),
+        },
+        200,
+      )
+    : c.json(
+        { error: { code: "NOT_FOUND", message: "分镜不存在", retryable: false, requestId: crypto.randomUUID() } },
+        404,
+      );
+});
+
+const applyVideoCreateShotMaterialVersionRoute = createRoute({
+  method: "post",
+  path: "/api/video-create/projects/{projectId}/shots/{shotId}/material-versions/{versionId}/apply",
+  operationId: "applyVideoCreateShotMaterialVersion",
+  request: {
+    params: z.object({
+      projectId: z.string().uuid(),
+      shotId: z.string().uuid(),
+      versionId: z.string().uuid(),
+    }),
+  },
+  responses: {
+    200: { description: "Applied", content: { "application/json": { schema: VideoCreateProjectSchema } } },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },
+    409: { description: "Not applicable", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(applyVideoCreateShotMaterialVersionRoute, (c) => {
+  const { projectId, shotId, versionId } = c.req.valid("param");
+  const shot = videoCreates.getOwnedShot(projectId, shotId, c.get("userId"));
+  const version = shot ? videoCreates.getMaterialVersion(projectId, shotId, versionId) : undefined;
+  if (!shot || !version)
+    return c.json(
+      { error: { code: "NOT_FOUND", message: "素材版本不存在", retryable: false, requestId: crypto.randomUUID() } },
+      404,
+    );
+  const available = Boolean(
+    version.status === "succeeded" &&
+      version.contentId &&
+      (version.storageKind === "artifact"
+        ? accounts.getArtifact(c.get("userId"), version.contentId)
+        : accounts.getOwnedAsset(c.get("userId"), version.contentId)?.mimeType.startsWith("video/")),
+  );
+  if (!available)
+    return c.json(
+      {
+        error: {
+          code: "VERSION_NOT_AVAILABLE",
+          message: "该素材版本的文件已不可用",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      409,
+    );
+  try {
+    const updated = videoCreates.applyMaterialVersion(projectId, shotId, versionId, c.get("userId"));
+    return updated
+      ? c.json(updated, 200)
+      : c.json(
+          { error: { code: "NOT_FOUND", message: "素材版本不存在", retryable: false, requestId: crypto.randomUUID() } },
+          404,
+        );
+  } catch (error) {
+    return c.json(
+      {
+        error: {
+          code: error instanceof VideoCreateMaterialBusyError ? "ACTION_IN_PROGRESS" : "VERSION_NOT_APPLICABLE",
+          message: error instanceof Error ? error.message : "素材版本无法应用",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      409,
+    );
+  }
+});
+
+const processVideoCreateShotMaterialRoute = createRoute({
+  method: "post",
+  path: "/api/video-create/projects/{projectId}/shots/{shotId}/material-actions/{action}",
+  operationId: "processVideoCreateShotMaterial",
+  request: {
+    params: z.object({
+      projectId: z.string().uuid(),
+      shotId: z.string().uuid(),
+      action: z.enum(["audio-replace", "subtitle-compose"]),
+    }),
+  },
+  responses: {
+    202: { description: "Accepted", content: { "application/json": { schema: JobSchema } } },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },
+    409: { description: "Invalid state", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(processVideoCreateShotMaterialRoute, async (c) => {
+  const { projectId, shotId, action } = c.req.valid("param");
+  const shot = videoCreates.getOwnedShot(projectId, shotId, c.get("userId"));
+  if (!shot)
+    return c.json(
+      { error: { code: "NOT_FOUND", message: "分镜不存在", retryable: false, requestId: crypto.randomUUID() } },
+      404,
+    );
+  if (!shot.currentMaterialVersionId || !shot.videoAssetId)
+    return c.json(
+      {
+        error: {
+          code: "VIDEO_REQUIRED",
+          message: "请先生成或选择视频素材",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      409,
+    );
+  if (action === "audio-replace" && !shot.audioArtifactId)
+    return c.json(
+      {
+        error: {
+          code: "AUDIO_REQUIRED",
+          message: "请先生成配音",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      409,
+    );
+  if (action === "subtitle-compose" && !shot.subtitleCues.length)
+    return c.json(
+      {
+        error: {
+          code: "SUBTITLE_REQUIRED",
+          message: "请先生成字幕",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      409,
+    );
+  try {
+    const job = await enqueueVideoCreateOperation({
+      ownerUserId: c.get("userId"),
+      projectId,
+      operation: action,
+      shotId,
+      idempotencyKey: c.req.header("Idempotency-Key")?.trim().slice(0, 128),
+    });
+    return c.json(job, 202);
+  } catch (error) {
+    if (!(error instanceof VideoCreateMaterialBusyError)) throw error;
+    return c.json(
+      {
+        error: {
+          code: "ACTION_IN_PROGRESS",
+          message: error.message,
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      409,
+    );
+  }
 });
 
 const updateVideoCreateShotSettingsRoute = createRoute({

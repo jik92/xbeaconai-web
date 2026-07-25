@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import {
+  applyVideoCreateShotMaterialVersion,
   batchGenerateVideoCreateShotVideos,
   clearVideoCreateScript,
   createVideoCreate,
@@ -32,7 +33,9 @@ import {
   fetchVideoCreateProject,
   fetchVideoCreateProjects,
   fetchVideoCreateShotGenerationDraft,
+  fetchVideoCreateShotMaterialVersions,
   generateVideoCreateShotVideo,
+  processVideoCreateShotVideo,
   regenerateVideoCreateScriptSection,
   replaceVideoCreateShotVideo,
   runVideoCreateProjectAction,
@@ -57,6 +60,7 @@ import { fetchPortraits } from "@/features/portrait-library/portrait-data";
 import { PortraitPickerDialog } from "@/features/portrait-library/portrait-picker-dialog";
 import { cn } from "@/lib/utils";
 import { videoCreateActionAvailability } from "./video-create-actions";
+import { VideoCreateMaterialHistoryDialog } from "./video-create-material-history-dialog";
 import { VideoCreateShotGenerationDialog } from "./video-create-shot-generation-dialog";
 
 const scenes = ["商城转化", "短视频带货", "引流直播间", "直播带货", "内容种草", "品牌曝光", "本地到店", "线索收集"];
@@ -380,6 +384,9 @@ export function VideoCreatePage() {
   const [shotGenerationLoading, setShotGenerationLoading] = useState(false);
   const [shotGenerationShotId, setShotGenerationShotId] = useState("");
   const [shotGenerationDraft, setShotGenerationDraft] = useState<VideoCreateShotGenerationDraft>();
+  const [materialHistoryShotId, setMaterialHistoryShotId] = useState("");
+  const [materialHistoryOpen, setMaterialHistoryOpen] = useState(false);
+  const [applyingMaterialVersionId, setApplyingMaterialVersionId] = useState("");
   const [batchSettings, setBatchSettings] = useState<VideoCreateShotGenerationOptions>({
     videoModel: "doubao-seedance-2-0-mini-260615",
     ratio: "9:16",
@@ -391,13 +398,17 @@ export function VideoCreatePage() {
   const [notice, setNotice] = useState("");
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const active = project?.project.status;
-  const hasRunningShot = project?.shots.some((shot) => shot.status === "queued" || shot.status === "generating");
+  const hasRunningShot = project?.shots.some(
+    (shot) => shot.status === "queued" || shot.status === "generating" || shot.materialProcessing,
+  );
   const projectId = project?.project.id;
   const sellingPoints = input.sellingPoints ?? [];
   const hasScript = Boolean(project?.sections.length);
   const hasStoryboard = Boolean(project?.shots.length);
   const batchEligibleShots =
-    project?.shots.filter((shot) => shot.status === "pending" || shot.status === "failed") ?? [];
+    project?.shots.filter(
+      (shot) => !shot.materialProcessing && (shot.status === "pending" || shot.status === "failed"),
+    ) ?? [];
   const actionAvailability = videoCreateActionAvailability({ hasScript, hasStoryboard });
   const polling =
     Boolean(active && ["analyzing", "script_generating", "storyboard_generating", "composing"].includes(active)) ||
@@ -418,6 +429,12 @@ export function VideoCreatePage() {
     queryFn: () => fetchVideoCreateProject(projectId ?? ""),
     enabled: Boolean(projectId),
     refetchInterval: polling ? 2_000 : false,
+  });
+  const { data: materialVersions = [], isLoading: materialHistoryLoading } = useQuery({
+    queryKey: ["video-create-material-versions", projectId, materialHistoryShotId],
+    queryFn: () => fetchVideoCreateShotMaterialVersions(projectId ?? "", materialHistoryShotId),
+    enabled: Boolean(projectId && materialHistoryShotId && materialHistoryOpen),
+    refetchInterval: materialHistoryOpen && hasRunningShot ? 2_000 : false,
   });
   useEffect(() => {
     if (!refreshed) return;
@@ -485,6 +502,25 @@ export function VideoCreatePage() {
       setShotGenerationLoading(false);
     }
   };
+  const processShotMaterial = (shotId: string, action: "audio-replace" | "subtitle-compose") =>
+    execute(`${action}-${shotId}`, async () => {
+      if (!project) return;
+      await processVideoCreateShotVideo(project.project.id, shotId, action);
+      setProject((current) =>
+        current
+          ? {
+              ...current,
+              shots: current.shots.map((shot) =>
+                shot.id === shotId ? { ...shot, materialProcessing: true, error: undefined } : shot,
+              ),
+            }
+          : current,
+      );
+      void queryClient.invalidateQueries({ queryKey: ["video-create-project", project.project.id] });
+      void queryClient.invalidateQueries({
+        queryKey: ["video-create-material-versions", project.project.id, shotId],
+      });
+    });
   const persist = async () => {
     if (!input.productAssetIds.length) throw new Error("请先添加至少一张商品图片");
     if (!project) {
@@ -1245,7 +1281,7 @@ export function VideoCreatePage() {
                 </span>
               </div>
               {project.shots.map((shot) => {
-                const generating = shot.status === "queued" || shot.status === "generating";
+                const generating = shot.status === "queued" || shot.status === "generating" || shot.materialProcessing;
                 return (
                   <article
                     className="grid min-h-64 min-w-[1120px] grid-cols-[40px_minmax(240px,1fr)_minmax(240px,1fr)_minmax(280px,1fr)_minmax(280px,1fr)] border-b border-line"
@@ -1311,7 +1347,12 @@ export function VideoCreatePage() {
                           onSelect={([asset]) =>
                             asset &&
                             void execute(`replace-${shot.id}`, async () => {
-                              const next = await replaceVideoCreateShotVideo(project.project.id, shot.id, asset.id);
+                              const next = await replaceVideoCreateShotVideo(
+                                project.project.id,
+                                shot.id,
+                                asset.id,
+                                asset.source === "upload" ? "upload_replacement" : "library_replacement",
+                              );
                               invalidate(next);
                             })
                           }
@@ -1327,7 +1368,12 @@ export function VideoCreatePage() {
                           onSelect={([asset]) =>
                             asset &&
                             void execute(`upload-replace-${shot.id}`, async () => {
-                              const next = await replaceVideoCreateShotVideo(project.project.id, shot.id, asset.id);
+                              const next = await replaceVideoCreateShotVideo(
+                                project.project.id,
+                                shot.id,
+                                asset.id,
+                                asset.source === "upload" ? "upload_replacement" : "library_replacement",
+                              );
                               invalidate(next);
                             })
                           }
@@ -1337,6 +1383,16 @@ export function VideoCreatePage() {
                             </Button>
                           )}
                         />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setMaterialHistoryShotId(shot.id);
+                            setMaterialHistoryOpen(true);
+                          }}
+                        >
+                          <History /> 生成历史
+                        </Button>
                       </div>
                       {shot.error && <small className="mt-2 block text-xs text-error">{shot.error.message}</small>}
                     </div>
@@ -1369,6 +1425,16 @@ export function VideoCreatePage() {
                       ) : (
                         <span className="text-xs text-muted">生成分镜视频后可试听配音</span>
                       )}
+                      <Button
+                        className="mt-3"
+                        variant="outline"
+                        size="sm"
+                        disabled={!shot.videoAssetId || !shot.audioArtifactId || generating || Boolean(busy)}
+                        onClick={() => void processShotMaterial(shot.id, "audio-replace")}
+                      >
+                        {busy === `audio-replace-${shot.id}` ? <LoaderCircle className="animate-spin" /> : <Mic />}
+                        配音替换
+                      </Button>
                     </div>
                     <div className={cn("p-3", !shot.subtitleEnabled && "opacity-50")}>
                       <div className="mb-3 flex items-center justify-between gap-3">
@@ -1402,6 +1468,20 @@ export function VideoCreatePage() {
                       ) : (
                         <span className="text-xs text-muted">生成配音后自动生成字幕时间轴</span>
                       )}
+                      <Button
+                        className="mt-3"
+                        variant="outline"
+                        size="sm"
+                        disabled={!shot.videoAssetId || !shot.subtitleCues.length || generating || Boolean(busy)}
+                        onClick={() => void processShotMaterial(shot.id, "subtitle-compose")}
+                      >
+                        {busy === `subtitle-compose-${shot.id}` ? (
+                          <LoaderCircle className="animate-spin" />
+                        ) : (
+                          <Captions />
+                        )}
+                        字幕合成
+                      </Button>
                     </div>
                   </article>
                 );
@@ -1616,6 +1696,31 @@ export function VideoCreatePage() {
           setShotGenerationDraft(undefined);
           setShotGenerationShotId("");
           void queryClient.invalidateQueries({ queryKey: ["video-create-project", project.project.id] });
+        }}
+      />
+      <VideoCreateMaterialHistoryDialog
+        open={materialHistoryOpen}
+        versions={materialVersions}
+        currentVersionId={project?.shots.find((shot) => shot.id === materialHistoryShotId)?.currentMaterialVersionId}
+        loading={materialHistoryLoading}
+        applyingVersionId={applyingMaterialVersionId}
+        onOpenChange={(open) => {
+          setMaterialHistoryOpen(open);
+          if (!open) setMaterialHistoryShotId("");
+        }}
+        onApply={(versionId) => {
+          if (!project || !materialHistoryShotId || applyingMaterialVersionId) return;
+          setApplyingMaterialVersionId(versionId);
+          setNotice("");
+          void applyVideoCreateShotMaterialVersion(project.project.id, materialHistoryShotId, versionId)
+            .then((next) => {
+              invalidate(next);
+              void queryClient.invalidateQueries({
+                queryKey: ["video-create-material-versions", project.project.id, materialHistoryShotId],
+              });
+            })
+            .catch((error) => setNotice(errorMessage(error)))
+            .finally(() => setApplyingMaterialVersionId(""));
         }}
       />
       <PortraitPickerDialog

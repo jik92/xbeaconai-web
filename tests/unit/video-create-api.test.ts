@@ -68,4 +68,26 @@ describe("video create shot generation API contract", () => {
     expect(individual?.responses).toHaveProperty("409");
     expect(batch?.responses).toHaveProperty("409");
   });
+
+  test("publishes material history, apply, and row-level post-processing operations", async () => {
+    const spec = (await Bun.file(resolve(import.meta.dir, "../../openapi/openapi.json")).json()) as {
+      paths: Record<string, Record<string, OpenApiOperation>>;
+    };
+    const history = spec.paths["/api/video-create/projects/{projectId}/shots/{shotId}/material-versions"]?.get;
+    const apply =
+      spec.paths["/api/video-create/projects/{projectId}/shots/{shotId}/material-versions/{versionId}/apply"]?.post;
+    const process = spec.paths["/api/video-create/projects/{projectId}/shots/{shotId}/material-actions/{action}"]?.post;
+    const replacement = spec.paths["/api/video-create/projects/{projectId}/shots/{shotId}/replacement"]?.post;
+
+    expect(history?.operationId).toBe("listVideoCreateShotMaterialVersions");
+    expect(apply?.operationId).toBe("applyVideoCreateShotMaterialVersion");
+    expect(process?.operationId).toBe("processVideoCreateShotMaterial");
+    expect(JSON.stringify(process)).toContain('"audio-replace","subtitle-compose"');
+    expect(replacement?.requestBody?.content?.["application/json"]?.schema?.required).toEqual(["assetId", "source"]);
+    expect(JSON.stringify(replacement)).toContain('"library_replacement","upload_replacement"');
+    for (const operation of [history, apply, process]) expect(operation?.responses).toHaveProperty("404");
+    expect(apply?.responses).toHaveProperty("409");
+    expect(process?.responses).toHaveProperty("202");
+    expect(process?.responses).toHaveProperty("409");
+  });
 });

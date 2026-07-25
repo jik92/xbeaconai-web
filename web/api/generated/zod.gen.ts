@@ -697,6 +697,8 @@ export const zVideoCreateProject = z.object({
         ]),
         jobId: z.uuid(),
         videoAssetId: z.uuid(),
+        currentMaterialVersionId: z.uuid(),
+        materialProcessing: z.boolean(),
         audioArtifactId: z.uuid(),
         subtitleCues: z.array(z.object({
             startSec: z.number().gte(0),
@@ -2144,7 +2146,8 @@ export const zBatchGenerateVideoCreateShotsResponse = z.object({
 });
 
 export const zReplaceVideoCreateShotBody = z.object({
-    assetId: z.uuid()
+    assetId: z.uuid(),
+    source: z.enum(['library_replacement', 'upload_replacement'])
 });
 
 export const zReplaceVideoCreateShotPath = z.object({
@@ -2156,6 +2159,69 @@ export const zReplaceVideoCreateShotPath = z.object({
  * Replaced
  */
 export const zReplaceVideoCreateShotResponse = zVideoCreateProject;
+
+export const zListVideoCreateShotMaterialVersionsPath = z.object({
+    projectId: z.uuid(),
+    shotId: z.uuid()
+});
+
+/**
+ * Material version history
+ */
+export const zListVideoCreateShotMaterialVersionsResponse = z.object({
+    versions: z.array(z.object({
+        id: z.uuid(),
+        projectId: z.uuid(),
+        shotId: z.uuid(),
+        source: z.enum([
+            'ai_generated',
+            'library_replacement',
+            'upload_replacement',
+            'audio_replaced',
+            'subtitle_composed'
+        ]),
+        status: z.enum([
+            'pending',
+            'succeeded',
+            'failed'
+        ]),
+        storageKind: z.enum(['artifact', 'asset']),
+        contentId: z.uuid(),
+        inputVersionId: z.uuid(),
+        jobId: z.uuid(),
+        error: z.object({
+            code: z.string(),
+            message: z.string(),
+            retryable: z.boolean(),
+            requestId: z.string()
+        }).optional(),
+        available: z.boolean(),
+        createdAt: z.string(),
+        updatedAt: z.string()
+    }))
+});
+
+export const zApplyVideoCreateShotMaterialVersionPath = z.object({
+    projectId: z.uuid(),
+    shotId: z.uuid(),
+    versionId: z.uuid()
+});
+
+/**
+ * Applied
+ */
+export const zApplyVideoCreateShotMaterialVersionResponse = zVideoCreateProject;
+
+export const zProcessVideoCreateShotMaterialPath = z.object({
+    projectId: z.uuid(),
+    shotId: z.uuid(),
+    action: z.enum(['audio-replace', 'subtitle-compose'])
+});
+
+/**
+ * Accepted
+ */
+export const zProcessVideoCreateShotMaterialResponse = zJob;
 
 export const zUpdateVideoCreateShotSettingsBody = z.object({
     audioEnabled: z.boolean(),

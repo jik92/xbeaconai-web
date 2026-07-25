@@ -79,6 +79,18 @@ export const VideoCreateShotStatusSchema = z.enum([
   "replaced",
 ]);
 
+export const VideoCreateMaterialVersionSourceSchema = z.enum([
+  "ai_generated",
+  "library_replacement",
+  "upload_replacement",
+  "audio_replaced",
+  "subtitle_composed",
+]);
+
+export const VideoCreateMaterialVersionStatusSchema = z.enum(["pending", "succeeded", "failed"]);
+
+export const VideoCreateMaterialStorageKindSchema = z.enum(["artifact", "asset"]);
+
 export const VideoCreateSubtitleCueSchema = z.object({
   startSec: z.number().nonnegative(),
   endSec: z.number().nonnegative(),
@@ -217,6 +229,9 @@ export const VideoCreateGeneratedStoryboardSchema = z.object({
 
 export type VideoCreateProjectStatus = z.infer<typeof VideoCreateProjectStatusSchema>;
 export type VideoCreateShotStatus = z.infer<typeof VideoCreateShotStatusSchema>;
+export type VideoCreateMaterialVersionSource = z.infer<typeof VideoCreateMaterialVersionSourceSchema>;
+export type VideoCreateMaterialVersionStatus = z.infer<typeof VideoCreateMaterialVersionStatusSchema>;
+export type VideoCreateMaterialStorageKind = z.infer<typeof VideoCreateMaterialStorageKindSchema>;
 export type VideoCreateSubtitleCue = z.infer<typeof VideoCreateSubtitleCueSchema>;
 export type VideoCreateInput = z.infer<typeof VideoCreateInputSchema>;
 export type VideoCreateRecommendation = z.infer<typeof VideoCreateRecommendationSchema>;

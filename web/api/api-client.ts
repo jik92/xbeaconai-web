@@ -5,6 +5,7 @@ import type { RemixPromptTool, RemixPromptToolConfig } from "../../shared/video-
 import { apiBaseUrl, apiUrl } from "./base-url";
 import { client } from "./generated/client.gen";
 import {
+  applyVideoCreateShotMaterialVersion as applyVideoCreateShotMaterialVersionRequest,
   batchGenerateVideoCreateShots,
   cancelJob,
   clearVideoCreateScript as clearVideoCreateScriptRequest,
@@ -36,9 +37,11 @@ import {
   listAdminUsers,
   listJobs,
   listVideoCreateProjects,
+  listVideoCreateShotMaterialVersions,
   listVideoRemixProjects,
   listVideoRemixShotGenerationJobs,
   parseAdScriptSource,
+  processVideoCreateShotMaterial,
   regenerateVideoCreateSection,
   replaceVideoCreateShot,
   retryJob,
@@ -57,14 +60,15 @@ import {
 import type {
   AdScriptInput,
   AdScriptProject,
-  GetProviderFeaturesResponse,
   GenerateVideoCreateShotData,
+  GetProviderFeaturesResponse,
   GetVideoCreateShotGenerationDraftResponse,
   GetVideoRemixProjectResponse,
   Job,
   ListAdminCredentialsResponse,
   ListAdminJobsResponse,
   ListAdminUsersResponse,
+  ListVideoCreateShotMaterialVersionsResponse,
   ListVideoRemixProjectsResponse,
   ModuleId,
   ProviderCredentialName,
@@ -83,6 +87,7 @@ export type ProviderFeatures = GetProviderFeaturesResponse;
 export type AdminStopAllJobsResult = StopAllAdminJobsResponse;
 export type RemixProjectSummary = ListVideoRemixProjectsResponse["projects"][number];
 export type RemixProjectDetail = GetVideoRemixProjectResponse;
+export type VideoCreateMaterialVersion = ListVideoCreateShotMaterialVersionsResponse["versions"][number];
 
 const configure = () =>
   client.setConfig({
@@ -371,15 +376,57 @@ export async function batchGenerateVideoCreateShotVideos(projectId: string, opti
   return data;
 }
 
-export async function replaceVideoCreateShotVideo(projectId: string, shotId: string, assetId: string) {
+export async function replaceVideoCreateShotVideo(
+  projectId: string,
+  shotId: string,
+  assetId: string,
+  source: "library_replacement" | "upload_replacement",
+) {
   configure();
   const { data } = await replaceVideoCreateShot({
     path: { projectId, shotId },
-    body: { assetId },
+    body: { assetId, source },
     headers: authHeaders(),
     throwOnError: true,
   });
   if (!data) throw new Error("替代视频保存失败");
+  return data;
+}
+
+export async function fetchVideoCreateShotMaterialVersions(projectId: string, shotId: string) {
+  configure();
+  const { data } = await listVideoCreateShotMaterialVersions({
+    path: { projectId, shotId },
+    headers: authHeaders(),
+    throwOnError: true,
+  });
+  if (!data) throw new Error("素材生成历史加载失败");
+  return data.versions;
+}
+
+export async function applyVideoCreateShotMaterialVersion(projectId: string, shotId: string, versionId: string) {
+  configure();
+  const { data } = await applyVideoCreateShotMaterialVersionRequest({
+    path: { projectId, shotId, versionId },
+    headers: authHeaders(),
+    throwOnError: true,
+  });
+  if (!data) throw new Error("素材历史版本应用失败");
+  return data;
+}
+
+export async function processVideoCreateShotVideo(
+  projectId: string,
+  shotId: string,
+  action: "audio-replace" | "subtitle-compose",
+) {
+  configure();
+  const { data } = await processVideoCreateShotMaterial({
+    path: { projectId, shotId, action },
+    headers: { ...authHeaders(), "Idempotency-Key": randomUuid() },
+    throwOnError: true,
+  });
+  if (!data) throw new Error(action === "audio-replace" ? "配音替换任务提交失败" : "字幕合成任务提交失败");
   return data;
 }
 

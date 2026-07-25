@@ -121,6 +121,25 @@ describe("video create action boundaries", () => {
     expect(source).toContain("fitVideoCreateShotPlanDuration");
   });
 
+  test("keeps row-level audio, subtitle, and immutable material history actions", () => {
+    const page = readFileSync(
+      resolve(import.meta.dir, "../../web/features/video-create/video-create-page.tsx"),
+      "utf8",
+    );
+    const history = readFileSync(
+      resolve(import.meta.dir, "../../web/features/video-create/video-create-material-history-dialog.tsx"),
+      "utf8",
+    );
+    expect(page).toContain("配音替换");
+    expect(page).toContain("字幕合成");
+    expect(page).toContain("生成历史");
+    expect(page).toContain('processShotMaterial(shot.id, "audio-replace")');
+    expect(page).toContain('processShotMaterial(shot.id, "subtitle-compose")');
+    expect(history).toContain("应用此版本");
+    expect(history).toContain("使用中");
+    expect(history).toContain("AuthenticatedMedia");
+  });
+
   test("clears the script beside copy only after confirming dependent storyboard removal", () => {
     const source = readFileSync(
       resolve(import.meta.dir, "../../web/features/video-create/video-create-page.tsx"),

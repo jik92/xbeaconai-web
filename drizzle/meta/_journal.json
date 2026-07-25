@@ -78,6 +78,13 @@
       "when": 1784986162783,
       "tag": "0010_chunky_moonstone",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1784988089213,
+      "tag": "0011_slow_whirlwind",
+      "breakpoints": true
     }
   ]
 }
