@@ -128,7 +128,6 @@ export const VideoCreateInputSchema = z
     voiceAssetId: z.string().uuid().optional(),
     ratio: z.enum(["9:16", "16:9", "1:1"]).default("9:16"),
     subtitles: z.boolean().default(true),
-    priority: z.enum(["speech", "visual"]).default("speech"),
   })
   .openapi("VideoCreateInput");
 

@@ -39,6 +39,17 @@ describe("video create action boundaries", () => {
     expect(source).not.toContain('action(project?.sections.length ? "storyboard" : "script")');
   });
 
+  test("does not expose the removed speech or visual priority selector", () => {
+    const source = readFileSync(
+      resolve(import.meta.dir, "../../web/features/video-create/video-create-page.tsx"),
+      "utf8",
+    );
+
+    expect(source).not.toContain("口播优先");
+    expect(source).not.toContain("画面优先");
+    expect(source).not.toContain('mutateInput("priority"');
+  });
+
   test("defaults both the new-project form and AI template to three segments", () => {
     const pageSource = readFileSync(
       resolve(import.meta.dir, "../../web/features/video-create/video-create-page.tsx"),

@@ -174,7 +174,6 @@ const defaultInput: VideoCreateInput = {
   videoModel: "doubao-seedance-2-0-fast-260128",
   ratio: "9:16",
   subtitles: true,
-  priority: "speech",
 };
 
 function errorMessage(error: unknown) {
@@ -1171,36 +1170,12 @@ export function VideoCreatePage() {
 
         {tab === "storyboard" && project?.shots.length ? (
           <section className="flex min-h-0 flex-1 flex-col">
-            <div className="flex h-12 shrink-0 items-center justify-between border-b border-line bg-canvas-soft px-3">
+            <div className="flex h-12 shrink-0 items-center border-b border-line bg-canvas-soft px-3">
               <div className="flex items-center gap-2">
                 <b className="font-medium text-ink">分镜编辑</b>
                 <span className="rounded-full bg-surface-strong px-2 py-0.5 text-xs text-muted">
                   {project.shots.length} 个段落
                 </span>
-              </div>
-              <div className="flex rounded-full border border-line bg-surface p-0.5">
-                <Button
-                  className={cn(
-                    "h-7 rounded-full border-0 px-3",
-                    input.priority === "speech" && "bg-primary text-white",
-                  )}
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => mutateInput("priority", "speech")}
-                >
-                  口播优先
-                </Button>
-                <Button
-                  className={cn(
-                    "h-7 rounded-full border-0 px-3",
-                    input.priority === "visual" && "bg-primary text-white",
-                  )}
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => mutateInput("priority", "visual")}
-                >
-                  画面优先
-                </Button>
               </div>
             </div>
             {project.project.finalArtifactId && (

@@ -486,8 +486,7 @@ export const zVideoCreateInput = z.object({
         '16:9',
         '1:1'
     ]).optional().default('9:16'),
-    subtitles: z.boolean().optional().default(true),
-    priority: z.enum(['speech', 'visual']).optional().default('speech')
+    subtitles: z.boolean().optional().default(true)
 });
 
 export const zVideoCreateRecommendation = z.object({

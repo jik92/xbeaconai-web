@@ -206,7 +206,6 @@ export class VideoCreateStore {
       videoModel: aggregate.project.input.videoModel,
       ratio: aggregate.project.input.ratio,
       subtitles: aggregate.project.input.subtitles,
-      priority: aggregate.project.input.priority,
       ...normalized,
     };
     this.db

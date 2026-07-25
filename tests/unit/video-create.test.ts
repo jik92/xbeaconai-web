@@ -9,7 +9,11 @@ import { buildGptImageAnalysisRequest } from "../../server/providers/aihubmix";
 import type { JobRecord } from "../../server/types";
 import { normalizeVideoCreateRecommendation, videoCreateTargetCharacterCount } from "../../server/video-create/model";
 import { createFallbackVideoCreateShotPlan } from "../../server/video-create/shot-generation";
-import { VideoCreateGeneratedScriptSchema, type VideoCreateInput } from "../../server/video-create/types";
+import {
+  VideoCreateGeneratedScriptSchema,
+  type VideoCreateInput,
+  VideoCreateInputSchema,
+} from "../../server/video-create/types";
 import {
   VideoCreateStateError,
   VideoCreateStore,
@@ -69,7 +73,6 @@ const input: VideoCreateInput = {
   videoModel: "doubao-seedance-2-0-fast-260128",
   ratio: "9:16",
   subtitles: true,
-  priority: "speech",
 };
 
 function generationPlan(durationSec: number, prompt: string, narration: string) {
@@ -77,6 +80,12 @@ function generationPlan(durationSec: number, prompt: string, narration: string) 
 }
 
 describe("video create domain", () => {
+  test("drops the removed priority field from legacy project input", () => {
+    const parsed = VideoCreateInputSchema.parse({ ...input, priority: "visual" });
+
+    expect("priority" in parsed).toBe(false);
+  });
+
   test("derives total script characters from duration and speech rate", () => {
     expect(videoCreateTargetCharacterCount(15, "slow")).toBe(45);
     expect(videoCreateTargetCharacterCount(30, "medium")).toBe(120);
@@ -296,7 +305,6 @@ describe("video create domain", () => {
       videoModel: input.videoModel,
       ratio: input.ratio,
       subtitles: input.subtitles,
-      priority: input.priority,
       productName: "AI 产品名",
       sellingPoints: ["AI 卖点"],
       scene: "品牌曝光",
