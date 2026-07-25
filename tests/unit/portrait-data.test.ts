@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { parsePortraitTags } from "../../shared/portraits/portrait-tags";
 import { getPortraitArkAssetUri, getPortraitById } from "../../server/portraits/catalog";
-import { parsePortrait } from "../../web/features/portrait-library/portrait-data";
+import { parsePortraitTags } from "../../shared/portraits/portrait-tags";
+import { parseCustomPortrait, parsePortrait } from "../../web/features/portrait-library/portrait-data";
 
 describe("portrait library data", () => {
   test("normalizes portrait metadata for both the library page and remix modal", () => {
@@ -32,6 +32,27 @@ describe("portrait library data", () => {
     });
     expect(parsePortraitTags("示例 32岁 女性 主播")?.gender).toBe("女");
     expect(parsePortraitTags("没有结构化标签的人像")).toBeUndefined();
+  });
+
+  test("uses persisted custom portrait gender without requiring tags in the name", () => {
+    expect(
+      parseCustomPortrait({
+        type: "custom",
+        assetId: "00000000-0000-4000-8000-000000000001",
+        name: "小林",
+        gender: "女",
+        description: "自然亲切的生活方式博主",
+        imageUrl: "/api/assets/portrait/content",
+        status: "active",
+        createdAt: "2026-07-26T00:00:00.000Z",
+        updatedAt: "2026-07-26T00:00:00.000Z",
+      }),
+    ).toMatchObject({
+      name: "小林",
+      gender: "女",
+      description: "自然亲切的生活方式博主",
+      profession: "自建人像",
+    });
   });
 
   test("converts a general portrait source URL into an Ark asset URI", () => {

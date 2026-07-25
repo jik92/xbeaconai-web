@@ -1283,6 +1283,7 @@ export const zListCustomPortraitsResponse = z.object({
         jobId: z.uuid().optional(),
         name: z.string(),
         description: z.string().optional(),
+        gender: z.enum(['男', '女']).optional(),
         imageUrl: z.string(),
         status: z.enum([
             'queued',
@@ -1298,7 +1299,8 @@ export const zListCustomPortraitsResponse = z.object({
 });
 
 export const zRegisterCustomPortraitBody = z.object({
-    assetId: z.uuid()
+    assetId: z.uuid(),
+    gender: z.enum(['男', '女'])
 });
 
 export const zRegisterCustomPortraitResponse = z.union([
@@ -1309,6 +1311,7 @@ export const zRegisterCustomPortraitResponse = z.union([
             jobId: z.uuid().optional(),
             name: z.string(),
             description: z.string().optional(),
+            gender: z.enum(['男', '女']).optional(),
             imageUrl: z.string(),
             status: z.enum([
                 'queued',
@@ -1329,6 +1332,7 @@ export const zRegisterCustomPortraitResponse = z.union([
             jobId: z.uuid().optional(),
             name: z.string(),
             description: z.string().optional(),
+            gender: z.enum(['男', '女']).optional(),
             imageUrl: z.string(),
             status: z.enum([
                 'queued',

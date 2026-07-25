@@ -4779,6 +4779,13 @@
                           "description": {
                             "type": "string"
                           },
+                          "gender": {
+                            "type": "string",
+                            "enum": [
+                              "男",
+                              "女"
+                            ]
+                          },
                           "imageUrl": {
                             "type": "string"
                           },
@@ -4837,10 +4844,18 @@
                   "assetId": {
                     "type": "string",
                     "format": "uuid"
+                  },
+                  "gender": {
+                    "type": "string",
+                    "enum": [
+                      "男",
+                      "女"
+                    ]
                   }
                 },
                 "required": [
-                  "assetId"
+                  "assetId",
+                  "gender"
                 ]
               }
             }
@@ -4876,6 +4891,13 @@
                         },
                         "description": {
                           "type": "string"
+                        },
+                        "gender": {
+                          "type": "string",
+                          "enum": [
+                            "男",
+                            "女"
+                          ]
                         },
                         "imageUrl": {
                           "type": "string"
@@ -4949,6 +4971,13 @@
                         },
                         "description": {
                           "type": "string"
+                        },
+                        "gender": {
+                          "type": "string",
+                          "enum": [
+                            "男",
+                            "女"
+                          ]
                         },
                         "imageUrl": {
                           "type": "string"

@@ -1,4 +1,5 @@
 import type { PortraitReference } from "../../shared/portraits/portrait-reference";
+import { type PortraitGender, parsePortraitTags } from "../../shared/portraits/portrait-tags";
 import type { AccountStore } from "../accounts/account-store";
 import { getPortraitArkAssetUri, getPortraitById } from "./catalog";
 import type { CustomPortraitStore } from "./custom-portrait-store";
@@ -7,6 +8,7 @@ export interface ResolvedPortraitReference {
   reference: PortraitReference;
   name: string;
   description?: string;
+  gender?: PortraitGender;
   imageUrl: string;
   arkAssetUri: string;
   mimeType: string;
@@ -25,6 +27,7 @@ export function resolvePortraitReference(input: {
           reference: input.reference,
           name: portrait.name,
           description: portrait.description,
+          gender: parsePortraitTags(portrait.name)?.gender,
           imageUrl: portrait.source_url,
           arkAssetUri: getPortraitArkAssetUri(portrait),
           mimeType: "image/jpeg",
@@ -38,6 +41,7 @@ export function resolvePortraitReference(input: {
     reference: input.reference,
     name: asset.displayName,
     description: asset.description,
+    gender: portrait.gender ?? parsePortraitTags(asset.displayName)?.gender,
     imageUrl: `/api/assets/${asset.id}/content`,
     arkAssetUri: `asset://${portrait.arkAssetId}`,
     mimeType: asset.mimeType,

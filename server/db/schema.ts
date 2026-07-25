@@ -1,6 +1,7 @@
 import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import { index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import type { AiToolModuleId } from "../../shared/jobs/ai-tool-modules";
+import type { PortraitGender } from "../../shared/portraits/portrait-tags";
 import type { JobModuleId, JobRecord, JobResult, JobStatus, StageProvenance } from "../types";
 
 export const users = sqliteTable(
@@ -263,6 +264,7 @@ export const customPortraits = sqliteTable(
       .references(() => users.id),
     groupId: text("group_id"),
     arkAssetId: text("ark_asset_id").unique(),
+    gender: text("gender", { enum: ["男", "女"] }).$type<PortraitGender>(),
     status: text("status", { enum: ["queued", "processing", "active", "failed"] }).notNull(),
     errorCode: text("error_code"),
     errorMessage: text("error_message"),

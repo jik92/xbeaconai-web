@@ -409,6 +409,8 @@ export const videoCreateJob: WorkerJobHandler = {
         const portraitAnalysisInput = portrait
           ? {
               name: portrait.name,
+              gender: portrait.gender,
+              description: portrait.description,
               source_url:
                 portraitReference?.type === "custom"
                   ? ossutils.createSignedReadUrl(
@@ -453,7 +455,7 @@ export const videoCreateJob: WorkerJobHandler = {
                 customPortraits: context.customPortraits,
               })
             : undefined;
-        const generated = await generateVideoCreateStoryboard(aggregate, portrait?.name);
+        const generated = await generateVideoCreateStoryboard(aggregate, portrait);
         projects.replaceShots(projectId, generated);
       } else if (operation === "audio-generate") {
         const shotId = job.values.shotId;

@@ -1913,6 +1913,7 @@ const CustomPortraitSchema = z.object({
   jobId: z.string().uuid().optional(),
   name: z.string(),
   description: z.string().optional(),
+  gender: z.enum(["男", "女"]).optional(),
   imageUrl: z.string(),
   status: CustomPortraitStatusSchema,
   errorCode: z.string().optional(),
@@ -1930,6 +1931,7 @@ function customPortraitResponse(record: CustomPortraitRecord) {
     jobId: record.jobId,
     name: asset.displayName,
     description: asset.description,
+    gender: record.gender,
     imageUrl: `/api/assets/${asset.id}/content`,
     status: record.status,
     errorCode: record.errorCode,
@@ -1969,7 +1971,9 @@ const registerCustomPortraitRoute = createRoute({
   request: {
     body: {
       required: true,
-      content: { "application/json": { schema: z.object({ assetId: z.string().uuid() }) } },
+      content: {
+        "application/json": { schema: z.object({ assetId: z.string().uuid(), gender: z.enum(["男", "女"]) }) },
+      },
     },
   },
   responses: {
@@ -1990,7 +1994,8 @@ const registerCustomPortraitRoute = createRoute({
 app.openapi(registerCustomPortraitRoute, async (c) => {
   const requestId = crypto.randomUUID();
   const ownerUserId = c.get("userId");
-  const asset = accounts.getOwnedAsset(ownerUserId, c.req.valid("json").assetId);
+  const body = c.req.valid("json");
+  const asset = accounts.getOwnedAsset(ownerUserId, body.assetId);
   if (!asset || asset.kind !== "portrait")
     return c.json(
       { error: { code: "PORTRAIT_ASSET_NOT_FOUND", message: "人像素材不存在", retryable: false, requestId } },
@@ -2025,7 +2030,7 @@ app.openapi(registerCustomPortraitRoute, async (c) => {
     progress: 0,
     stage: "排队中",
     overallExecutionMode: "real",
-    values: { assetId: asset.id },
+    values: { assetId: asset.id, gender: body.gender },
     executionPlan: [
       {
         id: "plan:0:portrait-asset-register",
@@ -2045,7 +2050,13 @@ app.openapi(registerCustomPortraitRoute, async (c) => {
     updatedAt: timestamp,
   };
   store.create(job);
-  const record = customPortraits.create({ assetId: asset.id, jobId, ownerUserId, createdAt: timestamp });
+  const record = customPortraits.create({
+    assetId: asset.id,
+    jobId,
+    ownerUserId,
+    gender: body.gender,
+    createdAt: timestamp,
+  });
   if (!record) throw new Error("CUSTOM_PORTRAIT_CREATE_FAILED");
   try {
     await queue.enqueue(jobId);

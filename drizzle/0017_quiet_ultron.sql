@@ -1,0 +1,1 @@
+ALTER TABLE `custom_portraits` ADD `gender` text;

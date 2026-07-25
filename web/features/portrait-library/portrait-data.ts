@@ -1,5 +1,5 @@
-import { parsePortraitTags } from "../../../shared/portraits/portrait-tags";
 import type { PortraitReference } from "../../../shared/portraits/portrait-reference";
+import { parsePortraitTags } from "../../../shared/portraits/portrait-tags";
 import { fetchCustomPortraits } from "../../api/api-client";
 
 export interface PortraitRecord {
@@ -59,28 +59,32 @@ export function parsePortrait(record: PortraitRecord): GeneralPortrait {
   };
 }
 
+type CustomPortraitResponse = Awaited<ReturnType<typeof fetchCustomPortraits>>[number];
+
+export function parseCustomPortrait(portrait: CustomPortraitResponse): CustomPortrait {
+  const tags = parsePortraitTags(portrait.name);
+  return {
+    key: `custom:${portrait.assetId}`,
+    type: "custom",
+    reference: { type: "custom", assetId: portrait.assetId },
+    assetId: portrait.assetId,
+    jobId: portrait.jobId,
+    name: portrait.name,
+    description: portrait.description ?? "自建虚拟人像",
+    source_url: portrait.imageUrl,
+    display_url: portrait.imageUrl,
+    age: tags?.age ?? 0,
+    gender: portrait.gender ?? tags?.gender ?? "未知",
+    profession: tags?.profession ?? "自建人像",
+    status: portrait.status,
+    errorMessage: portrait.errorMessage,
+  };
+}
+
 export async function fetchPortraits(): Promise<Portrait[]> {
   const [response, customPortraits] = await Promise.all([fetch("/portraits.json"), fetchCustomPortraits()]);
   if (!response.ok) throw new Error("人像清单加载失败");
   const general = ((await response.json()) as PortraitRecord[]).map(parsePortrait);
-  const custom: CustomPortrait[] = customPortraits.map((portrait) => {
-    const tags = parsePortraitTags(portrait.name);
-    return {
-      key: `custom:${portrait.assetId}`,
-      type: "custom",
-      reference: { type: "custom", assetId: portrait.assetId },
-      assetId: portrait.assetId,
-      jobId: portrait.jobId,
-      name: portrait.name,
-      description: portrait.description ?? "自建虚拟人像",
-      source_url: portrait.imageUrl,
-      display_url: portrait.imageUrl,
-      age: tags?.age ?? 0,
-      gender: tags?.gender ?? "未知",
-      profession: tags?.profession ?? "自建人像",
-      status: portrait.status,
-      errorMessage: portrait.errorMessage,
-    };
-  });
+  const custom = customPortraits.map(parseCustomPortrait);
   return [...custom, ...general];
 }

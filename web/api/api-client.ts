@@ -1,6 +1,7 @@
 import type { AssetFolder, AssetKind, LibraryAsset, LibraryProduct } from "@/entities/types";
 import { getAuthToken } from "@/features/account/auth-context";
 import { randomUuid } from "@/lib/random-id";
+import type { PortraitGender } from "../../shared/portraits/portrait-tags";
 import type { RemixPromptTool, RemixPromptToolConfig } from "../../shared/video-remix/prompt-tools";
 import { apiBaseUrl, apiUrl } from "./base-url";
 import { client } from "./generated/client.gen";
@@ -666,11 +667,11 @@ export async function fetchCustomPortraits() {
   const { data } = await listCustomPortraits({ headers: authHeaders(), throwOnError: true });
   return data?.portraits ?? [];
 }
-export async function createCustomPortrait(file: File, displayName: string, description = "") {
+export async function createCustomPortrait(file: File, displayName: string, gender: PortraitGender, description = "") {
   const asset = await uploadLibraryAsset(file, "portrait", displayName, description);
   configure();
   const { data } = await registerCustomPortrait({
-    body: { assetId: asset.id },
+    body: { assetId: asset.id, gender },
     headers: authHeaders(),
     throwOnError: true,
   });

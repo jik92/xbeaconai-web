@@ -7,7 +7,11 @@ import { SqliteJobStore } from "../../server/jobs/sqlite-job-store";
 import { getPortraitById } from "../../server/portraits/catalog";
 import { buildGptImageAnalysisRequest } from "../../server/providers/aihubmix";
 import type { JobRecord } from "../../server/types";
-import { normalizeVideoCreateRecommendation, videoCreateTargetCharacterCount } from "../../server/video-create/model";
+import {
+  normalizeVideoCreateRecommendation,
+  resolveVideoCreatePortraitIdentity,
+  videoCreateTargetCharacterCount,
+} from "../../server/video-create/model";
 import { createFallbackVideoCreateShotPlan } from "../../server/video-create/shot-generation";
 import {
   VideoCreateGeneratedScriptSchema,
@@ -88,6 +92,19 @@ function generationPlan(durationSec: number, prompt: string, narration: string) 
 }
 
 describe("video create domain", () => {
+  test("uses an explicit custom portrait gender and basic description without name tags", () => {
+    expect(
+      resolveVideoCreatePortraitIdentity({
+        name: "小林",
+        gender: "女",
+        description: "自然亲切的生活方式博主",
+      }),
+    ).toEqual({
+      gender: "女",
+      identity: '性别为“女”，基础描述为"自然亲切的生活方式博主"',
+    });
+  });
+
   test("drops the removed priority field from legacy project input", () => {
     const parsed = VideoCreateInputSchema.parse({ ...input, priority: "visual" });
 

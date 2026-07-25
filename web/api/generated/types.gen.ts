@@ -1416,6 +1416,7 @@ export type ListCustomPortraitsResponses = {
             jobId?: string;
             name: string;
             description?: string;
+            gender?: '男' | '女';
             imageUrl: string;
             status: 'queued' | 'processing' | 'active' | 'failed';
             errorCode?: string;
@@ -1431,6 +1432,7 @@ export type ListCustomPortraitsResponse = ListCustomPortraitsResponses[keyof Lis
 export type RegisterCustomPortraitData = {
     body: {
         assetId: string;
+        gender: '男' | '女';
     };
     path?: never;
     query?: never;
@@ -1469,6 +1471,7 @@ export type RegisterCustomPortraitResponses = {
             jobId?: string;
             name: string;
             description?: string;
+            gender?: '男' | '女';
             imageUrl: string;
             status: 'queued' | 'processing' | 'active' | 'failed';
             errorCode?: string;
@@ -1487,6 +1490,7 @@ export type RegisterCustomPortraitResponses = {
             jobId?: string;
             name: string;
             description?: string;
+            gender?: '男' | '女';
             imageUrl: string;
             status: 'queued' | 'processing' | 'active' | 'failed';
             errorCode?: string;
