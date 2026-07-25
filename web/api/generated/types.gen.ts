@@ -66,6 +66,18 @@ export type ProviderId = 'aihubmix' | 'volc-speech' | 'tos' | 'mediakit' | 'qwen
 
 export type AssetKind = 'media' | 'product' | 'portrait' | 'voice';
 
+export type AssetFolder = {
+    id: string;
+    parentId?: string;
+    name: string;
+    storagePrefix: string;
+    createdAt: string;
+    updatedAt: string;
+    isDefault?: boolean;
+};
+
+export type AiToolModuleId = 'ai-generate' | 'video-cut' | 'media-understand' | 'video-mashup' | 'voice-clone' | 'video-renewal' | 'subtitle-erase' | 'video-enhancement' | 'kickart';
+
 export type ProviderCredentialName = 'OPENAI_KEY' | 'VOLC_SPEECH_API_KEY_ID' | 'VOLC_SPEECH_API_KEY' | 'TOS_ACCESS_KEY_ID' | 'TOS_SECRET_ACCESS_KEY' | 'MEDIAKIT_API_KEY' | 'QWEN_AUDIO_API_KEY' | 'QWEN_AUDIO_WORKSPACE_ID';
 
 export type JobModuleId = 'video-remix' | 'video-create' | 'ad-script' | 'ai-generate' | 'video-cut' | 'media-understand' | 'video-mashup' | 'voice-clone' | 'video-renewal' | 'subtitle-erase' | 'video-enhancement' | 'video-extract' | 'video-editor' | 'kickart' | 'douyin-video-import' | 'share-content-import';
@@ -1297,6 +1309,10 @@ export type UploadMediaErrors = {
      * Unsupported media type
      */
     415: ApiErrorResponse;
+    /**
+     * TOS storage unavailable
+     */
+    503: ApiErrorResponse;
 };
 
 export type UploadMediaError = UploadMediaErrors[keyof UploadMediaErrors];
@@ -1415,6 +1431,70 @@ export type DeleteProductResponses = {
 };
 
 export type DeleteProductResponse = DeleteProductResponses[keyof DeleteProductResponses];
+
+export type GetToolOutputFolderData = {
+    body?: never;
+    path: {
+        moduleId: AiToolModuleId;
+    };
+    query?: never;
+    url: '/api/tool-output-folders/{moduleId}';
+};
+
+export type GetToolOutputFolderErrors = {
+    /**
+     * Invalid AI tool module
+     */
+    400: ApiErrorResponse;
+};
+
+export type GetToolOutputFolderError = GetToolOutputFolderErrors[keyof GetToolOutputFolderErrors];
+
+export type GetToolOutputFolderResponses = {
+    /**
+     * Resolved module output folder
+     */
+    200: {
+        folder: AssetFolder;
+    };
+};
+
+export type GetToolOutputFolderResponse = GetToolOutputFolderResponses[keyof GetToolOutputFolderResponses];
+
+export type SetToolOutputFolderData = {
+    body: {
+        folderId: string;
+    };
+    path: {
+        moduleId: AiToolModuleId;
+    };
+    query?: never;
+    url: '/api/tool-output-folders/{moduleId}';
+};
+
+export type SetToolOutputFolderErrors = {
+    /**
+     * Invalid AI tool module
+     */
+    400: ApiErrorResponse;
+    /**
+     * Folder not found
+     */
+    404: ApiErrorResponse;
+};
+
+export type SetToolOutputFolderError = SetToolOutputFolderErrors[keyof SetToolOutputFolderErrors];
+
+export type SetToolOutputFolderResponses = {
+    /**
+     * Updated module output folder
+     */
+    200: {
+        folder: AssetFolder;
+    };
+};
+
+export type SetToolOutputFolderResponse = SetToolOutputFolderResponses[keyof SetToolOutputFolderResponses];
 
 export type SaveAssetMetadataData = {
     body: {

@@ -5,6 +5,7 @@ import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import type { MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
+import { aiToolModuleIds } from "../shared/jobs/ai-tool-modules";
 import { parseVideoMashupConfig, type VideoMashupConfig } from "../shared/video-mashup/config";
 import { parseRemixWorkspace, remixProjectStages } from "../shared/video-remix/project-records";
 import {
@@ -74,6 +75,7 @@ import { auditSdkRegistry } from "./sdk-registry";
 import { ossutils } from "./storage/ossutils";
 import { rollbackUploadedObjects, uploadFilesStrictly } from "./storage/strict-library-upload";
 import type { JobModuleId, JobRecord } from "./types";
+import { inlineUtf8ContentDisposition } from "./uploads/content-disposition";
 import {
   directUploadExtensions,
   issueDirectUploadTicket,
@@ -134,6 +136,7 @@ const moduleIds = [
 const backgroundJobTypes = ["douyin-video-import", "share-content-import"] as const;
 const jobModuleIds = [...moduleIds, ...backgroundJobTypes] as const;
 const ModuleSchema = z.enum(moduleIds).openapi("ModuleId");
+const AiToolModuleSchema = z.enum(aiToolModuleIds).openapi("AiToolModuleId");
 const JobModuleSchema = z.enum(jobModuleIds).openapi("JobModuleId");
 const VideoModelIdSchema = z.enum(seedanceModelIds).openapi("SeedanceModelId");
 const JobStatusSchema = z.enum(["queued", "processing", "succeeded", "partially_succeeded", "failed", "cancelled"]);
@@ -2015,6 +2018,18 @@ const folderResponse = (folder: ReturnType<AccountStore["ensureDefaultAssetFolde
   isDefault: folder.id === defaultFolderId,
 });
 
+const AssetFolderSchema = z
+  .object({
+    id: z.string().uuid(),
+    parentId: z.string().uuid().optional(),
+    name: z.string(),
+    storagePrefix: z.string(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    isDefault: z.boolean().optional(),
+  })
+  .openapi("AssetFolder");
+
 app.get("/api/asset-folders", (c) => {
   const userId = c.get("userId");
   const defaultFolderId = accounts.getDefaultAssetFolderId(userId);
@@ -2033,6 +2048,64 @@ app.put("/api/asset-folders/:folderId/default", (c) => {
       return c.json(
         { error: { code: error.code, message: error.message, retryable: false, requestId: crypto.randomUUID() } },
         error.status,
+      );
+    throw error;
+  }
+});
+
+const getToolOutputFolderRoute = createRoute({
+  method: "get",
+  path: "/api/tool-output-folders/{moduleId}",
+  operationId: "getToolOutputFolder",
+  request: { params: z.object({ moduleId: AiToolModuleSchema }) },
+  responses: {
+    200: {
+      description: "Resolved module output folder",
+      content: { "application/json": { schema: z.object({ folder: AssetFolderSchema }) } },
+    },
+    400: { description: "Invalid AI tool module", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+
+app.openapi(getToolOutputFolderRoute, (c) => {
+  const folder = accounts.getModuleOutputFolder(c.get("userId"), c.req.valid("param").moduleId);
+  return c.json({ folder: folderResponse(folder) }, 200);
+});
+
+const setToolOutputFolderRoute = createRoute({
+  method: "put",
+  path: "/api/tool-output-folders/{moduleId}",
+  operationId: "setToolOutputFolder",
+  request: {
+    params: z.object({ moduleId: AiToolModuleSchema }),
+    body: {
+      required: true,
+      content: { "application/json": { schema: z.object({ folderId: z.string().uuid() }) } },
+    },
+  },
+  responses: {
+    200: {
+      description: "Updated module output folder",
+      content: { "application/json": { schema: z.object({ folder: AssetFolderSchema }) } },
+    },
+    400: { description: "Invalid AI tool module", content: { "application/json": { schema: ErrorSchema } } },
+    404: { description: "Folder not found", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+
+app.openapi(setToolOutputFolderRoute, (c) => {
+  try {
+    const folder = accounts.setModuleOutputFolder(
+      c.get("userId"),
+      c.req.valid("param").moduleId,
+      c.req.valid("json").folderId,
+    );
+    return c.json({ folder: folderResponse(folder) }, 200);
+  } catch (error) {
+    if (error instanceof AccountError)
+      return c.json(
+        { error: { code: error.code, message: error.message, retryable: false, requestId: crypto.randomUUID() } },
+        404,
       );
     throw error;
   }

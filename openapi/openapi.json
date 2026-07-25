@@ -250,6 +250,55 @@
           "voice"
         ]
       },
+      "AssetFolder": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "parentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "storagePrefix": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "isDefault": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "storagePrefix",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "AiToolModuleId": {
+        "type": "string",
+        "enum": [
+          "ai-generate",
+          "video-cut",
+          "media-understand",
+          "video-mashup",
+          "voice-clone",
+          "video-renewal",
+          "subtitle-erase",
+          "video-enhancement",
+          "kickart"
+        ]
+      },
       "ProviderCredentialName": {
         "type": "string",
         "enum": [
@@ -4463,6 +4512,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "TOS storage unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -4628,6 +4687,123 @@
           },
           "404": {
             "description": "Product not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tool-output-folders/{moduleId}": {
+      "get": {
+        "operationId": "getToolOutputFolder",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/AiToolModuleId"
+            },
+            "required": true,
+            "name": "moduleId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resolved module output folder",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "folder": {
+                      "$ref": "#/components/schemas/AssetFolder"
+                    }
+                  },
+                  "required": [
+                    "folder"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid AI tool module",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "setToolOutputFolder",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/AiToolModuleId"
+            },
+            "required": true,
+            "name": "moduleId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "folderId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "folderId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated module output folder",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "folder": {
+                      "$ref": "#/components/schemas/AssetFolder"
+                    }
+                  },
+                  "required": [
+                    "folder"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid AI tool module",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Folder not found",
             "content": {
               "application/json": {
                 "schema": {

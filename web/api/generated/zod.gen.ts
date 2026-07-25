@@ -79,6 +79,28 @@ export const zAssetKind = z.enum([
     'voice'
 ]);
 
+export const zAssetFolder = z.object({
+    id: z.uuid(),
+    parentId: z.uuid().optional(),
+    name: z.string(),
+    storagePrefix: z.string(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    isDefault: z.boolean().optional()
+});
+
+export const zAiToolModuleId = z.enum([
+    'ai-generate',
+    'video-cut',
+    'media-understand',
+    'video-mashup',
+    'voice-clone',
+    'video-renewal',
+    'subtitle-erase',
+    'video-enhancement',
+    'kickart'
+]);
+
 export const zProviderCredentialName = z.enum([
     'OPENAI_KEY',
     'VOLC_SPEECH_API_KEY_ID',
@@ -1227,6 +1249,32 @@ export const zDeleteProductPath = z.object({
  * Product and its images deleted
  */
 export const zDeleteProductResponse = z.void();
+
+export const zGetToolOutputFolderPath = z.object({
+    moduleId: zAiToolModuleId
+});
+
+/**
+ * Resolved module output folder
+ */
+export const zGetToolOutputFolderResponse = z.object({
+    folder: zAssetFolder
+});
+
+export const zSetToolOutputFolderBody = z.object({
+    folderId: z.uuid()
+});
+
+export const zSetToolOutputFolderPath = z.object({
+    moduleId: zAiToolModuleId
+});
+
+/**
+ * Updated module output folder
+ */
+export const zSetToolOutputFolderResponse = z.object({
+    folder: zAssetFolder
+});
 
 export const zSaveAssetMetadataBody = z.object({
     width: z.int().gte(1).optional(),

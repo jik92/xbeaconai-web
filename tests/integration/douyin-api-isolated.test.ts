@@ -103,6 +103,46 @@ describe("douyin API integration (isolated DB)", () => {
     return { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
   }
 
+  test("tool output folder API keeps module defaults independent and owner-scoped", async () => {
+    const cutFolder = realAccounts.createAssetFolder(userId, "API 分割成片");
+    const voiceFolder = realAccounts.createAssetFolder(userId, "API 音色成片");
+
+    const fallback = await honoApp.request("/api/tool-output-folders/video-cut", { headers: authHeaders() });
+    expect(fallback.status).toBe(200);
+    expect(((await fallback.json()) as { folder: { id: string } }).folder.id).toBe(folderId);
+
+    for (const [moduleId, selectedFolderId] of [
+      ["video-cut", cutFolder.id],
+      ["voice-clone", voiceFolder.id],
+    ]) {
+      const updated = await honoApp.request(`/api/tool-output-folders/${moduleId}`, {
+        method: "PUT",
+        headers: authHeaders(),
+        body: JSON.stringify({ folderId: selectedFolderId }),
+      });
+      expect(updated.status).toBe(200);
+    }
+
+    const cutDefault = await honoApp.request("/api/tool-output-folders/video-cut", { headers: authHeaders() });
+    const voiceDefault = await honoApp.request("/api/tool-output-folders/voice-clone", { headers: authHeaders() });
+    expect(((await cutDefault.json()) as { folder: { id: string } }).folder.id).toBe(cutFolder.id);
+    expect(((await voiceDefault.json()) as { folder: { id: string } }).folder.id).toBe(voiceFolder.id);
+
+    const foreign = await honoApp.request("/api/tool-output-folders/video-cut", {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({ folderId: otherFolderId }),
+    });
+    expect(foreign.status).toBe(404);
+
+    const invalidModule = await honoApp.request("/api/tool-output-folders/video-editor", {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({ folderId: cutFolder.id }),
+    });
+    expect(invalidModule.status).toBe(400);
+  });
+
   test("POST /api/imports/share-content/parse extracts douyin URL", async () => {
     const res = await honoApp.request("/api/imports/share-content/parse", {
       method: "POST",

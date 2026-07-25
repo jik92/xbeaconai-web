@@ -980,6 +980,28 @@ export async function setDefaultAssetFolder(folderId: string) {
   if (!response.ok || !data?.folder) throw new Error(data?.error?.message || "默认文件夹设置失败");
   return data.folder;
 }
+export async function fetchToolOutputFolder(moduleId: string) {
+  const response = await fetch(apiUrl(`/api/tool-output-folders/${moduleId}`), { headers: authHeaders() });
+  const data = (await response.json().catch(() => null)) as {
+    folder?: AssetFolder;
+    error?: { message?: string };
+  } | null;
+  if (!response.ok || !data?.folder) throw new Error(data?.error?.message || "任务默认文件夹加载失败");
+  return data.folder;
+}
+export async function setToolOutputFolder(moduleId: string, folderId: string) {
+  const response = await fetch(apiUrl(`/api/tool-output-folders/${moduleId}`), {
+    method: "PUT",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ folderId }),
+  });
+  const data = (await response.json().catch(() => null)) as {
+    folder?: AssetFolder;
+    error?: { message?: string };
+  } | null;
+  if (!response.ok || !data?.folder) throw new Error(data?.error?.message || "任务默认文件夹设置失败");
+  return data.folder;
+}
 export async function renameAssetFolder(folderId: string, name: string) {
   const response = await fetch(apiUrl(`/api/asset-folders/${folderId}`), {
     method: "PATCH",
