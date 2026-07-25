@@ -133,4 +133,3 @@ Expected: typecheck and build pass. If `make ci` reaches the known local FFmpeg 
 - [ ] **Step 4: Audit and push**
 
 Inspect `git diff`, ensure no generated files or unrelated changes are present, commit remaining documentation/formatting changes, then push `main` to `origin/main`.
-
