@@ -64,7 +64,8 @@ ensure_runtime_environment() {
     upsert_env "ALLOW_MOCK_FALLBACK" "true"
     upsert_env "REDIS_URL" "redis://127.0.0.1:6379"
     upsert_env "REDIS_QUEUE_NAME" "yaozuo-jobs"
-    upsert_env "WORKER_CONCURRENCY" "${WORKER_CONCURRENCY:-1}"
+    upsert_env "NETWORK_WORKER_CONCURRENCY" "${NETWORK_WORKER_CONCURRENCY:-40}"
+    upsert_env "FFMPEG_WORKER_CONCURRENCY" "${FFMPEG_WORKER_CONCURRENCY:-2}"
 }
 
 import_project_credentials() {

@@ -420,7 +420,7 @@ export const adScripts = new AdScriptStore();
 export const videoCreates = new VideoCreateStore();
 export const providerAudits = new ProviderGenerationAuditStore();
 export const customPortraits = new CustomPortraitStore();
-export const queue = new BullJobQueue();
+export const queue = new BullJobQueue((jobId) => store.get(jobId));
 function adminUser(userId: string) {
   const user = accounts.getUser(userId);
   return Boolean(user?.isAdmin);

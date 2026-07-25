@@ -46,6 +46,7 @@ Playwright 覆盖 `1440x900` Desktop 与 `1024x768` Tablet。修改路由、任�
 
 - SQLite 默认在 `.data/yaozuo.sqlite`；用 `YAOZUO_DATA_DIR` 或 `YAOZUO_DATABASE_URL` 隔离数据。
 - 上传暂存与本地结果为 `.data/uploads/`、`.data/results/`。
-- Redis 队列默认 `yaozuo-jobs`，并发由 `WORKER_CONCURRENCY` 设置。
+- Redis 基础队列名默认 `yaozuo-jobs`。纯网络任务由 `NETWORK_WORKER_CONCURRENCY` 控制并发，默认
+  40；实际执行 FFmpeg 或本地媒体渲染的任务由 `FFMPEG_WORKER_CONCURRENCY` 控制并发，默认 2。
 - 任务持续排队时优先检查 Redis 与 Worker；生产启动失败时检查 `JWT_SECRET`。
 - Server 与 Worker 并发访问同一个 SQLite；测试应使用独立数据目录，不能复用生产数据库。

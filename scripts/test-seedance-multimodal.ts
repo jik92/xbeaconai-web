@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { Worker } from "bullmq";
 import { extractAudio, extractFrame, generateSampleVideo, probeMedia } from "../server/media/ffmpeg";
 import { type SeedanceModelId, seedanceModelIds } from "../server/models/video-models";
+import { jobQueueName } from "../shared/jobs/queue-contract";
 
 const tempDir = await mkdtemp(resolve(tmpdir(), "yaozuo-seedance-matrix-"));
 process.env.YAOZUO_DATA_DIR = tempDir;
@@ -27,10 +28,14 @@ const [{ accounts, app, queue, store }, { env }, { JobProcessor }, { createWorke
 );
 const processor = new JobProcessor(store, accounts);
 const workerRedis = createWorkerRedisConnection();
-const worker = new Worker<{ jobId: string }>(env.redisQueueName, (job) => processor.process(job.data.jobId), {
-  connection: workerRedis,
-  concurrency: 1,
-});
+const worker = new Worker<{ jobId: string }>(
+  jobQueueName(env.redisQueueName, "network"),
+  (job) => processor.process(job.data.jobId),
+  {
+    connection: workerRedis,
+    concurrency: 1,
+  },
+);
 await worker.waitUntilReady();
 
 const outputDir = resolve("artifacts/api-tests/seedance-multimodal");

@@ -1,10 +1,15 @@
 import type { JobsOptions } from "bullmq";
+import type { JobWorkload } from "./job-workload";
 
 export interface ExecuteJobPayload {
   jobId: string;
 }
 
 export const executeJobName = "execute";
+
+export function jobQueueName(baseName: string, workload: JobWorkload) {
+  return `${baseName}-${workload}`;
+}
 
 export const executeJobOptions: JobsOptions = {
   attempts: 1,

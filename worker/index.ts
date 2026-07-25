@@ -7,7 +7,8 @@ import { env } from "../server/env";
 import { SqliteJobStore } from "../server/jobs/sqlite-job-store";
 import { CustomPortraitStore } from "../server/portraits/custom-portrait-store";
 import { VideoCreateStore } from "../server/video-create/video-create-store";
-import { type ExecuteJobPayload, executeJobName, executeJobOptions } from "../shared/jobs/queue-contract";
+import { classifyJobWorkload, type JobWorkload } from "../shared/jobs/job-workload";
+import { type ExecuteJobPayload, executeJobName, executeJobOptions, jobQueueName } from "../shared/jobs/queue-contract";
 import { JobProcessor } from "./job-processor";
 import { safelySyncProviderGenerationAudits } from "./jobs/provider-audit";
 import { createWorkerRedisConnection } from "./redis";
@@ -20,14 +21,29 @@ const providerAudits = new ProviderGenerationAuditStore();
 const customPortraits = new CustomPortraitStore();
 const processor = new JobProcessor(store, accounts, adScripts, videoCreates, providerAudits, customPortraits);
 const recoveryRedis = new IORedis(env.redisUrl, { lazyConnect: true, maxRetriesPerRequest: 1 });
-const recoveryQueue = new Queue<ExecuteJobPayload>(env.redisQueueName, {
-  connection: recoveryRedis,
-  defaultJobOptions: executeJobOptions,
-});
+const recoveryQueues = new Map<JobWorkload, Queue<ExecuteJobPayload>>(
+  (["network", "ffmpeg"] as const).map((workload) => [
+    workload,
+    new Queue<ExecuteJobPayload>(jobQueueName(env.redisQueueName, workload), {
+      connection: recoveryRedis,
+      defaultJobOptions: executeJobOptions,
+    }),
+  ]),
+);
+const legacyRecoveryQueue = new Queue<ExecuteJobPayload>(env.redisQueueName, { connection: recoveryRedis });
+const recoveryQueueFor = (workload: JobWorkload) => {
+  const queue = recoveryQueues.get(workload);
+  if (!queue) throw new Error(`WORKER_QUEUE_NOT_FOUND: ${workload}`);
+  return queue;
+};
 
 await processor.startMaintenance();
 for (const job of store.recoverable()) {
-  if (job.ownerUserId === "legacy" || (await recoveryQueue.getJob(job.id))) continue;
+  if (job.ownerUserId === "legacy") continue;
+  const recoveryQueue = recoveryQueueFor(classifyJobWorkload(job));
+  if (await recoveryQueue.getJob(job.id)) continue;
+  const legacyJob = await legacyRecoveryQueue.getJob(job.id);
+  if (legacyJob) await legacyJob.remove().catch(() => undefined);
   if (job.providerStatus === "submitting" && !job.providerTaskId) {
     const failed = store.update(job.id, {
       status: "failed",
@@ -46,16 +62,24 @@ for (const job of store.recoverable()) {
   await recoveryQueue.add(executeJobName, { jobId: job.id }, { jobId: job.id });
 }
 
-const workerRedis = createWorkerRedisConnection();
-const worker = new Worker<ExecuteJobPayload>(
-  env.redisQueueName,
-  async (job) => {
-    await processor.process(job.data.jobId);
-  },
-  { connection: workerRedis, concurrency: env.workerConcurrency },
-);
+const workerRedis = {
+  network: createWorkerRedisConnection(),
+  ffmpeg: createWorkerRedisConnection(),
+};
+const workers = {
+  network: new Worker<ExecuteJobPayload>(
+    jobQueueName(env.redisQueueName, "network"),
+    async (job) => processor.process(job.data.jobId),
+    { connection: workerRedis.network, concurrency: env.networkWorkerConcurrency },
+  ),
+  ffmpeg: new Worker<ExecuteJobPayload>(
+    jobQueueName(env.redisQueueName, "ffmpeg"),
+    async (job) => processor.process(job.data.jobId),
+    { connection: workerRedis.ffmpeg, concurrency: env.ffmpegWorkerConcurrency },
+  ),
+};
 
-worker.on("failed", (job, error) => {
+const handleFailure = (job: { data: ExecuteJobPayload } | undefined, error: Error) => {
   const jobId = job?.data.jobId;
   if (!jobId) return;
   const current = store.get(jobId);
@@ -71,19 +95,25 @@ worker.on("failed", (job, error) => {
     },
   });
   safelySyncProviderGenerationAudits(providerAudits, failed);
-});
-worker.on("error", (error) => console.error("BullMQ Worker error", error));
+};
+for (const [workload, worker] of Object.entries(workers)) {
+  worker.on("failed", handleFailure);
+  worker.on("error", (error) => console.error(`BullMQ ${workload} Worker error`, error));
+}
 
-await worker.waitUntilReady();
-console.log(`BullMQ worker ready: queue=${env.redisQueueName}, concurrency=${env.workerConcurrency}`);
+await Promise.all([workers.network.waitUntilReady(), workers.ffmpeg.waitUntilReady()]);
+console.log(
+  `BullMQ workers ready: network=${jobQueueName(env.redisQueueName, "network")}/${env.networkWorkerConcurrency}, ffmpeg=${jobQueueName(env.redisQueueName, "ffmpeg")}/${env.ffmpegWorkerConcurrency}`,
+);
 
 let closing = false;
 const shutdown = async () => {
   if (closing) return;
   closing = true;
-  await worker.close();
-  await workerRedis.quit();
-  await recoveryQueue.close();
+  await Promise.all([workers.network.close(), workers.ffmpeg.close()]);
+  await Promise.all([workerRedis.network.quit(), workerRedis.ffmpeg.quit()]);
+  await Promise.all([...recoveryQueues.values()].map((queue) => queue.close()));
+  await legacyRecoveryQueue.close();
   await recoveryRedis.quit();
   store.close();
   accounts.close();
