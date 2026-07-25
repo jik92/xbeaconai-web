@@ -1,5 +1,6 @@
 import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import { index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import type { AiToolModuleId } from "../../shared/jobs/ai-tool-modules";
 import type { JobModuleId, JobRecord, JobResult, JobStatus, StageProvenance } from "../types";
 
 export const users = sqliteTable(
@@ -104,6 +105,25 @@ export const userPreferences = sqliteTable("user_preferences", {
   defaultAssetFolderId: text("default_asset_folder_id").references(() => assetFolders.id),
   updatedAt: text("updated_at").notNull(),
 });
+
+export const moduleOutputFolderDefaults = sqliteTable(
+  "module_output_folder_defaults",
+  {
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    moduleId: text("module_id").$type<AiToolModuleId>().notNull(),
+    folderId: text("folder_id")
+      .notNull()
+      .references(() => assetFolders.id, { onDelete: "cascade" }),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("module_output_folder_defaults_owner_module_idx").on(table.ownerUserId, table.moduleId),
+    index("module_output_folder_defaults_folder_idx").on(table.folderId),
+  ],
+);
 
 export const authSessions = sqliteTable(
   "auth_sessions",

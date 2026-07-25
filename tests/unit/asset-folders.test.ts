@@ -11,6 +11,37 @@ afterEach(() => {
 });
 
 describe("asset folder mapping", () => {
+  test("keeps independent output folders for each AI tool and each account", async () => {
+    const path = join(tmpdir(), `tool-output-folders-${crypto.randomUUID()}.sqlite`);
+    databases.push(path);
+    const store = createTestAccountStore(path);
+    const { user } = await registerTestAccount(store, {
+      phone: "13800000013",
+      password: "Password123",
+      displayName: "工具目录用户",
+    });
+    const other = await registerTestAccount(store, {
+      phone: "13800000014",
+      password: "Password123",
+      displayName: "其他工具目录用户",
+    });
+    const [accountDefault] = store.listAssetFolders(user.id);
+    const cutFolder = store.createAssetFolder(user.id, "分割成片");
+    const voiceFolder = store.createAssetFolder(user.id, "音色成片");
+
+    expect(store.getModuleOutputFolder(user.id, "video-cut").id).toBe(accountDefault.id);
+    expect(store.setModuleOutputFolder(user.id, "video-cut", cutFolder.id).id).toBe(cutFolder.id);
+    expect(store.setModuleOutputFolder(user.id, "voice-clone", voiceFolder.id).id).toBe(voiceFolder.id);
+    expect(store.getModuleOutputFolder(user.id, "video-cut").id).toBe(cutFolder.id);
+    expect(store.getModuleOutputFolder(user.id, "voice-clone").id).toBe(voiceFolder.id);
+    expect(() => store.setModuleOutputFolder(other.user.id, "video-cut", cutFolder.id)).toThrow(AccountError);
+
+    store.deleteAssetFolder(user.id, cutFolder.id);
+    expect(store.getModuleOutputFolder(user.id, "video-cut").id).toBe(accountDefault.id);
+    expect(store.getModuleOutputFolder(user.id, "voice-clone").id).toBe(voiceFolder.id);
+    store.close();
+  });
+
   test("creates a user-scoped default folder and nested storage prefixes", async () => {
     const path = join(tmpdir(), `asset-folders-${crypto.randomUUID()}.sqlite`);
     databases.push(path);

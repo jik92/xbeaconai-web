@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomInt } from "node:crypto";
 import { and, asc, desc, eq, isNull, like, or, sql } from "drizzle-orm";
+import { type AiToolModuleId, isAiToolModuleId } from "../../shared/jobs/ai-tool-modules";
 import { APP_CONFIG } from "../../web/app/config";
 import { type AppDatabase, openDatabase } from "../db/database";
 import {
@@ -10,6 +11,7 @@ import {
   jobs,
   mediaAssets,
   migrationState,
+  moduleOutputFolderDefaults,
   notifications,
   passwordSetupTokens,
   rechargeOrders,
@@ -962,6 +964,36 @@ export class AccountStore {
       .update(userPreferences)
       .set({ defaultAssetFolderId: folderId, updatedAt: now() })
       .where(eq(userPreferences.userId, userId))
+      .run();
+    return folder;
+  }
+  getModuleOutputFolder(userId: string, moduleId: string): AssetFolder {
+    if (!isAiToolModuleId(moduleId)) throw new AccountError("INVALID_MODULE", "AI 工具模块不存在", 422);
+    const folderId = this.db
+      .select({ id: moduleOutputFolderDefaults.folderId })
+      .from(moduleOutputFolderDefaults)
+      .where(and(eq(moduleOutputFolderDefaults.ownerUserId, userId), eq(moduleOutputFolderDefaults.moduleId, moduleId)))
+      .get()?.id;
+    return (folderId && this.getAssetFolder(userId, folderId)) || this.ensureDefaultAssetFolder(userId);
+  }
+  setModuleOutputFolder(userId: string, moduleId: string, folderId: string): AssetFolder {
+    if (!isAiToolModuleId(moduleId)) throw new AccountError("INVALID_MODULE", "AI 工具模块不存在", 422);
+    const folder = this.getAssetFolder(userId, folderId);
+    if (!folder) throw new AccountError("FOLDER_NOT_FOUND", "文件夹不存在", 404);
+    const updatedAt = now();
+    this.db
+      .insert(moduleOutputFolderDefaults)
+      .values({
+        ownerUserId: userId,
+        moduleId: moduleId as AiToolModuleId,
+        folderId,
+        createdAt: updatedAt,
+        updatedAt,
+      })
+      .onConflictDoUpdate({
+        target: [moduleOutputFolderDefaults.ownerUserId, moduleOutputFolderDefaults.moduleId],
+        set: { folderId, updatedAt },
+      })
       .run();
     return folder;
   }
