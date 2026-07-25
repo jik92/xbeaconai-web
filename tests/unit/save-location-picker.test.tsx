@@ -33,13 +33,17 @@ const createdFolder: AssetFolder = {
   updatedAt: "2026-07-26T01:00:00.000Z",
 };
 const fetchAssetFolders = mock(async () => folders);
+const fetchToolOutputFolder = mock(async (_moduleId: string) => folders[1]);
 const createAssetFolder = mock(async (_name: string) => createdFolder);
-const setDefaultAssetFolder = mock(async (_folderId: string) => ({ ...createdFolder, isDefault: true }));
+const setDefaultAssetFolder = mock(async (_folderId: string) => createdFolder);
+const setToolOutputFolder = mock(async (_moduleId: string, _folderId: string) => createdFolder);
 
 mock.module("@/api/api-client", () => ({
   fetchAssetFolders,
+  fetchToolOutputFolder,
   createAssetFolder,
   setDefaultAssetFolder,
+  setToolOutputFolder,
 }));
 
 const { SaveLocationPicker } = await import("../../web/components/domain/save-location-picker");
@@ -62,8 +66,10 @@ afterEach(() => {
   for (const root of roots.splice(0)) act(() => root.unmount());
   document.body.replaceChildren();
   fetchAssetFolders.mockClear();
+  fetchToolOutputFolder.mockClear();
   createAssetFolder.mockClear();
   setDefaultAssetFolder.mockClear();
+  setToolOutputFolder.mockClear();
 });
 
 async function renderPicker(value = "", onChange = mock((_folderId: string) => undefined)) {
@@ -76,7 +82,7 @@ async function renderPicker(value = "", onChange = mock((_folderId: string) => u
   await act(async () => {
     root.render(
       <QueryClientProvider client={queryClient}>
-        <SaveLocationPicker value={value} onChange={onChange} />
+        <SaveLocationPicker moduleId="video-cut" value={value} onChange={onChange} />
       </QueryClientProvider>,
     );
   });
@@ -87,12 +93,13 @@ async function renderPicker(value = "", onChange = mock((_folderId: string) => u
 }
 
 describe("SaveLocationPicker", () => {
-  test("selects the default folder and renders nested folders", async () => {
+  test("selects the module default folder and renders nested folders", async () => {
     const { container, onChange } = await renderPicker();
 
-    expect(onChange).toHaveBeenCalledWith("folder-default");
-    expect(container.querySelector("select")?.textContent).toContain("默认素材（默认）");
-    expect(container.querySelector("select")?.textContent).toContain("　子文件夹");
+    expect(fetchToolOutputFolder).toHaveBeenCalledWith("video-cut");
+    expect(onChange).toHaveBeenCalledWith("folder-child");
+    expect(container.querySelector("select")?.textContent).toContain("默认素材（素材库默认）");
+    expect(container.querySelector("select")?.textContent).toContain("　子文件夹（此任务默认）");
   });
 
   test("creates a root folder, selects it, and makes it the default", async () => {
@@ -118,7 +125,7 @@ describe("SaveLocationPicker", () => {
 
     expect(createAssetFolder).toHaveBeenCalledWith("今日成片");
     expect(onChange).toHaveBeenCalledWith("folder-created");
-    expect(setDefaultAssetFolder).toHaveBeenCalledWith("folder-created");
+    expect(setToolOutputFolder).toHaveBeenCalledWith("video-cut", "folder-created");
   });
 
   test("keeps the creation error visible without closing the inline form", async () => {

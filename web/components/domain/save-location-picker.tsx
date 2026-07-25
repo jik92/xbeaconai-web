@@ -1,7 +1,13 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Loader2, Plus, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { createAssetFolder, fetchAssetFolders, setDefaultAssetFolder } from "@/api/api-client";
+import {
+  createAssetFolder,
+  fetchAssetFolders,
+  fetchToolOutputFolder,
+  setDefaultAssetFolder,
+  setToolOutputFolder,
+} from "@/api/api-client";
 import type { AssetFolder } from "@/entities/types";
 import { cn } from "@/lib/utils";
 import { Button } from "../ui/button";
@@ -10,6 +16,7 @@ import { NativeSelect } from "../ui/native-select";
 
 export interface SaveLocationPickerProps {
   id?: string;
+  moduleId?: string;
   value: string;
   onChange: (folderId: string) => void;
   required?: boolean;
@@ -38,6 +45,7 @@ export function orderAssetFolders(folders: AssetFolder[]) {
 
 export function SaveLocationPicker({
   id,
+  moduleId,
   value,
   onChange,
   required,
@@ -50,6 +58,11 @@ export function SaveLocationPicker({
     queryKey: ["asset-folders"],
     queryFn: fetchAssetFolders,
   });
+  const { data: moduleDefault, isLoading: defaultLoading } = useQuery({
+    queryKey: ["tool-output-folder", moduleId],
+    queryFn: () => fetchToolOutputFolder(moduleId ?? ""),
+    enabled: Boolean(moduleId),
+  });
   const orderedFolders = useMemo(() => orderAssetFolders(folders), [folders]);
   const [creating, setCreating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -58,8 +71,24 @@ export function SaveLocationPicker({
 
   useEffect(() => {
     if (!folders.length || folders.some((folder) => folder.id === value)) return;
-    onChange((folders.find((folder) => folder.isDefault) ?? folders[0]).id);
-  }, [folders, onChange, value]);
+    const preferred = moduleId ? moduleDefault : folders.find((folder) => folder.isDefault);
+    if (!preferred) return;
+    const resolved = folders.find((folder) => folder.id === preferred.id) ?? folders[0];
+    onChange(resolved.id);
+  }, [folders, moduleDefault, moduleId, onChange, value]);
+
+  const selectFolder = async (folderId: string) => {
+    onChange(folderId);
+    setError("");
+    try {
+      if (moduleId) {
+        const folder = await setToolOutputFolder(moduleId, folderId);
+        queryClient.setQueryData(["tool-output-folder", moduleId], folder);
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "任务默认文件夹设置失败");
+    }
+  };
 
   const cancelCreate = () => {
     setCreating(false);
@@ -79,14 +108,17 @@ export function SaveLocationPicker({
       setName("");
       setCreating(false);
       try {
-        const defaultFolder = await setDefaultAssetFolder(folder.id);
-        queryClient.setQueryData<AssetFolder[]>(["asset-folders"], (current = []) =>
-          current.map((item) => ({ ...item, isDefault: item.id === defaultFolder.id })),
-        );
+        const defaultFolder = moduleId
+          ? await setToolOutputFolder(moduleId, folder.id)
+          : await setDefaultAssetFolder(folder.id);
+        if (moduleId) queryClient.setQueryData(["tool-output-folder", moduleId], defaultFolder);
       } catch (reason) {
-        setError(reason instanceof Error ? reason.message : "默认文件夹设置失败");
+        setError(reason instanceof Error ? reason.message : "任务默认文件夹设置失败");
       }
-      await queryClient.invalidateQueries({ queryKey: ["asset-folders"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["asset-folders"] }),
+        ...(moduleId ? [queryClient.invalidateQueries({ queryKey: ["tool-output-folder", moduleId] })] : []),
+      ]);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "文件夹创建失败");
     } finally {
@@ -102,16 +134,18 @@ export function SaveLocationPicker({
           aria-label="保存位置"
           className={cn("h-8", invalid && "border-red-500")}
           required={required}
-          disabled={disabled || isLoading || !folders.length}
+          disabled={disabled || isLoading || (Boolean(moduleId) && defaultLoading) || !folders.length}
           value={value}
-          onChange={(event) => onChange(event.target.value)}
+          onChange={(event) => void selectFolder(event.target.value)}
         >
           <option value="" disabled>
             {isLoading ? "正在加载我的文件夹…" : folders.length ? "请选择我的文件夹" : "暂无文件夹"}
           </option>
           {orderedFolders.map(({ folder, depth }) => (
             <option key={folder.id} value={folder.id}>
-              {`${"　".repeat(depth)}${folder.name}${folder.isDefault ? "（默认）" : ""}`}
+              {`${"　".repeat(depth)}${folder.name}${
+                folder.id === moduleDefault?.id ? "（此任务默认）" : folder.isDefault ? "（素材库默认）" : ""
+              }`}
             </option>
           ))}
         </NativeSelect>

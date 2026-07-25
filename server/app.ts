@@ -5,7 +5,7 @@ import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import type { MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
-import { aiToolModuleIds } from "../shared/jobs/ai-tool-modules";
+import { aiToolModuleIds, isAiToolModuleId } from "../shared/jobs/ai-tool-modules";
 import { parseVideoMashupConfig, type VideoMashupConfig } from "../shared/video-mashup/config";
 import { parseRemixWorkspace, remixProjectStages } from "../shared/video-remix/project-records";
 import {
@@ -5703,13 +5703,8 @@ app.openapi(createJobRoute, async (c) => {
     jobValues.outputFolderId = mashupConfig.outputFolderId;
     jobValues.saveLocation = mashupConfig.outputFolderId;
   }
-  if (
-    moduleId === "video-cut" ||
-    moduleId === "video-extract" ||
-    moduleId === "video-editor" ||
-    moduleId === "video-mashup"
-  ) {
-    const outputFolderId = jobValues.outputFolderId || accounts.getDefaultAssetFolderId(ownerUserId);
+  if (isAiToolModuleId(moduleId)) {
+    const outputFolderId = jobValues.outputFolderId;
     if (!accounts.getAssetFolder(ownerUserId, outputFolderId))
       return c.json(
         {
@@ -5724,6 +5719,21 @@ app.openapi(createJobRoute, async (c) => {
       );
     jobValues.outputFolderId = outputFolderId;
     jobValues.saveLocation = outputFolderId;
+  } else if (moduleId === "video-extract" || moduleId === "video-editor") {
+    const outputFolderId = jobValues.outputFolderId || accounts.getDefaultAssetFolderId(ownerUserId);
+    if (!accounts.getAssetFolder(ownerUserId, outputFolderId))
+      return c.json(
+        {
+          error: {
+            code: "OUTPUT_FOLDER_NOT_FOUND",
+            message: "保存文件夹不存在或不属于当前账号",
+            retryable: false,
+            requestId: crypto.randomUUID(),
+          },
+        },
+        422,
+      );
+    jobValues.outputFolderId = outputFolderId;
   }
   if (moduleId === "video-extract") {
     try {

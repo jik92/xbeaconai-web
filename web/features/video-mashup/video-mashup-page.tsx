@@ -321,7 +321,7 @@ export function VideoMashupPage() {
           </Label>
           <Label className="flex-col items-start text-xs text-muted">
             保存位置
-            <SaveLocationPicker required value={outputFolderId} onChange={setOutputFolderId} />
+            <SaveLocationPicker moduleId="video-mashup" required value={outputFolderId} onChange={setOutputFolderId} />
           </Label>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
             <span>视频组 {groups.length}</span>

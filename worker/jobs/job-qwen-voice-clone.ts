@@ -137,9 +137,8 @@ export const qwenVoiceCloneJob: WorkerJobHandler = {
       let artifactUrl: string;
       let outputFolderId = "";
       if (job.values.autoSave === "true") {
-        const folderId = accounts.getDefaultAssetFolderId(job.ownerUserId);
-        const folder = accounts.getAssetFolder(job.ownerUserId, folderId);
-        if (!folder) throw new Error("默认素材文件夹不存在");
+        const folder = accounts.getAssetFolder(job.ownerUserId, job.values.outputFolderId ?? "");
+        if (!folder) throw new Error("任务保存文件夹不存在");
         const storageKey = `${folder.storagePrefix}generated/${job.id}/${name}`;
         context.change(job.id, { stage: "正在自动保存到素材库", progress: 92 });
         await ossutils.putLibraryBytes({ bytes, key: storageKey, mimeType: "audio/wav" });

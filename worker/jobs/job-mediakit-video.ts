@@ -155,9 +155,8 @@ function createMediaKitJob(config: MediaKitJobConfig): WorkerJobHandler {
 
         context.change(job.id, { stage: "正在保存处理结果", progress: 88, providerStatus: "completed" });
         const bytes = await volcMediaKit.download(resultUrl);
-        const folderId = accounts.getDefaultAssetFolderId(job.ownerUserId);
-        const folder = accounts.getAssetFolder(job.ownerUserId, folderId);
-        if (!folder) throw new Error("默认素材文件夹不存在");
+        const folder = accounts.getAssetFolder(job.ownerUserId, job.values.outputFolderId ?? "");
+        if (!folder) throw new Error("任务保存文件夹不存在");
         const fileName = `${safeFileBase(sourceAsset.originalName)}-${config.resultSuffix}.mp4`;
         const storageKey = `${folder.storagePrefix}generated/${job.id}/${fileName}`;
         await ossutils.putLibraryBytes({ bytes, key: storageKey, mimeType: "video/mp4" });

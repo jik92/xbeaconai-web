@@ -355,7 +355,7 @@ function ToolboxSwitch({ value, onChange }: { value: string; onChange: (value: s
   );
 }
 
-function ToolboxCreatorForm({
+export function ToolboxCreatorForm({
   config,
   values,
   setValue,
@@ -455,15 +455,6 @@ function ToolboxCreatorForm({
           {compactLabel("自动保存")}
           <ToolboxSwitch value={values.autoSave ?? ""} onChange={(value) => setValue("autoSave", value)} />
         </div>
-        <div className="grid items-start gap-2 sm:grid-cols-[96px_minmax(0,1fr)]">
-          {compactLabel("保存位置", true)}
-          <SaveLocationPicker
-            required
-            invalid={invalid("saveLocation")}
-            value={values.saveLocation ?? ""}
-            onChange={(folderId) => setValue("saveLocation", folderId)}
-          />
-        </div>
         <div
           className={cn(
             "grid items-start gap-2 sm:grid-cols-[96px_minmax(0,1fr)] [&_.tool-upload-tile]:!size-24",
@@ -510,15 +501,6 @@ function ToolboxCreatorForm({
             max="20"
             value={values.count ?? "1"}
             onChange={(event) => setValue("count", event.target.value)}
-          />
-        </div>
-        <div className={`tool-form-row ${invalid("saveLocation") ? "invalid" : ""}`}>
-          {requiredLabel("保存位置", true)}
-          <SaveLocationPicker
-            required
-            invalid={invalid("saveLocation")}
-            value={values.saveLocation ?? ""}
-            onChange={(folderId) => setValue("saveLocation", folderId)}
           />
         </div>
         <div className="tool-form-row">
@@ -624,7 +606,7 @@ function ToolboxCreatorForm({
         </div>
       </div>
     );
-  } else {
+  } else if (config.id === "kickart") {
     content = (
       <div className="tool-simple-form kickart-form">
         <div className="tool-form-row">
@@ -645,12 +627,36 @@ function ToolboxCreatorForm({
         </div>
       </div>
     );
+  } else {
+    content = (
+      <div className="tool-simple-form space-y-3">
+        {config.fields.map((item) => (
+          <BusinessField
+            key={item.id}
+            field={item}
+            value={values[item.id] ?? ""}
+            onChange={(value) => setValue(item.id, value)}
+            invalid={Boolean(invalid(item.id))}
+          />
+        ))}
+      </div>
+    );
   }
 
   return (
     <>
       <div className="min-h-0 flex-1 overflow-y-auto p-4 text-sm max-sm:[&_.tool-form-label]:!justify-start max-sm:[&_.tool-form-row]:!grid-cols-1 [&_.mashup-form]:!grid-cols-1 [&_.mashup-left]:!border-0 [&_.mashup-left]:!p-0 [&_.mashup-right]:!p-0 [&_.tool-form-label]:!justify-end [&_.tool-form-label]:!text-xs [&_.tool-form-label]:!text-muted [&_.tool-form-row]:!min-h-10 [&_.tool-form-row]:!grid-cols-[96px_minmax(0,1fr)] [&_.tool-form-row]:!gap-3 [&_.tool-simple-form]:!mx-auto [&_.tool-simple-form]:!w-full [&_.tool-simple-form]:!max-w-2xl [&_.tool-simple-form]:!p-0 [&_input:not([type=range])]:!h-8 [&_input:not([type=range])]:!rounded-md [&_input:not([type=range])]:!border-line [&_input:not([type=range])]:!px-3 [&_select]:!h-8 [&_textarea]:!rounded-md [&_textarea]:!border-line [&_textarea]:!p-3">
         {content}
+        <div className="mx-auto mt-3 grid w-full max-w-2xl items-start gap-3 sm:grid-cols-[96px_minmax(0,1fr)]">
+          {compactLabel("保存位置", true)}
+          <SaveLocationPicker
+            moduleId={config.id}
+            required
+            invalid={submitted && !values.outputFolderId}
+            value={values.outputFolderId ?? ""}
+            onChange={(folderId) => setValue("outputFolderId", folderId)}
+          />
+        </div>
       </div>
       {error && <div className="border-t border-red-100 bg-red-50 px-4 py-2 text-xs text-red-600">{error}</div>}
       <footer className="flex h-13 flex-none items-center justify-end gap-2 border-t border-line px-4">
@@ -1006,7 +1012,7 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
     setHydrated(false);
     void db.drafts.get(config.id).then((draft) => {
       if (!active) return;
-      setValues({ ...initialValues(), ...(draft?.values ?? {}) });
+      setValues({ ...initialValues(), ...(draft?.values ?? {}), outputFolderId: "" });
       setHydrated(true);
     });
     return () => {
@@ -1068,16 +1074,15 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
   );
   const submit = async () => {
     setSubmitted(true);
-    if (missing.length) return;
+    if (missing.length || !values.outputFolderId) return;
     setRunning(true);
     setApiError("");
     try {
-      const submittedValues = config.id === "video-cut" ? { ...values, outputFolderId: values.saveLocation } : values;
       const generatedTitle = `${config.label} · ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
       const job = await submitJob(
         config.id as ModuleId,
         values.taskName || generatedTitle,
-        { ...submittedValues, __scenario: scenario },
+        { ...values, __scenario: scenario },
         usesSeedance ? videoModel : undefined,
       );
       setTasks((old) => [job, ...old.filter((x) => x.id !== job.id)]);
@@ -1115,6 +1120,7 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
       setValues({
         ...initialValues(),
         ...selectedTask.values,
+        outputFolderId: "",
         operation: "synthesize",
         voiceSource: "preset",
         presetVoiceId: "zh_female_vv_uranus_bigtts",
