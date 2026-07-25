@@ -3,10 +3,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { Job } from "../../web/api/generated/types.gen";
-import type { LibraryAsset, LibraryProduct } from "../../web/entities/types";
-import type { Portrait } from "../../web/features/portrait-library/portrait-data";
 import { GlobalSearch, isGlobalSearchShortcut } from "../../web/components/domain/global-search";
 import { buildGlobalSearchResults, type GlobalSearchPage } from "../../web/components/domain/global-search-index";
+import type { LibraryAsset, LibraryProduct } from "../../web/entities/types";
+import type { Portrait } from "../../web/features/portrait-library/portrait-data";
 
 const pages: GlobalSearchPage[] = [
   { id: "module:video-cut", label: "视频分割", path: "/tools/video-cut", group: "AI 工具箱" },
@@ -65,7 +65,8 @@ describe("global search", () => {
     expect(html).toContain('aria-expanded="false"');
     expect(html).toContain('type="button"');
     expect(html).toContain("打开全局搜索");
-    expect(html).toContain("⌘ K");
+    const shortcut = /Mac|iPhone|iPad|iPod/.test(navigator.platform) ? "⌘ K" : "Ctrl K";
+    expect(html).toContain(shortcut);
   });
 
   test("shows visible page entrances before a query is entered", () => {
