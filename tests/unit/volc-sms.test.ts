@@ -76,13 +76,13 @@ describe("ConfiguredVolcSmsSender", () => {
       },
     );
 
-    await sender.send({
+    const registrationDelivery = await sender.send({
       phone: "13800000000",
       code: "123456",
       purpose: "register",
       expiresAt: "2026-07-22T15:00:00.000Z",
     });
-    await sender.send({
+    const resetDelivery = await sender.send({
       phone: "13800000001",
       code: "654321",
       purpose: "reset_password",
@@ -94,15 +94,52 @@ describe("ConfiguredVolcSmsSender", () => {
       APP_CONFIG.providerDefaults.volcSms.templateId,
     ]);
     expect(APP_CONFIG.providerDefaults.volcSms.templateId).toBe("SPT_09a29a26");
+    expect(registrationDelivery).toBe("sent");
+    expect(resetDelivery).toBe("sent");
   });
 
-  test("fails clearly when the Volcengine access key is unavailable", async () => {
-    const sender = new ConfiguredVolcSmsSender(() => undefined);
+  test("displays the code without a provider request when either access key is unavailable", async () => {
+    let providerRequests = 0;
+    const message = {
+      phone: "13800000000",
+      code: "123456",
+      purpose: "register" as const,
+      expiresAt: "2026-07-22T15:00:00.000Z",
+    };
+    const fetcher = async () => {
+      providerRequests += 1;
+      return Response.json({ Result: { MessageID: ["message-1"] } });
+    };
+    const missingBoth = new ConfiguredVolcSmsSender(() => undefined, fetcher);
+    const missingId = new ConfiguredVolcSmsSender(
+      (name) => (name === "TOS_SECRET_ACCESS_KEY" ? "test-secret-key" : undefined),
+      fetcher,
+    );
+    const missingSecret = new ConfiguredVolcSmsSender(
+      (name) => (name === "TOS_ACCESS_KEY_ID" ? "test-access-key" : undefined),
+      fetcher,
+    );
+
+    expect(await missingBoth.send(message)).toBe("display");
+    expect(await missingId.send(message)).toBe("display");
+    expect(await missingSecret.send(message)).toBe("display");
+    expect(providerRequests).toBe(0);
+  });
+
+  test("does not fall back to display when configured provider delivery fails", async () => {
+    const sender = new ConfiguredVolcSmsSender(
+      (name) => (name === "TOS_ACCESS_KEY_ID" ? "test-access-key" : "test-secret-key"),
+      async () =>
+        Response.json({
+          ResponseMetadata: { Error: { Code: "RE:0005", Message: "模板错误" } },
+        }),
+    );
+
     const error = await sender
       .send({ phone: "13800000000", code: "123456", purpose: "register", expiresAt: "2026-07-22T15:00:00.000Z" })
       .catch((caught) => caught);
 
     expect(error).toBeInstanceOf(SmsProviderError);
-    expect(error).toMatchObject({ message: "火山短信 Access Key 未配置" });
+    expect(error).toMatchObject({ message: "模板错误" });
   });
 });

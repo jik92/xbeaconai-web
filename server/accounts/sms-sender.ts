@@ -5,8 +5,10 @@ export interface SmsMessage {
   expiresAt: string;
 }
 
+export type SmsDelivery = "sent" | "display";
+
 export interface SmsSender {
-  send(message: SmsMessage): Promise<void>;
+  send(message: SmsMessage): Promise<SmsDelivery>;
 }
 
 export class SmsProviderError extends Error {
@@ -27,5 +29,6 @@ export class ConsoleSmsSender implements SmsSender {
       code: message.code,
       expiresAt: message.expiresAt,
     });
+    return "display" as const;
   }
 }

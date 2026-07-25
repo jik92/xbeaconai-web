@@ -194,12 +194,8 @@ export class AccountStore {
   private readonly client: ReturnType<typeof openDatabase>["client"];
   private readonly smsSender: SmsSender;
   private readonly generateSmsCode: () => string;
-  private readonly exposeSmsCode: boolean;
 
-  constructor(
-    path = env.databasePath,
-    options: { smsSender?: SmsSender; generateSmsCode?: () => string; exposeSmsCode?: boolean } = {},
-  ) {
+  constructor(path = env.databasePath, options: { smsSender?: SmsSender; generateSmsCode?: () => string } = {}) {
     const connection = openDatabase(path);
     this.client = connection.client;
     this.db = connection.db;
@@ -207,7 +203,6 @@ export class AccountStore {
     this.generateSmsCode =
       options.generateSmsCode ??
       (() => env.smsVerificationFixedCode || randomInt(0, 1_000_000).toString().padStart(6, "0"));
-    this.exposeSmsCode = options.exposeSmsCode ?? !env.isProduction;
     this.db
       .update(mediaAssets)
       .set({ displayName: mediaAssets.originalName })
@@ -244,8 +239,9 @@ export class AccountStore {
     const codeHash = await Bun.password.hash(code);
     const id = crypto.randomUUID();
     this.db.insert(smsVerificationCodes).values({ id, phone, purpose, codeHash, expiresAt, createdAt }).run();
+    let delivery: Awaited<ReturnType<SmsSender["send"]>>;
     try {
-      await this.smsSender.send({ phone, code, purpose, expiresAt });
+      delivery = await this.smsSender.send({ phone, code, purpose, expiresAt });
     } catch (error) {
       this.db.delete(smsVerificationCodes).where(eq(smsVerificationCodes.id, id)).run();
       throw error;
@@ -253,7 +249,7 @@ export class AccountStore {
     return {
       expiresAt,
       retryAfterSeconds: 60,
-      ...(this.exposeSmsCode ? { verificationCode: code } : {}),
+      ...(delivery === "display" ? { verificationCode: code } : {}),
     };
   }
 

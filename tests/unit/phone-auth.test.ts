@@ -20,7 +20,12 @@ function fixture(code = "246810") {
   const path = join(tmpdir(), `phone-auth-${crypto.randomUUID()}.sqlite`);
   databases.push(path);
   const messages: SmsMessage[] = [];
-  const sender: SmsSender = { send: async (message) => void messages.push(message) };
+  const sender: SmsSender = {
+    send: async (message) => {
+      messages.push(message);
+      return "display";
+    },
+  };
   const store = new AccountStore(path, { smsSender: sender, generateSmsCode: () => code });
   return { store, messages };
 }
@@ -59,13 +64,12 @@ describe("two-step phone authentication", () => {
     store.close();
   });
 
-  test("supports disabling verification-code exposure for production", async () => {
+  test("does not expose the verification code after real SMS delivery", async () => {
     const path = join(tmpdir(), `phone-auth-${crypto.randomUUID()}.sqlite`);
     databases.push(path);
     const store = new AccountStore(path, {
-      smsSender: { send: async () => {} },
+      smsSender: { send: async () => "sent" },
       generateSmsCode: () => "246810",
-      exposeSmsCode: false,
     });
 
     expect((await store.sendRegistrationCode("13800000028")).verificationCode).toBeUndefined();

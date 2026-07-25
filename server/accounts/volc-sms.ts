@@ -133,7 +133,8 @@ export class VolcSmsSender implements SmsSender {
     this.client = new VolcSmsClient(config, fetcher);
   }
 
-  async send(message: SmsMessage): Promise<void> {
+  async send(message: SmsMessage) {
     await this.client.sendCode(message.phone, message.code);
+    return "sent" as const;
   }
 }

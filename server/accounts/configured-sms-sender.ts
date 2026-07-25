@@ -15,7 +15,7 @@ export class ConfiguredVolcSmsSender implements SmsSender {
   async send(message: SmsMessage) {
     const accessKeyId = this.getCredential("TOS_ACCESS_KEY_ID") ?? "";
     const secretAccessKey = this.getCredential("TOS_SECRET_ACCESS_KEY") ?? "";
-    if (!accessKeyId || !secretAccessKey) throw new SmsProviderError("火山短信 Access Key 未配置");
+    if (!accessKeyId || !secretAccessKey) return "display" as const;
 
     const client = new VolcSmsClient(
       {
@@ -27,6 +27,7 @@ export class ConfiguredVolcSmsSender implements SmsSender {
     );
     try {
       await client.sendCode(message.phone, message.code);
+      return "sent" as const;
     } catch (error) {
       if (error instanceof VolcSmsError) throw new SmsProviderError(error.message, error.requestId);
       throw new SmsProviderError(error instanceof Error ? error.message : "火山短信请求失败");
