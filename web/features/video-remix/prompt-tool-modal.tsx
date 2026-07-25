@@ -358,7 +358,7 @@ export function PromptToolModal({
     findings: string[];
   } | null>(null);
   const [editingVoiceRewrite, setEditingVoiceRewrite] = useState(false);
-  const [voiceRewriteSaved, setVoiceRewriteSaved] = useState(false);
+  const [lastAppliedVoiceRewrite, setLastAppliedVoiceRewrite] = useState("");
   const [error, setError] = useState("");
   const completedJobs = useRef(new Set<string>());
   const lastOpenedKey = useRef("");
@@ -376,7 +376,7 @@ export function PromptToolModal({
     setDraftPreview(prompt);
     setPendingVoiceRewrite(null);
     setEditingVoiceRewrite(false);
-    setVoiceRewriteSaved(false);
+    setLastAppliedVoiceRewrite("");
     setError("");
     setJob((current) => (current && current.status !== "queued" && current.status !== "processing" ? null : current));
   }, [prompt, sourceAssetId, tool]);
@@ -415,7 +415,7 @@ export function PromptToolModal({
               setDraftPreview(rewritten);
               setPendingVoiceRewrite({ tool: currentTool, summary, findings });
               setEditingVoiceRewrite(false);
-              setVoiceRewriteSaved(false);
+              setLastAppliedVoiceRewrite("");
               return;
             }
             onApply(currentTool, rewritten, summary, findings);
@@ -440,6 +440,7 @@ export function PromptToolModal({
     [comparisonPreview, originalPreview],
   );
   const showVoiceDiff = tool === "voice" && comparisonPreview !== originalPreview;
+  const canApplyVoiceRewrite = showVoiceDiff && comparisonPreview !== lastAppliedVoiceRewrite;
   const syncDiffScroll = (source: HTMLElement | null, target: HTMLElement | null) => {
     if (!source || !target) return;
     target.scrollTop = source.scrollTop;
@@ -454,7 +455,7 @@ export function PromptToolModal({
       setDraftPreview(preview);
       setPendingVoiceRewrite(null);
       setEditingVoiceRewrite(false);
-      setVoiceRewriteSaved(false);
+      setLastAppliedVoiceRewrite("");
     }
     try {
       setJob(await runRemixPromptTool({ sourceJobId, sourceAssetId, prompt: preview, tool, config }));
@@ -468,13 +469,18 @@ export function PromptToolModal({
     setError("");
   };
   const saveVoiceRewrite = () => {
-    if (!pendingVoiceRewrite || voiceRewriteSaved) return;
+    if (!canApplyVoiceRewrite) return;
     const rewritten = editingVoiceRewrite ? draftPreview : preview;
     setPreview(rewritten);
     setDraftPreview(rewritten);
     setEditingVoiceRewrite(false);
-    setVoiceRewriteSaved(true);
-    onApply(pendingVoiceRewrite.tool, rewritten, pendingVoiceRewrite.summary, pendingVoiceRewrite.findings);
+    setLastAppliedVoiceRewrite(rewritten);
+    onApply(
+      pendingVoiceRewrite?.tool ?? "voice",
+      rewritten,
+      pendingVoiceRewrite?.summary ?? "已应用修正口播",
+      pendingVoiceRewrite?.findings ?? [],
+    );
   };
   const close = () => {
     lastOpenedKey.current = "";
@@ -557,7 +563,6 @@ export function PromptToolModal({
                 <div className="voice-diff-actions">
                   <button
                     type="button"
-                    disabled={!pendingVoiceRewrite || voiceRewriteSaved}
                     onClick={() => {
                       if (editingVoiceRewrite) {
                         setDraftPreview(preview);
@@ -570,13 +575,8 @@ export function PromptToolModal({
                   >
                     {editingVoiceRewrite ? "取消" : "修改"}
                   </button>
-                  <button
-                    type="button"
-                    className="primary"
-                    disabled={!pendingVoiceRewrite || voiceRewriteSaved}
-                    onClick={saveVoiceRewrite}
-                  >
-                    {voiceRewriteSaved ? "已保存为新版本" : "保存为新版本"}
+                  <button type="button" className="primary" disabled={!canApplyVoiceRewrite} onClick={saveVoiceRewrite}>
+                    {canApplyVoiceRewrite ? "应用并保存为新版本" : "已应用，修改后可再次保存"}
                   </button>
                 </div>
               </div>
