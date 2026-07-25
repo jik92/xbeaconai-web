@@ -4810,19 +4810,47 @@ app.openapi(batchGenerateVideoCreateShotsRoute, async (c) => {
       },
       409,
     );
+  const drafts = shots.map((shot) => getVideoCreateShotGenerationDraft(projectId, shot.id, ownerUserId));
+  if (drafts.some((draft) => !draft))
+    return c.json(
+      {
+        error: {
+          code: "INVALID_SHOT_GENERATION_DRAFT",
+          message: "部分分镜缺少可用的视频生成参数",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      422,
+    );
   const batchKey = c.req.header("Idempotency-Key")?.trim().slice(0, 64) ?? crypto.randomUUID();
   const jobs = [];
-  for (const shot of shots)
+  for (const [index, shot] of shots.entries()) {
+    const draft = drafts[index];
+    if (!draft) continue;
+    const portrait = draft.attachments.find((attachment) => attachment.source === "portrait");
     jobs.push(
       await enqueueVideoCreateOperation({
         ownerUserId,
         projectId,
         operation: "shot",
         shotId: shot.id,
-        shotOptions: options,
+        shotOptions: {
+          ...options,
+          prompt: draft.prompt,
+          duration: draft.duration,
+          referenceMode: draft.referenceMode,
+          references: draft.attachments.flatMap((attachment) =>
+            attachment.source === "asset" && attachment.assetId
+              ? [{ assetId: attachment.assetId, label: attachment.label, category: attachment.category }]
+              : [],
+          ),
+          portrait: portrait?.portraitId ? { id: portrait.portraitId, label: portrait.label, category: "人物" } : null,
+        },
         idempotencyKey: `${batchKey}:${shot.id}`,
       }),
     );
+  }
   return c.json({ jobs, submittedShotIds: shots.map((shot) => shot.id) }, 202);
 });
 

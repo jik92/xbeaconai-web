@@ -20,6 +20,12 @@ describe("video create shot generation review", () => {
       shotPrompt: "女生对镜头摊手，随后戴上草帽侧身展示，最后对镜头比耶",
       narration,
     });
+    plan.characterAppearance = "年轻女性，淡妆，自然黑发，身穿白色衬衫";
+    plan.subshots[0] = {
+      ...plan.subshots[0],
+      action: "23岁的女生对镜头摊手，随后她拿起草帽，其他行人从背景经过",
+      composition: "年轻女性位于画面中心",
+    };
     const prompt = buildVideoCreateShotGenerationPrompt({
       durationSec: 15,
       plan,
@@ -33,7 +39,13 @@ describe("video create shot generation review", () => {
     expect(plan.subshots.map((subshot) => subshot.narration).join("")).toBe(narration);
     expect(plan.subshots.reduce((total, subshot) => total + subshot.durationSec, 0)).toBe(15);
     expect(prompt.startsWith("### 第一部分：全局基础设定\n约束条件：")).toBe(true);
-    expect(prompt).toContain("人物形象严格参考 @Image1（人物）");
+    expect(prompt).toContain("人物主体必须使用 @Image1（人物）");
+    expect(prompt).toContain("保持其性别、年龄、脸型、五官、肤色、发型和身份特征一致");
+    expect(prompt).toContain("人物动作描述：人物对镜头摊手，随后人物拿起草帽，其他行人从背景经过");
+    expect(prompt).toContain("画面构图：人物位于画面中心");
+    expect(prompt).not.toContain("年轻女性");
+    expect(prompt).not.toContain("23岁的女生");
+    expect(prompt).not.toContain("淡妆");
     expect(prompt).toContain("商品外观严格参考 @Image2（商品）");
     expect(prompt).toContain("### 第二部分：分镜内容（按播放顺序逐条输出分镜，每条独立成段，并标注序号）");
     expect(prompt.match(/^分镜 \d{2}$/gmu)).toHaveLength(3);
@@ -49,6 +61,19 @@ describe("video create shot generation review", () => {
         portraitCategory: "人物",
       }),
     ).toBeUndefined();
+  });
+
+  test("keeps the planned appearance when no portrait reference is selected", () => {
+    const plan = createFallbackVideoCreateShotPlan({
+      durationSec: 6,
+      shotPrompt: "年轻女性在街景中展示商品",
+      narration: "这款商品轻巧又方便。",
+    });
+    plan.characterAppearance = "年轻女性，淡妆，自然黑发，身穿白色衬衫";
+    const prompt = buildVideoCreateShotGenerationPrompt({ durationSec: 6, plan, references: [] });
+
+    expect(prompt).toContain("人物形象：年轻女性，淡妆，自然黑发，身穿白色衬衫");
+    expect(prompt).toContain("背景描述：遵循当前分镜的真实生活化场景设定：年轻女性在街景中展示商品");
   });
 
   test("splits a short current shot into two semantic subshots with exact duration", () => {
@@ -214,5 +239,19 @@ describe("video create shot generation review", () => {
     expect(draftSource).toContain('category: "人物"');
     expect(draftSource).toContain('category: "商品"');
     expect(draftSource).not.toContain("aggregate.project.input.productAssetIds[0]");
+  });
+
+  test("builds every batch job from the same portrait-bound generation draft", () => {
+    const source = readFileSync(resolve(import.meta.dir, "../../server/app.ts"), "utf8");
+    const batchSource = source.slice(
+      source.indexOf("const batchGenerateVideoCreateShotsRoute"),
+      source.indexOf("const replaceVideoCreateShotRoute"),
+    );
+
+    expect(batchSource).toContain("getVideoCreateShotGenerationDraft(projectId, shot.id, ownerUserId)");
+    expect(batchSource).toContain("prompt: draft.prompt");
+    expect(batchSource).toContain("references: draft.attachments.flatMap");
+    expect(batchSource).toContain('attachment.source === "portrait"');
+    expect(batchSource).not.toContain("shotOptions: options");
   });
 });

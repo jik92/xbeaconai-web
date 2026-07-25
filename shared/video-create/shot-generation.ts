@@ -169,6 +169,21 @@ function referenceToken(reference: VideoCreatePromptReference) {
   return `@${reference.label}${reference.category ? `（${reference.category}）` : ""}`;
 }
 
+const visualPersonDescriptorPattern =
+  /(?:(?:\d{1,3}\s*岁(?:左右)?|年轻|青春靓丽|中年|年长|老年)的?\s*)?(?:女主播|男主播|女模特|男模特|小姐姐|小哥哥|女性|男性|女生|男生|女孩|男孩|女人|男人|女士|先生|模特)/gu;
+const visualPersonPronounPattern =
+  /(^|[，。；：、,\s]|随后|然后|接着|同时)(?:(?:\d{1,3}\s*岁(?:左右)?|年轻|青春靓丽|中年|年长|老年)的?\s*)?[她他](?=的|在|正|先|后|拿|对|将|把|用|面|侧|转|走|坐|站|做|展示|佩戴|穿|露|微|伸|看|注视|说|介绍|比|挥|点|$)/gu;
+
+function neutralizeVisualPersonDescription(value: string) {
+  return value
+    .replace(visualPersonDescriptorPattern, "人物")
+    .replace(visualPersonPronounPattern, (_match, prefix: string) => `${prefix}人物`);
+}
+
+function portraitBoundVisualDescription(value: string, hasPortraitReference: boolean) {
+  return hasPortraitReference ? neutralizeVisualPersonDescription(value) : value;
+}
+
 export function buildVideoCreateShotGenerationPrompt(input: {
   durationSec: number;
   plan: VideoCreateShotGenerationPlan;
@@ -182,17 +197,18 @@ export function buildVideoCreateShotGenerationPrompt(input: {
     ? `${globalConstraints} 商品外观严格参考 ${products.join("、")}。`
     : globalConstraints;
   const characterAppearance = people.length
-    ? `${input.plan.characterAppearance}，人物形象严格参考 ${people.join("、")}`
+    ? `人物主体必须使用 ${people.join("、")}；人物形象严格参考人物图片，保持其性别、年龄、脸型、五官、肤色、发型和身份特征一致，禁止替换为其他人物`
     : input.plan.characterAppearance;
   const voice = audio.length ? `${input.plan.voice}，音色严格参考 ${audio.join("、")}` : input.plan.voice;
+  const hasPortraitReference = people.length > 0;
   const global = [
     "### 第一部分：全局基础设定",
     `约束条件：${constraints}`,
     `人物形象：${characterAppearance}`,
     `人物神态：${naturalExpression}`,
-    `镜头视角：${input.plan.cameraView}${videos.length ? `，镜头运动严格参考 ${videos.join("、")}` : ""}`,
-    `背景描述：${input.plan.background}`,
-    `光线分析：${input.plan.lighting}`,
+    `镜头视角：${portraitBoundVisualDescription(input.plan.cameraView, hasPortraitReference)}${videos.length ? `，镜头运动严格参考 ${videos.join("、")}` : ""}`,
+    `背景描述：${portraitBoundVisualDescription(input.plan.background, hasPortraitReference)}`,
+    `光线分析：${portraitBoundVisualDescription(input.plan.lighting, hasPortraitReference)}`,
     `音色设定：${voice}`,
     `画质要求：${input.plan.quality}`,
     `视频总时长：${input.durationSec}秒。`,
@@ -200,15 +216,15 @@ export function buildVideoCreateShotGenerationPrompt(input: {
   const subshots = input.plan.subshots.map((subshot, index) =>
     [
       `分镜 ${String(index + 1).padStart(2, "0")}`,
-      `人物动作描述：${subshot.action}`,
+      `人物动作描述：${portraitBoundVisualDescription(subshot.action, hasPortraitReference)}`,
       `画面口播文案：${subshot.narration}`,
-      `人物说话神态：${subshot.expression}`,
+      `人物说话神态：${portraitBoundVisualDescription(subshot.expression, hasPortraitReference)}`,
       `音色语气设定：${subshot.voiceTone}`,
       `分镜时长：${subshot.durationSec}秒`,
-      `景别：${subshot.shotSize}`,
-      `画面构图：${subshot.composition}`,
-      `背景环境描述：${subshot.background}`,
-      `光线风格分析：${subshot.lighting}`,
+      `景别：${portraitBoundVisualDescription(subshot.shotSize, hasPortraitReference)}`,
+      `画面构图：${portraitBoundVisualDescription(subshot.composition, hasPortraitReference)}`,
+      `背景环境描述：${portraitBoundVisualDescription(subshot.background, hasPortraitReference)}`,
+      `光线风格分析：${portraitBoundVisualDescription(subshot.lighting, hasPortraitReference)}`,
     ].join("\n"),
   );
   return [
