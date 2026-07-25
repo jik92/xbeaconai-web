@@ -3,6 +3,21 @@ export interface MediaPreviewSize {
   height: number;
 }
 
+export interface MediaPreviewContentSize {
+  width: number | "100%";
+  height: number | "100%";
+}
+
+const fullPreviewSize: MediaPreviewContentSize = { width: "100%", height: "100%" };
+
+export function resolveMediaPreviewContentSize(
+  mimeType: string,
+  fittedSize?: MediaPreviewSize,
+): MediaPreviewContentSize {
+  if (mimeType.startsWith("video/")) return fullPreviewSize;
+  return fittedSize ?? fullPreviewSize;
+}
+
 export function fitMediaPreviewSize(
   width?: number,
   height?: number,

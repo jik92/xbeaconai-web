@@ -1,9 +1,26 @@
 import { describe, expect, test } from "bun:test";
-import { fitMediaPreviewSize } from "../../web/features/asset-library/media-preview-size";
+import {
+  fitMediaPreviewSize,
+  resolveMediaPreviewContentSize,
+} from "../../web/features/asset-library/media-preview-size";
 
 describe("asset media preview sizing", () => {
-  test("fits portrait video inside the preview without cropping", () => {
+  test("fits portrait media inside the preview without cropping", () => {
     expect(fitMediaPreviewSize(720, 1280)).toEqual({ width: 40.5, height: 72 });
+  });
+
+  test("keeps the interactive video frame at full 16:9 size while the video itself uses contain", () => {
+    expect(resolveMediaPreviewContentSize("video/mp4", { width: 40.5, height: 72 })).toEqual({
+      width: "100%",
+      height: "100%",
+    });
+  });
+
+  test("keeps the fitted dimensions for an image preview", () => {
+    expect(resolveMediaPreviewContentSize("image/png", { width: 40.5, height: 72 })).toEqual({
+      width: 40.5,
+      height: 72,
+    });
   });
 
   test("fits square images without stretching them to landscape", () => {

@@ -299,7 +299,13 @@ function ToolboxUploadTile({
         >
           {preview?.url ? (
             <span className="tool-upload-preview">
-              <AuthenticatedMedia url={preview.url} mimeType={preview.mimeType} alt={preview.name} controls={false} />
+              <AuthenticatedMedia
+                url={preview.url}
+                mimeType={preview.mimeType}
+                alt={preview.name}
+                controls={false}
+                previewable={false}
+              />
               <i>
                 <Check />
               </i>

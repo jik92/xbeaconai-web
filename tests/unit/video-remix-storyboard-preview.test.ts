@@ -24,7 +24,7 @@ describe("video remix storyboard media preview", () => {
 
   test("handles public portrait failures and disables unavailable result downloads", () => {
     expect(page).toContain('className="public-image-error"');
-    expect(page).toContain("onError={() => setFailed(true)}");
+    expect(page).toContain("onImageError={() => setFailed(true)}");
     expect(storyboard).toContain("disabled={!activeGeneratedVersion?.artifact.url}");
   });
 });
