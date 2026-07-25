@@ -392,7 +392,6 @@ export type VideoCreateInput = {
     voiceAssetId?: string;
     ratio?: '9:16' | '16:9' | '1:1';
     subtitles?: boolean;
-    priority?: 'speech' | 'visual';
 };
 
 export type VideoCreateRecommendation = {

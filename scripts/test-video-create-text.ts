@@ -45,7 +45,6 @@ const aggregate: VideoCreateAggregate = {
       videoModel: "doubao-seedance-2-0-fast-260128",
       ratio: "9:16",
       subtitles: true,
-      priority: "speech",
     },
     recommendation: null,
     currentJobId: null,

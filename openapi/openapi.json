@@ -1962,14 +1962,6 @@
           "subtitles": {
             "type": "boolean",
             "default": true
-          },
-          "priority": {
-            "type": "string",
-            "enum": [
-              "speech",
-              "visual"
-            ],
-            "default": "speech"
           }
         },
         "required": [
