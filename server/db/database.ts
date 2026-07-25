@@ -11,6 +11,28 @@ function ensureColumn(client: Database, table: string, column: string, definitio
   if (!columns.some((item) => item.name === column)) client.run(`ALTER TABLE ${table} ADD COLUMN ${definition}`);
 }
 
+function ensureProviderCredentialTables(client: Database) {
+  // Some local databases recorded an obsolete migration history that omitted
+  // provider_credentials. Keep the credential store available after upgrades.
+  client.run(`CREATE TABLE IF NOT EXISTS provider_credentials (
+    name TEXT PRIMARY KEY NOT NULL,
+    ciphertext TEXT NOT NULL,
+    nonce TEXT NOT NULL,
+    auth_tag TEXT NOT NULL,
+    last_four TEXT NOT NULL,
+    updated_by_user_id TEXT,
+    updated_at TEXT NOT NULL
+  )`);
+  client.run(`CREATE TABLE IF NOT EXISTS provider_credential_checks (
+    provider_id TEXT PRIMARY KEY NOT NULL,
+    provider TEXT NOT NULL,
+    status TEXT NOT NULL,
+    message TEXT NOT NULL,
+    latency_ms INTEGER NOT NULL,
+    checked_at TEXT NOT NULL
+  )`);
+}
+
 function repairLegacyUserStatusConstraint(client: Database) {
   const usersTable = client.query("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'users'").get() as
     | { sql: string | null }
@@ -77,6 +99,7 @@ export function openDatabase(path: string) {
   ensureColumn(client, "media_assets", "width", "width INTEGER");
   ensureColumn(client, "media_assets", "height", "height INTEGER");
   ensureColumn(client, "media_assets", "duration_sec", "duration_sec REAL");
+  ensureProviderCredentialTables(client);
   repairLegacyUserStatusConstraint(client);
 
   return { client, db };

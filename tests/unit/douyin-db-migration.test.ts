@@ -140,6 +140,22 @@ describe("database migration", () => {
     conn.client.close();
   });
 
+  test("repairs a missing provider credentials table after historical migrations", () => {
+    const path = tempDbPath();
+    const initial = openDatabase(path);
+    initial.client.run("DROP TABLE provider_credentials");
+    initial.client.close();
+
+    const repaired = openDatabase(path);
+    repaired.client.run(
+      "INSERT INTO provider_credentials (name, ciphertext, nonce, auth_tag, last_four, updated_at) VALUES ('OPENAI_KEY', 'ciphertext', 'nonce', 'tag', '1234', '2026-01-01T00:00:00Z')",
+    );
+    expect(repaired.client.query("SELECT name FROM provider_credentials WHERE name = 'OPENAI_KEY'").get()).toEqual({
+      name: "OPENAI_KEY",
+    });
+    repaired.client.close();
+  });
+
   test("repairs the legacy user status constraint without losing accounts", () => {
     const path = tempDbPath();
     const initial = openDatabase(path);
