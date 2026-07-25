@@ -56,7 +56,7 @@ describe("video create action boundaries", () => {
       "utf8",
     );
     expect(source).toContain('import { Switch } from "@/components/ui/switch"');
-    expect(source.match(/<Switch/g)).toHaveLength(4);
+    expect(source.match(/<Switch/g)).toHaveLength(5);
     expect(source).not.toContain("ShotToggle");
   });
 
@@ -68,5 +68,17 @@ describe("video create action boundaries", () => {
     expect(source).toContain("批量生成");
     expect(source).toContain("<Dialog open={batchDialogOpen}");
     expect(source).toContain("batchGenerateVideoCreateShotVideos");
+  });
+
+  test("shares the Mini audio-enabled settings with batch and individual generation", () => {
+    const source = readFileSync(
+      resolve(import.meta.dir, "../../web/features/video-create/video-create-page.tsx"),
+      "utf8",
+    );
+    expect(source).toContain('videoModel: "doubao-seedance-2-0-mini-260615"');
+    expect(source).toContain("generateAudio: true");
+    expect(source).toContain("generateVideoCreateShotVideo(project.project.id, shot.id, batchSettings)");
+    expect(source).toContain("batchGenerateVideoCreateShotVideos(project.project.id, batchSettings)");
+    expect(source).not.toContain("generateAudio: false");
   });
 });

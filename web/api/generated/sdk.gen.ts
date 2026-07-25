@@ -351,7 +351,14 @@ export const regenerateVideoCreateSection = <ThrowOnError extends boolean = fals
     }
 });
 
-export const generateVideoCreateShot = <ThrowOnError extends boolean = false>(options: Options<GenerateVideoCreateShotData, ThrowOnError>): RequestResult<GenerateVideoCreateShotResponses, GenerateVideoCreateShotErrors, ThrowOnError> => (options.client ?? client).post<GenerateVideoCreateShotResponses, GenerateVideoCreateShotErrors, ThrowOnError>({ url: '/api/video-create/projects/{projectId}/shots/{shotId}/generate', ...options });
+export const generateVideoCreateShot = <ThrowOnError extends boolean = false>(options: Options<GenerateVideoCreateShotData, ThrowOnError>): RequestResult<GenerateVideoCreateShotResponses, GenerateVideoCreateShotErrors, ThrowOnError> => (options.client ?? client).post<GenerateVideoCreateShotResponses, GenerateVideoCreateShotErrors, ThrowOnError>({
+    url: '/api/video-create/projects/{projectId}/shots/{shotId}/generate',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 export const batchGenerateVideoCreateShots = <ThrowOnError extends boolean = false>(options: Options<BatchGenerateVideoCreateShotsData, ThrowOnError>): RequestResult<BatchGenerateVideoCreateShotsResponses, BatchGenerateVideoCreateShotsErrors, ThrowOnError> => (options.client ?? client).post<BatchGenerateVideoCreateShotsResponses, BatchGenerateVideoCreateShotsErrors, ThrowOnError>({
     url: '/api/video-create/projects/{projectId}/shots/batch-generate',

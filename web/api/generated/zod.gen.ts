@@ -1999,6 +1999,17 @@ export const zRegenerateVideoCreateSectionPath = z.object({
  */
 export const zRegenerateVideoCreateSectionResponse = zJob;
 
+export const zGenerateVideoCreateShotBody = z.object({
+    videoModel: zSeedanceModelId,
+    ratio: z.enum([
+        '9:16',
+        '16:9',
+        '1:1'
+    ]),
+    resolution: z.enum(['480p', '720p']),
+    generateAudio: z.boolean()
+});
+
 export const zGenerateVideoCreateShotPath = z.object({
     projectId: z.uuid(),
     shotId: z.uuid()
@@ -2017,7 +2028,7 @@ export const zBatchGenerateVideoCreateShotsBody = z.object({
         '1:1'
     ]),
     resolution: z.enum(['480p', '720p']),
-    generateAudio: z.literal(false)
+    generateAudio: z.boolean()
 });
 
 export const zBatchGenerateVideoCreateShotsPath = z.object({

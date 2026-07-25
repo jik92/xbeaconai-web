@@ -2760,7 +2760,12 @@ export type RegenerateVideoCreateSectionResponses = {
 export type RegenerateVideoCreateSectionResponse = RegenerateVideoCreateSectionResponses[keyof RegenerateVideoCreateSectionResponses];
 
 export type GenerateVideoCreateShotData = {
-    body?: never;
+    body: {
+        videoModel: SeedanceModelId;
+        ratio: '9:16' | '16:9' | '1:1';
+        resolution: '480p' | '720p';
+        generateAudio: boolean;
+    };
     path: {
         projectId: string;
         shotId: string;
@@ -2778,6 +2783,10 @@ export type GenerateVideoCreateShotErrors = {
      * Already generating
      */
     409: ApiErrorResponse;
+    /**
+     * Model unavailable
+     */
+    422: ApiErrorResponse;
 };
 
 export type GenerateVideoCreateShotError = GenerateVideoCreateShotErrors[keyof GenerateVideoCreateShotErrors];
@@ -2796,7 +2805,7 @@ export type BatchGenerateVideoCreateShotsData = {
         videoModel: SeedanceModelId;
         ratio: '9:16' | '16:9' | '1:1';
         resolution: '480p' | '720p';
-        generateAudio: false;
+        generateAudio: boolean;
     };
     path: {
         projectId: string;

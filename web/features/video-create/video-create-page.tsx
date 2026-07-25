@@ -37,6 +37,7 @@ import {
   updateAllVideoCreateShotOptions,
   updateVideoCreate,
   updateVideoCreateShotOptions,
+  type VideoCreateShotGenerationOptions,
 } from "@/api/api-client";
 import type { VideoCreateInput, VideoCreateProject } from "@/api/generated/types.gen";
 import { AttachmentPicker, type AttachmentSelection } from "@/components/domain/attachment-picker";
@@ -368,11 +369,12 @@ export function VideoCreatePage() {
   const [openPanels, setOpenPanels] = useState({ requirements: false, style: false, advanced: false });
   const [historyOpen, setHistoryOpen] = useState(false);
   const [batchDialogOpen, setBatchDialogOpen] = useState(false);
-  const [batchSettings, setBatchSettings] = useState<{
-    videoModel: NonNullable<VideoCreateInput["videoModel"]>;
-    ratio: NonNullable<VideoCreateInput["ratio"]>;
-    resolution: "480p" | "720p";
-  }>({ videoModel: "doubao-seedance-2-0-fast-260128", ratio: "9:16", resolution: "720p" });
+  const [batchSettings, setBatchSettings] = useState<VideoCreateShotGenerationOptions>({
+    videoModel: "doubao-seedance-2-0-mini-260615",
+    ratio: "9:16",
+    resolution: "720p",
+    generateAudio: true,
+  });
   const [portraitPickerOpen, setPortraitPickerOpen] = useState(false);
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
@@ -1163,14 +1165,7 @@ export function VideoCreatePage() {
                     variant="outline"
                     size="sm"
                     disabled={!batchEligibleShots.length || Boolean(busy)}
-                    onClick={() => {
-                      setBatchSettings({
-                        videoModel: input.videoModel ?? "doubao-seedance-2-0-fast-260128",
-                        ratio: input.ratio ?? "9:16",
-                        resolution: "720p",
-                      });
-                      setBatchDialogOpen(true);
-                    }}
+                    onClick={() => setBatchDialogOpen(true)}
                   >
                     <WandSparkles /> 批量生成
                   </Button>
@@ -1273,7 +1268,7 @@ export function VideoCreatePage() {
                           disabled={generating || Boolean(busy)}
                           onClick={() =>
                             execute(`shot-${shot.id}`, async () => {
-                              await generateVideoCreateShotVideo(project.project.id, shot.id);
+                              await generateVideoCreateShotVideo(project.project.id, shot.id, batchSettings);
                               void queryClient.invalidateQueries({
                                 queryKey: ["video-create-project", project.project.id],
                               });
@@ -1443,14 +1438,13 @@ export function VideoCreatePage() {
                 );
               })}
             </div>
-            <div className="flex items-center gap-3 rounded-xl border border-line bg-canvas-soft px-4 py-3">
-              <span className="grid size-6 place-items-center rounded-md bg-primary text-white">
-                <Check className="size-4" />
-              </span>
-              <span>
-                <b className="font-medium text-ink">不生成声音</b>
-                <span className="ml-2 text-xs text-muted">后续使用分镜独立配音</span>
-              </span>
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-canvas-soft px-4 py-3">
+              <span className="font-medium text-ink">生成声音</span>
+              <Switch
+                checked={batchSettings.generateAudio}
+                aria-label="生成声音"
+                onCheckedChange={(generateAudio) => setBatchSettings((current) => ({ ...current, generateAudio }))}
+              />
             </div>
             <div className="space-y-4 rounded-xl border border-line bg-canvas-soft p-4">
               <div className="space-y-2">
@@ -1502,10 +1496,7 @@ export function VideoCreatePage() {
               onClick={() =>
                 project &&
                 void execute("batch-shots", async () => {
-                  const result = await batchGenerateVideoCreateShotVideos(project.project.id, {
-                    ...batchSettings,
-                    generateAudio: false,
-                  });
+                  const result = await batchGenerateVideoCreateShotVideos(project.project.id, batchSettings);
                   const submitted = new Set(result.submittedShotIds);
                   setProject((current) =>
                     current

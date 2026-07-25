@@ -4350,19 +4350,31 @@ app.openapi(regenerateVideoCreateSectionRoute, async (c) => {
   return c.json(job, 202);
 });
 
+const VideoCreateShotGenerationOptionsSchema = z.object({
+  videoModel: VideoModelIdSchema,
+  ratio: z.enum(["9:16", "16:9", "1:1"]),
+  resolution: z.enum(["480p", "720p"]),
+  generateAudio: z.boolean(),
+});
+
 const generateVideoCreateShotRoute = createRoute({
   method: "post",
   path: "/api/video-create/projects/{projectId}/shots/{shotId}/generate",
   operationId: "generateVideoCreateShot",
-  request: { params: z.object({ projectId: z.string().uuid(), shotId: z.string().uuid() }) },
+  request: {
+    params: z.object({ projectId: z.string().uuid(), shotId: z.string().uuid() }),
+    body: { required: true, content: { "application/json": { schema: VideoCreateShotGenerationOptionsSchema } } },
+  },
   responses: {
     202: { description: "Accepted", content: { "application/json": { schema: JobSchema } } },
     404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },
     409: { description: "Already generating", content: { "application/json": { schema: ErrorSchema } } },
+    422: { description: "Model unavailable", content: { "application/json": { schema: ErrorSchema } } },
   },
 });
 app.openapi(generateVideoCreateShotRoute, async (c) => {
   const { projectId, shotId } = c.req.valid("param");
+  const options = c.req.valid("json");
   const shot = videoCreates.getOwnedShot(projectId, shotId, c.get("userId"));
   if (!shot)
     return c.json(
@@ -4381,11 +4393,24 @@ app.openapi(generateVideoCreateShotRoute, async (c) => {
       },
       409,
     );
+  if (!videoModelEnabled(options.videoModel))
+    return c.json(
+      {
+        error: {
+          code: "VIDEO_MODEL_UNAVAILABLE",
+          message: "所选视频模型当前不可用",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      422,
+    );
   const job = await enqueueVideoCreateOperation({
     ownerUserId: c.get("userId"),
     projectId,
     operation: "shot",
     shotId,
+    shotOptions: options,
     idempotencyKey: c.req.header("Idempotency-Key")?.trim().slice(0, 128),
   });
   return c.json(job, 202);
@@ -4401,12 +4426,7 @@ const batchGenerateVideoCreateShotsRoute = createRoute({
       required: true,
       content: {
         "application/json": {
-          schema: z.object({
-            videoModel: VideoModelIdSchema,
-            ratio: z.enum(["9:16", "16:9", "1:1"]),
-            resolution: z.enum(["480p", "720p"]),
-            generateAudio: z.literal(false),
-          }),
+          schema: VideoCreateShotGenerationOptionsSchema,
         },
       },
     },

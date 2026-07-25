@@ -307,10 +307,22 @@ export async function regenerateVideoCreateScriptSection(input: {
   return data;
 }
 
-export async function generateVideoCreateShotVideo(projectId: string, shotId: string) {
+export type VideoCreateShotGenerationOptions = {
+  videoModel: NonNullable<VideoCreateInput["videoModel"]>;
+  ratio: NonNullable<VideoCreateInput["ratio"]>;
+  resolution: "480p" | "720p";
+  generateAudio: boolean;
+};
+
+export async function generateVideoCreateShotVideo(
+  projectId: string,
+  shotId: string,
+  options: VideoCreateShotGenerationOptions,
+) {
   configure();
   const { data } = await generateVideoCreateShot({
     path: { projectId, shotId },
+    body: options,
     headers: { ...authHeaders(), "Idempotency-Key": randomUuid() },
     throwOnError: true,
   });
@@ -318,15 +330,7 @@ export async function generateVideoCreateShotVideo(projectId: string, shotId: st
   return data;
 }
 
-export async function batchGenerateVideoCreateShotVideos(
-  projectId: string,
-  options: {
-    videoModel: NonNullable<VideoCreateInput["videoModel"]>;
-    ratio: NonNullable<VideoCreateInput["ratio"]>;
-    resolution: "480p" | "720p";
-    generateAudio: false;
-  },
-) {
+export async function batchGenerateVideoCreateShotVideos(projectId: string, options: VideoCreateShotGenerationOptions) {
   configure();
   const { data } = await batchGenerateVideoCreateShots({
     path: { projectId },
