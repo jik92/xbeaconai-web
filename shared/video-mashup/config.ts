@@ -44,7 +44,7 @@ export function validateVideoMashupConfig(value: unknown): string | undefined {
   if (config.resolution !== "720P" && config.resolution !== "1080P") return "输出分辨率无效";
   if (!Number.isInteger(config.count) || (config.count ?? 0) < 1 || (config.count ?? 0) > 20)
     return "生成数量必须为 1–20";
-  if (typeof config.outputFolderId !== "string" || !config.outputFolderId) return "请选择保存位置";
+  if (typeof config.outputFolderId !== "string") return "保存位置格式无效";
   if ((config.count ?? 0) > theoreticalCombinationCount(config.groups)) return "生成数量不能超过理论组合数";
 }
 

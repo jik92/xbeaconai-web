@@ -136,7 +136,7 @@ export const qwenVoiceCloneJob: WorkerJobHandler = {
       const artifactId = crypto.randomUUID();
       let artifactUrl: string;
       let outputFolderId = "";
-      if (job.values.autoSave === "true") {
+      if (job.values.outputFolderId) {
         const folder = accounts.getAssetFolder(job.ownerUserId, job.values.outputFolderId ?? "");
         if (!folder) throw new Error("任务保存文件夹不存在");
         const storageKey = `${folder.storagePrefix}generated/${job.id}/${name}`;

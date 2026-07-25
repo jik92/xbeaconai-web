@@ -648,11 +648,9 @@ export function ToolboxCreatorForm({
       <div className="min-h-0 flex-1 overflow-y-auto p-4 text-sm max-sm:[&_.tool-form-label]:!justify-start max-sm:[&_.tool-form-row]:!grid-cols-1 [&_.mashup-form]:!grid-cols-1 [&_.mashup-left]:!border-0 [&_.mashup-left]:!p-0 [&_.mashup-right]:!p-0 [&_.tool-form-label]:!justify-end [&_.tool-form-label]:!text-xs [&_.tool-form-label]:!text-muted [&_.tool-form-row]:!min-h-10 [&_.tool-form-row]:!grid-cols-[96px_minmax(0,1fr)] [&_.tool-form-row]:!gap-3 [&_.tool-simple-form]:!mx-auto [&_.tool-simple-form]:!w-full [&_.tool-simple-form]:!max-w-2xl [&_.tool-simple-form]:!p-0 [&_input:not([type=range])]:!h-8 [&_input:not([type=range])]:!rounded-md [&_input:not([type=range])]:!border-line [&_input:not([type=range])]:!px-3 [&_select]:!h-8 [&_textarea]:!rounded-md [&_textarea]:!border-line [&_textarea]:!p-3">
         {content}
         <div className="mx-auto mt-3 grid w-full max-w-2xl items-start gap-3 sm:grid-cols-[96px_minmax(0,1fr)]">
-          {compactLabel("保存位置", true)}
+          {compactLabel("保存位置")}
           <SaveLocationPicker
             moduleId={config.id}
-            required
-            invalid={submitted && !values.outputFolderId}
             value={values.outputFolderId ?? ""}
             onChange={(folderId) => setValue("outputFolderId", folderId)}
           />
@@ -1074,7 +1072,7 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
   );
   const submit = async () => {
     setSubmitted(true);
-    if (missing.length || !values.outputFolderId) return;
+    if (missing.length) return;
     setRunning(true);
     setApiError("");
     try {

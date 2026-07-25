@@ -107,9 +107,9 @@ describe("douyin API integration (isolated DB)", () => {
     const cutFolder = realAccounts.createAssetFolder(userId, "API 分割成片");
     const voiceFolder = realAccounts.createAssetFolder(userId, "API 音色成片");
 
-    const fallback = await honoApp.request("/api/tool-output-folders/video-cut", { headers: authHeaders() });
-    expect(fallback.status).toBe(200);
-    expect(((await fallback.json()) as { folder: { id: string } }).folder.id).toBe(folderId);
+    const initial = await honoApp.request("/api/tool-output-folders/video-cut", { headers: authHeaders() });
+    expect(initial.status).toBe(200);
+    expect(await initial.json()).toEqual({});
 
     for (const [moduleId, selectedFolderId] of [
       ["video-cut", cutFolder.id],
@@ -127,6 +127,16 @@ describe("douyin API integration (isolated DB)", () => {
     const voiceDefault = await honoApp.request("/api/tool-output-folders/voice-clone", { headers: authHeaders() });
     expect(((await cutDefault.json()) as { folder: { id: string } }).folder.id).toBe(cutFolder.id);
     expect(((await voiceDefault.json()) as { folder: { id: string } }).folder.id).toBe(voiceFolder.id);
+
+    const cleared = await honoApp.request("/api/tool-output-folders/video-cut", {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({}),
+    });
+    expect(cleared.status).toBe(200);
+    expect(await cleared.json()).toEqual({});
+    const cutAfterClear = await honoApp.request("/api/tool-output-folders/video-cut", { headers: authHeaders() });
+    expect(await cutAfterClear.json()).toEqual({});
 
     const foreign = await honoApp.request("/api/tool-output-folders/video-cut", {
       method: "PUT",

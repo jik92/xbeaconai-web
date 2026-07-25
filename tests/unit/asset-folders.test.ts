@@ -25,20 +25,23 @@ describe("asset folder mapping", () => {
       password: "Password123",
       displayName: "其他工具目录用户",
     });
-    const [accountDefault] = store.listAssetFolders(user.id);
+    store.listAssetFolders(user.id);
     const cutFolder = store.createAssetFolder(user.id, "分割成片");
     const voiceFolder = store.createAssetFolder(user.id, "音色成片");
 
-    expect(store.getModuleOutputFolder(user.id, "video-cut").id).toBe(accountDefault.id);
-    expect(store.setModuleOutputFolder(user.id, "video-cut", cutFolder.id).id).toBe(cutFolder.id);
-    expect(store.setModuleOutputFolder(user.id, "voice-clone", voiceFolder.id).id).toBe(voiceFolder.id);
-    expect(store.getModuleOutputFolder(user.id, "video-cut").id).toBe(cutFolder.id);
-    expect(store.getModuleOutputFolder(user.id, "voice-clone").id).toBe(voiceFolder.id);
+    expect(store.getModuleOutputFolder(user.id, "video-cut")).toBeUndefined();
+    expect(store.setModuleOutputFolder(user.id, "video-cut", cutFolder.id)?.id).toBe(cutFolder.id);
+    expect(store.setModuleOutputFolder(user.id, "voice-clone", voiceFolder.id)?.id).toBe(voiceFolder.id);
+    expect(store.getModuleOutputFolder(user.id, "video-cut")?.id).toBe(cutFolder.id);
+    expect(store.getModuleOutputFolder(user.id, "voice-clone")?.id).toBe(voiceFolder.id);
     expect(() => store.setModuleOutputFolder(other.user.id, "video-cut", cutFolder.id)).toThrow(AccountError);
 
+    expect(store.setModuleOutputFolder(user.id, "video-cut", undefined)).toBeUndefined();
+    expect(store.getModuleOutputFolder(user.id, "video-cut")).toBeUndefined();
+    store.setModuleOutputFolder(user.id, "video-cut", cutFolder.id);
     store.deleteAssetFolder(user.id, cutFolder.id);
-    expect(store.getModuleOutputFolder(user.id, "video-cut").id).toBe(accountDefault.id);
-    expect(store.getModuleOutputFolder(user.id, "voice-clone").id).toBe(voiceFolder.id);
+    expect(store.getModuleOutputFolder(user.id, "video-cut")).toBeUndefined();
+    expect(store.getModuleOutputFolder(user.id, "voice-clone")?.id).toBe(voiceFolder.id);
     store.close();
   });
 

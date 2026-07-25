@@ -1,6 +1,7 @@
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, resolve } from "node:path";
+import { env } from "../../server/env";
 import { probeMedia, splitFixed } from "../../server/media/ffmpeg";
 import { ossutils } from "../../server/storage/ossutils";
 import type { JobResult, StageProvenance } from "../../server/types";
@@ -12,14 +13,14 @@ export const videoCutJob: WorkerJobHandler = {
   async execute(job, context) {
     const { accounts, store } = context;
     if (!accounts) throw new Error("素材所有权服务不可用");
-    if (!ossutils.configured) throw new Error("TOS_NOT_CONFIGURED: 视频切片必须保存到素材文件夹的 TOS 目录");
     const sourceAssetId = job.values.source?.split(":", 3)[1];
     if (!sourceAssetId) throw new Error("视频素材标识无效");
     const sourceAsset = accounts.getOwnedAsset(job.ownerUserId, sourceAssetId);
     if (!sourceAsset?.mimeType.startsWith("video/")) throw new Error("视频素材不存在或不属于当前账号");
     const folderId = job.values.outputFolderId;
     const folder = folderId ? accounts.getAssetFolder(job.ownerUserId, folderId) : undefined;
-    if (!folder) throw new Error("保存文件夹不存在或不属于当前账号");
+    if (folderId && !folder) throw new Error("保存文件夹不存在或不属于当前账号");
+    if (folder && !ossutils.configured) throw new Error("TOS_NOT_CONFIGURED: 视频切片必须保存到素材文件夹的 TOS 目录");
 
     const plan: StageProvenance[] = [
       {
@@ -73,37 +74,54 @@ export const videoCutJob: WorkerJobHandler = {
         const sequence = String(index + 1).padStart(3, "0");
         const fileName = `${originalBase || "video"}_切片_${sequence}.mp4`;
         const assetId = crypto.randomUUID();
-        const storageKey = `${folder.storagePrefix}generated/${job.id}/${fileName}`;
         const file = Bun.file(clipPath);
         const media = await probeMedia(clipPath);
         const video = media.streams.find((stream) => stream.codec_type === "video");
-        await ossutils.putLibraryFile({
-          filePath: clipPath,
-          key: storageKey,
-          mimeType: "video/mp4",
-          sizeBytes: file.size,
-        });
-        accounts.createAsset({
-          id: assetId,
-          ownerUserId: job.ownerUserId,
-          storageKey,
-          originalName: fileName,
-          mimeType: "video/mp4",
-          byteSize: file.size,
-          width: video?.width,
-          height: video?.height,
-          durationSec: Number(media.format.duration ?? 0) || undefined,
-          kind: "media",
-          displayName: `${sourceAsset.displayName}_切片_${sequence}`,
-          description: `由任务 ${job.title} 自动生成`,
-          folderId: folder.id,
-          createdAt: new Date().toISOString(),
-        });
+        let artifactUrl: string;
+        if (folder) {
+          const storageKey = `${folder.storagePrefix}generated/${job.id}/${fileName}`;
+          await ossutils.putLibraryFile({
+            filePath: clipPath,
+            key: storageKey,
+            mimeType: "video/mp4",
+            sizeBytes: file.size,
+          });
+          accounts.createAsset({
+            id: assetId,
+            ownerUserId: job.ownerUserId,
+            storageKey,
+            originalName: fileName,
+            mimeType: "video/mp4",
+            byteSize: file.size,
+            width: video?.width,
+            height: video?.height,
+            durationSec: Number(media.format.duration ?? 0) || undefined,
+            kind: "media",
+            displayName: `${sourceAsset.displayName}_切片_${sequence}`,
+            description: `由任务 ${job.title} 自动生成`,
+            folderId: folder.id,
+            createdAt: new Date().toISOString(),
+          });
+          artifactUrl = `/api/assets/${assetId}/content`;
+        } else {
+          const artifactName = `${job.id}-${fileName}`;
+          await Bun.write(resolve(env.dataDir, "results", artifactName), file);
+          accounts.createArtifact({
+            id: assetId,
+            ownerUserId: job.ownerUserId,
+            jobId: job.id,
+            storageKey: artifactName,
+            name: fileName,
+            mimeType: "video/mp4",
+            createdAt: new Date().toISOString(),
+          });
+          artifactUrl = `/api/artifacts/${assetId}`;
+        }
         artifacts.push({
           id: assetId,
           name: fileName,
           mimeType: "video/mp4",
-          url: `/api/assets/${assetId}/content`,
+          url: artifactUrl,
           executionMode: "local",
           lineage: plan,
         });
@@ -115,16 +133,18 @@ export const videoCutJob: WorkerJobHandler = {
       plan[1].completedAt = new Date().toISOString();
       context.change(job.id, {
         status: "succeeded",
-        stage: "已保存到素材文件夹",
+        stage: folder ? "已保存到素材文件夹" : "已完成",
         progress: 100,
         provenance: plan,
         result: {
           kind: "video-cut",
           title: job.title,
-          summary: `已生成 ${artifacts.length} 个切片并保存到“${folder.name}”文件夹。`,
+          summary: folder
+            ? `已生成 ${artifacts.length} 个切片并保存到“${folder.name}”文件夹。`
+            : `已生成 ${artifacts.length} 个切片。`,
           artifacts,
           data: {
-            values: { ...job.values, outputFolderId: folder.id, clipCount: String(artifacts.length) },
+            values: { ...job.values, outputFolderId: folder?.id ?? "", clipCount: String(artifacts.length) },
             generatedAt: new Date().toISOString(),
             mock: false,
           },
@@ -136,7 +156,7 @@ export const videoCutJob: WorkerJobHandler = {
           job.ownerUserId,
           "task_completed",
           "视频分割已完成",
-          `${artifacts.length} 个切片已保存到“${folder.name}”。`,
+          folder ? `${artifacts.length} 个切片已保存到“${folder.name}”。` : `${artifacts.length} 个切片已生成。`,
           job.id,
         );
     } finally {

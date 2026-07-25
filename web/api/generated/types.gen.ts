@@ -1455,7 +1455,7 @@ export type GetToolOutputFolderResponses = {
      * Resolved module output folder
      */
     200: {
-        folder: AssetFolder;
+        folder?: AssetFolder;
     };
 };
 
@@ -1463,7 +1463,7 @@ export type GetToolOutputFolderResponse = GetToolOutputFolderResponses[keyof Get
 
 export type SetToolOutputFolderData = {
     body: {
-        folderId: string;
+        folderId?: string;
     };
     path: {
         moduleId: AiToolModuleId;
@@ -1490,7 +1490,7 @@ export type SetToolOutputFolderResponses = {
      * Updated module output folder
      */
     200: {
-        folder: AssetFolder;
+        folder?: AssetFolder;
     };
 };
 

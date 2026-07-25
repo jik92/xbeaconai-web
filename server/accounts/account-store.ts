@@ -967,17 +967,26 @@ export class AccountStore {
       .run();
     return folder;
   }
-  getModuleOutputFolder(userId: string, moduleId: string): AssetFolder {
+  getModuleOutputFolder(userId: string, moduleId: string): AssetFolder | undefined {
     if (!isAiToolModuleId(moduleId)) throw new AccountError("INVALID_MODULE", "AI 工具模块不存在", 422);
     const folderId = this.db
       .select({ id: moduleOutputFolderDefaults.folderId })
       .from(moduleOutputFolderDefaults)
       .where(and(eq(moduleOutputFolderDefaults.ownerUserId, userId), eq(moduleOutputFolderDefaults.moduleId, moduleId)))
       .get()?.id;
-    return (folderId && this.getAssetFolder(userId, folderId)) || this.ensureDefaultAssetFolder(userId);
+    return folderId ? this.getAssetFolder(userId, folderId) : undefined;
   }
-  setModuleOutputFolder(userId: string, moduleId: string, folderId: string): AssetFolder {
+  setModuleOutputFolder(userId: string, moduleId: string, folderId?: string): AssetFolder | undefined {
     if (!isAiToolModuleId(moduleId)) throw new AccountError("INVALID_MODULE", "AI 工具模块不存在", 422);
+    if (!folderId) {
+      this.db
+        .delete(moduleOutputFolderDefaults)
+        .where(
+          and(eq(moduleOutputFolderDefaults.ownerUserId, userId), eq(moduleOutputFolderDefaults.moduleId, moduleId)),
+        )
+        .run();
+      return undefined;
+    }
     const folder = this.getAssetFolder(userId, folderId);
     if (!folder) throw new AccountError("FOLDER_NOT_FOUND", "文件夹不存在", 404);
     const updatedAt = now();

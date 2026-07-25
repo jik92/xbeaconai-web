@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, resolve } from "node:path";
+import { env } from "../../server/env";
 import { concatMashupVideos, normalizeMashupVideo, probeMedia } from "../../server/media/ffmpeg";
 import { ossutils } from "../../server/storage/ossutils";
 import type { JobResult, StageProvenance } from "../../server/types";
@@ -14,10 +15,10 @@ export const videoMashupJob: WorkerJobHandler = {
   async execute(job, context) {
     const { accounts } = context;
     if (!accounts) throw new Error("素材所有权服务不可用");
-    if (!ossutils.configured) throw new Error("TOS_NOT_CONFIGURED: 视频混剪必须保存到私有 TOS");
     const config = parseVideoMashupConfig(job.values.config ?? "");
     const folder = accounts.getAssetFolder(job.ownerUserId, config.outputFolderId);
-    if (!folder) throw new Error("保存文件夹不存在或不属于当前账号");
+    if (config.outputFolderId && !folder) throw new Error("保存文件夹不存在或不属于当前账号");
+    if (folder && !ossutils.configured) throw new Error("TOS_NOT_CONFIGURED: 视频混剪必须保存到私有 TOS");
     const combinations = planMashupCombinations(config);
     if (!combinations.length) throw new Error("混剪没有可用组合");
     const uniqueAssetIds = [...new Set(config.groups.flatMap((group) => group.assetIds))];
@@ -144,50 +145,67 @@ export const videoMashupJob: WorkerJobHandler = {
           const safeTitle = job.title.replace(/[^\p{L}\p{N}._-]+/gu, "-") || "视频混剪";
           const fileName = `${safeTitle}_${sequence}.mp4`;
           const assetId = crypto.randomUUID();
-          const storageKey = `${folder.storagePrefix}generated/${job.id}/${fileName}`;
-          const uploadAbort = new AbortController();
-          const cancellationTimer = setInterval(() => {
-            if (context.store.get(job.id)?.cancelRequested) uploadAbort.abort();
-          }, 500);
-          try {
-            await ossutils.putLibraryFile({
-              filePath: outputPath,
-              key: storageKey,
-              mimeType: "video/mp4",
-              sizeBytes: file.size,
-              signal: uploadAbort.signal,
-              onProgress: (percent) =>
-                context.change(job.id, {
-                  stage: `正在保存成片 ${index + 1}/${combinations.length} · ${Math.round(percent * 100)}%`,
-                  progress: Math.min(98, Math.round(42 + ((index + percent) / combinations.length) * 55)),
-                }),
-            });
-          } finally {
-            clearInterval(cancellationTimer);
-          }
           const media = await probeMedia(outputPath);
           const video = media.streams.find((stream) => stream.codec_type === "video");
-          accounts.createAsset({
-            id: assetId,
-            ownerUserId: job.ownerUserId,
-            storageKey,
-            originalName: fileName,
-            mimeType: "video/mp4",
-            byteSize: file.size,
-            width: video?.width,
-            height: video?.height,
-            durationSec: Number(media.format.duration ?? 0) || undefined,
-            kind: "media",
-            displayName: `${job.title}_${sequence}`,
-            description: `由视频混剪任务 ${job.id} 的组合 ${combination.key} 创建`,
-            folderId: folder.id,
-            createdAt: new Date().toISOString(),
-          });
+          let artifactUrl: string;
+          if (folder) {
+            const storageKey = `${folder.storagePrefix}generated/${job.id}/${fileName}`;
+            const uploadAbort = new AbortController();
+            const cancellationTimer = setInterval(() => {
+              if (context.store.get(job.id)?.cancelRequested) uploadAbort.abort();
+            }, 500);
+            try {
+              await ossutils.putLibraryFile({
+                filePath: outputPath,
+                key: storageKey,
+                mimeType: "video/mp4",
+                sizeBytes: file.size,
+                signal: uploadAbort.signal,
+                onProgress: (percent) =>
+                  context.change(job.id, {
+                    stage: `正在保存成片 ${index + 1}/${combinations.length} · ${Math.round(percent * 100)}%`,
+                    progress: Math.min(98, Math.round(42 + ((index + percent) / combinations.length) * 55)),
+                  }),
+              });
+            } finally {
+              clearInterval(cancellationTimer);
+            }
+            accounts.createAsset({
+              id: assetId,
+              ownerUserId: job.ownerUserId,
+              storageKey,
+              originalName: fileName,
+              mimeType: "video/mp4",
+              byteSize: file.size,
+              width: video?.width,
+              height: video?.height,
+              durationSec: Number(media.format.duration ?? 0) || undefined,
+              kind: "media",
+              displayName: `${job.title}_${sequence}`,
+              description: `由视频混剪任务 ${job.id} 的组合 ${combination.key} 创建`,
+              folderId: folder.id,
+              createdAt: new Date().toISOString(),
+            });
+            artifactUrl = `/api/assets/${assetId}/content`;
+          } else {
+            const artifactName = `${job.id}-${fileName}`;
+            await Bun.write(resolve(env.dataDir, "results", artifactName), file);
+            accounts.createArtifact({
+              id: assetId,
+              ownerUserId: job.ownerUserId,
+              jobId: job.id,
+              storageKey: artifactName,
+              name: fileName,
+              mimeType: "video/mp4",
+              createdAt: new Date().toISOString(),
+            });
+            artifactUrl = `/api/artifacts/${assetId}`;
+          }
           artifacts.push({
             id: assetId,
             name: fileName,
             mimeType: "video/mp4",
-            url: `/api/assets/${assetId}/content`,
+            url: artifactUrl,
             executionMode: "local",
             lineage: plan,
           });
@@ -222,9 +240,13 @@ export const videoMashupJob: WorkerJobHandler = {
         result: {
           kind: "video-mashup",
           title: job.title,
-          summary: failed.length
-            ? `成功 ${artifacts.length} 个，失败 ${failed.length} 个，已保存到“${folder.name}”。`
-            : `已生成 ${artifacts.length} 个成片并保存到“${folder.name}”。`,
+          summary: folder
+            ? failed.length
+              ? `成功 ${artifacts.length} 个，失败 ${failed.length} 个，已保存到“${folder.name}”。`
+              : `已生成 ${artifacts.length} 个成片并保存到“${folder.name}”。`
+            : failed.length
+              ? `成功 ${artifacts.length} 个，失败 ${failed.length} 个。`
+              : `已生成 ${artifacts.length} 个成片。`,
           artifacts,
           data: {
             values: {

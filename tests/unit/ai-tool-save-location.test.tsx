@@ -31,6 +31,7 @@ describe("AI tool save locations", () => {
         </QueryClientProvider>,
       );
       expect(html.match(/aria-label="保存位置"/g)).toHaveLength(1);
+      expect(html).not.toContain('required=""');
     }
   });
 

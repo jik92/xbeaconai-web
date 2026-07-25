@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { env } from "../../server/env";
 import {
   MediaKitError,
@@ -156,29 +157,45 @@ function createMediaKitJob(config: MediaKitJobConfig): WorkerJobHandler {
         context.change(job.id, { stage: "正在保存处理结果", progress: 88, providerStatus: "completed" });
         const bytes = await volcMediaKit.download(resultUrl);
         const folder = accounts.getAssetFolder(job.ownerUserId, job.values.outputFolderId ?? "");
-        if (!folder) throw new Error("任务保存文件夹不存在");
         const fileName = `${safeFileBase(sourceAsset.originalName)}-${config.resultSuffix}.mp4`;
-        const storageKey = `${folder.storagePrefix}generated/${job.id}/${fileName}`;
-        await ossutils.putLibraryBytes({ bytes, key: storageKey, mimeType: "video/mp4" });
         const assetId = crypto.randomUUID();
-        accounts.createAsset({
-          id: assetId,
-          ownerUserId: job.ownerUserId,
-          storageKey,
-          originalName: fileName,
-          mimeType: "video/mp4",
-          byteSize: bytes.byteLength,
-          durationSec: completed.result?.duration,
-          kind: "media",
-          displayName: `${sourceAsset.displayName}-${config.resultSuffix}`,
-          description: `由 AI MediaKit ${config.summary}`,
-          folderId: folder.id,
-          createdAt: new Date().toISOString(),
-        });
+        let artifactUrl: string;
+        if (folder) {
+          const storageKey = `${folder.storagePrefix}generated/${job.id}/${fileName}`;
+          await ossutils.putLibraryBytes({ bytes, key: storageKey, mimeType: "video/mp4" });
+          accounts.createAsset({
+            id: assetId,
+            ownerUserId: job.ownerUserId,
+            storageKey,
+            originalName: fileName,
+            mimeType: "video/mp4",
+            byteSize: bytes.byteLength,
+            durationSec: completed.result?.duration,
+            kind: "media",
+            displayName: `${sourceAsset.displayName}-${config.resultSuffix}`,
+            description: `由 AI MediaKit ${config.summary}`,
+            folderId: folder.id,
+            createdAt: new Date().toISOString(),
+          });
+          artifactUrl = `/api/assets/${assetId}/content`;
+        } else {
+          const artifactName = `${job.id}-${fileName}`;
+          await Bun.write(resolve(env.dataDir, "results", artifactName), bytes);
+          accounts.createArtifact({
+            id: assetId,
+            ownerUserId: job.ownerUserId,
+            jobId: job.id,
+            storageKey: artifactName,
+            name: fileName,
+            mimeType: "video/mp4",
+            createdAt: new Date().toISOString(),
+          });
+          artifactUrl = `/api/artifacts/${assetId}`;
+        }
         stage.completedAt = new Date().toISOString();
         context.change(job.id, {
           status: "succeeded",
-          stage: "已完成并保存到素材库",
+          stage: folder ? "已完成并保存到素材库" : "已完成",
           progress: 100,
           providerStatus: "completed",
           provenance: [stage],
@@ -186,19 +203,19 @@ function createMediaKitJob(config: MediaKitJobConfig): WorkerJobHandler {
           result: {
             kind: config.moduleId,
             title: job.title,
-            summary: `${config.summary}，结果已保存到“${folder.name}”。`,
+            summary: folder ? `${config.summary}，结果已保存到“${folder.name}”。` : `${config.summary}。`,
             artifacts: [
               {
                 id: assetId,
                 name: fileName,
                 mimeType: "video/mp4",
-                url: `/api/assets/${assetId}/content`,
+                url: artifactUrl,
                 executionMode: "real",
                 lineage: [stage],
               },
             ],
             data: {
-              values: { ...job.values, outputFolderId: folder.id, providerTaskId: taskId },
+              values: { ...job.values, outputFolderId: folder?.id ?? "", providerTaskId: taskId },
               generatedAt: new Date().toISOString(),
               mock: false,
             },

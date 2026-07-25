@@ -20,8 +20,8 @@ describe("Qwen voice clone UI", () => {
     expect(modal).toContain("官方支持的合成方言");
     expect(modal).toContain("音频转换文本");
     expect(modal).toContain("音色速度");
-    expect(modal).toContain("const [autoSave, setAutoSave] = useState(true)");
-    expect(modal).toContain("autoSave: String(autoSave)");
+    expect(modal).not.toContain("qwen-voice-auto-save");
+    expect(modal).toContain("autoSave: String(Boolean(outputFolderId))");
     expect(modal).toContain("checkQwenVoiceSample");
     expect(modal).toContain("sampleChecking");
     expect(modal).toContain("录音校验通过");

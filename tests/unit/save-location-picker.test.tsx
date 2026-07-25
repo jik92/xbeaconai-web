@@ -33,7 +33,7 @@ const createdFolder: AssetFolder = {
   updatedAt: "2026-07-26T01:00:00.000Z",
 };
 const fetchAssetFolders = mock(async () => folders);
-const fetchToolOutputFolder = mock(async (_moduleId: string) => folders[1]);
+const fetchToolOutputFolder = mock(async (_moduleId: string): Promise<AssetFolder | null> => null);
 const createAssetFolder = mock(async (_name: string) => createdFolder);
 const setDefaultAssetFolder = mock(async (_folderId: string) => createdFolder);
 const setToolOutputFolder = mock(async (_moduleId: string, _folderId: string) => createdFolder);
@@ -93,13 +93,30 @@ async function renderPicker(value = "", onChange = mock((_folderId: string) => u
 }
 
 describe("SaveLocationPicker", () => {
-  test("selects the module default folder and renders nested folders", async () => {
+  test("defaults to not saving and renders nested folders", async () => {
     const { container, onChange } = await renderPicker();
 
     expect(fetchToolOutputFolder).toHaveBeenCalledWith("video-cut");
-    expect(onChange).toHaveBeenCalledWith("folder-child");
+    expect(onChange).not.toHaveBeenCalled();
+    expect(container.querySelector("select")?.value).toBe("");
+    expect(container.querySelector("select")?.textContent).toContain("不保存素材库");
     expect(container.querySelector("select")?.textContent).toContain("默认素材（素材库默认）");
-    expect(container.querySelector("select")?.textContent).toContain("　子文件夹（此任务默认）");
+    expect(container.querySelector("select")?.textContent).toContain("　子文件夹");
+  });
+
+  test("clears the module default when selecting not to save", async () => {
+    fetchToolOutputFolder.mockImplementationOnce(async () => folders[1]);
+    const { container, onChange } = await renderPicker("folder-child");
+    const select = container.querySelector("select") as HTMLSelectElement;
+
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value")?.set?.call(select, "");
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(onChange).toHaveBeenCalledWith("");
+    expect(setToolOutputFolder).toHaveBeenCalledWith("video-cut", "");
   });
 
   test("creates a root folder, selects it, and makes it the default", async () => {

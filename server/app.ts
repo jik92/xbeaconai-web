@@ -2061,7 +2061,7 @@ const getToolOutputFolderRoute = createRoute({
   responses: {
     200: {
       description: "Resolved module output folder",
-      content: { "application/json": { schema: z.object({ folder: AssetFolderSchema }) } },
+      content: { "application/json": { schema: z.object({ folder: AssetFolderSchema.optional() }) } },
     },
     400: { description: "Invalid AI tool module", content: { "application/json": { schema: ErrorSchema } } },
   },
@@ -2069,7 +2069,7 @@ const getToolOutputFolderRoute = createRoute({
 
 app.openapi(getToolOutputFolderRoute, (c) => {
   const folder = accounts.getModuleOutputFolder(c.get("userId"), c.req.valid("param").moduleId);
-  return c.json({ folder: folderResponse(folder) }, 200);
+  return c.json(folder ? { folder: folderResponse(folder) } : {}, 200);
 });
 
 const setToolOutputFolderRoute = createRoute({
@@ -2080,13 +2080,15 @@ const setToolOutputFolderRoute = createRoute({
     params: z.object({ moduleId: AiToolModuleSchema }),
     body: {
       required: true,
-      content: { "application/json": { schema: z.object({ folderId: z.string().uuid() }) } },
+      content: {
+        "application/json": { schema: z.object({ folderId: z.string().uuid().optional() }) },
+      },
     },
   },
   responses: {
     200: {
       description: "Updated module output folder",
-      content: { "application/json": { schema: z.object({ folder: AssetFolderSchema }) } },
+      content: { "application/json": { schema: z.object({ folder: AssetFolderSchema.optional() }) } },
     },
     400: { description: "Invalid AI tool module", content: { "application/json": { schema: ErrorSchema } } },
     404: { description: "Folder not found", content: { "application/json": { schema: ErrorSchema } } },
@@ -2098,9 +2100,9 @@ app.openapi(setToolOutputFolderRoute, (c) => {
     const folder = accounts.setModuleOutputFolder(
       c.get("userId"),
       c.req.valid("param").moduleId,
-      c.req.valid("json").folderId,
+      c.req.valid("json").folderId ?? undefined,
     );
-    return c.json({ folder: folderResponse(folder) }, 200);
+    return c.json(folder ? { folder: folderResponse(folder) } : {}, 200);
   } catch (error) {
     if (error instanceof AccountError)
       return c.json(
@@ -5705,7 +5707,7 @@ app.openapi(createJobRoute, async (c) => {
   }
   if (isAiToolModuleId(moduleId)) {
     const outputFolderId = jobValues.outputFolderId;
-    if (!accounts.getAssetFolder(ownerUserId, outputFolderId))
+    if (outputFolderId && !accounts.getAssetFolder(ownerUserId, outputFolderId))
       return c.json(
         {
           error: {

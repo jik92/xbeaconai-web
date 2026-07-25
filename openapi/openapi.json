@@ -4722,10 +4722,7 @@
                     "folder": {
                       "$ref": "#/components/schemas/AssetFolder"
                     }
-                  },
-                  "required": [
-                    "folder"
-                  ]
+                  }
                 }
               }
             }
@@ -4765,10 +4762,7 @@
                     "type": "string",
                     "format": "uuid"
                   }
-                },
-                "required": [
-                  "folderId"
-                ]
+                }
               }
             }
           }
@@ -4784,10 +4778,7 @@
                     "folder": {
                       "$ref": "#/components/schemas/AssetFolder"
                     }
-                  },
-                  "required": [
-                    "folder"
-                  ]
+                  }
                 }
               }
             }

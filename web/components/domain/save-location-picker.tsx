@@ -72,6 +72,7 @@ export function SaveLocationPicker({
   useEffect(() => {
     if (!folders.length || folders.some((folder) => folder.id === value)) return;
     const preferred = moduleId ? moduleDefault : folders.find((folder) => folder.isDefault);
+    if (moduleId && !preferred) return;
     if (!preferred) return;
     const resolved = folders.find((folder) => folder.id === preferred.id) ?? folders[0];
     onChange(resolved.id);
@@ -133,13 +134,19 @@ export function SaveLocationPicker({
           id={id}
           aria-label="保存位置"
           className={cn("h-8", invalid && "border-red-500")}
-          required={required}
-          disabled={disabled || isLoading || (Boolean(moduleId) && defaultLoading) || !folders.length}
+          required={moduleId ? false : required}
+          disabled={disabled || isLoading || (Boolean(moduleId) && defaultLoading)}
           value={value}
           onChange={(event) => void selectFolder(event.target.value)}
         >
-          <option value="" disabled>
-            {isLoading ? "正在加载我的文件夹…" : folders.length ? "请选择我的文件夹" : "暂无文件夹"}
+          <option value="" disabled={!moduleId}>
+            {isLoading
+              ? "正在加载我的文件夹…"
+              : moduleId
+                ? "不保存素材库"
+                : folders.length
+                  ? "请选择我的文件夹"
+                  : "暂无文件夹"}
           </option>
           {orderedFolders.map(({ folder, depth }) => (
             <option key={folder.id} value={folder.id}>

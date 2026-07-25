@@ -1258,11 +1258,11 @@ export const zGetToolOutputFolderPath = z.object({
  * Resolved module output folder
  */
 export const zGetToolOutputFolderResponse = z.object({
-    folder: zAssetFolder
+    folder: zAssetFolder.optional()
 });
 
 export const zSetToolOutputFolderBody = z.object({
-    folderId: z.uuid()
+    folderId: z.uuid().optional()
 });
 
 export const zSetToolOutputFolderPath = z.object({
@@ -1273,7 +1273,7 @@ export const zSetToolOutputFolderPath = z.object({
  * Updated module output folder
  */
 export const zSetToolOutputFolderResponse = z.object({
-    folder: zAssetFolder
+    folder: zAssetFolder.optional()
 });
 
 export const zSaveAssetMetadataBody = z.object({

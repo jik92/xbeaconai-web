@@ -8,7 +8,6 @@ import { ToolCreatorModal } from "@/components/domain/tool-creator-modal";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
-import { Switch } from "@/components/ui/switch";
 import { qwenVoiceDialects, qwenVoiceSpeeds, qwenVoiceStyles } from "../../../shared/voice/qwen-voice";
 
 interface QwenVoiceCloneModalProps {
@@ -26,7 +25,6 @@ export function QwenVoiceCloneModal({ open, onClose, onCreated }: QwenVoiceClone
   const [style, setStyle] = useState<(typeof qwenVoiceStyles)[number]>("标准播音风格");
   const [speechSpeed, setSpeechSpeed] = useState<(typeof qwenVoiceSpeeds)[number]>("标准");
   const [demoText, setDemoText] = useState("恭喜发财，天天向上。");
-  const [autoSave, setAutoSave] = useState(true);
   const [outputFolderId, setOutputFolderId] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -47,7 +45,6 @@ export function QwenVoiceCloneModal({ open, onClose, onCreated }: QwenVoiceClone
     if (!sample) return setError("请选择 5–60 秒的单人声音频");
     if (sampleChecking || !samplePreflight) return setError(sampleError || "请等待录音校验完成");
     if (demoText.trim().length < 4 || demoText.trim().length > 300) return setError("音频转换文本需为 4–300 字");
-    if (!outputFolderId) return setError("请选择保存位置");
     setSubmitting(true);
     try {
       const title = `Qwen 音色人物 · ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
@@ -59,7 +56,7 @@ export function QwenVoiceCloneModal({ open, onClose, onCreated }: QwenVoiceClone
         dialect,
         style,
         speechSpeed,
-        autoSave: String(autoSave),
+        autoSave: String(Boolean(outputFolderId)),
         outputFolderId,
       });
       onCreated(job);
@@ -170,16 +167,11 @@ export function QwenVoiceCloneModal({ open, onClose, onCreated }: QwenVoiceClone
             onChange={(event) => setDemoText(event.target.value)}
           />
         </div>
-        <div className="flex items-center justify-between rounded-md border border-line p-3">
-          <Label htmlFor="qwen-voice-auto-save">自动保存到素材库</Label>
-          <Switch id="qwen-voice-auto-save" checked={autoSave} onCheckedChange={setAutoSave} />
-        </div>
         <div className="space-y-1.5">
           <Label htmlFor="qwen-voice-output-folder">保存位置</Label>
           <SaveLocationPicker
             id="qwen-voice-output-folder"
             moduleId="voice-clone"
-            required
             value={outputFolderId}
             onChange={setOutputFolderId}
           />
@@ -190,7 +182,7 @@ export function QwenVoiceCloneModal({ open, onClose, onCreated }: QwenVoiceClone
         <Button variant="outline" disabled={submitting} onClick={close}>
           取消
         </Button>
-        <Button disabled={submitting || sampleChecking || !samplePreflight || !outputFolderId} onClick={submit}>
+        <Button disabled={submitting || sampleChecking || !samplePreflight} onClick={submit}>
           {submitting && <LoaderCircle className="animate-spin" />}
           {submitting ? "正在创建…" : "创建并生成试听"}
         </Button>
