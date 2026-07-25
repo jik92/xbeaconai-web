@@ -315,6 +315,24 @@ export class SqliteJobStore {
     return next;
   }
 
+  /**
+   * Keeps project review writes isolated from worker-owned lifecycle fields.
+   * In particular, a browser autosave must never overwrite status, stage or
+   * progress read by an earlier request.
+   */
+  updateRemixProjectMetadata(id: string, input: { title: string; values: JobRecord["values"] }): JobRecord | undefined {
+    const current = this.get(id);
+    if (!current) return undefined;
+    if (current.title === input.title && JSON.stringify(current.values) === JSON.stringify(input.values))
+      return current;
+    this.db
+      .update(jobs)
+      .set({ title: input.title, values: input.values, updatedAt: new Date().toISOString() })
+      .where(eq(jobs.id, id))
+      .run();
+    return this.get(id);
+  }
+
   scheduleObjectCleanup(jobId: string, key: string, error: unknown) {
     const timestamp = new Date().toISOString();
     this.db.transaction(

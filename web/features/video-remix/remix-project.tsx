@@ -962,6 +962,7 @@ function ProjectHistoryDrawer({
 export function RemixProject() {
   const queryClient = useQueryClient();
   const lastSavedWorkspace = useRef("");
+  const skipNextWorkspaceSave = useRef(false);
   const [stage, setStage] = useState(0);
   const [parsed, setParsed] = useState(false);
   const [parsing, setParsing] = useState(false);
@@ -1093,6 +1094,11 @@ export function RemixProject() {
       composePreviewId,
     };
     const serialized = JSON.stringify(workspace);
+    if (skipNextWorkspaceSave.current) {
+      skipNextWorkspaceSave.current = false;
+      lastSavedWorkspace.current = serialized;
+      return;
+    }
     if (serialized === lastSavedWorkspace.current) return;
     const timer = window.setTimeout(() => {
       void saveRemixProject(job.id, { workspace })
@@ -1390,6 +1396,7 @@ export function RemixProject() {
       const rootReady = detail.rootJob.status === "succeeded" || detail.rootJob.status === "partially_succeeded";
       const shotHistory = detail.childJobs.filter((child) => child.values.workflowPhase === "shot-generation");
       const latestCompose = detail.childJobs.find((child) => child.values.workflowPhase === "compose") ?? null;
+      skipNextWorkspaceSave.current = true;
       lastSavedWorkspace.current = JSON.stringify(detail.workspace);
       queryClient.setQueryData(["video-remix-shot-jobs", detail.rootJob.id], shotHistory);
       setMode(request.mode ?? "product");
@@ -2155,10 +2162,7 @@ export function RemixProject() {
         open={historyOpen}
         currentProjectId={job?.id}
         onClose={() => setHistoryOpen(false)}
-        onContinue={async (detail) => {
-          await saveCurrentProject();
-          restoreProject(detail.rootJob.id === job?.id ? await fetchRemixProject(detail.rootJob.id) : detail);
-        }}
+        onContinue={(detail) => restoreProject(detail)}
         onRenamed={(projectId, title) => {
           if (job?.id !== projectId) return;
           setProjectName(title);

@@ -68,6 +68,13 @@ describe("Drizzle SQLite stores", () => {
     };
     jobs.createCharged(job, 4);
     expect(jobs.getOwned(job.id, registration.user.id)?.values.method).toBe("按固定时长");
+    const unchangedProject = jobs.updateRemixProjectMetadata(job.id, { title: job.title, values: job.values });
+    expect(unchangedProject?.updatedAt).toBe(timestamp);
+    const reviewedProject = jobs.updateRemixProjectMetadata(job.id, {
+      title: "已回顾的项目",
+      values: { ...job.values, workspaceState: "{}" },
+    });
+    expect(reviewedProject).toMatchObject({ title: "已回顾的项目", status: "queued", stage: "排队中", progress: 0 });
     expect(jobs.update(job.id, { status: "succeeded", progress: 100 })?.status).toBe("succeeded");
     expect(accounts.getUser(registration.user.id)?.credits).toBe(3476);
 

@@ -13,6 +13,7 @@ import {
   remixModifyPresets,
   remixPromptToolLabels,
 } from "../../../shared/video-remix/prompt-tools";
+import { buildLineDiff, type LineDiff } from "./line-diff";
 
 const toolTitles: Record<RemixPromptTool, string> = {
   check: "脚本智能检查",
@@ -298,6 +299,37 @@ function VoiceControls({
   );
 }
 
+function DiffColumn({
+  title,
+  lines,
+  side,
+  panelRef,
+  onScroll,
+}: {
+  title: string;
+  lines: LineDiff["before"] | LineDiff["after"];
+  side: "before" | "after";
+  panelRef: { current: HTMLPreElement | null };
+  onScroll: () => void;
+}) {
+  return (
+    <section className={`voice-diff-column voice-diff-column-${side}`} aria-label={title}>
+      <header>{title}</header>
+      <pre ref={panelRef} onScroll={onScroll}>
+        {lines.map((line) => (
+          <span
+            className={line.kind === "unchanged" ? "" : `is-${line.kind}`}
+            key={`${line.kind}-${line.lineNumber}-${line.text}`}
+          >
+            <i>{line.lineNumber}</i>
+            <code>{line.text || " "}</code>
+          </span>
+        ))}
+      </pre>
+    </section>
+  );
+}
+
 export function PromptToolModal({
   tool,
   sourceJobId,
@@ -317,10 +349,21 @@ export function PromptToolModal({
 }) {
   const [config, setConfig] = useState(copyDefaultConfig);
   const [job, setJob] = useState<Job | null>(null);
+  const [originalPreview, setOriginalPreview] = useState(prompt);
   const [preview, setPreview] = useState(prompt);
+  const [draftPreview, setDraftPreview] = useState(prompt);
+  const [pendingVoiceRewrite, setPendingVoiceRewrite] = useState<{
+    tool: RemixPromptTool;
+    summary: string;
+    findings: string[];
+  } | null>(null);
+  const [editingVoiceRewrite, setEditingVoiceRewrite] = useState(false);
+  const [voiceRewriteSaved, setVoiceRewriteSaved] = useState(false);
   const [error, setError] = useState("");
   const completedJobs = useRef(new Set<string>());
   const lastOpenedKey = useRef("");
+  const originalDiffPanel = useRef<HTMLPreElement>(null);
+  const revisedDiffPanel = useRef<HTMLPreElement>(null);
   const activeJobId = job && (job.status === "queued" || job.status === "processing") ? job.id : undefined;
 
   useEffect(() => {
@@ -328,7 +371,12 @@ export function PromptToolModal({
     if (!openKey || lastOpenedKey.current === openKey) return;
     lastOpenedKey.current = openKey;
     setConfig(copyDefaultConfig());
+    setOriginalPreview(prompt);
     setPreview(prompt);
+    setDraftPreview(prompt);
+    setPendingVoiceRewrite(null);
+    setEditingVoiceRewrite(false);
+    setVoiceRewriteSaved(false);
     setError("");
     setJob((current) => (current && current.status !== "queued" && current.status !== "processing" ? null : current));
   }, [prompt, sourceAssetId, tool]);
@@ -356,12 +404,21 @@ export function PromptToolModal({
               findings = [];
             }
             setPreview(rewritten);
-            onApply(
-              currentTool,
-              rewritten,
-              updated.values.rewriteSummary || updated.result?.summary || "AI 修改完成",
-              findings,
-            );
+            const summary = updated.values.rewriteSummary || updated.result?.summary || "AI 修改完成";
+            let voiceMode: RemixPromptToolConfig["voiceMode"] | undefined;
+            try {
+              voiceMode = (JSON.parse(updated.values.promptToolConfig || "{}") as RemixPromptToolConfig).voiceMode;
+            } catch {
+              voiceMode = undefined;
+            }
+            if (currentTool === "voice" && voiceMode === "correct") {
+              setDraftPreview(rewritten);
+              setPendingVoiceRewrite({ tool: currentTool, summary, findings });
+              setEditingVoiceRewrite(false);
+              setVoiceRewriteSaved(false);
+              return;
+            }
+            onApply(currentTool, rewritten, summary, findings);
           }
         })
         .catch((reason) => setError(errorMessage(reason)));
@@ -377,10 +434,28 @@ export function PromptToolModal({
     if (tool === "modify") return Boolean(config.preset || config.customInstruction.trim());
     return config.voiceMode === "correct" || Boolean(config.customInstruction.trim());
   }, [activeJobId, config, prompt, sourceAssetId, sourceJobId, tool]);
+  const comparisonPreview = editingVoiceRewrite ? draftPreview : preview;
+  const voiceDiff = useMemo(
+    () => buildLineDiff(originalPreview, comparisonPreview),
+    [comparisonPreview, originalPreview],
+  );
+  const showVoiceDiff = tool === "voice" && comparisonPreview !== originalPreview;
+  const syncDiffScroll = (source: HTMLElement | null, target: HTMLElement | null) => {
+    if (!source || !target) return;
+    target.scrollTop = source.scrollTop;
+    target.scrollLeft = source.scrollLeft;
+  };
 
   const submit = async () => {
     if (!tool || !sourceJobId || !sourceAssetId || !canSubmit) return;
     setError("");
+    if (tool === "voice" && config.voiceMode === "correct") {
+      setOriginalPreview(preview);
+      setDraftPreview(preview);
+      setPendingVoiceRewrite(null);
+      setEditingVoiceRewrite(false);
+      setVoiceRewriteSaved(false);
+    }
     try {
       setJob(await runRemixPromptTool({ sourceJobId, sourceAssetId, prompt: preview, tool, config }));
     } catch (reason) {
@@ -391,6 +466,15 @@ export function PromptToolModal({
   const reset = () => {
     setConfig(copyDefaultConfig());
     setError("");
+  };
+  const saveVoiceRewrite = () => {
+    if (!pendingVoiceRewrite || voiceRewriteSaved) return;
+    const rewritten = editingVoiceRewrite ? draftPreview : preview;
+    setPreview(rewritten);
+    setDraftPreview(rewritten);
+    setEditingVoiceRewrite(false);
+    setVoiceRewriteSaved(true);
+    onApply(pendingVoiceRewrite.tool, rewritten, pendingVoiceRewrite.summary, pendingVoiceRewrite.findings);
   };
   const close = () => {
     lastOpenedKey.current = "";
@@ -440,10 +524,67 @@ export function PromptToolModal({
               </Button>
             </footer>
           </aside>
-          <section className="min-h-0 bg-white p-4">
-            <pre className="h-full overflow-auto whitespace-pre-wrap rounded-xl border border-line bg-surface-muted/20 p-4 font-sans text-sm leading-6 text-ink">
-              {preview}
-            </pre>
+          <section className="h-full min-h-0 overflow-hidden bg-white p-4">
+            {showVoiceDiff ? (
+              <div className="voice-diff-review">
+                <section className="voice-diff" aria-label="口播修正前后对比">
+                  <DiffColumn
+                    title="原文"
+                    lines={voiceDiff.before}
+                    side="before"
+                    panelRef={originalDiffPanel}
+                    onScroll={() => syncDiffScroll(originalDiffPanel.current, revisedDiffPanel.current)}
+                  />
+                  {editingVoiceRewrite ? (
+                    <section className="voice-diff-editor" aria-label="编辑修正后的口播">
+                      <header>修正后（编辑中）</header>
+                      <textarea
+                        value={draftPreview}
+                        onChange={(event) => setDraftPreview(event.target.value)}
+                        onScroll={(event) => syncDiffScroll(event.currentTarget, originalDiffPanel.current)}
+                      />
+                    </section>
+                  ) : (
+                    <DiffColumn
+                      title="修正后"
+                      lines={voiceDiff.after}
+                      side="after"
+                      panelRef={revisedDiffPanel}
+                      onScroll={() => syncDiffScroll(revisedDiffPanel.current, originalDiffPanel.current)}
+                    />
+                  )}
+                </section>
+                <div className="voice-diff-actions">
+                  <button
+                    type="button"
+                    disabled={!pendingVoiceRewrite || voiceRewriteSaved}
+                    onClick={() => {
+                      if (editingVoiceRewrite) {
+                        setDraftPreview(preview);
+                        setEditingVoiceRewrite(false);
+                      } else {
+                        setDraftPreview(preview);
+                        setEditingVoiceRewrite(true);
+                      }
+                    }}
+                  >
+                    {editingVoiceRewrite ? "取消" : "修改"}
+                  </button>
+                  <button
+                    type="button"
+                    className="primary"
+                    disabled={!pendingVoiceRewrite || voiceRewriteSaved}
+                    onClick={saveVoiceRewrite}
+                  >
+                    {voiceRewriteSaved ? "已保存为新版本" : "保存为新版本"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <pre className="h-full overflow-auto whitespace-pre-wrap rounded-xl border border-line bg-surface-muted/20 p-4 font-sans text-sm leading-6 text-ink">
+                {preview}
+              </pre>
+            )}
           </section>
         </div>
       </DialogContent>

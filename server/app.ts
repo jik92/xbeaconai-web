@@ -3338,10 +3338,10 @@ app.openapi(updateRemixProjectRoute, (c) => {
         422,
       );
   }
-  const updated = store.update(root.id, {
-    title: body.title ?? root.title,
-    values: body.workspace ? { ...root.values, workspaceState: JSON.stringify(body.workspace) } : root.values,
-  });
+  const title = body.title ?? root.title;
+  const values = body.workspace ? { ...root.values, workspaceState: JSON.stringify(body.workspace) } : root.values;
+  if (title === root.title && JSON.stringify(values) === JSON.stringify(root.values)) return c.json(root, 200);
+  const updated = store.updateRemixProjectMetadata(root.id, { title, values });
   if (!updated) throw new Error("REMIX_PROJECT_UPDATE_FAILED");
   return c.json(updated, 200);
 });
