@@ -17,18 +17,32 @@ describe("creation capabilities", () => {
     expect(mockModels.every((model) => model.enabled && model.executionMode === "mock")).toBeTrue();
   });
 
-  test("publishes a default real image model, explicit mock alternatives, and enabled real video models", () => {
+  test("publishes only the seven provider-backed image models and enabled real video models", () => {
     const imageModels = models.filter((model) => model.kind === "image");
     const videoModels = models.filter((model) => model.kind === "video");
 
-    expect(imageModels).not.toHaveLength(0);
+    expect(imageModels.map((model) => model.id)).toEqual([
+      "gpt-image-1-mini",
+      "seedream-5-lite",
+      "seedream-4-5",
+      "seedream-4-0",
+      "nano-banana-2",
+      "nano-banana-pro",
+      "gpt-image-2-stable",
+    ]);
     expect(imageModels.filter((model) => model.isDefault)).toHaveLength(1);
     expect(imageModels.find((model) => model.isDefault)).toMatchObject({
       id: "gpt-image-1-mini",
       executionMode: "real",
       enabled: true,
+      supportedRatios: ["1:1", "3:2", "2:3"],
+      supportedResolutions: ["1k"],
     });
-    expect(imageModels.some((model) => model.executionMode === "mock")).toBe(true);
+    expect(imageModels.every((model) => model.executionMode === "real" && model.enabled)).toBeTrue();
+    expect(imageModels.find((model) => model.id === "gpt-image-2-stable")).toMatchObject({
+      minReferences: 1,
+      maxReferences: 1,
+    });
     expect(videoModels.filter((model) => model.isDefault)).toHaveLength(1);
     expect(enabledVideoModel.executionMode).toBe("real");
     expect(disabledVideoModel.disabledReason).toBe("真实基线尚未验证");
