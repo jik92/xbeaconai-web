@@ -46,7 +46,40 @@ const safeJson = async (response: Response) => {
   }
 };
 
-const defaultProviders: CredentialDoctorProvider[] = [
+export const qwenAudioDoctorProvider: CredentialDoctorProvider = {
+  providerId: "qwen-audio",
+  provider: "Qwen Audio",
+  credentials: ["QWEN_AUDIO_API_KEY", "QWEN_AUDIO_WORKSPACE_ID"],
+  probe: async (values, signal) => {
+    const workspaceId = values.QWEN_AUDIO_WORKSPACE_ID ?? "";
+    const response = await fetch(
+      `https://${workspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/audio/tts/SpeechSynthesizer`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${values.QWEN_AUDIO_API_KEY ?? ""}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "qwen-audio-3.0-tts-plus",
+          input: { text: "", voice: "longanlingxin", format: "wav", sample_rate: 24_000 },
+        }),
+        signal,
+      },
+    );
+    const payload = await safeJson(response);
+    if (
+      response.status === 401 ||
+      response.status === 403 ||
+      /invalid.+key|unauthorized|permission|workspace|forbidden/i.test(`${payload.code ?? ""} ${payload.message ?? ""}`)
+    )
+      throw new InvalidCredentialError("鉴权失败，请检查 API Key、Workspace ID 和北京地域");
+    if (response.ok || response.status === 400) return "鉴权与 Qwen Audio 业务空间可用";
+    throw new InvalidCredentialError("Qwen Audio 接口未通过可用性检查");
+  },
+};
+
+export const activeCredentialDoctorProviders: CredentialDoctorProvider[] = [
   {
     providerId: "aihubmix",
     provider: "AIHubMix",
@@ -56,38 +89,7 @@ const defaultProviders: CredentialDoctorProvider[] = [
       return `鉴权通过，可读取 ${models.length} 个模型`;
     },
   },
-  {
-    providerId: "volc-speech",
-    provider: "火山语音",
-    credentials: ["VOLC_SPEECH_API_KEY_ID", "VOLC_SPEECH_API_KEY"],
-    probe: async (values, signal) => {
-      const response = await fetch(`${env.volcSpeech.baseUrl.replace(/\/$/, "")}/api/v3/tts/unidirectional`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "X-Api-Key": values.VOLC_SPEECH_API_KEY ?? "",
-          "X-Api-Resource-Id": env.volcSpeech.presetTtsResourceId,
-          "X-Api-Request-Id": crypto.randomUUID(),
-        },
-        body: JSON.stringify({
-          req_params: {
-            text: "",
-            speaker: "zh_female_vv_uranus_bigtts",
-            model: "seed-tts-2.0-standard",
-            audio_params: { format: "mp3", sample_rate: 24_000 },
-          },
-        }),
-        signal,
-      });
-      const payload = await safeJson(response);
-      if (response.status === 401 || response.status === 403)
-        throw new InvalidCredentialError("鉴权失败，请检查 API Key 和资源授权");
-      if (payload.code === 0 || payload.code === 45_002_001) return "鉴权与预置语音资源可用";
-      if (/permission|forbidden|invalid.+key|not.?granted|resource/i.test(payload.message ?? ""))
-        throw new InvalidCredentialError("API Key 有效，但语音资源未授权或配置错误");
-      throw new InvalidCredentialError("语音接口未通过可用性检查");
-    },
-  },
+  qwenAudioDoctorProvider,
   {
     providerId: "tos",
     provider: "火山 TOS",
@@ -141,7 +143,7 @@ export class CredentialDoctor {
   constructor(
     private readonly getCredential: (name: ProviderCredentialName) => string | undefined = (name) =>
       providerCredentials.get(name),
-    private readonly providers: CredentialDoctorProvider[] = defaultProviders,
+    private readonly providers: CredentialDoctorProvider[] = activeCredentialDoctorProviders,
     private readonly timeoutMs = PROVIDER_DOCTOR_TIMEOUT_MS,
     private readonly persistResults: (results: StoredCredentialCheck[]) => void = () => {},
   ) {}
@@ -212,7 +214,7 @@ export class CredentialDoctor {
 
 export const credentialDoctor = new CredentialDoctor(
   (name) => providerCredentials.get(name),
-  defaultProviders,
+  activeCredentialDoctorProviders,
   PROVIDER_DOCTOR_TIMEOUT_MS,
   (results) => providerCredentials.saveChecks(results),
 );

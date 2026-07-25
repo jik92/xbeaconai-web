@@ -8,11 +8,13 @@ describe(".env.key parser", () => {
 OPENAI_KEY="openai-secret"
 export VOLC_SPEECH_API_KEY='speech-secret'
 MEDIAKIT_API_KEY=
+QWEN_AUDIO_API_KEY=
+QWEN_AUDIO_WORKSPACE_ID=
 JWT_SECRET=must-be-ignored
 OPENAI_KEY=rotated-secret
 `);
     expect(parsed.values).toEqual({ OPENAI_KEY: "rotated-secret", VOLC_SPEECH_API_KEY: "speech-secret" });
-    expect(parsed.empty).toEqual(["MEDIAKIT_API_KEY"]);
+    expect(parsed.empty).toEqual(["MEDIAKIT_API_KEY", "QWEN_AUDIO_API_KEY", "QWEN_AUDIO_WORKSPACE_ID"]);
     expect(parsed.ignored).toEqual(["JWT_SECRET"]);
   });
 
@@ -26,6 +28,8 @@ OPENAI_KEY=rotated-secret
     const serialized = serializeEnvKey({ OPENAI_KEY: "secret" });
     expect(serialized).toContain("OPENAI_KEY=secret");
     expect(serialized).toContain("MEDIAKIT_API_KEY=");
+    expect(serialized).toContain("QWEN_AUDIO_API_KEY=");
+    expect(serialized).toContain("QWEN_AUDIO_WORKSPACE_ID=");
     expect(
       removeProviderEnvironment(
         `JWT_SECRET=system\nOPENAI_KEY=secret\nOPENAI_BASE_URL=https://example.test\nVIDEO_ANALYSIS_MODEL=model\nTOS_BUCKET=bucket\nREDIS_URL=redis://local\n`,

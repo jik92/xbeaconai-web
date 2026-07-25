@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  activeCredentialDoctorProviders,
   CredentialDoctor,
   type CredentialDoctorProvider,
   type CredentialValues,
@@ -38,6 +39,13 @@ const providers: CredentialDoctorProvider[] = [
 ];
 
 describe("credential doctor", () => {
+  test("checks Qwen and TOS but omits Volc Speech from the active Provider list", () => {
+    const providerIds = activeCredentialDoctorProviders.map((provider) => provider.providerId);
+    expect(providerIds).toContain("qwen-audio");
+    expect(providerIds).toContain("tos");
+    expect(providerIds).not.toContain("volc-speech");
+  });
+
   test("reports available, missing, invalid and timeout without exposing provider errors", async () => {
     const values: Partial<Record<ProviderCredentialName, string>> = {
       OPENAI_KEY: "openai-secret",

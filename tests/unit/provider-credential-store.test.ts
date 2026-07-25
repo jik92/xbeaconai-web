@@ -19,6 +19,37 @@ afterEach(() => {
 });
 
 describe("ProviderCredentialStore", () => {
+  test("hides Volc Speech from managed credentials while retaining TOS and Qwen", () => {
+    const store = new ProviderCredentialStore(temporaryDatabase("byok-managed-"), masterKey);
+    store.set("VOLC_SPEECH_API_KEY_ID", "historical-speech-id");
+    store.set("VOLC_SPEECH_API_KEY", "historical-speech-key");
+
+    const names = store.listMasked().map((item) => item.name);
+    expect(names).not.toContain("VOLC_SPEECH_API_KEY_ID");
+    expect(names).not.toContain("VOLC_SPEECH_API_KEY");
+    expect(names).toContain("TOS_ACCESS_KEY_ID");
+    expect(names).toContain("TOS_SECRET_ACCESS_KEY");
+    expect(names).toContain("QWEN_AUDIO_API_KEY");
+    expect(store.get("VOLC_SPEECH_API_KEY")).toBe("historical-speech-key");
+    store.close();
+  });
+
+  test("publishes capability documentation for every managed Provider", () => {
+    const store = new ProviderCredentialStore(temporaryDatabase("byok-docs-"), masterKey);
+    const documentation = Object.fromEntries(
+      store.listMasked().map((item) => [item.providerId, (item as typeof item & { docsUrl?: string }).docsUrl]),
+    );
+
+    expect(documentation).toMatchObject({
+      aihubmix: "https://aihubmix.mintlify.app/cn/api/Models-API",
+      tos: "https://www.volcengine.com/docs/6349/163211?lang=zh",
+      mediakit: "https://www.volcengine.com/docs/6448/2373721",
+      "qwen-audio": "https://help.aliyun.com/zh/model-studio/speech-synthesis-api-reference/",
+    });
+    expect(Object.values(documentation).every(Boolean)).toBe(true);
+    store.close();
+  });
+
   test("encrypts values at rest and only exposes a masked suffix", () => {
     const path = temporaryDatabase("byok-store-");
     const store = new ProviderCredentialStore(path, masterKey);

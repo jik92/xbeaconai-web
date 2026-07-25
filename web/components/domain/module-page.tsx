@@ -43,6 +43,7 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Slider } from "@/components/ui/slider";
 import type { ApiJobResult, AssetFolder } from "@/entities/types";
+import { QwenVoiceCloneModal } from "@/features/voice-clone/qwen-voice-clone-modal";
 import { db } from "@/lib/db";
 import { cn } from "@/lib/utils";
 import { AttachmentPicker } from "./attachment-picker";
@@ -996,6 +997,7 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
   const [actionNotice, setActionNotice] = useState("");
   const [videoModel, setVideoModel] = useState<SeedanceModelId>("doubao-seedance-2-0-fast-260128");
   const [creatorOpen, setCreatorOpen] = useState(false);
+  const [qwenCreatorOpen, setQwenCreatorOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState({ name: "", status: "", from: "", to: "" });
   const setValue = (id: string, value: string) => setValues((old) => ({ ...old, [id]: value }));
   const { data: restored = emptyJobs } = useQuery({
@@ -1118,7 +1120,7 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
       const generatedTitle = `${config.label} · ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
       const job = await submitJob(
         config.id as ModuleId,
-        config.id === "voice-clone" ? generatedTitle : values.taskName || generatedTitle,
+        values.taskName || generatedTitle,
         { ...submittedValues, __scenario: scenario },
         usesSeedance ? videoModel : undefined,
       );
@@ -1159,6 +1161,11 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
     const mediaArtifacts = resultMediaArtifacts(result);
     const selectedArtifacts = mediaArtifacts.filter((item) => selectedArtifactIds.includes(item.id));
     if (action === "再次生成") {
+      if (config.id === "voice-clone") {
+        setSelectedTask(null);
+        setQwenCreatorOpen(true);
+        return;
+      }
       setValues({
         ...initialValues(),
         ...selectedTask.values,
@@ -1270,7 +1277,8 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
     if (/再次|重新|调整|改写|变体|替换|编辑|继续/.test(action)) {
       setSelectedTask(null);
       setCurrentStep(0);
-      setCreatorOpen(true);
+      if (config.id === "voice-clone") setQwenCreatorOpen(true);
+      else setCreatorOpen(true);
       setActionNotice(`已进入“${action}”配置状态`);
       return;
     }
@@ -1278,7 +1286,11 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
   };
   return (
     <div className="!m-0 !max-w-none !bg-white !p-0">
-      <ToolCreatorModal open={creatorOpen} title={newTaskLabel} onClose={() => setCreatorOpen(false)}>
+      <ToolCreatorModal
+        open={config.id !== "voice-clone" && creatorOpen}
+        title={newTaskLabel}
+        onClose={() => setCreatorOpen(false)}
+      >
         <div className="flex min-h-0 flex-1 flex-col">
           <ToolboxCreatorForm
             config={config}
@@ -1511,9 +1523,16 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
           )}
         </div>
       </ToolCreatorModal>
+      {config.id === "voice-clone" && (
+        <QwenVoiceCloneModal
+          open={qwenCreatorOpen}
+          onClose={() => setQwenCreatorOpen(false)}
+          onCreated={(job) => setTasks((current) => [job, ...current.filter((item) => item.id !== job.id)])}
+        />
+      )}
       <ToolTaskPage
-        actionLabel={newTaskLabel}
-        onAction={() => setCreatorOpen(true)}
+        actionLabel={config.id === "voice-clone" ? "新建音色人物" : newTaskLabel}
+        onAction={() => (config.id === "voice-clone" ? setQwenCreatorOpen(true) : setCreatorOpen(true))}
         onSearch={setAppliedFilters}
         count={filteredTasks.length}
         totalCount={tasks.length}
@@ -1528,8 +1547,11 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
           emptyMessage={tasks.length ? "没有符合条件的任务" : "暂无任务"}
           emptyAction={
             !tasks.length ? (
-              <Button size="sm" onClick={() => setCreatorOpen(true)}>
-                {newTaskLabel}
+              <Button
+                size="sm"
+                onClick={() => (config.id === "voice-clone" ? setQwenCreatorOpen(true) : setCreatorOpen(true))}
+              >
+                {config.id === "voice-clone" ? "新建音色人物" : newTaskLabel}
               </Button>
             ) : undefined
           }

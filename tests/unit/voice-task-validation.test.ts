@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { validateVoiceTaskValues } from "../../server/voice/validate-voice-task";
+import { validateQwenVoiceCloneValues } from "../../server/voice/validate-qwen-voice-clone";
 
 const validClone = {
   operation: "clone",
@@ -59,5 +60,28 @@ describe("validateVoiceTaskValues", () => {
     expect(validateVoiceTaskValues({ ...validPresetSynthesis, synthesisStyle: "自定义" })).toBe(
       "请选择系统提供的配音风格",
     );
+  });
+});
+
+describe("validateQwenVoiceCloneValues", () => {
+  const valid = {
+    voiceProvider: "qwen",
+    operation: "clone",
+    sample: "asset:asset-id:sample.wav",
+    demoText: "恭喜发财，天天向上！",
+    dialect: "广东话",
+    style: "广告配音风格",
+    speechSpeed: "标准",
+    autoSave: "true",
+  };
+
+  test("accepts a simplified official Qwen clone task", () => {
+    expect(validateQwenVoiceCloneValues(valid)).toBeUndefined();
+  });
+
+  test("rejects unsupported dialects, speeds, and autosave values", () => {
+    expect(validateQwenVoiceCloneValues({ ...valid, dialect: "长沙话" })).toBe("请选择官方支持的合成方言");
+    expect(validateQwenVoiceCloneValues({ ...valid, speechSpeed: "极速" })).toBe("请选择系统提供的音色速度");
+    expect(validateQwenVoiceCloneValues({ ...valid, autoSave: "yes" })).toBe("自动保存参数无效");
   });
 });

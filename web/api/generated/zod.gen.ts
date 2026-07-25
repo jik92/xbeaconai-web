@@ -68,7 +68,8 @@ export const zProviderId = z.enum([
     'aihubmix',
     'volc-speech',
     'tos',
-    'mediakit'
+    'mediakit',
+    'qwen-audio'
 ]);
 
 export const zAssetKind = z.enum([
@@ -84,7 +85,9 @@ export const zProviderCredentialName = z.enum([
     'VOLC_SPEECH_API_KEY',
     'TOS_ACCESS_KEY_ID',
     'TOS_SECRET_ACCESS_KEY',
-    'MEDIAKIT_API_KEY'
+    'MEDIAKIT_API_KEY',
+    'QWEN_AUDIO_API_KEY',
+    'QWEN_AUDIO_WORKSPACE_ID'
 ]);
 
 export const zJobModuleId = z.enum([
@@ -1251,6 +1254,7 @@ export const zListAdminCredentialsResponse = z.object({
         name: zProviderCredentialName,
         providerId: zProviderId,
         provider: z.string(),
+        docsUrl: z.url(),
         label: z.string(),
         secret: z.boolean(),
         configured: z.boolean(),
@@ -1270,6 +1274,7 @@ export const zDeleteAdminCredentialResponse = z.object({
     name: zProviderCredentialName,
     providerId: zProviderId,
     provider: z.string(),
+    docsUrl: z.url(),
     label: z.string(),
     secret: z.boolean(),
     configured: z.boolean(),
@@ -1292,6 +1297,7 @@ export const zUpdateAdminCredentialResponse = z.object({
     name: zProviderCredentialName,
     providerId: zProviderId,
     provider: z.string(),
+    docsUrl: z.url(),
     label: z.string(),
     secret: z.boolean(),
     configured: z.boolean(),
@@ -2074,6 +2080,20 @@ export const zUpdateAllVideoCreateShotSettingsPath = z.object({
  * Updated
  */
 export const zUpdateAllVideoCreateShotSettingsResponse = zVideoCreateProject;
+
+export const zPreflightQwenVoiceSampleBody = z.object({
+    assetId: z.uuid()
+});
+
+/**
+ * Sample is valid
+ */
+export const zPreflightQwenVoiceSampleResponse = z.object({
+    durationSec: z.number().gte(0.001),
+    format: z.string(),
+    channels: z.int().gte(1).optional(),
+    sampleRate: z.int().gte(1).optional()
+});
 
 export const zCreateJobBody = z.object({
     title: z.string().min(1).max(200),

@@ -62,11 +62,11 @@ export type RechargeOrder = {
     createdAt: string;
 };
 
-export type ProviderId = 'aihubmix' | 'volc-speech' | 'tos' | 'mediakit';
+export type ProviderId = 'aihubmix' | 'volc-speech' | 'tos' | 'mediakit' | 'qwen-audio';
 
 export type AssetKind = 'media' | 'product' | 'portrait' | 'voice';
 
-export type ProviderCredentialName = 'OPENAI_KEY' | 'VOLC_SPEECH_API_KEY_ID' | 'VOLC_SPEECH_API_KEY' | 'TOS_ACCESS_KEY_ID' | 'TOS_SECRET_ACCESS_KEY' | 'MEDIAKIT_API_KEY';
+export type ProviderCredentialName = 'OPENAI_KEY' | 'VOLC_SPEECH_API_KEY_ID' | 'VOLC_SPEECH_API_KEY' | 'TOS_ACCESS_KEY_ID' | 'TOS_SECRET_ACCESS_KEY' | 'MEDIAKIT_API_KEY' | 'QWEN_AUDIO_API_KEY' | 'QWEN_AUDIO_WORKSPACE_ID';
 
 export type JobModuleId = 'video-remix' | 'video-create' | 'ad-script' | 'ai-generate' | 'video-cut' | 'media-understand' | 'video-mashup' | 'voice-clone' | 'video-renewal' | 'subtitle-erase' | 'video-enhancement' | 'video-extract' | 'video-editor' | 'kickart' | 'douyin-video-import' | 'share-content-import';
 
@@ -1497,6 +1497,7 @@ export type ListAdminCredentialsResponses = {
             name: ProviderCredentialName;
             providerId: ProviderId;
             provider: string;
+            docsUrl: string;
             label: string;
             secret: boolean;
             configured: boolean;
@@ -1538,6 +1539,7 @@ export type DeleteAdminCredentialResponses = {
         name: ProviderCredentialName;
         providerId: ProviderId;
         provider: string;
+        docsUrl: string;
         label: string;
         secret: boolean;
         configured: boolean;
@@ -1580,6 +1582,7 @@ export type UpdateAdminCredentialResponses = {
         name: ProviderCredentialName;
         providerId: ProviderId;
         provider: string;
+        docsUrl: string;
         label: string;
         secret: boolean;
         configured: boolean;
@@ -2928,6 +2931,38 @@ export type UpdateAllVideoCreateShotSettingsResponses = {
 };
 
 export type UpdateAllVideoCreateShotSettingsResponse = UpdateAllVideoCreateShotSettingsResponses[keyof UpdateAllVideoCreateShotSettingsResponses];
+
+export type PreflightQwenVoiceSampleData = {
+    body: {
+        assetId: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/voice-clone/qwen/sample-preflight';
+};
+
+export type PreflightQwenVoiceSampleErrors = {
+    /**
+     * Invalid sample
+     */
+    422: ApiErrorResponse;
+};
+
+export type PreflightQwenVoiceSampleError = PreflightQwenVoiceSampleErrors[keyof PreflightQwenVoiceSampleErrors];
+
+export type PreflightQwenVoiceSampleResponses = {
+    /**
+     * Sample is valid
+     */
+    200: {
+        durationSec: number;
+        format: string;
+        channels?: number;
+        sampleRate?: number;
+    };
+};
+
+export type PreflightQwenVoiceSampleResponse = PreflightQwenVoiceSampleResponses[keyof PreflightQwenVoiceSampleResponses];
 
 export type CreateJobData = {
     body: {

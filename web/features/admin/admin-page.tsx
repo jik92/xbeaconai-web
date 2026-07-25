@@ -7,6 +7,7 @@ import {
   Clock3,
   Coins,
   Download,
+  ExternalLink,
   LoaderCircle,
   RefreshCw,
   Stethoscope,
@@ -211,7 +212,18 @@ function CredentialsPanel() {
       accessorKey: "provider",
       header: "Provider",
       size: 100,
-      cell: ({ row }) => <span className="font-medium text-ink">{row.original.provider}</span>,
+      cell: ({ row }) => (
+        <a
+          className="inline-flex min-w-0 items-center gap-1 font-medium text-ink hover:underline"
+          href={row.original.docsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`${row.original.provider} 开发文档（新窗口打开）`}
+        >
+          <span className="truncate">{row.original.provider}</span>
+          <ExternalLink className="size-3 shrink-0 text-muted" aria-hidden="true" />
+        </a>
+      ),
     },
     {
       id: "credential",
@@ -304,13 +316,12 @@ function CredentialsPanel() {
           <input
             ref={fileInput}
             type="file"
-            accept=".env.key"
             className="hidden"
-            aria-label="选择 .env.key 文件"
+            aria-label="选择密钥文件"
             onChange={(event) => void importFile(event.target.files?.[0])}
           />
           <Button variant="outline" size="sm" disabled={uploading} onClick={() => fileInput.current?.click()}>
-            {uploading ? <LoaderCircle className="animate-spin" /> : <Upload />} 导入 .env.key
+            {uploading ? <LoaderCircle className="animate-spin" /> : <Upload />} 导入密钥文件
           </Button>
           <Button variant="outline" size="sm" disabled={exporting} onClick={() => void exportFile()}>
             {exporting ? <LoaderCircle className="animate-spin" /> : <Download />} 导出 .env.key

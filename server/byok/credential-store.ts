@@ -6,6 +6,8 @@ import { env } from "../env";
 import {
   type ProviderCredentialName,
   type ProviderId,
+  managedProviderCredentialCatalog,
+  managedProviderIds,
   providerCredentialCatalog,
   providerCredentialNames,
   providerIdForCredential,
@@ -37,6 +39,7 @@ export interface MaskedProviderCredential {
   provider: string;
   label: string;
   secret: boolean;
+  docsUrl: string;
   configured: boolean;
   maskedValue?: string;
   updatedAt?: string;
@@ -107,7 +110,7 @@ export class ProviderCredentialStore {
         .all()
         .map((row) => [row.name, row]),
     );
-    return providerCredentialCatalog.map((item) => {
+    return managedProviderCredentialCatalog.map((item) => {
       const row = rows.get(item.name);
       return {
         ...item,
@@ -126,7 +129,7 @@ export class ProviderCredentialStore {
         .all()
         .map((row) => [row.providerId, row]),
     );
-    return providerIds.flatMap((providerId) => {
+    return managedProviderIds.flatMap((providerId) => {
       const row = rows.get(providerId);
       return row ? [{ ...row, providerId: providerId as ProviderId }] : [];
     });

@@ -6,6 +6,7 @@ import { TaskSearchFilters, type TaskSearchFilterValue } from "./task-search-fil
 interface ToolTaskPageProps {
   actionLabel: string;
   onAction: () => void;
+  secondaryAction?: { label: string; onAction: () => void };
   onSearch: (filters: TaskSearchFilterValue) => void;
   count: number;
   totalCount?: number;
@@ -19,6 +20,7 @@ export function createToolTaskLabel(toolName: string) {
 export function ToolTaskPage({
   actionLabel,
   onAction,
+  secondaryAction,
   onSearch,
   count,
   totalCount = count,
@@ -32,6 +34,12 @@ export function ToolTaskPage({
           <Plus />
           {actionLabel}
         </Button>
+        {secondaryAction && (
+          <Button size="sm" variant="outline" onClick={secondaryAction.onAction}>
+            <Plus />
+            {secondaryAction.label}
+          </Button>
+        )}
       </div>
       <div className="mt-2 flex min-h-0 flex-1 flex-col">{children}</div>
       <small className="flex flex-none justify-end pt-1 text-2xs text-muted">

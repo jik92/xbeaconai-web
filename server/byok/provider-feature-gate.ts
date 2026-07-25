@@ -16,7 +16,7 @@ export const moduleProviderRequirements: Record<ModuleId, ProviderId[]> = {
   "video-cut": ["tos"],
   "media-understand": ["aihubmix"],
   "video-mashup": ["tos"],
-  "voice-clone": ["volc-speech"],
+  "voice-clone": ["qwen-audio", "tos"],
   "video-renewal": ["aihubmix"],
   "subtitle-erase": ["mediakit", "tos"],
   "video-enhancement": ["mediakit", "tos"],

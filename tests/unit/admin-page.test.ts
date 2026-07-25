@@ -6,7 +6,9 @@ describe("compact admin page", () => {
     const source = await Bun.file(resolve(import.meta.dir, "../../web/features/admin/admin-page.tsx")).text();
 
     expect(source).toContain("检测全部");
-    expect(source).toContain("导入 .env.key");
+    expect(source).toContain("导入密钥文件");
+    expect(source).toContain('aria-label="选择密钥文件"');
+    expect(source).not.toContain('accept=".env.key"');
     expect(source).toContain("导出 .env.key");
     expect(source).toContain("fetchAdminEnvKeyExport");
     expect(source).toContain("用户管理");
@@ -16,6 +18,10 @@ describe("compact admin page", () => {
     expect(source).toContain("停止所有任务");
     expect(source).toContain("saveCredential(row.original)");
     expect(source).toContain("getRowId={(credential) => credential.name}");
+    expect(source).toContain("href={row.original.docsUrl}");
+    expect(source).toContain('target="_blank"');
+    expect(source).toContain('rel="noopener noreferrer"');
+    expect(source).toContain("<ExternalLink");
     expect(source).toContain('from "@/components/ui/button"');
     expect(source).toContain('from "@/components/ui/input"');
     expect(source).toContain('from "@/components/ui/native-select"');

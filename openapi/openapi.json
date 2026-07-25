@@ -237,7 +237,8 @@
           "aihubmix",
           "volc-speech",
           "tos",
-          "mediakit"
+          "mediakit",
+          "qwen-audio"
         ]
       },
       "AssetKind": {
@@ -257,7 +258,9 @@
           "VOLC_SPEECH_API_KEY",
           "TOS_ACCESS_KEY_ID",
           "TOS_SECRET_ACCESS_KEY",
-          "MEDIAKIT_API_KEY"
+          "MEDIAKIT_API_KEY",
+          "QWEN_AUDIO_API_KEY",
+          "QWEN_AUDIO_WORKSPACE_ID"
         ]
       },
       "JobModuleId": {
@@ -4701,6 +4704,10 @@
                           "provider": {
                             "type": "string"
                           },
+                          "docsUrl": {
+                            "type": "string",
+                            "format": "uri"
+                          },
                           "label": {
                             "type": "string"
                           },
@@ -4721,6 +4728,7 @@
                           "name",
                           "providerId",
                           "provider",
+                          "docsUrl",
                           "label",
                           "secret",
                           "configured"
@@ -4808,6 +4816,10 @@
                     "provider": {
                       "type": "string"
                     },
+                    "docsUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    },
                     "label": {
                       "type": "string"
                     },
@@ -4828,6 +4840,7 @@
                     "name",
                     "providerId",
                     "provider",
+                    "docsUrl",
                     "label",
                     "secret",
                     "configured"
@@ -4887,6 +4900,10 @@
                     "provider": {
                       "type": "string"
                     },
+                    "docsUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    },
                     "label": {
                       "type": "string"
                     },
@@ -4907,6 +4924,7 @@
                     "name",
                     "providerId",
                     "provider",
+                    "docsUrl",
                     "label",
                     "secret",
                     "configured"
@@ -8429,6 +8447,73 @@
           },
           "404": {
             "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/voice-clone/qwen/sample-preflight": {
+      "post": {
+        "operationId": "preflightQwenVoiceSample",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "assetId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "assetId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sample is valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "durationSec": {
+                      "type": "number",
+                      "minimum": 0.001
+                    },
+                    "format": {
+                      "type": "string"
+                    },
+                    "channels": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "sampleRate": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  },
+                  "required": [
+                    "durationSec",
+                    "format"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid sample",
             "content": {
               "application/json": {
                 "schema": {

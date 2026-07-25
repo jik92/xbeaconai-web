@@ -54,6 +54,7 @@ describe("worker job registry", () => {
     expect(findJobHandler(job("video-cut")).name).toBe("video-cut");
     expect(findJobHandler(job("video-mashup")).name).toBe("video-mashup");
     expect(findJobHandler(job("voice-clone")).name).toBe("voice-clone");
+    expect(findJobHandler(job("voice-clone", { voiceProvider: "qwen" })).name).toBe("qwen-voice-clone");
     expect(findJobHandler(job("subtitle-erase")).name).toBe("mediakit-subtitle-erase");
     expect(findJobHandler(job("video-enhancement")).name).toBe("mediakit-video-enhancement");
     expect(findJobHandler(job("ad-script")).name).toBe("ad-script");

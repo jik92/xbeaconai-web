@@ -37,6 +37,7 @@ import {
   listVideoRemixProjects,
   listVideoRemixShotGenerationJobs,
   parseAdScriptSource,
+  preflightQwenVoiceSample as preflightQwenVoiceSampleRequest,
   regenerateVideoCreateSection,
   replaceVideoCreateShot,
   retryJob,
@@ -475,6 +476,24 @@ export async function submitJob(
   });
   if (!data) throw new Error("任务创建失败");
   return data;
+}
+export async function checkQwenVoiceSample(assetId: string) {
+  configure();
+  try {
+    const { data } = await preflightQwenVoiceSampleRequest({
+      body: { assetId },
+      headers: authHeaders(),
+      throwOnError: true,
+    });
+    if (!data) throw new Error("录音预检失败");
+    return data;
+  } catch (reason) {
+    const message =
+      reason && typeof reason === "object" && "error" in reason
+        ? (reason as { error?: { message?: string } }).error?.message
+        : undefined;
+    throw new Error(message || (reason instanceof Error ? reason.message : "录音预检失败"));
+  }
 }
 export async function fetchCreationCapabilities() {
   const response = await fetch(apiUrl("/api/creation/capabilities"));

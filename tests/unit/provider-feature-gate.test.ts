@@ -13,7 +13,7 @@ describe("Provider feature gate", () => {
     const isVerified = (providerId: ProviderId) => passed.has(providerId);
 
     expect(moduleFeatureAvailability("ad-script", isVerified).enabled).toBe(true);
-    expect(moduleFeatureAvailability("voice-clone", isVerified).enabled).toBe(true);
+    expect(moduleFeatureAvailability("voice-clone", isVerified).enabled).toBe(false);
     expect(moduleFeatureAvailability("video-remix", isVerified)).toMatchObject({
       enabled: false,
       unavailableProviders: ["tos"],
@@ -23,6 +23,17 @@ describe("Provider feature gate", () => {
       unavailableProviders: ["mediakit", "tos"],
     });
     expect(allProviderFeatureAvailability(isVerified).operations.assetUpload.enabled).toBe(false);
+  });
+
+  test("enables new voice-clone tasks only through verified Qwen with TOS", () => {
+    const qwenAndTos = new Set<ProviderId>(["qwen-audio", "tos"]);
+    expect(moduleProviderRequirements["voice-clone"]).toEqual(["qwen-audio", "tos"]);
+    expect(moduleFeatureAvailability("voice-clone", (providerId) => qwenAndTos.has(providerId)).enabled).toBe(true);
+    expect(moduleFeatureAvailability("voice-clone", (providerId) => providerId === "volc-speech").enabled).toBe(false);
+    expect(moduleFeatureAvailability("voice-clone", (providerId) => providerId === "qwen-audio")).toMatchObject({
+      enabled: false,
+      unavailableProviders: ["tos"],
+    });
   });
 
   test("keeps static menuFeatures decisions separate from Provider verification", () => {

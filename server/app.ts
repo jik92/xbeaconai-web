@@ -51,7 +51,11 @@ import {
   providerIds,
 } from "./byok/credential-store";
 import { maxEnvKeyBytes, parseEnvKey, serializeEnvKey } from "./byok/env-key";
-import { allProviderFeatureAvailability, moduleFeatureAvailability } from "./byok/provider-feature-gate";
+import {
+  allProviderFeatureAvailability,
+  moduleFeatureAvailability,
+  providerFeatureAvailability,
+} from "./byok/provider-feature-gate";
 import { creationCapabilities, quoteCreation, validateCreationValues } from "./creation/capabilities";
 import { env } from "./env";
 import { emitLog } from "./imports/import-logger";
@@ -92,7 +96,8 @@ import {
   videoCreateJobValues,
 } from "./video-create/video-create-store";
 import { groupRemixChildren, summarizeRemixProject } from "./video-remix/project-records";
-import { validateVoiceTaskValues } from "./voice/validate-voice-task";
+import { preflightQwenVoiceSample, QwenVoiceSamplePreflightError } from "./voice/qwen-voice-sample-preflight";
+import { validateQwenVoiceCloneValues } from "./voice/validate-qwen-voice-clone";
 
 const moduleIds = [
   "video-remix",
@@ -2104,6 +2109,7 @@ const AdminCredentialSchema = z.object({
   name: ProviderCredentialNameSchema,
   providerId: ProviderIdSchema,
   provider: z.string(),
+  docsUrl: z.string().url(),
   label: z.string(),
   secret: z.boolean(),
   configured: z.boolean(),
@@ -2338,17 +2344,12 @@ app.openapi(importAdminEnvKeyRoute, async (c) => {
   const file = (await c.req.formData()).get("file");
   if (!(file instanceof File) || !file.size)
     return c.json(
-      { error: { code: "INVALID_ENV_KEY", message: "请选择有效的 .env.key 文件", retryable: false, requestId } },
+      { error: { code: "INVALID_ENV_KEY", message: "请选择有效的密钥文件", retryable: false, requestId } },
       400,
-    );
-  if (file.name !== ".env.key")
-    return c.json(
-      { error: { code: "INVALID_ENV_KEY_NAME", message: "文件名必须是 .env.key", retryable: false, requestId } },
-      415,
     );
   if (file.size > maxEnvKeyBytes)
     return c.json(
-      { error: { code: "ENV_KEY_TOO_LARGE", message: ".env.key 不能超过 64KB", retryable: false, requestId } },
+      { error: { code: "ENV_KEY_TOO_LARGE", message: "密钥文件不能超过 64KB", retryable: false, requestId } },
       413,
     );
   try {
@@ -2369,7 +2370,7 @@ app.openapi(importAdminEnvKeyRoute, async (c) => {
       {
         error: {
           code: "INVALID_ENV_KEY_CONTENT",
-          message: error instanceof Error ? error.message : ".env.key 内容无效",
+          message: error instanceof Error ? error.message : "密钥文件内容无效",
           retryable: false,
           requestId,
         },
@@ -4603,6 +4604,55 @@ app.openapi(updateAllVideoCreateShotSettingsRoute, (c) => {
       );
 });
 
+const qwenVoiceSamplePreflightRoute = createRoute({
+  method: "post",
+  path: "/api/voice-clone/qwen/sample-preflight",
+  operationId: "preflightQwenVoiceSample",
+  request: {
+    body: {
+      required: true,
+      content: { "application/json": { schema: z.object({ assetId: z.string().uuid() }) } },
+    },
+  },
+  responses: {
+    200: {
+      description: "Sample is valid",
+      content: {
+        "application/json": {
+          schema: z.object({
+            durationSec: z.number().min(0.001),
+            format: z.string(),
+            channels: z.number().int().min(1).optional(),
+            sampleRate: z.number().int().min(1).optional(),
+          }),
+        },
+      },
+    },
+    422: { description: "Invalid sample", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(qwenVoiceSamplePreflightRoute, async (c) => {
+  const ownerUserId = c.get("userId");
+  const { assetId } = c.req.valid("json");
+  try {
+    return c.json(await preflightQwenVoiceSample(ownerUserId, assetId, accounts), 200);
+  } catch (error) {
+    if (error instanceof QwenVoiceSamplePreflightError)
+      return c.json(
+        {
+          error: {
+            code: "INVALID_QWEN_VOICE_SAMPLE",
+            message: error.message,
+            retryable: false,
+            requestId: crypto.randomUUID(),
+          },
+        },
+        422,
+      );
+    throw error;
+  }
+});
+
 const createJobRoute = createRoute({
   method: "post",
   path: "/api/{moduleId}/jobs",
@@ -4656,7 +4706,23 @@ app.openapi(createJobRoute, async (c) => {
       },
       403,
     );
-  const availability = moduleFeatureAvailability(moduleId);
+  const body = c.req.valid("json");
+  if (moduleId === "voice-clone" && body.values.voiceProvider !== "qwen")
+    return c.json(
+      {
+        error: {
+          code: "QWEN_VOICE_CLONE_REQUIRED",
+          message: "新建音色克隆任务仅支持 Qwen",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      422,
+    );
+  const isQwenVoiceClone = moduleId === "voice-clone" && body.values.voiceProvider === "qwen";
+  const availability = isQwenVoiceClone
+    ? providerFeatureAvailability(["qwen-audio", "tos"])
+    : moduleFeatureAvailability(moduleId);
   if (!availability.enabled)
     return c.json(
       {
@@ -4669,28 +4735,16 @@ app.openapi(createJobRoute, async (c) => {
       },
       403,
     );
-  const body = c.req.valid("json");
   const ownerUserId = c.get("userId");
   const jobValues = { ...body.values };
   let mashupConfig: VideoMashupConfig | undefined;
-  if (moduleId === "voice-clone") {
-    jobValues.operation = "synthesize";
-    jobValues.voiceSource = "preset";
-    jobValues.presetVoiceId = "zh_female_vv_uranus_bigtts";
-    jobValues.synthesisSpeakerId = "";
-    jobValues.parentJobId = "";
-    jobValues.styleInstruction = "";
-    jobValues.toneFidelity = "";
-    jobValues.authorized = "";
-    jobValues.consentReference = "";
-    jobValues.consentScope = "";
-    jobValues.consentExpiresAt = "";
-    const invalidMessage = validateVoiceTaskValues(jobValues);
+  if (isQwenVoiceClone) {
+    const invalidMessage = validateQwenVoiceCloneValues(jobValues);
     if (invalidMessage)
       return c.json(
         {
           error: {
-            code: "INVALID_VOICE_CLONE_CONFIG",
+            code: "INVALID_QWEN_VOICE_CLONE_CONFIG",
             message: invalidMessage,
             retryable: false,
             requestId: crypto.randomUUID(),
@@ -4698,6 +4752,28 @@ app.openapi(createJobRoute, async (c) => {
         },
         422,
       );
+    const sourceAssetId = jobValues.sample?.split(":", 3)[1] ?? "";
+    try {
+      await preflightQwenVoiceSample(ownerUserId, sourceAssetId, accounts);
+    } catch (error) {
+      if (error instanceof QwenVoiceSamplePreflightError)
+        return c.json(
+          {
+            error: {
+              code: "INVALID_QWEN_VOICE_SAMPLE",
+              message: error.message,
+              retryable: false,
+              requestId: crypto.randomUUID(),
+            },
+          },
+          422,
+        );
+      throw error;
+    }
+    const submittedAt = new Date().toISOString();
+    jobValues.auditReference = `authenticated-submission:${ownerUserId}:${submittedAt}`;
+    jobValues.submittedByUserId = ownerUserId;
+    jobValues.submittedAt = submittedAt;
   }
   if (moduleId === "video-mashup" && jobValues.mergeMode !== "video-cut-clips") {
     try {

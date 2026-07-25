@@ -3,6 +3,7 @@ import { adScriptJob } from "./job-ad-script";
 import { douyinVideoImportJob } from "./job-douyin-video-import";
 import { genericCreationJob } from "./job-generic-creation";
 import { subtitleEraseJob, videoEnhancementJob } from "./job-mediakit-video";
+import { qwenVoiceCloneJob } from "./job-qwen-voice-clone";
 import { videoClipMergeJob } from "./job-video-clip-merge";
 import { videoCreateJob } from "./job-video-create";
 import { videoCutJob } from "./job-video-cut";
@@ -29,6 +30,7 @@ export const jobHandlers: readonly WorkerJobHandler[] = [
   videoExtractJob,
   videoEditorJob,
   videoMashupJob,
+  qwenVoiceCloneJob,
   voiceCloneJob,
   subtitleEraseJob,
   videoEnhancementJob,

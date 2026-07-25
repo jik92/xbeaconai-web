@@ -198,7 +198,7 @@ async function executeSynthesis(job: JobRecord, context: JobHandlerContext) {
 
 export const voiceCloneJob: WorkerJobHandler = {
   name: "voice-clone",
-  supports: (job) => job.moduleId === "voice-clone",
+  supports: (job) => job.moduleId === "voice-clone" && job.values.voiceProvider !== "qwen",
   async execute(job, context) {
     if (job.values.operation === "synthesize") return executeSynthesis(job, context);
     const { accounts, store } = context;
