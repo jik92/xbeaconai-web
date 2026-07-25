@@ -7,13 +7,16 @@ import { SqliteJobStore } from "../../server/jobs/sqlite-job-store";
 import { getPortraitById } from "../../server/portraits/catalog";
 import { buildGptImageAnalysisRequest } from "../../server/providers/aihubmix";
 import type { JobRecord } from "../../server/types";
-import { normalizeVideoCreateRecommendation } from "../../server/video-create/model";
-import type { VideoCreateInput } from "../../server/video-create/types";
+import { normalizeVideoCreateRecommendation, videoCreateTargetCharacterCount } from "../../server/video-create/model";
+import { createFallbackVideoCreateShotPlan } from "../../server/video-create/shot-generation";
+import { VideoCreateGeneratedScriptSchema, type VideoCreateInput } from "../../server/video-create/types";
 import {
   VideoCreateStateError,
   VideoCreateStore,
   VideoCreateVersionConflictError,
   videoCreateBatchEligibleShots,
+  videoCreateMinimumStoryboardCount,
+  videoCreateShotNarration,
 } from "../../server/video-create/video-create-store";
 import { JobProcessor } from "../../worker/job-processor";
 import { buildSubtitleCues } from "../../worker/jobs/job-video-create";
@@ -63,7 +66,32 @@ const input: VideoCreateInput = {
   priority: "speech",
 };
 
+function generationPlan(durationSec: number, prompt: string, narration: string) {
+  return createFallbackVideoCreateShotPlan({ durationSec, shotPrompt: prompt, narration });
+}
+
 describe("video create domain", () => {
+  test("derives total script characters from duration and speech rate", () => {
+    expect(videoCreateTargetCharacterCount(15, "slow")).toBe(45);
+    expect(videoCreateTargetCharacterCount(30, "medium")).toBe(120);
+    expect(videoCreateTargetCharacterCount(60, "fast")).toBe(300);
+    expect(() =>
+      VideoCreateGeneratedScriptSchema.parse({
+        sections: [
+          { label: "开场痛点", text: "痛点", durationSec: 3 },
+          { label: "产品介绍", text: "介绍", durationSec: 8 },
+        ],
+      }),
+    ).toThrow();
+  });
+
+  test("applies the video-model duration limit only when planning storyboards", () => {
+    expect(videoCreateMinimumStoryboardCount(15)).toBe(1);
+    expect(videoCreateMinimumStoryboardCount(30)).toBe(2);
+    expect(videoCreateMinimumStoryboardCount(60)).toBe(4);
+    expect(videoCreateMinimumStoryboardCount(180)).toBe(12);
+  });
+
   test("batch generation only selects pending and failed shots", () => {
     const statuses = ["pending", "failed", "queued", "generating", "succeeded", "replaced"] as const;
     expect(videoCreateBatchEligibleShots(statuses.map((status) => ({ status }))).map((shot) => shot.status)).toEqual([
@@ -155,7 +183,7 @@ describe("video create domain", () => {
       productName: "AI 产品名",
       sellingPoints: ["AI 卖点"],
       scene: "品牌曝光",
-      durationSec: 30,
+      durationSec: 60,
       segmentCount: 2,
       speechRate: "fast",
       requirements: "AI 要求",
@@ -187,7 +215,8 @@ describe("video create domain", () => {
       productName: "AI 产品名",
       sellingPoints: ["AI 卖点"],
       scene: "品牌曝光",
-      durationSec: 30,
+      durationSec: 60,
+      segmentCount: 2,
       speechRate: "fast",
       requirements: "AI 要求",
       sensitiveWords: "绝对化表达",
@@ -236,10 +265,11 @@ describe("video create domain", () => {
     const scripted = store.replaceScripts(projectId, {
       sections: [
         { label: "开场共鸣", text: "职场穿搭总怕闷热又没精神？", durationSec: 4 },
-        { label: "卖点介绍", text: "这件衬衫面料亲肤，剪裁利落，通勤也能轻松有气质。", durationSec: 11 },
+        { label: "卖点介绍", text: "这件衬衫面料亲肤，剪裁利落。", durationSec: 7 },
+        { label: "收尾引导", text: "通勤也能轻松穿出好气质。", durationSec: 4 },
       ],
     });
-    expect(scripted?.sections).toHaveLength(2);
+    expect(scripted?.sections).toHaveLength(3);
     const first = scripted?.sections[0];
     expect(first?.currentVersion?.source).toBe("generated");
     if (!first?.currentVersionId) throw new Error("SCRIPT_SECTION_NOT_CREATED");
@@ -266,18 +296,59 @@ describe("video create domain", () => {
 
     expect(() =>
       store.replaceShots(projectId, {
-        shots: [{ prompt: "竖屏近景展示通勤女性整理衬衫衣领，晨间自然光", durationSec: 4 }],
+        shots: [
+          {
+            prompt: "竖屏近景展示通勤女性整理衬衫衣领，晨间自然光",
+            narration: "上班穿搭总怕闷热又显得没精神？",
+            durationSec: 4,
+            generationPlan: generationPlan(
+              4,
+              "竖屏近景展示通勤女性整理衬衫衣领，晨间自然光",
+              "上班穿搭总怕闷热又显得没精神？",
+            ),
+          },
+        ],
       }),
     ).toThrow(VideoCreateStateError);
     const storyboard = store.replaceShots(projectId, {
       shots: [
-        { prompt: "竖屏近景展示通勤女性整理衬衫衣领，晨间自然光", durationSec: 4 },
-        { prompt: "竖屏中景展示衬衫亲肤面料和利落剪裁，镜头轻推", durationSec: 11 },
+        {
+          prompt: "竖屏近景展示通勤女性整理衬衫衣领，晨间自然光",
+          narration: "上班穿搭总怕闷热又显得没精神？",
+          durationSec: 4,
+          generationPlan: generationPlan(
+            4,
+            "竖屏近景展示通勤女性整理衬衫衣领，晨间自然光",
+            "上班穿搭总怕闷热又显得没精神？",
+          ),
+        },
+        {
+          prompt: "竖屏中景展示衬衫亲肤面料和利落剪裁，镜头轻推",
+          narration: "这件衬衫面料亲肤，剪裁利落。通勤也能轻松穿出好气质。",
+          durationSec: 11,
+          generationPlan: generationPlan(
+            11,
+            "竖屏中景展示衬衫亲肤面料和利落剪裁，镜头轻推",
+            "这件衬衫面料亲肤，剪裁利落。通勤也能轻松穿出好气质。",
+          ),
+        },
       ],
     });
     expect(storyboard?.canCompose).toBe(false);
     if (!storyboard) throw new Error("STORYBOARD_NOT_CREATED");
     expect(storyboard.shots.every((shot) => shot.audioEnabled && shot.subtitleEnabled)).toBe(true);
+    expect(storyboard.shots.map((shot) => shot.narration)).toEqual([
+      "上班穿搭总怕闷热又显得没精神？",
+      "这件衬衫面料亲肤，剪裁利落。通勤也能轻松穿出好气质。",
+    ]);
+    expect(
+      storyboard.shots.every((shot) => shot.generationPlan?.subshots.length === (shot.durationSec >= 10 ? 3 : 2)),
+    ).toBe(true);
+    store.updateShot(storyboard.shots[0].id, { narration: "" });
+    const legacyAggregate = store.get(projectId);
+    expect(legacyAggregate && videoCreateShotNarration(legacyAggregate, legacyAggregate.shots[0])).toBe(
+      "上班穿搭总怕闷热又显得没精神？",
+    );
     expect(storyboard.shots.every((shot) => shot.subtitleCues.length === 0)).toBe(true);
     store.updateAllShotSettings(projectId, { audioEnabled: false });
     expect(store.get(projectId)?.shots.every((shot) => !shot.audioEnabled)).toBe(true);
@@ -301,6 +372,61 @@ describe("video create domain", () => {
     accounts.close();
   });
 
+  test("clears scripts and dependent shots while preserving project inputs", async () => {
+    const path = join(tmpdir(), `video-create-clear-script-${crypto.randomUUID()}.sqlite`);
+    databases.push(path);
+    const accounts = createTestAccountStore(path);
+    const store = new VideoCreateStore(path);
+    const owner = await registerTestAccount(accounts, {
+      phone: "13800000013",
+      password: "Password123",
+      displayName: "脚本清除用户",
+    });
+    const other = await registerTestAccount(accounts, {
+      phone: "13800000014",
+      password: "Password123",
+      displayName: "其他清除用户",
+    });
+    const projectId = crypto.randomUUID();
+    const created = store.createDraft({
+      id: projectId,
+      ownerUserId: owner.user.id,
+      title: "待重新生成脚本",
+      projectInput: { ...input, segmentCount: 1 },
+    });
+    store.replaceScripts(projectId, {
+      sections: [{ label: "商品卖点", text: "这件衬衫亲肤透气，适合日常通勤。", durationSec: 5 }],
+    });
+    const storyboard = store.replaceShots(projectId, {
+      shots: [
+        {
+          prompt: "模特在通勤场景展示衬衫",
+          narration: "这件衬衫亲肤透气。",
+          durationSec: 5,
+          generationPlan: generationPlan(5, "模特在通勤场景展示衬衫", "这件衬衫亲肤透气。"),
+        },
+      ],
+    });
+    const shot = storyboard?.shots[0];
+    if (!shot) throw new Error("SHOT_NOT_CREATED");
+    store.updateShot(shot.id, { status: "queued" });
+    expect(() => store.clearScripts(projectId, owner.user.id)).toThrow(VideoCreateStateError);
+    store.updateShot(shot.id, { status: "succeeded", videoAssetId: crypto.randomUUID() });
+    store.setProject(projectId, { status: "completed", finalArtifactId: crypto.randomUUID() });
+
+    expect(store.clearScripts(projectId, other.user.id)).toBeUndefined();
+    const cleared = store.clearScripts(projectId, owner.user.id);
+    expect(cleared?.project.status).toBe("draft");
+    expect(cleared?.project.version).toBe(created.project.version + 1);
+    expect(cleared?.project.input).toEqual({ ...input, segmentCount: 1 });
+    expect(cleared?.project.finalArtifactId).toBeNull();
+    expect(cleared?.sections).toEqual([]);
+    expect(cleared?.shots).toEqual([]);
+
+    store.close();
+    accounts.close();
+  });
+
   test("uses the environment-controlled FFmpeg mock for Seedance shots", async () => {
     env.mockGenerateVideoApi = true;
     const path = join(tmpdir(), `video-create-mock-${crypto.randomUUID()}.sqlite`);
@@ -314,12 +440,28 @@ describe("video create domain", () => {
       displayName: "Mock 视频用户",
     });
     const projectId = crypto.randomUUID();
-    projects.createDraft({ id: projectId, ownerUserId: owner.user.id, title: "Mock 视频验收", projectInput: input });
+    projects.createDraft({
+      id: projectId,
+      ownerUserId: owner.user.id,
+      title: "Mock 视频验收",
+      projectInput: { ...input, segmentCount: 1 },
+    });
     projects.replaceScripts(projectId, {
       sections: [{ label: "内容种草", text: "这件衬衫亲肤利落，适合日常通勤。", durationSec: 5 }],
     });
     const storyboard = projects.replaceShots(projectId, {
-      shots: [{ prompt: "竖屏中景展示通勤衬衫，人物自然走动，柔和日光", durationSec: 5 }],
+      shots: [
+        {
+          prompt: "竖屏中景展示通勤衬衫，人物自然走动，柔和日光",
+          narration: "这件衬衫亲肤利落，适合日常通勤。",
+          durationSec: 5,
+          generationPlan: generationPlan(
+            5,
+            "竖屏中景展示通勤衬衫，人物自然走动，柔和日光",
+            "这件衬衫亲肤利落，适合日常通勤。",
+          ),
+        },
+      ],
     });
     const shot = storyboard?.shots[0];
     if (!shot) throw new Error("SHOT_NOT_CREATED");

@@ -463,6 +463,10 @@ export const videoCreateShots = sqliteTable(
       .references(() => videoCreateScriptSections.id),
     ordinal: integer("ordinal").notNull(),
     prompt: text("prompt").notNull(),
+    narration: text("narration").notNull().default(""),
+    generationPlan: text("generation_plan_json", { mode: "json" }).$type<
+      import("../video-create/types").VideoCreateShotGenerationPlan
+    >(),
     durationSec: integer("duration_sec").notNull(),
     status: text("status").$type<import("../video-create/types").VideoCreateShotStatus>().notNull().default("pending"),
     jobId: text("job_id").references(() => jobs.id),

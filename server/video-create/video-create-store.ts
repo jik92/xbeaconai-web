@@ -37,6 +37,16 @@ export function videoCreateBatchEligibleShots<T extends { status: VideoCreateSho
   return shots.filter((shot) => shot.status === "pending" || shot.status === "failed");
 }
 
+export function videoCreateMinimumStoryboardCount(durationSec: number) {
+  return Math.ceil(durationSec / 15);
+}
+
+export function videoCreateShotNarration(aggregate: VideoCreateAggregate, shot: ShotRow) {
+  const savedNarration = shot.narration.trim();
+  if (savedNarration) return savedNarration;
+  return aggregate.sections.find((section) => section.id === shot.scriptSectionId)?.currentVersion?.text.trim() ?? "";
+}
+
 export class VideoCreateStore {
   readonly db: AppDatabase;
   private readonly client: ReturnType<typeof openDatabase>["client"];
@@ -151,10 +161,7 @@ export class VideoCreateStore {
   setRecommendation(projectId: string, recommendation: VideoCreateRecommendation) {
     const aggregate = this.get(projectId);
     if (!aggregate) return undefined;
-    const normalized = {
-      ...recommendation,
-      segmentCount: Math.max(recommendation.segmentCount, Math.ceil(recommendation.durationSec / 15)),
-    };
+    const normalized = recommendation;
     const input: VideoCreateInput = {
       productAssetIds: aggregate.project.input.productAssetIds,
       portraitId: aggregate.project.input.portraitId,
@@ -230,6 +237,57 @@ export class VideoCreateStore {
     return this.get(projectId);
   }
 
+  clearScripts(projectId: string, ownerUserId: string) {
+    if (!this.getOwned(projectId, ownerUserId)) return undefined;
+    const runningProjectStatuses: VideoCreateProjectStatus[] = [
+      "analyzing",
+      "script_generating",
+      "storyboard_generating",
+      "composing",
+    ];
+    const timestamp = new Date().toISOString();
+    this.db.transaction(
+      (tx) => {
+        const project = tx
+          .select()
+          .from(videoCreateProjects)
+          .where(and(eq(videoCreateProjects.id, projectId), eq(videoCreateProjects.ownerUserId, ownerUserId)))
+          .get();
+        const hasRunningShot = tx
+          .select({ status: videoCreateShots.status })
+          .from(videoCreateShots)
+          .where(eq(videoCreateShots.projectId, projectId))
+          .all()
+          .some((shot) => shot.status === "queued" || shot.status === "generating");
+        if (!project || runningProjectStatuses.includes(project.status) || hasRunningShot)
+          throw new VideoCreateStateError("项目仍有任务执行中，暂时不能清除脚本");
+        const sectionIds = tx
+          .select({ id: videoCreateScriptSections.id })
+          .from(videoCreateScriptSections)
+          .where(eq(videoCreateScriptSections.projectId, projectId))
+          .all()
+          .map((item) => item.id);
+        tx.delete(videoCreateShots).where(eq(videoCreateShots.projectId, projectId)).run();
+        for (const sectionId of sectionIds)
+          tx.delete(videoCreateScriptVersions).where(eq(videoCreateScriptVersions.sectionId, sectionId)).run();
+        tx.delete(videoCreateScriptSections).where(eq(videoCreateScriptSections.projectId, projectId)).run();
+        tx.update(videoCreateProjects)
+          .set({
+            status: "draft",
+            currentJobId: null,
+            finalArtifactId: null,
+            error: null,
+            version: project.version + 1,
+            updatedAt: timestamp,
+          })
+          .where(and(eq(videoCreateProjects.id, projectId), eq(videoCreateProjects.ownerUserId, ownerUserId)))
+          .run();
+      },
+      { behavior: "immediate" },
+    );
+    return this.getOwned(projectId, ownerUserId);
+  }
+
   appendScriptVersion(input: {
     projectId: string;
     sectionId: string;
@@ -287,8 +345,9 @@ export class VideoCreateStore {
 
   replaceShots(projectId: string, storyboard: VideoCreateGeneratedStoryboard) {
     const aggregate = this.get(projectId);
-    if (!aggregate || aggregate.sections.length !== storyboard.shots.length)
-      throw new VideoCreateStateError("分镜数量必须与脚本段落数量一致");
+    if (!aggregate?.sections.length) throw new VideoCreateStateError("请先生成并确认脚本");
+    if (aggregate.project.input.segmentCount !== storyboard.shots.length)
+      throw new VideoCreateStateError("分镜数量必须与设置的分镜段数一致");
     const timestamp = new Date().toISOString();
     this.db.transaction(
       (tx) => {
@@ -298,9 +357,17 @@ export class VideoCreateStore {
             storyboard.shots.map((shot, index) => ({
               id: crypto.randomUUID(),
               projectId,
-              scriptSectionId: aggregate.sections[index].id,
+              scriptSectionId:
+                aggregate.sections[
+                  Math.min(
+                    aggregate.sections.length - 1,
+                    Math.floor((index * aggregate.sections.length) / storyboard.shots.length),
+                  )
+                ].id,
               ordinal: index + 1,
               prompt: shot.prompt,
+              narration: shot.narration,
+              generationPlan: shot.generationPlan,
               durationSec: shot.durationSec,
               status: "pending" as const,
               createdAt: timestamp,
@@ -331,6 +398,8 @@ export class VideoCreateStore {
         | "attempts"
         | "error"
         | "prompt"
+        | "narration"
+        | "generationPlan"
         | "audioEnabled"
         | "subtitleEnabled"
       >
@@ -399,13 +468,20 @@ export class VideoCreateStore {
       .where(eq(videoCreateShots.projectId, project.id))
       .orderBy(asc(videoCreateShots.ordinal))
       .all();
+    const resolvedShots = shots.map((shot) => ({
+      ...shot,
+      narration:
+        shot.narration.trim() ||
+        enriched.find((section) => section.id === shot.scriptSectionId)?.currentVersion?.text.trim() ||
+        "",
+    }));
     return {
       project: normalizedProject,
       sections: enriched,
-      shots,
+      shots: resolvedShots,
       canCompose:
-        Boolean(shots.length) &&
-        shots.every(
+        Boolean(resolvedShots.length) &&
+        resolvedShots.every(
           (shot) =>
             (shot.status === "succeeded" || shot.status === "replaced") &&
             (!shot.audioEnabled || Boolean(shot.audioArtifactId)) &&

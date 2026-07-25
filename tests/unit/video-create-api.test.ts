@@ -6,25 +6,62 @@ type OpenApiOperation = {
   responses?: Record<string, unknown>;
   requestBody?: {
     content?: {
-      "application/json"?: { schema?: { properties?: Record<string, { type?: string }>; required?: string[] } };
+      "application/json"?: {
+        schema?: { properties?: Record<string, { type?: string; maxItems?: number }>; required?: string[] };
+      };
     };
   };
 };
 
 describe("video create shot generation API contract", () => {
-  test("publishes shared settings for individual and batch shot generation", async () => {
+  test("publishes the owned script clearing operation", async () => {
+    const spec = (await Bun.file(resolve(import.meta.dir, "../../openapi/openapi.json")).json()) as {
+      paths: Record<string, Record<string, OpenApiOperation>>;
+    };
+    const clear = spec.paths["/api/video-create/projects/{projectId}/script"]?.delete;
+
+    expect(clear?.operationId).toBe("clearVideoCreateScript");
+    expect(clear?.responses).toHaveProperty("200");
+    expect(clear?.responses).toHaveProperty("404");
+    expect(clear?.responses).toHaveProperty("409");
+  });
+
+  test("publishes the review draft and exact individual submission contract", async () => {
     const spec = (await Bun.file(resolve(import.meta.dir, "../../openapi/openapi.json")).json()) as {
       paths: Record<string, Record<string, OpenApiOperation>>;
     };
     const individual = spec.paths["/api/video-create/projects/{projectId}/shots/{shotId}/generate"]?.post;
     const batch = spec.paths["/api/video-create/projects/{projectId}/shots/batch-generate"]?.post;
+    const draft = spec.paths["/api/video-create/projects/{projectId}/shots/{shotId}/generation-draft"]?.get;
 
+    expect(draft?.operationId).toBe("getVideoCreateShotGenerationDraft");
+    expect(draft?.responses).toHaveProperty("200");
+    expect(draft?.responses).toHaveProperty("404");
+    expect(JSON.stringify(draft?.responses?.["200"])).toContain('"generationPlan"');
+    expect(JSON.stringify(draft?.responses?.["200"])).toContain('"人物","商品"');
     expect(individual?.operationId).toBe("generateVideoCreateShot");
     expect(batch?.operationId).toBe("batchGenerateVideoCreateShots");
+    const individualSchema = individual?.requestBody?.content?.["application/json"]?.schema;
+    expect(individualSchema?.required).toEqual([
+      "videoModel",
+      "ratio",
+      "resolution",
+      "generateAudio",
+      "prompt",
+      "duration",
+      "referenceMode",
+      "references",
+      "usePortrait",
+    ]);
+    expect(individualSchema?.properties).toHaveProperty("portrait");
+    expect(individualSchema?.properties?.generateAudio?.type).toBe("boolean");
+    expect(individualSchema?.properties?.references?.maxItems).toBe(12);
+    expect(JSON.stringify(individualSchema?.properties?.references)).toContain('"人物","商品"');
+
+    const batchSchema = batch?.requestBody?.content?.["application/json"]?.schema;
+    expect(batchSchema?.required).toEqual(["videoModel", "ratio", "resolution", "generateAudio"]);
+    expect(batchSchema?.properties?.generateAudio?.type).toBe("boolean");
     for (const route of [individual, batch]) {
-      const schema = route?.requestBody?.content?.["application/json"]?.schema;
-      expect(schema?.required).toEqual(["videoModel", "ratio", "resolution", "generateAudio"]);
-      expect(schema?.properties?.generateAudio?.type).toBe("boolean");
       expect(route?.responses).toHaveProperty("202");
       expect(route?.responses).toHaveProperty("422");
     }

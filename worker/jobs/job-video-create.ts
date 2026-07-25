@@ -21,7 +21,7 @@ import {
 } from "../../server/video-create/model";
 import type { VideoCreateSubtitleCue } from "../../server/video-create/types";
 import { VIDEO_CREATE_ANALYSIS_MODEL } from "../../server/video-create/types";
-import { videoCreateError } from "../../server/video-create/video-create-store";
+import { videoCreateError, videoCreateShotNarration } from "../../server/video-create/video-create-store";
 import { SeedanceVideoJob } from "./job-seedance-video";
 import type { JobHandlerContext, WorkerJobHandler } from "./types";
 
@@ -228,8 +228,7 @@ export const videoCreateJob: WorkerJobHandler = {
         const shot = aggregate.shots.find((item) => item.id === shotId);
         if (!shot) throw new Error("SHOT_NOT_FOUND");
         projects.updateShot(shot.id, { status: "generating", jobId: job.id, attempts: shot.attempts + 1, error: null });
-        const section = aggregate.sections.find((item) => item.id === shot.scriptSectionId);
-        const narration = section?.currentVersion?.text.trim();
+        const narration = videoCreateShotNarration(aggregate, shot);
         if (!narration) throw new Error("SHOT_SCRIPT_NOT_AVAILABLE");
         const mockAudio = job.values.__mockAudio === "true";
         const audioStage = stage(

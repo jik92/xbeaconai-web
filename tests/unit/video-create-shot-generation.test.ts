@@ -1,0 +1,218 @@
+import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { buildSeedanceReferenceContent } from "../../server/providers/aihubmix";
+import {
+  allocateVideoCreateSubshotDurations,
+  buildVideoCreateShotGenerationPrompt,
+  createFallbackVideoCreateShotPlan,
+  splitVideoCreateSubshotText,
+  validateVideoCreateShotGenerationReferences,
+} from "../../server/video-create/shot-generation";
+import { VideoCreateGeneratedStoryboardSchema } from "../../server/video-create/types";
+import { normalizeVideoCreateAttachmentLabels } from "../../web/features/video-create/video-create-shot-generation-dialog";
+
+describe("video create shot generation review", () => {
+  test("constructs the exact two-part prompt with semantic image categories and three subshots", () => {
+    const narration = "夏天出门还在为搭配饰发愁？这款复古草帽透气不闷头，搭啥都好看。出游拍照巨出片！";
+    const plan = createFallbackVideoCreateShotPlan({
+      durationSec: 15,
+      shotPrompt: "女生对镜头摊手，随后戴上草帽侧身展示，最后对镜头比耶",
+      narration,
+    });
+    const prompt = buildVideoCreateShotGenerationPrompt({
+      durationSec: 15,
+      plan,
+      references: [
+        { label: "Image1", name: "夏日模特", role: "reference_image", category: "人物" },
+        { label: "Image2", name: "复古草帽", role: "reference_image", category: "商品" },
+      ],
+    });
+
+    expect(plan.subshots).toHaveLength(3);
+    expect(plan.subshots.map((subshot) => subshot.narration).join("")).toBe(narration);
+    expect(plan.subshots.reduce((total, subshot) => total + subshot.durationSec, 0)).toBe(15);
+    expect(prompt.startsWith("### 第一部分：全局基础设定\n约束条件：")).toBe(true);
+    expect(prompt).toContain("人物形象严格参考 @Image1（人物）");
+    expect(prompt).toContain("商品外观严格参考 @Image2（商品）");
+    expect(prompt).toContain("### 第二部分：分镜内容（按播放顺序逐条输出分镜，每条独立成段，并标注序号）");
+    expect(prompt.match(/^分镜 \d{2}$/gmu)).toHaveLength(3);
+    expect(prompt).toContain("画面口播文案：夏天出门还在为搭配饰发愁？");
+    expect(prompt).not.toContain("绑定参考素材");
+    expect(prompt).not.toContain("执行要求");
+    expect(prompt).not.toContain("画面生成要求");
+    expect(
+      validateVideoCreateShotGenerationReferences({
+        prompt,
+        references: [{ id: "product", label: "Image2", mimeType: "image/png", byteSize: 1024, category: "商品" }],
+        portraitLabel: "Image1",
+        portraitCategory: "人物",
+      }),
+    ).toBeUndefined();
+  });
+
+  test("splits a short current shot into two semantic subshots with exact duration", () => {
+    const narration = "这款复古草帽透气不闷头，搭啥都好看";
+    const parts = splitVideoCreateSubshotText(narration, 2);
+    expect(parts).toEqual(["这款复古草帽透气不闷头，", "搭啥都好看"]);
+    expect(allocateVideoCreateSubshotDurations(parts, 6).reduce((total, duration) => total + duration, 0)).toBe(6);
+    expect(
+      createFallbackVideoCreateShotPlan({
+        durationSec: 6,
+        shotPrompt: "女生拿起草帽戴上，侧身展示帽型",
+        narration,
+      }).subshots,
+    ).toHaveLength(2);
+  });
+
+  test("rejects model plans that lose narration or break the parent-shot duration", () => {
+    const narration = "先展示商品外观，再说明核心卖点。";
+    const generationPlan = createFallbackVideoCreateShotPlan({
+      durationSec: 6,
+      shotPrompt: "人物拿起商品并转动展示细节",
+      narration,
+    });
+    const shot = {
+      prompt: "人物在生活化场景中拿起商品并展示外观细节",
+      narration,
+      durationSec: 6,
+      generationPlan,
+    };
+    expect(
+      VideoCreateGeneratedStoryboardSchema.parse({ shots: [shot] }).shots[0]?.generationPlan.subshots,
+    ).toHaveLength(2);
+    expect(() =>
+      VideoCreateGeneratedStoryboardSchema.parse({
+        shots: [
+          {
+            ...shot,
+            generationPlan: {
+              ...generationPlan,
+              subshots: generationPlan.subshots.map((subshot, index) =>
+                index === 0 ? { ...subshot, narration: "遗漏后的口播" } : subshot,
+              ),
+            },
+          },
+        ],
+      }),
+    ).toThrow();
+  });
+
+  test("accepts references only when every prompt tag resolves to an owned attachment", () => {
+    const prompt = "近景展示商品使用方式，并严格参考 @Image1（商品）和 @Image2（商品）的外观完成六秒镜头。";
+    expect(
+      validateVideoCreateShotGenerationReferences({
+        prompt,
+        references: [
+          { id: "asset-1", label: "Image1", mimeType: "image/png", byteSize: 1024, category: "商品" },
+          { id: "asset-2", label: "Image2", mimeType: "image/jpeg", byteSize: 2048, category: "商品" },
+        ],
+      }),
+    ).toBeUndefined();
+    expect(
+      validateVideoCreateShotGenerationReferences({ prompt: `${prompt} 同时参考 @Video1。`, references: [] }),
+    ).toBe("@Image1 未绑定到提交附件");
+    expect(
+      validateVideoCreateShotGenerationReferences({
+        prompt: "镜头严格参考 @Image1 的商品外观完成自然展示。",
+        references: [{ id: "asset-1", label: "Image1", mimeType: "image/png", byteSize: 1024 }],
+      }),
+    ).toBe("图片参考必须分类为人物或商品");
+  });
+
+  test("accepts a portrait followed by multiple product images and rejects label gaps", () => {
+    expect(
+      validateVideoCreateShotGenerationReferences({
+        prompt: "镜头严格参考 @Image1（人物），并结合 @Image2（商品）与 @Image3（商品）完成展示。",
+        references: [
+          { id: "asset-1", label: "Image2", mimeType: "image/png", byteSize: 1024, category: "商品" },
+          { id: "asset-2", label: "Image3", mimeType: "image/webp", byteSize: 1024, category: "商品" },
+        ],
+        portraitLabel: "Image1",
+        portraitCategory: "人物",
+      }),
+    ).toBeUndefined();
+    expect(
+      validateVideoCreateShotGenerationReferences({
+        prompt: "镜头严格参考 @Image1（商品）与 @Image3（商品）的外观完成六秒展示。",
+        references: [
+          { id: "asset-1", label: "Image1", mimeType: "image/png", byteSize: 1024, category: "商品" },
+          { id: "asset-2", label: "Image3", mimeType: "image/webp", byteSize: 1024, category: "商品" },
+        ],
+      }),
+    ).toBe("image参考标签必须按顺序绑定为 @Image2");
+  });
+
+  test("keeps multiple Seedance images in provider content order", () => {
+    expect(
+      buildSeedanceReferenceContent([
+        { kind: "image", url: "https://example.test/portrait.jpg" },
+        { kind: "image", url: "https://example.test/product-front.jpg" },
+        { kind: "image", url: "https://example.test/product-side.jpg" },
+        { kind: "audio", url: "https://example.test/voice.wav" },
+      ]),
+    ).toEqual([
+      {
+        type: "image_url",
+        image_url: { url: "https://example.test/portrait.jpg" },
+        role: "reference_image",
+      },
+      {
+        type: "image_url",
+        image_url: { url: "https://example.test/product-front.jpg" },
+        role: "reference_image",
+      },
+      {
+        type: "image_url",
+        image_url: { url: "https://example.test/product-side.jpg" },
+        role: "reference_image",
+      },
+      {
+        type: "audio_url",
+        audio_url: { url: "https://example.test/voice.wav" },
+        role: "reference_audio",
+      },
+    ]);
+  });
+
+  test("renumbers image prompt tags after an attachment is removed", () => {
+    const normalized = normalizeVideoCreateAttachmentLabels("使用 @Image2（商品）的正面和 @Image3（商品）的侧面。", [
+      {
+        source: "asset",
+        assetId: "00000000-0000-4000-8000-000000000001",
+        label: "Image2",
+        name: "正面图",
+        mimeType: "image/png",
+        role: "reference_image",
+        category: "商品",
+        url: "/api/assets/1/content",
+      },
+      {
+        source: "asset",
+        assetId: "00000000-0000-4000-8000-000000000002",
+        label: "Image3",
+        name: "侧面图",
+        mimeType: "image/jpeg",
+        role: "reference_image",
+        category: "商品",
+        url: "/api/assets/2/content",
+      },
+    ]);
+
+    expect(normalized.attachments.map((item) => item.label)).toEqual(["Image1", "Image2"]);
+    expect(normalized.prompt).toContain("使用 @Image1（商品）的正面和 @Image2（商品）的侧面");
+    expect(normalized.prompt).not.toContain("@Image3");
+  });
+
+  test("builds the draft from every selected product image instead of only the first", () => {
+    const source = readFileSync(resolve(import.meta.dir, "../../server/app.ts"), "utf8");
+    const draftSource = source.slice(
+      source.indexOf("function getVideoCreateShotGenerationDraft"),
+      source.indexOf("const getVideoCreateShotGenerationDraftRoute"),
+    );
+    expect(draftSource).toContain("for (const productId of aggregate.project.input.productAssetIds)");
+    expect(draftSource).toContain('category: "人物"');
+    expect(draftSource).toContain('category: "商品"');
+    expect(draftSource).not.toContain("aggregate.project.input.productAssetIds[0]");
+  });
+});

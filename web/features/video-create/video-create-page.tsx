@@ -17,6 +17,7 @@ import {
   Plus,
   RefreshCw,
   Sparkles,
+  Trash2,
   Upload,
   Video,
   WandSparkles,
@@ -25,10 +26,12 @@ import {
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import {
   batchGenerateVideoCreateShotVideos,
+  clearVideoCreateScript,
   createVideoCreate,
   downloadAuthenticated,
   fetchVideoCreateProject,
   fetchVideoCreateProjects,
+  fetchVideoCreateShotGenerationDraft,
   generateVideoCreateShotVideo,
   regenerateVideoCreateScriptSection,
   replaceVideoCreateShotVideo,
@@ -37,7 +40,9 @@ import {
   updateAllVideoCreateShotOptions,
   updateVideoCreate,
   updateVideoCreateShotOptions,
+  type VideoCreateShotGenerationDraft,
   type VideoCreateShotGenerationOptions,
+  type VideoCreateShotGenerationSubmitOptions,
 } from "@/api/api-client";
 import type { VideoCreateInput, VideoCreateProject } from "@/api/generated/types.gen";
 import { AttachmentPicker, type AttachmentSelection } from "@/components/domain/attachment-picker";
@@ -52,6 +57,7 @@ import { fetchPortraits } from "@/features/portrait-library/portrait-data";
 import { PortraitPickerDialog } from "@/features/portrait-library/portrait-picker-dialog";
 import { cn } from "@/lib/utils";
 import { videoCreateActionAvailability } from "./video-create-actions";
+import { VideoCreateShotGenerationDialog } from "./video-create-shot-generation-dialog";
 
 const scenes = ["商城转化", "短视频带货", "引流直播间", "直播带货", "内容种草", "品牌曝光", "本地到店", "线索收集"];
 const durationOptions = [15, 30, 60, 180];
@@ -369,6 +375,11 @@ export function VideoCreatePage() {
   const [openPanels, setOpenPanels] = useState({ requirements: false, style: false, advanced: false });
   const [historyOpen, setHistoryOpen] = useState(false);
   const [batchDialogOpen, setBatchDialogOpen] = useState(false);
+  const [clearScriptDialogOpen, setClearScriptDialogOpen] = useState(false);
+  const [shotGenerationOpen, setShotGenerationOpen] = useState(false);
+  const [shotGenerationLoading, setShotGenerationLoading] = useState(false);
+  const [shotGenerationShotId, setShotGenerationShotId] = useState("");
+  const [shotGenerationDraft, setShotGenerationDraft] = useState<VideoCreateShotGenerationDraft>();
   const [batchSettings, setBatchSettings] = useState<VideoCreateShotGenerationOptions>({
     videoModel: "doubao-seedance-2-0-mini-260615",
     ratio: "9:16",
@@ -455,6 +466,23 @@ export function VideoCreatePage() {
       setNotice(errorMessage(error));
     } finally {
       setBusy("");
+    }
+  };
+  const openShotGeneration = async (shotId: string) => {
+    if (!project || busy) return;
+    setShotGenerationShotId(shotId);
+    setShotGenerationDraft(undefined);
+    setShotGenerationOpen(true);
+    setShotGenerationLoading(true);
+    setNotice("");
+    try {
+      const draft = await fetchVideoCreateShotGenerationDraft(project.project.id, shotId);
+      setShotGenerationDraft(draft);
+    } catch (error) {
+      setShotGenerationOpen(false);
+      setNotice(errorMessage(error));
+    } finally {
+      setShotGenerationLoading(false);
     }
   };
   const persist = async () => {
@@ -680,10 +708,7 @@ export function VideoCreatePage() {
                   variant="outline"
                   size="sm"
                   key={seconds}
-                  onClick={() => {
-                    mutateInput("durationSec", seconds);
-                    mutateInput("segmentCount", Math.max(input.segmentCount, Math.ceil(seconds / 15)));
-                  }}
+                  onClick={() => mutateInput("durationSec", seconds)}
                 >
                   {seconds < 60 ? `${seconds}s` : `${seconds / 60}min`}
                 </Button>
@@ -998,6 +1023,16 @@ export function VideoCreatePage() {
                   <Copy />
                   复制脚本
                 </Button>
+                <Button
+                  className="text-error hover:text-error"
+                  variant="outline"
+                  size="sm"
+                  disabled={Boolean(busy) || polling}
+                  onClick={() => setClearScriptDialogOpen(true)}
+                >
+                  <Trash2 />
+                  清除脚本
+                </Button>
               </div>
             </div>
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
@@ -1210,7 +1245,6 @@ export function VideoCreatePage() {
                 </span>
               </div>
               {project.shots.map((shot) => {
-                const section = project.sections.find((item) => item.id === shot.scriptSectionId);
                 const generating = shot.status === "queued" || shot.status === "generating";
                 return (
                   <article
@@ -1224,7 +1258,7 @@ export function VideoCreatePage() {
                       <span className="inline-flex rounded-full bg-surface-strong px-2 py-1 text-xs text-muted">
                         {shot.durationSec}s
                       </span>
-                      <p className="leading-relaxed text-body">{section?.currentVersion?.text}</p>
+                      <p className="leading-relaxed text-body">{shot.narration}</p>
                       <small className="text-xs text-muted">0–{shot.durationSec}s · 1 镜</small>
                     </div>
                     <div className="border-r border-line p-3">
@@ -1266,14 +1300,7 @@ export function VideoCreatePage() {
                         <Button
                           size="sm"
                           disabled={generating || Boolean(busy)}
-                          onClick={() =>
-                            execute(`shot-${shot.id}`, async () => {
-                              await generateVideoCreateShotVideo(project.project.id, shot.id, batchSettings);
-                              void queryClient.invalidateQueries({
-                                queryKey: ["video-create-project", project.project.id],
-                              });
-                            })
-                          }
+                          onClick={() => void openShotGeneration(shot.id)}
                         >
                           {generating ? <LoaderCircle className="animate-spin" /> : <Video />}
                           {shot.status === "failed" ? "重新生成" : shot.videoAssetId ? "再生成" : "AI生成视频"}
@@ -1315,7 +1342,7 @@ export function VideoCreatePage() {
                     </div>
                     <div className={cn("border-r border-line p-3", !shot.audioEnabled && "opacity-50")}>
                       <div className="mb-3 flex items-start justify-between gap-3">
-                        <p className="leading-relaxed text-body">{section?.currentVersion?.text}</p>
+                        <p className="leading-relaxed text-body">{shot.narration}</p>
                         <Switch
                           checked={shot.audioEnabled}
                           aria-label={`分镜 ${shot.ordinal} 配音`}
@@ -1519,6 +1546,78 @@ export function VideoCreatePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <Dialog open={clearScriptDialogOpen} onOpenChange={setClearScriptDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>清除脚本</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 text-sm leading-relaxed text-body">
+            <p>清除后，当前脚本和依赖的分镜记录将无法恢复。</p>
+            <p className="text-muted">已经生成的视频、音频和素材库文件会继续保留。</p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={busy === "clear-script"}
+              onClick={() => setClearScriptDialogOpen(false)}
+            >
+              取消
+            </Button>
+            <Button
+              className="bg-error text-white hover:bg-error/90"
+              disabled={!project || Boolean(busy) || polling}
+              onClick={() =>
+                project &&
+                void execute("clear-script", async () => {
+                  const next = await clearVideoCreateScript(project.project.id);
+                  setDrafts({});
+                  setTab("script");
+                  setClearScriptDialogOpen(false);
+                  invalidate(next);
+                })
+              }
+            >
+              {busy === "clear-script" ? <LoaderCircle className="animate-spin" /> : <Trash2 />}
+              确认清除
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <VideoCreateShotGenerationDialog
+        open={shotGenerationOpen}
+        draft={shotGenerationDraft}
+        settings={batchSettings}
+        loading={shotGenerationLoading}
+        onClose={() => {
+          setShotGenerationOpen(false);
+          setShotGenerationDraft(undefined);
+          setShotGenerationShotId("");
+        }}
+        onSubmit={async (options: VideoCreateShotGenerationSubmitOptions) => {
+          if (!project || !shotGenerationShotId) throw new Error("分镜不存在，请刷新后重试");
+          await generateVideoCreateShotVideo(project.project.id, shotGenerationShotId, options);
+          setBatchSettings({
+            videoModel: options.videoModel,
+            ratio: options.ratio,
+            resolution: options.resolution,
+            generateAudio: options.generateAudio,
+          });
+          setProject((current) =>
+            current
+              ? {
+                  ...current,
+                  shots: current.shots.map((shot) =>
+                    shot.id === shotGenerationShotId ? { ...shot, status: "queued" as const, error: undefined } : shot,
+                  ),
+                }
+              : current,
+          );
+          setShotGenerationOpen(false);
+          setShotGenerationDraft(undefined);
+          setShotGenerationShotId("");
+          void queryClient.invalidateQueries({ queryKey: ["video-create-project", project.project.id] });
+        }}
+      />
       <PortraitPickerDialog
         open={portraitPickerOpen}
         portraits={portraits}

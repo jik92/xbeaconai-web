@@ -7,6 +7,7 @@ import { client } from "./generated/client.gen";
 import {
   batchGenerateVideoCreateShots,
   cancelJob,
+  clearVideoCreateScript as clearVideoCreateScriptRequest,
   createAdScriptAction,
   createAdScriptProject,
   createJob,
@@ -26,6 +27,7 @@ import {
   getModels,
   getProviderFeatures,
   getVideoCreateProject,
+  getVideoCreateShotGenerationDraft as getVideoCreateShotGenerationDraftRequest,
   getVideoRemixProject,
   grantAdminUserCredits,
   importAdminEnvKey,
@@ -56,6 +58,8 @@ import type {
   AdScriptInput,
   AdScriptProject,
   GetProviderFeaturesResponse,
+  GenerateVideoCreateShotData,
+  GetVideoCreateShotGenerationDraftResponse,
   GetVideoRemixProjectResponse,
   Job,
   ListAdminCredentialsResponse,
@@ -259,6 +263,17 @@ export async function updateVideoCreate(input: VideoCreateProject, values: Video
   return data;
 }
 
+export async function clearVideoCreateScript(projectId: string) {
+  configure();
+  const { data } = await clearVideoCreateScriptRequest({
+    path: { projectId },
+    headers: authHeaders(),
+    throwOnError: true,
+  });
+  if (!data) throw new Error("脚本清除失败");
+  return data;
+}
+
 export async function runVideoCreateProjectAction(
   projectId: string,
   action: "analyze" | "script" | "storyboard" | "compose",
@@ -314,10 +329,24 @@ export type VideoCreateShotGenerationOptions = {
   generateAudio: boolean;
 };
 
+export type VideoCreateShotGenerationDraft = GetVideoCreateShotGenerationDraftResponse;
+export type VideoCreateShotGenerationSubmitOptions = GenerateVideoCreateShotData["body"];
+
+export async function fetchVideoCreateShotGenerationDraft(projectId: string, shotId: string) {
+  configure();
+  const { data } = await getVideoCreateShotGenerationDraftRequest({
+    path: { projectId, shotId },
+    headers: authHeaders(),
+    throwOnError: true,
+  });
+  if (!data) throw new Error("分镜视频生成参数加载失败");
+  return data;
+}
+
 export async function generateVideoCreateShotVideo(
   projectId: string,
   shotId: string,
-  options: VideoCreateShotGenerationOptions,
+  options: VideoCreateShotGenerationSubmitOptions,
 ) {
   configure();
   const { data } = await generateVideoCreateShot({

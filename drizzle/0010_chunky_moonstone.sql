@@ -1,0 +1,1 @@
+ALTER TABLE `video_create_shots` ADD `generation_plan_json` text;

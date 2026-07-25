@@ -314,6 +314,26 @@ export type VideoCreateProject = {
         scriptSectionId: string;
         ordinal: number;
         prompt: string;
+        narration: string;
+        generationPlan: {
+            characterAppearance: string;
+            cameraView: string;
+            background: string;
+            lighting: string;
+            voice: string;
+            quality: string;
+            subshots: Array<{
+                action: string;
+                narration: string;
+                expression: string;
+                voiceTone: string;
+                durationSec: number;
+                shotSize: string;
+                composition: string;
+                background: string;
+                lighting: string;
+            }>;
+        };
         durationSec: number;
         status: 'pending' | 'queued' | 'generating' | 'succeeded' | 'failed' | 'replaced';
         jobId: string;
@@ -2657,6 +2677,37 @@ export type UpdateVideoCreateProjectResponses = {
 
 export type UpdateVideoCreateProjectResponse = UpdateVideoCreateProjectResponses[keyof UpdateVideoCreateProjectResponses];
 
+export type ClearVideoCreateScriptData = {
+    body?: never;
+    path: {
+        projectId: string;
+    };
+    query?: never;
+    url: '/api/video-create/projects/{projectId}/script';
+};
+
+export type ClearVideoCreateScriptErrors = {
+    /**
+     * Not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Project is busy
+     */
+    409: ApiErrorResponse;
+};
+
+export type ClearVideoCreateScriptError = ClearVideoCreateScriptErrors[keyof ClearVideoCreateScriptErrors];
+
+export type ClearVideoCreateScriptResponses = {
+    /**
+     * Script cleared
+     */
+    200: VideoCreateProject;
+};
+
+export type ClearVideoCreateScriptResponse = ClearVideoCreateScriptResponses[keyof ClearVideoCreateScriptResponses];
+
 export type SaveVideoCreateSectionData = {
     body: {
         expectedVersionId: string;
@@ -2759,12 +2810,97 @@ export type RegenerateVideoCreateSectionResponses = {
 
 export type RegenerateVideoCreateSectionResponse = RegenerateVideoCreateSectionResponses[keyof RegenerateVideoCreateSectionResponses];
 
+export type GetVideoCreateShotGenerationDraftData = {
+    body?: never;
+    path: {
+        projectId: string;
+        shotId: string;
+    };
+    query?: never;
+    url: '/api/video-create/projects/{projectId}/shots/{shotId}/generation-draft';
+};
+
+export type GetVideoCreateShotGenerationDraftErrors = {
+    /**
+     * Not found
+     */
+    404: ApiErrorResponse;
+};
+
+export type GetVideoCreateShotGenerationDraftError = GetVideoCreateShotGenerationDraftErrors[keyof GetVideoCreateShotGenerationDraftErrors];
+
+export type GetVideoCreateShotGenerationDraftResponses = {
+    /**
+     * Resolved shot generation draft
+     */
+    200: {
+        shotId: string;
+        ordinal: number;
+        narration: string;
+        duration: number;
+        prompt: string;
+        generationPlan: {
+            characterAppearance: string;
+            cameraView: string;
+            background: string;
+            lighting: string;
+            voice: string;
+            quality: string;
+            subshots: Array<{
+                action: string;
+                narration: string;
+                expression: string;
+                voiceTone: string;
+                durationSec: number;
+                shotSize: string;
+                composition: string;
+                background: string;
+                lighting: string;
+            }>;
+        };
+        referenceMode: 'omni';
+        attachments: Array<{
+            source: 'asset' | 'portrait';
+            assetId?: string;
+            portraitId?: number;
+            label: string;
+            name: string;
+            mimeType: string;
+            role: 'reference_image' | 'reference_video' | 'reference_audio';
+            category?: '人物' | '商品';
+            url: string;
+        }>;
+        executionMode: 'real' | 'mock';
+        postProcessAudio: {
+            model: 'tts-1';
+            voice: 'alloy';
+            replacesNativeAudio: boolean;
+        };
+    };
+};
+
+export type GetVideoCreateShotGenerationDraftResponse = GetVideoCreateShotGenerationDraftResponses[keyof GetVideoCreateShotGenerationDraftResponses];
+
 export type GenerateVideoCreateShotData = {
     body: {
         videoModel: SeedanceModelId;
         ratio: '9:16' | '16:9' | '1:1';
         resolution: '480p' | '720p';
         generateAudio: boolean;
+        prompt: string;
+        duration: number;
+        referenceMode: 'omni';
+        references: Array<{
+            assetId: string;
+            label: string;
+            category?: '人物' | '商品';
+        }>;
+        usePortrait: boolean;
+        portrait?: {
+            id: number;
+            label: string;
+            category: '人物';
+        };
     };
     path: {
         projectId: string;

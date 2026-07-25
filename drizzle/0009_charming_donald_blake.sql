@@ -1,0 +1,1 @@
+ALTER TABLE `video_create_shots` ADD `narration` text DEFAULT '' NOT NULL;

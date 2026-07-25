@@ -60,6 +60,16 @@ export function buildGptImageAnalysisRequest(input: GptImageAnalysisInput) {
   };
 }
 
+export function buildSeedanceReferenceContent(references: SeedanceReference[] = []) {
+  return references.map((reference) =>
+    reference.kind === "image"
+      ? { type: "image_url" as const, image_url: { url: reference.url }, role: "reference_image" as const }
+      : reference.kind === "video"
+        ? { type: "video_url" as const, video_url: { url: reference.url }, role: "reference_video" as const }
+        : { type: "audio_url" as const, audio_url: { url: reference.url }, role: "reference_audio" as const },
+  );
+}
+
 export class AihubmixClient {
   constructor(
     private readonly baseUrl = env.openaiBaseUrl || "https://aihubmix.com",
@@ -191,13 +201,7 @@ export class AihubmixClient {
   }
 
   async createSeedanceVideo(input: SeedanceVideoInput) {
-    const content = input.references?.map((reference) =>
-      reference.kind === "image"
-        ? { type: "image_url", image_url: { url: reference.url }, role: "reference_image" }
-        : reference.kind === "video"
-          ? { type: "video_url", video_url: { url: reference.url }, role: "reference_video" }
-          : { type: "audio_url", audio_url: { url: reference.url }, role: "reference_audio" },
-    );
+    const content = buildSeedanceReferenceContent(input.references);
     const task = (await this.request("/v1/videos", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -205,7 +209,7 @@ export class AihubmixClient {
         model: input.model,
         prompt: input.prompt,
         extra_body: {
-          ...(content?.length ? { content } : {}),
+          ...(content.length ? { content } : {}),
           resolution: input.resolution ?? "720p",
           ratio: input.ratio ?? "16:9",
           duration: input.duration ?? 5,

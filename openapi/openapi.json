@@ -1422,6 +1422,120 @@
                 "prompt": {
                   "type": "string"
                 },
+                "narration": {
+                  "type": "string"
+                },
+                "generationPlan": {
+                  "type": "object",
+                  "nullable": true,
+                  "properties": {
+                    "characterAppearance": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    },
+                    "cameraView": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 300
+                    },
+                    "background": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    },
+                    "lighting": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 300
+                    },
+                    "voice": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 300
+                    },
+                    "quality": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 300
+                    },
+                    "subshots": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "action": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "narration": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          },
+                          "expression": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 300
+                          },
+                          "voiceTone": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 300
+                          },
+                          "durationSec": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 15
+                          },
+                          "shotSize": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100
+                          },
+                          "composition": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 300
+                          },
+                          "background": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 300
+                          },
+                          "lighting": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 300
+                          }
+                        },
+                        "required": [
+                          "action",
+                          "narration",
+                          "expression",
+                          "voiceTone",
+                          "durationSec",
+                          "shotSize",
+                          "composition",
+                          "background",
+                          "lighting"
+                        ]
+                      },
+                      "minItems": 2,
+                      "maxItems": 3
+                    }
+                  },
+                  "required": [
+                    "characterAppearance",
+                    "cameraView",
+                    "background",
+                    "lighting",
+                    "voice",
+                    "quality",
+                    "subshots"
+                  ]
+                },
                 "durationSec": {
                   "type": "integer",
                   "minimum": 1
@@ -1523,6 +1637,8 @@
                 "scriptSectionId",
                 "ordinal",
                 "prompt",
+                "narration",
+                "generationPlan",
                 "durationSec",
                 "status",
                 "jobId",
@@ -7837,6 +7953,54 @@
         }
       }
     },
+    "/api/video-create/projects/{projectId}/script": {
+      "delete": {
+        "operationId": "clearVideoCreateScript",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Script cleared",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoCreateProject"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Project is busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/video-create/projects/{projectId}/sections/{sectionId}": {
       "patch": {
         "operationId": "saveVideoCreateSection",
@@ -8063,6 +8227,292 @@
         }
       }
     },
+    "/api/video-create/projects/{projectId}/shots/{shotId}/generation-draft": {
+      "get": {
+        "operationId": "getVideoCreateShotGenerationDraft",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "shotId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resolved shot generation draft",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "shotId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "ordinal": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "narration": {
+                      "type": "string"
+                    },
+                    "duration": {
+                      "type": "integer",
+                      "minimum": 4,
+                      "maximum": 15
+                    },
+                    "prompt": {
+                      "type": "string"
+                    },
+                    "generationPlan": {
+                      "type": "object",
+                      "properties": {
+                        "characterAppearance": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "cameraView": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 300
+                        },
+                        "background": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "lighting": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 300
+                        },
+                        "voice": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 300
+                        },
+                        "quality": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 300
+                        },
+                        "subshots": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "action": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 500
+                              },
+                              "narration": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 1000
+                              },
+                              "expression": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 300
+                              },
+                              "voiceTone": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 300
+                              },
+                              "durationSec": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 15
+                              },
+                              "shotSize": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100
+                              },
+                              "composition": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 300
+                              },
+                              "background": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 300
+                              },
+                              "lighting": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 300
+                              }
+                            },
+                            "required": [
+                              "action",
+                              "narration",
+                              "expression",
+                              "voiceTone",
+                              "durationSec",
+                              "shotSize",
+                              "composition",
+                              "background",
+                              "lighting"
+                            ]
+                          },
+                          "minItems": 2,
+                          "maxItems": 3
+                        }
+                      },
+                      "required": [
+                        "characterAppearance",
+                        "cameraView",
+                        "background",
+                        "lighting",
+                        "voice",
+                        "quality",
+                        "subshots"
+                      ]
+                    },
+                    "referenceMode": {
+                      "type": "string",
+                      "enum": [
+                        "omni"
+                      ]
+                    },
+                    "attachments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "asset",
+                              "portrait"
+                            ]
+                          },
+                          "assetId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "portraitId": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "mimeType": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "reference_image",
+                              "reference_video",
+                              "reference_audio"
+                            ]
+                          },
+                          "category": {
+                            "type": "string",
+                            "enum": [
+                              "人物",
+                              "商品"
+                            ]
+                          },
+                          "url": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "source",
+                          "label",
+                          "name",
+                          "mimeType",
+                          "role",
+                          "url"
+                        ]
+                      }
+                    },
+                    "executionMode": {
+                      "type": "string",
+                      "enum": [
+                        "real",
+                        "mock"
+                      ]
+                    },
+                    "postProcessAudio": {
+                      "type": "object",
+                      "properties": {
+                        "model": {
+                          "type": "string",
+                          "enum": [
+                            "tts-1"
+                          ]
+                        },
+                        "voice": {
+                          "type": "string",
+                          "enum": [
+                            "alloy"
+                          ]
+                        },
+                        "replacesNativeAudio": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "model",
+                        "voice",
+                        "replacesNativeAudio"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "shotId",
+                    "ordinal",
+                    "narration",
+                    "duration",
+                    "prompt",
+                    "generationPlan",
+                    "referenceMode",
+                    "attachments",
+                    "executionMode",
+                    "postProcessAudio"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/video-create/projects/{projectId}/shots/{shotId}/generate": {
       "post": {
         "operationId": "generateVideoCreateShot",
@@ -8113,13 +8563,91 @@
                   },
                   "generateAudio": {
                     "type": "boolean"
+                  },
+                  "prompt": {
+                    "type": "string",
+                    "minLength": 20,
+                    "maxLength": 10000
+                  },
+                  "duration": {
+                    "type": "integer",
+                    "minimum": 4,
+                    "maximum": 15
+                  },
+                  "referenceMode": {
+                    "type": "string",
+                    "enum": [
+                      "omni"
+                    ]
+                  },
+                  "references": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "assetId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "label": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 20
+                        },
+                        "category": {
+                          "type": "string",
+                          "enum": [
+                            "人物",
+                            "商品"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "assetId",
+                        "label"
+                      ]
+                    },
+                    "maxItems": 12
+                  },
+                  "usePortrait": {
+                    "type": "boolean"
+                  },
+                  "portrait": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "label": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 20
+                      },
+                      "category": {
+                        "type": "string",
+                        "enum": [
+                          "人物"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "label",
+                      "category"
+                    ]
                   }
                 },
                 "required": [
                   "videoModel",
                   "ratio",
                   "resolution",
-                  "generateAudio"
+                  "generateAudio",
+                  "prompt",
+                  "duration",
+                  "referenceMode",
+                  "references",
+                  "usePortrait"
                 ]
               }
             }

@@ -61,6 +61,14 @@ const recommendationAliases: Record<string, string> = {
   场景化展示: "场景展示",
 };
 
+export function videoCreateTargetCharacterCount(
+  durationSec: number,
+  speechRate: VideoCreateRecommendation["speechRate"],
+) {
+  const charactersPerSecond = speechRate === "slow" ? 3 : speechRate === "fast" ? 5 : 4;
+  return durationSec * charactersPerSecond;
+}
+
 export function normalizeVideoCreateRecommendation(value: unknown): VideoCreateRecommendation {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
   const normalized: Record<string, unknown> = { ...source };
@@ -121,11 +129,14 @@ marketingGoals=电商转化/品牌曝光/App下载/门店到店/直播引流；t
 
 export function generateVideoCreateScript(aggregate: VideoCreateAggregate): Promise<VideoCreateGeneratedScript> {
   const input = aggregate.project.input;
+  const { segmentCount: _segmentCount, ...scriptInput } = input;
+  const targetCharacters = videoCreateTargetCharacterCount(input.durationSec, input.speechRate);
   return generateStructured(
-    `你是专业中文短视频广告编导。为商品生成可直接配音的分段脚本。严格返回 JSON：
-{"sections":[{"label":"开场共鸣","text":"","durationSec":3}]}
-必须恰好 ${input.segmentCount} 段，总时长尽量为 ${input.durationSec} 秒；根据语速 ${input.speechRate} 控制字数；每段衔接自然，突出真实卖点并避免夸大承诺。
-业务参数：${JSON.stringify(input)}`,
+    `你是专业中文短视频广告编导。为商品生成可直接配音的结构化连续脚本。严格返回 JSON：
+{"sections":[{"label":"开场痛点","text":"","durationSec":3}]}
+脚本模块数量由内容动态决定，至少 3 个；必须包含开场痛点、产品介绍、收尾引导，也可以增加使用场景、卖点拆解、信任背书或优惠信息等模块。模块是文案语义结构，不是视频分镜。
+所有模块组成一篇前后连贯的口播文案，总字数目标约 ${targetCharacters} 字（允许上下浮动 10%），所有模块时长之和尽量为 ${input.durationSec} 秒。语速为 ${input.speechRate}，每段衔接自然，突出真实卖点并避免夸大承诺。
+业务参数：${JSON.stringify(scriptInput)}`,
     VideoCreateGeneratedScriptSchema,
     { maxTokens: 3_000 },
   );
@@ -137,10 +148,11 @@ export function regenerateVideoCreateSection(
 ): Promise<VideoCreateGeneratedScript["sections"][number]> {
   const section = aggregate.sections.find((item) => item.id === sectionId);
   if (!section?.currentVersion) throw new Error("SCRIPT_SECTION_NOT_FOUND");
+  const { segmentCount: _segmentCount, ...scriptInput } = aggregate.project.input;
   return generateStructured(
     `你是中文短视频广告编导。改写指定段落，保持用途和时长，只返回 JSON：
 {"label":"${section.label}","text":"","durationSec":${section.currentVersion.durationSec}}
-项目参数：${JSON.stringify(aggregate.project.input)}
+项目参数：${JSON.stringify(scriptInput)}
 当前段落：${section.currentVersion.text}`,
     VideoCreateGeneratedScriptSchema.shape.sections.element,
     { maxTokens: 1_000 },
@@ -156,12 +168,13 @@ export function generateVideoCreateStoryboard(
     durationSec: section.currentVersion?.durationSec,
   }));
   return generateStructured(
-    `你是短视频分镜导演。根据商品信息和逐段口播，为每段生成一个可直接提交视频模型的中文画面提示词。严格返回 JSON：
-{"shots":[{"prompt":"","durationSec":5}]}
-必须恰好 ${sections.length} 个镜头，顺序与脚本一致；单镜头 4-15 秒；提示词包含主体、动作、场景、景别、运镜、光线、画幅和商品一致性要求，不要在画面中生成文字。
+    `你是短视频分镜导演。根据商品信息和完整口播脚本，重新切分口播并生成可直接提交视频模型的中文画面提示词。严格返回 JSON：
+{"shots":[{"prompt":"当前分镜画面摘要","narration":"该分镜连续口播原文","durationSec":5,"generationPlan":{"characterAppearance":"人物外形服饰","cameraView":"镜头视角","background":"全局背景","lighting":"全局光线","voice":"全局音色","quality":"画质要求","subshots":[{"action":"人物动作","narration":"子镜头连续口播原文","expression":"说话神态","voiceTone":"音色语气","durationSec":2,"shotSize":"近景","composition":"画面构图","background":"背景环境","lighting":"光线风格"},{"action":"人物动作","narration":"子镜头连续口播原文","expression":"说话神态","voiceTone":"音色语气","durationSec":3,"shotSize":"中景","composition":"画面构图","background":"背景环境","lighting":"光线风格"}]}}]}
+必须恰好 ${aggregate.project.input.segmentCount} 个镜头，不受脚本语义模块数量影响。按原始顺序把完整口播分配给所有镜头，不能遗漏、重复或改写口播内容；每个镜头的 narration 必须非空。所有镜头时长之和尽量为 ${aggregate.project.input.durationSec} 秒，单镜头不超过 15 秒。
+每个镜头还要规划内部子镜头：durationSec 小于 10 秒时生成 2 个，10-15 秒时生成 3 个；优先按口播句意和标点拆分，子镜头 narration 按顺序拼接后必须与所属镜头 narration 完全一致，子镜头 durationSec 之和必须等于所属镜头 durationSec。每个子镜头分别描述人物动作、说话神态、音色语气、景别、构图、背景和光线；动作要随口播推进，不能重复套话。prompt 是所属镜头的简洁画面摘要，包含主体、动作、场景、运镜、画幅和商品一致性要求，不要在画面中生成额外文字。
 项目参数：${JSON.stringify(aggregate.project.input)}
 脚本：${JSON.stringify(sections)}`,
     VideoCreateGeneratedStoryboardSchema,
-    { maxTokens: 4_000 },
+    { maxTokens: 12_000 },
   );
 }
