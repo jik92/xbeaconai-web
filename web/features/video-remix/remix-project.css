@@ -1821,6 +1821,10 @@
   position: absolute;
   inset: 0 0 0 auto;
   width: min(89vw, 1372px);
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   background: #fff;
   box-shadow: -10px 0 35px #10151c1c;
 }
@@ -1900,6 +1904,9 @@
 }
 .history-table {
   margin: 0 28px;
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
 }
 .history-head,
 .history-row {
@@ -2011,7 +2018,15 @@
   color: #929aa7;
   border-bottom: 1px solid #e5e7eb;
 }
+.history-load-more {
+  min-height: 52px;
+  display: grid;
+  place-items: center;
+  color: #929aa7;
+  @apply text-sm;
+}
 .history-drawer > footer {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: flex-end;

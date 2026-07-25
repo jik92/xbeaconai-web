@@ -7,6 +7,9 @@ describe("video remix project history", () => {
     const page = readFileSync(resolve(import.meta.dir, "../../web/features/video-remix/remix-project.tsx"), "utf8");
 
     expect(page).toContain("fetchRemixProjects({");
+    expect(page).toContain("useInfiniteQuery");
+    expect(page).toContain("pageSize: 20");
+    expect(page).toContain("history.fetchNextPage()");
     expect(page).toContain("await saveRemixProject(project.id, { title });");
     expect(page).toContain("await onContinue(await fetchRemixProject(projectId));");
     expect(page).toContain("onContinue={(detail) => restoreProject(detail)}");

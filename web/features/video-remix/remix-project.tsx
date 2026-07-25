@@ -1,6 +1,6 @@
 // biome-ignore-all lint/a11y/useButtonType: This full-screen workbench contains no forms.
 // biome-ignore-all lint/a11y/noStaticElementInteractions: Modal backdrops dismiss their dialogs.
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Check,
   ChevronLeft,
@@ -785,23 +785,41 @@ function ProjectHistoryDrawer({
   const [appliedQuery, setAppliedQuery] = useState("");
   const [stageFilter, setStageFilter] = useState<"" | RemixProjectSummary["currentStage"]>("");
   const [appliedStage, setAppliedStage] = useState<"" | RemixProjectSummary["currentStage"]>("");
-  const [page, setPage] = useState(1);
   const [editingId, setEditingId] = useState("");
   const [editingTitle, setEditingTitle] = useState("");
   const [busyId, setBusyId] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
-  const history = useQuery({
-    queryKey: ["video-remix-projects", appliedQuery, appliedStage, page],
-    queryFn: () =>
+  const historyTableRef = useRef<HTMLDivElement>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const history = useInfiniteQuery({
+    queryKey: ["video-remix-projects", appliedQuery, appliedStage],
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) =>
       fetchRemixProjects({
         query: appliedQuery || undefined,
         stage: appliedStage || undefined,
-        page,
-        pageSize: 8,
+        page: pageParam,
+        pageSize: 20,
       }),
+    getNextPageParam: (lastPage) =>
+      lastPage.page * lastPage.pageSize < lastPage.total ? lastPage.page + 1 : undefined,
     enabled: open,
   });
-  const totalPages = Math.max(1, Math.ceil((history.data?.total ?? 0) / (history.data?.pageSize ?? 8)));
+  const projects = history.data?.pages.flatMap((pageData) => pageData.projects) ?? [];
+  const total = history.data?.pages[0]?.total ?? 0;
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    const root = historyTableRef.current;
+    if (!open || !target || !root || !history.hasNextPage || history.isFetchingNextPage) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) void history.fetchNextPage();
+      },
+      { root, rootMargin: "160px" },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [history.fetchNextPage, history.hasNextPage, history.isFetchingNextPage, open]);
   const renameProject = async (project: RemixProjectSummary) => {
     const title = editingTitle.trim();
     if (!title || title === project.title) {
@@ -870,7 +888,6 @@ function ProjectHistoryDrawer({
             onClick={() => {
               setAppliedQuery(query.trim());
               setAppliedStage(stageFilter);
-              setPage(1);
             }}
           >
             查询
@@ -881,7 +898,7 @@ function ProjectHistoryDrawer({
             {errorMessage || (history.error instanceof Error ? history.error.message : "项目记录加载失败")}，点击重试
           </button>
         )}
-        <div className="history-table">
+        <div className="history-table" ref={historyTableRef}>
           <div className="history-head">
             <span>项目名称</span>
             <span>项目进度</span>
@@ -889,7 +906,7 @@ function ProjectHistoryDrawer({
             <span>更新时间</span>
             <span>操作</span>
           </div>
-          {history.data?.projects.map((project) => (
+          {projects.map((project) => (
             <div className={`history-row ${project.id === currentProjectId ? "current" : ""}`} key={project.id}>
               <span>
                 {editingId === project.id ? (
@@ -942,17 +959,26 @@ function ProjectHistoryDrawer({
             </div>
           ))}
           {history.isLoading && <div className="history-empty">正在加载项目记录…</div>}
-          {!history.isLoading && !history.data?.projects.length && <div className="history-empty">暂无项目记录</div>}
+          {!history.isLoading && !projects.length && <div className="history-empty">暂无项目记录</div>}
+          <div className="history-load-more" ref={loadMoreRef}>
+            {history.isFetchingNextPage
+              ? "正在加载更多记录…"
+              : history.hasNextPage
+                ? "下滑自动加载更多"
+                : projects.length
+                  ? "已加载全部记录"
+                  : ""}
+          </div>
         </div>
         <footer>
-          <span>共 {history.data?.total ?? 0} 条</span>
-          <button disabled={page <= 1 || history.isFetching} onClick={() => setPage((value) => value - 1)}>
-            <ChevronLeft />
-          </button>
-          <b>{page}</b>
-          <button disabled={page >= totalPages || history.isFetching} onClick={() => setPage((value) => value + 1)}>
-            <ChevronRight />
-          </button>
+          <span>
+            已加载 {projects.length}/{total} 条
+          </span>
+          {history.hasNextPage && (
+            <button disabled={history.isFetchingNextPage} onClick={() => void history.fetchNextPage()}>
+              {history.isFetchingNextPage ? "加载中…" : "加载更多"}
+            </button>
+          )}
         </footer>
       </aside>
     </div>
