@@ -1,5 +1,12 @@
 import { mkdir, unlink } from "node:fs/promises";
-import { dirname } from "node:path";
+import { dirname, resolve } from "node:path";
+
+export const DOUYIN_SANS_FONT_NAME = "DouyinSans";
+export const DOUYIN_SANS_FONT_PATH = resolve(import.meta.dir, "../../assets/fonts/douyin-sans/DouyinSansBold.ttf");
+
+function escapeFfmpegFilterPath(path: string) {
+  return path.replaceAll("\\", "\\\\").replaceAll(":", "\\:").replaceAll("'", "\\'");
+}
 
 async function run(binary: "ffmpeg" | "ffprobe", args: string[]) {
   const process = Bun.spawn([binary, ...args], { stdout: "pipe", stderr: "pipe" });
@@ -403,14 +410,18 @@ export async function composeMedia(video: string, audio: string, output: string)
 
 export async function burnSubtitleFile(input: string, subtitleFile: string, output: string) {
   await requireFfmpegFilter("subtitles");
+  if (!(await Bun.file(DOUYIN_SANS_FONT_PATH).exists())) {
+    throw new Error(`DOUYIN_SANS_FONT_UNAVAILABLE:${DOUYIN_SANS_FONT_PATH}`);
+  }
   await outputDir(output);
-  const escapedSubtitleFile = subtitleFile.replaceAll("\\", "\\\\").replaceAll(":", "\\:").replaceAll("'", "\\'");
+  const escapedSubtitleFile = escapeFfmpegFilterPath(subtitleFile);
+  const escapedFontDirectory = escapeFfmpegFilterPath(dirname(DOUYIN_SANS_FONT_PATH));
   await run("ffmpeg", [
     "-y",
     "-i",
     input,
     "-vf",
-    `subtitles=filename='${escapedSubtitleFile}':force_style='FontName=Noto Sans CJK SC,FontSize=18,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=0,Alignment=2,MarginV=36'`,
+    `subtitles=filename='${escapedSubtitleFile}':fontsdir='${escapedFontDirectory}':force_style='FontName=${DOUYIN_SANS_FONT_NAME},FontSize=18,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=0,Alignment=2,MarginV=36'`,
     "-c:v",
     "libx264",
     "-preset",
