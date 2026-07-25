@@ -22,8 +22,8 @@ import {
   type AdminCredentialDoctorResult,
   type AdminJob,
   type AdminUser,
-  fetchAdminCredentials,
   fetchAdminCredentialDoctorResults,
+  fetchAdminCredentials,
   fetchAdminEnvKeyExport,
   fetchAdminJobs,
   fetchAdminUsers,
@@ -35,8 +35,8 @@ import {
   stopAllAdminQueueJobs,
   uploadAdminEnvKey,
 } from "@/api/api-client";
-import { ToolCreatorModal } from "@/components/domain/tool-creator-modal";
 import type { ModuleId, ProviderCredentialName } from "@/api/generated/types.gen";
+import { ToolCreatorModal } from "@/components/domain/tool-creator-modal";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
@@ -44,6 +44,7 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { apiErrorMessage, useAuth } from "@/features/account/auth-context";
 import { randomUuid } from "@/lib/random-id";
+import { ProviderAuditPanel } from "./provider-audit-panel";
 
 const statusLabels: Record<AdminJob["status"], string> = {
   queued: "排队中",
@@ -824,7 +825,7 @@ function JobsPanel() {
 
 export function AdminPage() {
   const { user } = useAuth();
-  const [tab, setTab] = useState<"credentials" | "users" | "jobs">("credentials");
+  const [tab, setTab] = useState<"credentials" | "users" | "jobs" | "audits">("credentials");
   if (!user?.isAdmin) return <Navigate to="/" />;
   return (
     <div className="flex h-[calc(100vh-56px)] min-h-0 flex-col bg-white p-3 text-ink">
@@ -854,9 +855,25 @@ export function AdminPage() {
           >
             队列任务
           </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={tab === "audits" ? "bg-surface-muted text-ink" : "text-muted"}
+            onClick={() => setTab("audits")}
+          >
+            审计日志
+          </Button>
         </nav>
       </header>
-      {tab === "credentials" ? <CredentialsPanel /> : tab === "users" ? <UsersPanel /> : <JobsPanel />}
+      {tab === "credentials" ? (
+        <CredentialsPanel />
+      ) : tab === "users" ? (
+        <UsersPanel />
+      ) : tab === "jobs" ? (
+        <JobsPanel />
+      ) : (
+        <ProviderAuditPanel />
+      )}
     </div>
   );
 }

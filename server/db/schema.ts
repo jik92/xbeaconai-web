@@ -257,6 +257,40 @@ export const jobs = sqliteTable(
   ],
 );
 
+export const providerGenerationAudits = sqliteTable(
+  "provider_generation_audits",
+  {
+    id: text("id").primaryKey(),
+    jobId: text("job_id").notNull(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id),
+    moduleId: text("module_id").notNull(),
+    capability: text("capability").notNull(),
+    provider: text("provider").notNull(),
+    model: text("model"),
+    operation: text("operation").notNull(),
+    providerTaskId: text("provider_task_id"),
+    providerRequestId: text("provider_request_id"),
+    status: text("status", { enum: ["submitting", "processing", "succeeded", "failed", "cancelled"] }).notNull(),
+    requestPayload: text("request_payload_json", { mode: "json" }).$type<unknown>().notNull(),
+    responsePayload: text("response_payload_json", { mode: "json" }).$type<unknown>(),
+    errorPayload: text("error_payload_json", { mode: "json" }).$type<unknown>(),
+    assetIds: text("asset_ids_json", { mode: "json" }).$type<string[]>().notNull().default([]),
+    submittedAt: text("submitted_at").notNull(),
+    completedAt: text("completed_at"),
+    durationMs: integer("duration_ms"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("provider_generation_audits_job_operation_idx").on(table.jobId, table.capability, table.operation),
+    index("provider_generation_audits_owner_submitted_idx").on(table.ownerUserId, table.submittedAt),
+    index("provider_generation_audits_provider_submitted_idx").on(table.provider, table.submittedAt),
+    index("provider_generation_audits_status_submitted_idx").on(table.status, table.submittedAt),
+  ],
+);
+
 export const artifacts = sqliteTable(
   "artifacts",
   {

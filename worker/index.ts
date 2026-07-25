@@ -2,18 +2,21 @@ import { Queue, Worker } from "bullmq";
 import IORedis from "ioredis";
 import { AccountStore } from "../server/accounts/account-store";
 import { AdScriptStore } from "../server/ad-script/ad-script-store";
+import { ProviderGenerationAuditStore } from "../server/audit/provider-generation-audit-store";
 import { env } from "../server/env";
 import { SqliteJobStore } from "../server/jobs/sqlite-job-store";
 import { VideoCreateStore } from "../server/video-create/video-create-store";
 import { type ExecuteJobPayload, executeJobName, executeJobOptions } from "../shared/jobs/queue-contract";
 import { JobProcessor } from "./job-processor";
+import { safelySyncProviderGenerationAudits } from "./jobs/provider-audit";
 import { createWorkerRedisConnection } from "./redis";
 
 const store = new SqliteJobStore();
 const accounts = new AccountStore();
 const adScripts = new AdScriptStore();
 const videoCreates = new VideoCreateStore();
-const processor = new JobProcessor(store, accounts, adScripts, videoCreates);
+const providerAudits = new ProviderGenerationAuditStore();
+const processor = new JobProcessor(store, accounts, adScripts, videoCreates, providerAudits);
 const recoveryRedis = new IORedis(env.redisUrl, { lazyConnect: true, maxRetriesPerRequest: 1 });
 const recoveryQueue = new Queue<ExecuteJobPayload>(env.redisQueueName, {
   connection: recoveryRedis,
@@ -24,7 +27,7 @@ await processor.startMaintenance();
 for (const job of store.recoverable()) {
   if (job.ownerUserId === "legacy" || (await recoveryQueue.getJob(job.id))) continue;
   if (job.providerStatus === "submitting" && !job.providerTaskId) {
-    store.update(job.id, {
+    const failed = store.update(job.id, {
       status: "failed",
       stage: "上游提交状态未知",
       error: {
@@ -34,6 +37,7 @@ for (const job of store.recoverable()) {
         requestId: crypto.randomUUID(),
       },
     });
+    safelySyncProviderGenerationAudits(providerAudits, failed);
     continue;
   }
   store.update(job.id, { status: "queued", stage: "等待恢复", progress: Math.min(job.progress, 95) });
@@ -54,7 +58,7 @@ worker.on("failed", (job, error) => {
   if (!jobId) return;
   const current = store.get(jobId);
   if (!current || ["succeeded", "partially_succeeded", "failed", "cancelled"].includes(current.status)) return;
-  store.update(jobId, {
+  const failed = store.update(jobId, {
     status: "failed",
     stage: "Worker 执行失败",
     error: {
@@ -64,6 +68,7 @@ worker.on("failed", (job, error) => {
       requestId: crypto.randomUUID(),
     },
   });
+  safelySyncProviderGenerationAudits(providerAudits, failed);
 });
 worker.on("error", (error) => console.error("BullMQ Worker error", error));
 
@@ -82,6 +87,7 @@ const shutdown = async () => {
   accounts.close();
   adScripts.close();
   videoCreates.close();
+  providerAudits.close();
   process.exit(0);
 };
 process.on("SIGINT", () => void shutdown());

@@ -23,6 +23,7 @@ import {
   exportAdScriptVersion,
   generateVideoCreateShot,
   getAdminCredentialDoctorResults,
+  getAdminProviderAudit,
   getAdScriptProject,
   getJob,
   getModels,
@@ -34,6 +35,7 @@ import {
   importAdminEnvKey,
   listAdminCredentials,
   listAdminJobs,
+  listAdminProviderAudits,
   listAdminUsers,
   listJobs,
   listVideoCreateProjects,
@@ -62,12 +64,15 @@ import type {
   AdScriptInput,
   AdScriptProject,
   GenerateVideoCreateShotData,
+  GetAdminProviderAuditResponse,
   GetProviderFeaturesResponse,
   GetVideoCreateShotGenerationDraftResponse,
   GetVideoRemixProjectResponse,
   Job,
   ListAdminCredentialsResponse,
   ListAdminJobsResponse,
+  ListAdminProviderAuditsData,
+  ListAdminProviderAuditsResponse,
   ListAdminUsersResponse,
   ListVideoCreateShotMaterialVersionsResponse,
   ListVideoRemixProjectsResponse,
@@ -82,6 +87,8 @@ import type {
 
 export type AdminCredential = ListAdminCredentialsResponse["credentials"][number];
 export type AdminJob = ListAdminJobsResponse["jobs"][number];
+export type AdminProviderAudit = ListAdminProviderAuditsResponse["audits"][number];
+export type AdminProviderAuditDetail = GetAdminProviderAuditResponse;
 export type AdminUser = ListAdminUsersResponse["users"][number];
 export type AdminCredentialDoctorResult = RunAdminCredentialDoctorResponse["results"][number];
 export type ProviderFeatures = GetProviderFeaturesResponse;
@@ -182,6 +189,20 @@ export async function fetchAdminJobs(query: {
   configure();
   const { data } = await listAdminJobs({ query, headers: authHeaders(), throwOnError: true });
   if (!data) throw new Error("队列任务加载失败");
+  return data;
+}
+
+export async function fetchAdminProviderAudits(query: NonNullable<ListAdminProviderAuditsData["query"]>) {
+  configure();
+  const { data } = await listAdminProviderAudits({ query, headers: authHeaders(), throwOnError: true });
+  if (!data) throw new Error("审计日志加载失败");
+  return data;
+}
+
+export async function fetchAdminProviderAudit(auditId: string) {
+  configure();
+  const { data } = await getAdminProviderAudit({ path: { auditId }, headers: authHeaders(), throwOnError: true });
+  if (!data) throw new Error("审计详情加载失败");
   return data;
 }
 

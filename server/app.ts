@@ -43,6 +43,7 @@ import {
   AdScriptVariantStatusSchema,
   AdScriptVersionSourceSchema,
 } from "./ad-script/types";
+import { ProviderGenerationAuditStore } from "./audit/provider-generation-audit-store";
 import { credentialDoctor } from "./byok/credential-doctor";
 import {
   type ProviderCredentialName,
@@ -394,6 +395,7 @@ export const store = new SqliteJobStore();
 export const accounts = new AccountStore(env.databasePath, { smsSender: createApplicationSmsSender() });
 export const adScripts = new AdScriptStore();
 export const videoCreates = new VideoCreateStore();
+export const providerAudits = new ProviderGenerationAuditStore();
 export const queue = new BullJobQueue();
 function adminUser(userId: string) {
   const user = accounts.getUser(userId);
@@ -2202,6 +2204,42 @@ const AdminCreditGrantSchema = z.object({
   balanceAfter: z.number().int().nonnegative(),
   createdAt: z.string(),
 });
+const ProviderAuditStatusSchema = z.enum(["submitting", "processing", "succeeded", "failed", "cancelled"]);
+const AdminProviderAuditSchema = z.object({
+  id: z.string().uuid(),
+  jobId: z.string(),
+  ownerUserId: z.string().uuid(),
+  userPhone: z.string().optional(),
+  userDisplayName: z.string().optional(),
+  moduleId: z.string(),
+  capability: z.string(),
+  provider: z.string(),
+  model: z.string().optional(),
+  operation: z.string(),
+  providerTaskId: z.string().optional(),
+  providerRequestId: z.string().optional(),
+  status: ProviderAuditStatusSchema,
+  assetCount: z.number().int().nonnegative(),
+  submittedAt: z.string(),
+  completedAt: z.string().optional(),
+  durationMs: z.number().int().nonnegative().optional(),
+});
+const AdminProviderAuditAssetSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  mimeType: z.string(),
+  url: z.string(),
+  available: z.boolean(),
+});
+const AdminProviderAuditDetailSchema = AdminProviderAuditSchema.extend({
+  requestPayload: z.unknown(),
+  responsePayload: z.unknown().optional(),
+  errorPayload: z.unknown().optional(),
+  assetIds: z.array(z.string()),
+  assets: z.array(AdminProviderAuditAssetSchema),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
 const adminCredentialsRoute = createRoute({
   method: "get",
   path: "/api/admin/credentials",
@@ -2477,6 +2515,158 @@ app.openapi(adminCredentialDoctorResultsRoute, (c) => {
       403,
     );
   return c.json({ results: providerCredentials.listChecks() }, 200);
+});
+
+const listAdminProviderAuditsRoute = createRoute({
+  method: "get",
+  path: "/api/admin/provider-audits",
+  operationId: "listAdminProviderAudits",
+  request: {
+    query: z.object({
+      page: z.coerce.number().int().min(1).default(1),
+      pageSize: z.coerce.number().int().min(10).max(100).default(25),
+      query: z.string().trim().max(100).optional(),
+      provider: z.string().trim().max(80).optional(),
+      moduleId: z.string().trim().max(80).optional(),
+      status: ProviderAuditStatusSchema.optional(),
+      startedFrom: z.iso.datetime().optional(),
+      startedTo: z.iso.datetime().optional(),
+    }),
+  },
+  responses: {
+    200: {
+      description: "Third-party generation audit list",
+      content: {
+        "application/json": {
+          schema: z.object({
+            audits: z.array(AdminProviderAuditSchema),
+            total: z.number().int().nonnegative(),
+            page: z.number().int().min(1),
+            pageSize: z.number().int().min(1),
+          }),
+        },
+      },
+    },
+    403: { description: "Admin required", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(listAdminProviderAuditsRoute, (c) => {
+  if (!adminUser(c.get("userId")))
+    return c.json(
+      {
+        error: { code: "ADMIN_REQUIRED", message: "仅管理员可访问", retryable: false, requestId: crypto.randomUUID() },
+      },
+      403,
+    );
+  return c.json(providerAudits.list(c.req.valid("query")), 200);
+});
+
+function adminProviderAuditAsset(auditId: string, assetId: string) {
+  const audit = providerAudits.get(auditId);
+  if (!audit?.assetIds.includes(assetId)) return undefined;
+  const artifact = accounts.getArtifact(audit.ownerUserId, assetId);
+  if (artifact)
+    return {
+      id: assetId,
+      name: artifact.name,
+      mimeType: artifact.mime_type,
+      storageKey: artifact.storage_key,
+      storageArea: "results" as const,
+    };
+  const asset = accounts.getOwnedAsset(audit.ownerUserId, assetId);
+  if (!asset)
+    return {
+      id: assetId,
+      name: assetId,
+      mimeType: "",
+      storageKey: undefined,
+      storageArea: undefined,
+      available: false as const,
+    };
+  return {
+    id: assetId,
+    name: asset.displayName || asset.originalName,
+    mimeType: asset.mimeType,
+    storageKey: asset.storageKey,
+    storageArea: "uploads" as const,
+  };
+}
+
+const getAdminProviderAuditRoute = createRoute({
+  method: "get",
+  path: "/api/admin/provider-audits/{auditId}",
+  operationId: "getAdminProviderAudit",
+  request: { params: z.object({ auditId: z.string().uuid() }) },
+  responses: {
+    200: {
+      description: "Third-party generation audit detail",
+      content: { "application/json": { schema: AdminProviderAuditDetailSchema } },
+    },
+    403: { description: "Admin required", content: { "application/json": { schema: ErrorSchema } } },
+    404: { description: "Audit not found", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(getAdminProviderAuditRoute, (c) => {
+  const requestId = crypto.randomUUID();
+  if (!adminUser(c.get("userId")))
+    return c.json({ error: { code: "ADMIN_REQUIRED", message: "仅管理员可访问", retryable: false, requestId } }, 403);
+  const audit = providerAudits.get(c.req.valid("param").auditId);
+  if (!audit)
+    return c.json({ error: { code: "AUDIT_NOT_FOUND", message: "审计记录不存在", retryable: false, requestId } }, 404);
+  const assets = audit.assetIds.map((assetId) => {
+    const asset = adminProviderAuditAsset(audit.id, assetId);
+    return {
+      id: assetId,
+      name: asset?.name ?? assetId,
+      mimeType: asset?.mimeType ?? "",
+      url: asset?.storageKey ? `/api/admin/provider-audits/${audit.id}/assets/${assetId}` : "",
+      available: Boolean(asset?.storageKey),
+    };
+  });
+  return c.json({ ...audit, assets }, 200);
+});
+
+const previewAdminProviderAuditAssetRoute = createRoute({
+  method: "get",
+  path: "/api/admin/provider-audits/{auditId}/assets/{assetId}",
+  operationId: "previewAdminProviderAuditAsset",
+  request: { params: z.object({ auditId: z.string().uuid(), assetId: z.string() }) },
+  responses: {
+    200: {
+      description: "Generated material binary",
+      content: { "application/octet-stream": { schema: z.string().openapi({ format: "binary" }) } },
+    },
+    403: { description: "Admin required", content: { "application/json": { schema: ErrorSchema } } },
+    404: { description: "Material not found", content: { "text/plain": { schema: z.string() } } },
+  },
+});
+app.openapi(previewAdminProviderAuditAssetRoute, async (c) => {
+  if (!adminUser(c.get("userId")))
+    return c.json(
+      {
+        error: { code: "ADMIN_REQUIRED", message: "仅管理员可访问", retryable: false, requestId: crypto.randomUUID() },
+      },
+      403,
+    );
+  const asset = adminProviderAuditAsset(c.req.valid("param").auditId, c.req.valid("param").assetId);
+  if (!asset?.storageKey || !asset.storageArea) return new Response("Not found", { status: 404 });
+  const file = Bun.file(resolve(env.dataDir, asset.storageArea, asset.storageKey));
+  if (!(await file.exists())) {
+    if (asset.storageArea !== "uploads" || !ossutils.configured) return new Response("Not found", { status: 404 });
+    try {
+      await ossutils.headObject(asset.storageKey);
+      return Response.redirect(ossutils.createSignedReadUrl(asset.storageKey), 302);
+    } catch {
+      return new Response("Not found", { status: 404 });
+    }
+  }
+  return new Response(file, {
+    headers: {
+      "Content-Type": asset.mimeType || "application/octet-stream",
+      "Content-Disposition": inlineUtf8ContentDisposition(asset.name),
+      "Cache-Control": "private, max-age=300",
+    },
+  });
 });
 
 const listAdminUsersRoute = createRoute({

@@ -1384,6 +1384,113 @@ export const zRunAdminCredentialDoctorResponse = z.object({
     }))
 });
 
+export const zListAdminProviderAuditsQuery = z.object({
+    page: z.int().gte(1).optional().default(1),
+    pageSize: z.int().gte(10).lte(100).optional().default(25),
+    query: z.string().max(100).optional(),
+    provider: z.string().max(80).optional(),
+    moduleId: z.string().max(80).optional(),
+    status: z.enum([
+        'submitting',
+        'processing',
+        'succeeded',
+        'failed',
+        'cancelled'
+    ]).optional(),
+    startedFrom: z.iso.datetime().optional(),
+    startedTo: z.iso.datetime().optional()
+});
+
+/**
+ * Third-party generation audit list
+ */
+export const zListAdminProviderAuditsResponse = z.object({
+    audits: z.array(z.object({
+        id: z.uuid(),
+        jobId: z.string(),
+        ownerUserId: z.uuid(),
+        userPhone: z.string().optional(),
+        userDisplayName: z.string().optional(),
+        moduleId: z.string(),
+        capability: z.string(),
+        provider: z.string(),
+        model: z.string().optional(),
+        operation: z.string(),
+        providerTaskId: z.string().optional(),
+        providerRequestId: z.string().optional(),
+        status: z.enum([
+            'submitting',
+            'processing',
+            'succeeded',
+            'failed',
+            'cancelled'
+        ]),
+        assetCount: z.int().gte(0),
+        submittedAt: z.string(),
+        completedAt: z.string().optional(),
+        durationMs: z.int().gte(0).optional()
+    })),
+    total: z.int().gte(0),
+    page: z.int().gte(1),
+    pageSize: z.int().gte(1)
+});
+
+export const zGetAdminProviderAuditPath = z.object({
+    auditId: z.uuid()
+});
+
+/**
+ * Third-party generation audit detail
+ */
+export const zGetAdminProviderAuditResponse = z.object({
+    id: z.uuid(),
+    jobId: z.string(),
+    ownerUserId: z.uuid(),
+    userPhone: z.string().optional(),
+    userDisplayName: z.string().optional(),
+    moduleId: z.string(),
+    capability: z.string(),
+    provider: z.string(),
+    model: z.string().optional(),
+    operation: z.string(),
+    providerTaskId: z.string().optional(),
+    providerRequestId: z.string().optional(),
+    status: z.enum([
+        'submitting',
+        'processing',
+        'succeeded',
+        'failed',
+        'cancelled'
+    ]),
+    assetCount: z.int().gte(0),
+    submittedAt: z.string(),
+    completedAt: z.string().optional(),
+    durationMs: z.int().gte(0).optional(),
+    requestPayload: z.unknown().optional(),
+    responsePayload: z.unknown().optional(),
+    errorPayload: z.unknown().optional(),
+    assetIds: z.array(z.string()),
+    assets: z.array(z.object({
+        id: z.string(),
+        name: z.string(),
+        mimeType: z.string(),
+        url: z.string(),
+        available: z.boolean()
+    })),
+    createdAt: z.string(),
+    updatedAt: z.string()
+});
+
+export const zPreviewAdminProviderAuditAssetPath = z.object({
+    auditId: z.uuid(),
+    assetId: z.string()
+});
+
+/**
+ * Generated material binary
+ */
+export const zPreviewAdminProviderAuditAssetResponse = z.string();
+
 export const zListAdminUsersQuery = z.object({
     page: z.int().gte(1).optional().default(1),
     pageSize: z.int().gte(10).lte(100).optional().default(25),

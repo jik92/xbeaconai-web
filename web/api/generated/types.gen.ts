@@ -1760,6 +1760,157 @@ export type RunAdminCredentialDoctorResponses = {
 
 export type RunAdminCredentialDoctorResponse = RunAdminCredentialDoctorResponses[keyof RunAdminCredentialDoctorResponses];
 
+export type ListAdminProviderAuditsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        pageSize?: number;
+        query?: string;
+        provider?: string;
+        moduleId?: string;
+        status?: 'submitting' | 'processing' | 'succeeded' | 'failed' | 'cancelled';
+        startedFrom?: string;
+        startedTo?: string;
+    };
+    url: '/api/admin/provider-audits';
+};
+
+export type ListAdminProviderAuditsErrors = {
+    /**
+     * Admin required
+     */
+    403: ApiErrorResponse;
+};
+
+export type ListAdminProviderAuditsError = ListAdminProviderAuditsErrors[keyof ListAdminProviderAuditsErrors];
+
+export type ListAdminProviderAuditsResponses = {
+    /**
+     * Third-party generation audit list
+     */
+    200: {
+        audits: Array<{
+            id: string;
+            jobId: string;
+            ownerUserId: string;
+            userPhone?: string;
+            userDisplayName?: string;
+            moduleId: string;
+            capability: string;
+            provider: string;
+            model?: string;
+            operation: string;
+            providerTaskId?: string;
+            providerRequestId?: string;
+            status: 'submitting' | 'processing' | 'succeeded' | 'failed' | 'cancelled';
+            assetCount: number;
+            submittedAt: string;
+            completedAt?: string;
+            durationMs?: number;
+        }>;
+        total: number;
+        page: number;
+        pageSize: number;
+    };
+};
+
+export type ListAdminProviderAuditsResponse = ListAdminProviderAuditsResponses[keyof ListAdminProviderAuditsResponses];
+
+export type GetAdminProviderAuditData = {
+    body?: never;
+    path: {
+        auditId: string;
+    };
+    query?: never;
+    url: '/api/admin/provider-audits/{auditId}';
+};
+
+export type GetAdminProviderAuditErrors = {
+    /**
+     * Admin required
+     */
+    403: ApiErrorResponse;
+    /**
+     * Audit not found
+     */
+    404: ApiErrorResponse;
+};
+
+export type GetAdminProviderAuditError = GetAdminProviderAuditErrors[keyof GetAdminProviderAuditErrors];
+
+export type GetAdminProviderAuditResponses = {
+    /**
+     * Third-party generation audit detail
+     */
+    200: {
+        id: string;
+        jobId: string;
+        ownerUserId: string;
+        userPhone?: string;
+        userDisplayName?: string;
+        moduleId: string;
+        capability: string;
+        provider: string;
+        model?: string;
+        operation: string;
+        providerTaskId?: string;
+        providerRequestId?: string;
+        status: 'submitting' | 'processing' | 'succeeded' | 'failed' | 'cancelled';
+        assetCount: number;
+        submittedAt: string;
+        completedAt?: string;
+        durationMs?: number;
+        requestPayload?: unknown;
+        responsePayload?: unknown;
+        errorPayload?: unknown;
+        assetIds: Array<string>;
+        assets: Array<{
+            id: string;
+            name: string;
+            mimeType: string;
+            url: string;
+            available: boolean;
+        }>;
+        createdAt: string;
+        updatedAt: string;
+    };
+};
+
+export type GetAdminProviderAuditResponse = GetAdminProviderAuditResponses[keyof GetAdminProviderAuditResponses];
+
+export type PreviewAdminProviderAuditAssetData = {
+    body?: never;
+    path: {
+        auditId: string;
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/admin/provider-audits/{auditId}/assets/{assetId}';
+};
+
+export type PreviewAdminProviderAuditAssetErrors = {
+    /**
+     * Admin required
+     */
+    403: ApiErrorResponse;
+    /**
+     * Material not found
+     */
+    404: string;
+};
+
+export type PreviewAdminProviderAuditAssetError = PreviewAdminProviderAuditAssetErrors[keyof PreviewAdminProviderAuditAssetErrors];
+
+export type PreviewAdminProviderAuditAssetResponses = {
+    /**
+     * Generated material binary
+     */
+    200: Blob | File;
+};
+
+export type PreviewAdminProviderAuditAssetResponse = PreviewAdminProviderAuditAssetResponses[keyof PreviewAdminProviderAuditAssetResponses];
+
 export type ListAdminUsersData = {
     body?: never;
     path?: never;
