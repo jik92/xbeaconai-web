@@ -39,16 +39,17 @@ describe("video create media settings", () => {
     expect(getVideoCreateSubtitlePreset("happy-orange").forceStyle).toContain("PrimaryColour=&H000080FF");
   });
 
-  test("selects only enabled shots with missing or stale audio", () => {
+  test("force-selects every idle shot with narration for batch audio", () => {
     const shots = videoCreateBatchEligibleAudioShots([
-      { id: "missing", audioEnabled: true, audioArtifactId: null, audioStale: false },
-      { id: "stale", audioEnabled: true, audioArtifactId: "audio", audioStale: true },
-      { id: "current", audioEnabled: true, audioArtifactId: "audio", audioStale: false },
-      { id: "disabled", audioEnabled: false, audioArtifactId: null, audioStale: false },
-      { id: "busy", audioEnabled: true, audioArtifactId: null, audioStale: false, materialProcessing: true },
-      { id: "queued", status: "queued" as const, audioEnabled: true, audioArtifactId: null, audioStale: false },
+      { id: "missing", narration: "缺失配音" },
+      { id: "current", narration: "覆盖已有配音" },
+      { id: "disabled", narration: "自动开启配音" },
+      { id: "empty", narration: "  " },
+      { id: "busy", narration: "素材处理中", materialProcessing: true },
+      { id: "queued", status: "queued" as const, narration: "已经排队" },
+      { id: "generating", status: "generating" as const, narration: "正在生成" },
     ]);
-    expect(shots.map((shot) => shot.id)).toEqual(["missing", "stale"]);
+    expect(shots.map((shot) => shot.id)).toEqual(["missing", "current", "disabled"]);
   });
 
   test("gates voice synthesis without gating the video-create module", () => {

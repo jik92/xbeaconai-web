@@ -4987,7 +4987,12 @@ async function enqueueVideoCreateOperation(input: {
       error: null,
     });
   } else if (shot) {
-    videoCreates.updateShot(shot.id, { status: "queued", jobId: job.id, error: null });
+    videoCreates.updateShot(shot.id, {
+      status: "queued",
+      ...(input.operation === "audio-generate" ? { audioEnabled: true } : {}),
+      jobId: job.id,
+      error: null,
+    });
   } else
     videoCreates.setProject(input.projectId, {
       status: nextVideoCreateStatus(input.operation),
@@ -6069,7 +6074,7 @@ app.openapi(batchGenerateVideoCreateAudioRoute, async (c) => {
       {
         error: {
           code: "NO_AUDIO_TO_GENERATE",
-          message: "没有缺失或需要更新的配音",
+          message: "没有可生成配音的分镜",
           retryable: false,
           requestId: crypto.randomUUID(),
         },

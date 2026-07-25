@@ -54,19 +54,16 @@ export function videoCreateBatchEligibleShots<
 export function videoCreateBatchEligibleAudioShots<
   T extends {
     status?: VideoCreateShotStatus;
-    audioEnabled: boolean;
-    audioArtifactId?: string | null;
-    audioStale: boolean;
+    narration: string;
     materialProcessing?: boolean;
   },
 >(shots: T[]) {
   return shots.filter(
     (shot) =>
-      shot.audioEnabled &&
+      Boolean(shot.narration.trim()) &&
       shot.status !== "queued" &&
       shot.status !== "generating" &&
-      !shot.materialProcessing &&
-      (!shot.audioArtifactId || shot.audioStale),
+      !shot.materialProcessing,
   );
 }
 

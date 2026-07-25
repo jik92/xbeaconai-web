@@ -1746,7 +1746,9 @@ export function VideoCreatePage() {
                     ? {
                         ...current,
                         shots: current.shots.map((shot) =>
-                          submitted.has(shot.id) ? { ...shot, status: "queued" as const, error: undefined } : shot,
+                          submitted.has(shot.id)
+                            ? { ...shot, status: "queued" as const, audioEnabled: true, error: undefined }
+                            : shot,
                         ),
                       }
                     : current,

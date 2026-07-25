@@ -143,6 +143,7 @@ describe("video create action boundaries", () => {
     );
 
     expect(app).toContain("audioEnabled: !input.shotOptions.generateAudio");
+    expect(app).toContain('input.operation === "audio-generate" ? { audioEnabled: true } : {}');
     expect(app).toContain("subtitleEnabled: String(shot.subtitleEnabled)");
     expect(worker).toContain("if (subtitleEnabled)");
     expect(worker).toContain('nameSuffix = ""');
@@ -196,6 +197,7 @@ describe("video create action boundaries", () => {
     expect(dialogs).toContain("配音设置");
     expect(dialogs).toContain("字幕样式设置");
     expect(dialogs).toContain("批量生成配音");
+    expect(page).toContain('{ ...shot, status: "queued" as const, audioEnabled: true, error: undefined }');
     expect(dialogs).toContain("previewVideoCreatePresetVoice");
   });
 
