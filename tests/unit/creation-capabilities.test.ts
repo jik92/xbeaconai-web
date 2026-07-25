@@ -17,13 +17,18 @@ describe("creation capabilities", () => {
     expect(mockModels.every((model) => model.enabled && model.executionMode === "mock")).toBeTrue();
   });
 
-  test("publishes one default mock image model and only enabled real video models", () => {
+  test("publishes a default real image model, explicit mock alternatives, and enabled real video models", () => {
     const imageModels = models.filter((model) => model.kind === "image");
     const videoModels = models.filter((model) => model.kind === "video");
 
     expect(imageModels).not.toHaveLength(0);
     expect(imageModels.filter((model) => model.isDefault)).toHaveLength(1);
-    expect(imageModels.every((model) => model.executionMode === "mock" && model.enabled)).toBe(true);
+    expect(imageModels.find((model) => model.isDefault)).toMatchObject({
+      id: "gpt-image-1-mini",
+      executionMode: "real",
+      enabled: true,
+    });
+    expect(imageModels.some((model) => model.executionMode === "mock")).toBe(true);
     expect(videoModels.filter((model) => model.isDefault)).toHaveLength(1);
     expect(enabledVideoModel.executionMode).toBe("real");
     expect(disabledVideoModel.disabledReason).toBe("真实基线尚未验证");
@@ -36,10 +41,10 @@ describe("creation capabilities", () => {
       prompt: "一顶草编礼帽的电商主图",
       ratio: "1:1",
       resolution: "1k",
-      count: "2",
+      count: "1",
       referenceMode: "",
       duration: "",
-      seed: "123",
+      seed: "",
     };
 
     expect(validateCreationValues(validImageValues, models)).toBeUndefined();

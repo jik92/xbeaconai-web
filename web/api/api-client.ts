@@ -571,11 +571,12 @@ export async function submitJob(
   values: Record<string, string>,
   videoModel?: SeedanceModelId,
   idempotencyKey = randomUuid(),
+  options: { allowMockFallback?: boolean } = {},
 ) {
   configure();
   const { data } = await createJob({
     path: { moduleId },
-    body: { title, values, videoModel, allowMockFallback: true },
+    body: { title, values, videoModel, allowMockFallback: options.allowMockFallback ?? true },
     headers: { ...authHeaders(), "Idempotency-Key": idempotencyKey },
     throwOnError: true,
   });

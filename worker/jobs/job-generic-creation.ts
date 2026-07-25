@@ -196,6 +196,20 @@ export const genericCreationJob: WorkerJobHandler = {
     const plan = job.executionPlan.length
       ? job.executionPlan
       : buildExecutionPlan(job.moduleId, job.values, job.videoModel);
+    const allowMockFallback = job.values.allowMockFallback !== "false" && env.allowMockFallback;
+    if (!allowMockFallback && plan.some((stage) => stage.executionMode === "mock")) {
+      context.change(id, {
+        status: "failed",
+        stage: "真实能力校验失败",
+        error: {
+          code: "REAL_PROVIDER_UNAVAILABLE",
+          message: "所选模型当前没有已验证的真实 Provider，请更换模型或完成 Provider 检测",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      });
+      return;
+    }
     if (!job.executionPlan.length) context.change(id, { executionPlan: plan });
     const processingJob = context.change(id, {
       status: "processing",
@@ -317,7 +331,7 @@ export const genericCreationJob: WorkerJobHandler = {
         if (
           stage.implementation === "ark-seedance-video" ||
           stage.implementation === "ffmpeg-seedance-mock" ||
-          !env.allowMockFallback
+          !allowMockFallback
         ) {
           context.change(id, {
             status: "failed",
@@ -341,7 +355,11 @@ export const genericCreationJob: WorkerJobHandler = {
       context.change(id, { progress: Math.round(8 + ((index + 1) / stages.length) * 82), provenance: [...provenance] });
     }
     const expected = definition.outputKind(job.values);
-    if (expected !== "text" && !produced.some((artifact) => artifact.mimeType.startsWith(`${expected}/`)))
+    if (
+      allowMockFallback &&
+      expected !== "text" &&
+      !produced.some((artifact) => artifact.mimeType.startsWith(`${expected}/`))
+    )
       produced.push(await ensureMockMedia(expected));
     const finalArtifacts: ArtifactDraft[] = produced.length
       ? produced

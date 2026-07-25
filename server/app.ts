@@ -1471,7 +1471,16 @@ const creationCapabilitiesRoute = createRoute({
   },
 });
 app.openapi(creationCapabilitiesRoute, (c) =>
-  c.json({ models: creationCapabilities(videoModelEnabled, env.mockGenerateVideoApi ? "mock" : "real") }, 200),
+  c.json(
+    {
+      models: creationCapabilities(
+        videoModelEnabled,
+        env.mockGenerateVideoApi ? "mock" : "real",
+        getVerifiedSdkIds().has("aihubmix-image"),
+      ),
+    },
+    200,
+  ),
 );
 
 const libraryAssetResponse = (asset: MediaAsset) => ({
@@ -3939,7 +3948,11 @@ app.openapi(remixShotGenerationRoute, async (c) => {
     referenceMode: body.referenceMode,
     duration: String(body.duration),
   };
-  const models = creationCapabilities(videoModelEnabled, env.mockGenerateVideoApi ? "mock" : "real");
+  const models = creationCapabilities(
+    videoModelEnabled,
+    env.mockGenerateVideoApi ? "mock" : "real",
+    getVerifiedSdkIds().has("aihubmix-image"),
+  );
   const validationError = validateCreationValues(creationValues, models);
   if (validationError)
     return c.json(
@@ -5970,6 +5983,7 @@ app.openapi(createJobRoute, async (c) => {
     );
   const ownerUserId = c.get("userId");
   const jobValues = { ...body.values };
+  jobValues.allowMockFallback = String(body.allowMockFallback);
   let mashupConfig: VideoMashupConfig | undefined;
   if (isQwenVoiceClone) {
     const invalidMessage = validateQwenVoiceCloneValues(jobValues);
@@ -6095,7 +6109,11 @@ app.openapi(createJobRoute, async (c) => {
   const needsVideoModel = moduleId === "video-remix" || (moduleId === "ai-generate" && body.values.type === "视频");
   let creationQuote = 0;
   if (moduleId === "ai-generate" && body.values.creationKind) {
-    const models = creationCapabilities(videoModelEnabled, env.mockGenerateVideoApi ? "mock" : "real");
+    const models = creationCapabilities(
+      videoModelEnabled,
+      env.mockGenerateVideoApi ? "mock" : "real",
+      getVerifiedSdkIds().has("aihubmix-image"),
+    );
     const validationError = validateCreationValues(body.values, models);
     if (validationError)
       return c.json(

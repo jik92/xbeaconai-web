@@ -38,7 +38,7 @@ describe("Provider feature gate", () => {
   });
 
   test("keeps static menuFeatures decisions separate from Provider verification", () => {
-    expect(isModuleOpen("ai-generate")).toBe(false);
+    expect(isModuleOpen("ai-generate")).toBe(true);
     expect(moduleProviderRequirements["ai-generate"]).toEqual(["aihubmix", "ark"]);
     expect(isModuleOpen("video-cut")).toBe(true);
   });

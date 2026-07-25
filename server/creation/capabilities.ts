@@ -47,7 +47,7 @@ const imageDimensions = {
   },
 };
 
-const imageModels: CreationModelCapability[] = [
+const mockImageModels: CreationModelCapability[] = [
   ["seedream-5-pro", "字节 Seedream 5.0 Pro", "精准图像编辑｜解锁图层自由", ["模型上新"]],
   ["seedream-5-lite", "字节 Seedream 5.0 Lite", "更智能可控的创作，实时检索，更强的一致性保持", []],
   ["seedream-4-5", "字节 Seedream 4.5", "新一代图像多模态，细节更准，多图融合更好，小字与小人脸更自然", []],
@@ -55,7 +55,7 @@ const imageModels: CreationModelCapability[] = [
   ["nano-banana-2", "Nano Banana 2", "高效极速创作，实时检索，兼顾性价比并覆盖多国场景", []],
   ["nano-banana-pro", "Nano Banana Pro", "旗舰级专业创作，光影精准，支持高级编辑", []],
   ["gpt-image-2-stable", "GPT Image 2.0 稳定版", "高质量图像创作与编辑能力", ["稳定版"]],
-].map(([id, displayName, description, badges], index) => ({
+].map(([id, displayName, description, badges]) => ({
   id: id as string,
   kind: "image" as const,
   displayName: displayName as string,
@@ -63,7 +63,7 @@ const imageModels: CreationModelCapability[] = [
   badges: badges as string[],
   enabled: true,
   executionMode: "mock" as const,
-  isDefault: index === 0,
+  isDefault: false,
   supportedRatios: ["1:1", "4:3", "3:4", "16:9", "9:16", "3:2", "2:3", "21:9"],
   supportedResolutions: ["1k", "2k"],
   supportedDurations: [],
@@ -75,10 +75,43 @@ const imageModels: CreationModelCapability[] = [
   dimensions: imageDimensions,
 }));
 
+const imageModels: CreationModelCapability[] = [
+  {
+    id: "gpt-image-1-mini",
+    kind: "image",
+    displayName: "GPT Image 1 Mini",
+    description: "已接入 AIHubMix 的真实图片生成模型",
+    badges: ["真实"],
+    enabled: true,
+    executionMode: "real",
+    isDefault: true,
+    supportedRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
+    supportedResolutions: ["1k", "2k"],
+    supportedDurations: [],
+    maxOutputs: 1,
+    supportsSeed: false,
+    referenceModes: [],
+    acceptedReferenceKinds: ["image"],
+    pricing: { baseCredits: 70, perOutputCredits: 70 },
+    dimensions: imageDimensions,
+  },
+  ...mockImageModels,
+];
+
 export function creationCapabilities(
   videoEnabled: (id: SeedanceModelId) => boolean,
   videoExecutionMode: CreationExecutionMode = "real",
+  imageEnabled = true,
 ): CreationModelCapability[] {
+  const images = imageModels.map((model) =>
+    model.executionMode === "real"
+      ? {
+          ...model,
+          enabled: imageEnabled,
+          disabledReason: imageEnabled ? undefined : "真实图片生成基线尚未验证",
+        }
+      : model,
+  );
   const videos = videoModels.map(
     (model, index): CreationModelCapability => ({
       id: model.id,
@@ -103,14 +136,14 @@ export function creationCapabilities(
       },
     }),
   );
-  return [...imageModels, ...videos];
+  return [...images, ...videos];
 }
 
 export function validateCreationValues(values: Record<string, string>, models: CreationModelCapability[]) {
   const kind = values.creationKind;
   if (kind !== "image" && kind !== "video") return "请选择创作类型";
   const model = models.find((item) => item.id === values.modelId && item.kind === kind);
-  if (!model || !model.enabled) return "所选模型当前不可用";
+  if (!model?.enabled) return "所选模型当前不可用";
   if (!values.prompt?.trim()) return "请输入创意描述";
   if (!model.supportedRatios.includes(values.ratio)) return "所选模型不支持该画幅";
   if (!model.supportedResolutions.includes(values.resolution)) return "所选模型不支持该清晰度";
