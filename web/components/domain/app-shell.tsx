@@ -1,4 +1,5 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import {
   AudioLines,
   Bell,
@@ -20,11 +21,13 @@ import {
   Settings2,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { fetchLibraryAssets, fetchProducts } from "@/api/api-client";
 import { listNotifications } from "@/api/generated/sdk.gen";
-import { APP_CONFIG, isAssetOpen, isModuleOpen } from "@/app/config";
+import { APP_CONFIG, type AssetFeatureId, isAssetOpen, isModuleOpen } from "@/app/config";
 import { modules } from "@/app/routes";
 import { useAuth } from "@/features/account/auth-context";
 import { AuthScreen } from "@/features/account/auth-screen";
+import { fetchPortraits } from "@/features/portrait-library/portrait-data";
 import { moduleProviderAvailability, useProviderFeatures } from "@/features/provider/provider-features";
 import { type WorkspacePanel, WorkspacePanelDrawer } from "@/features/account/workspace-panels";
 import { Button } from "@/components/ui/button";
@@ -48,16 +51,28 @@ interface SidebarMenuItem {
   label: string;
   path: string;
   icon: LucideIcon;
-  badge?: string;
   available: boolean;
 }
 
 const ASSET_MENU_ITEMS = [
-  { id: "materials", path: "/assets/materials", label: "素材库", icon: Files, badge: undefined },
-  { id: "portraits", path: "/assets/portraits", label: "人像库", icon: Images, badge: "1125" },
-  { id: "products", path: "/assets/products", label: "商品库", icon: Package, badge: undefined },
-  { id: "voices", path: "/assets/voices", label: "音色库", icon: AudioLines, badge: undefined },
+  { id: "materials", path: "/assets/materials", label: "素材库", icon: Files },
+  { id: "portraits", path: "/assets/portraits", label: "人像库", icon: Images },
+  { id: "products", path: "/assets/products", label: "商品库", icon: Package },
+  { id: "voices", path: "/assets/voices", label: "音色库", icon: AudioLines },
 ] as const;
+
+export function assetSidebarCounts(input: {
+  materials?: readonly unknown[];
+  portraits?: readonly unknown[];
+  products?: readonly unknown[];
+  voices?: readonly unknown[];
+}): Partial<Record<AssetFeatureId, string>> {
+  return Object.fromEntries(
+    (Object.entries(input) as Array<[AssetFeatureId, readonly unknown[] | undefined]>)
+      .filter((entry): entry is [AssetFeatureId, readonly unknown[]] => entry[1] !== undefined)
+      .map(([id, items]) => [id, String(items.length)]),
+  );
+}
 
 const sidebarMenuItems: Record<SidebarGroup, SidebarMenuItem[]> = {
   创作工作流: modules
@@ -93,6 +108,37 @@ export function AppShell() {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const { status, user } = useAuth();
   const providerFeatures = useProviderFeatures(status === "authenticated");
+  const assetQueriesEnabled = status === "authenticated";
+  const materials = useQuery({
+    queryKey: ["asset-library", "media", ""],
+    queryFn: () => fetchLibraryAssets("media"),
+    enabled: assetQueriesEnabled && isAssetOpen("materials"),
+    staleTime: 30_000,
+  });
+  const portraits = useQuery({
+    queryKey: ["portrait-library"],
+    queryFn: fetchPortraits,
+    enabled: assetQueriesEnabled && isAssetOpen("portraits"),
+    staleTime: Infinity,
+  });
+  const products = useQuery({
+    queryKey: ["product-library"],
+    queryFn: fetchProducts,
+    enabled: assetQueriesEnabled && isAssetOpen("products"),
+    staleTime: 30_000,
+  });
+  const voices = useQuery({
+    queryKey: ["asset-library", "voice"],
+    queryFn: () => fetchLibraryAssets("voice"),
+    enabled: assetQueriesEnabled && isAssetOpen("voices"),
+    staleTime: 30_000,
+  });
+  const assetCounts = assetSidebarCounts({
+    materials: materials.data,
+    portraits: portraits.data,
+    products: products.data,
+    voices: voices.data,
+  });
   const runtimeAvailability = (item: SidebarMenuItem) => {
     if (!item.id.startsWith("module:")) return undefined;
     return moduleProviderAvailability(providerFeatures.data, item.id.slice(7) as (typeof modules)[number]["id"]);
@@ -215,6 +261,9 @@ export function AppShell() {
                   const hidden = isSidebarMenuItemHidden(menuPreferences, item.id, item.available);
                   const providerAvailability = runtimeAvailability(item);
                   const providerEnabled = !item.id.startsWith("module:") || providerAvailability?.enabled === true;
+                  const assetCount = item.id.startsWith("asset:")
+                    ? assetCounts[item.id.slice(6) as AssetFeatureId]
+                    : undefined;
                   if (hidden && !menuEditing) return null;
                   if (menuEditing)
                     return (
@@ -287,7 +336,7 @@ export function AppShell() {
                       <item.icon />
                       <span>{item.label}</span>
                       {item.id === "module:video-remix" && <i>HOT</i>}
-                      {item.badge && <i>{item.badge}</i>}
+                      {assetCount !== undefined && <i>{assetCount}</i>}
                     </Link>
                   ) : item.available ? (
                     <button
