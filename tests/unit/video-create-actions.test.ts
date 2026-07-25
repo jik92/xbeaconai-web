@@ -103,6 +103,8 @@ describe("video create action boundaries", () => {
     expect(source).toContain("fetchVideoCreateShotGenerationDraft(project.project.id, shotId)");
     expect(source).toContain("generateVideoCreateShotVideo(project.project.id, shotGenerationShotId, options)");
     expect(source).toContain("batchGenerateVideoCreateShotVideos(project.project.id, batchSettings)");
+    expect(source).toContain("audioEnabled: !options.generateAudio");
+    expect(source).toContain("audioEnabled: !batchSettings.generateAudio");
     expect(source).not.toContain("generateAudio: false");
   });
 
@@ -114,11 +116,27 @@ describe("video create action boundaries", () => {
     expect(source).toContain("最终视频生成提示词");
     expect(source).toContain("attachment.label");
     expect(source).toContain('draft.executionMode === "mock" ? "FFmpeg Mock" : "真实 Seedance API"');
-    expect(source).toContain("最终合成会替换原生音轨");
+    expect(source).toContain("保留生成视频原声，分镜配音将关闭");
     expect(source).toContain('referenceMode: "omni"');
     expect(source).toContain('value="人物"');
     expect(source).toContain('value="商品"');
     expect(source).toContain("fitVideoCreateShotPlanDuration");
+  });
+
+  test("persists native-audio selection and avoids composing subtitles twice", () => {
+    const app = readFileSync(resolve(import.meta.dir, "../../server/app.ts"), "utf8");
+    const worker = readFileSync(resolve(import.meta.dir, "../../worker/jobs/job-video-create.ts"), "utf8");
+    const page = readFileSync(
+      resolve(import.meta.dir, "../../web/features/video-create/video-create-page.tsx"),
+      "utf8",
+    );
+
+    expect(app).toContain("audioEnabled: !input.shotOptions.generateAudio");
+    expect(app).toContain("subtitleEnabled: String(shot.subtitleEnabled)");
+    expect(worker).toContain("subtitleEnabled ? subtitleCues : undefined");
+    expect(worker).toContain("!currentMaterialVersion?.subtitlesComposed");
+    expect(worker).toContain('"SUBTITLES_ALREADY_COMPOSED"');
+    expect(page).toContain('shot.subtitlesComposed ? "字幕已合成" : "字幕合成"');
   });
 
   test("keeps row-level audio, subtitle, and immutable material history actions", () => {
@@ -135,9 +153,17 @@ describe("video create action boundaries", () => {
     expect(page).toContain("生成历史");
     expect(page).toContain('processShotMaterial(shot.id, "audio-replace")');
     expect(page).toContain('processShotMaterial(shot.id, "subtitle-compose")');
-    expect(history).toContain("应用此版本");
-    expect(history).toContain("使用中");
+    expect(history).toContain("选择此版本");
+    expect(history).toContain("当前使用");
     expect(history).toContain("AuthenticatedMedia");
+    expect(history).toContain("Card, CardContent");
+    expect(history).toContain('className="space-y-3"');
+    expect(history).toContain('label="模型"');
+    expect(history).toContain('label="提交时间"');
+    expect(history).toContain('label="总耗时"');
+    expect(history).toContain("grid-rows-[auto_minmax(0,1fr)]");
+    expect(history).toContain('className="min-h-0 overflow-y-auto pr-1"');
+    expect(history).not.toContain("grid grid-cols-1 gap-3 sm:grid-cols-2");
   });
 
   test("clears the script beside copy only after confirming dependent storyboard removal", () => {

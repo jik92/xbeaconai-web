@@ -14,6 +14,8 @@ export interface AihubmixModel {
 export interface VideoTask {
   id: string;
   status: string;
+  model?: string;
+  duration?: number;
   url?: string | null;
   error?: unknown;
 }
@@ -68,6 +70,25 @@ export function buildSeedanceReferenceContent(references: SeedanceReference[] = 
         ? { type: "video_url" as const, video_url: { url: reference.url }, role: "reference_video" as const }
         : { type: "audio_url" as const, audio_url: { url: reference.url }, role: "reference_audio" as const },
   );
+}
+
+export function buildSeedanceVideoRequest(input: SeedanceVideoInput) {
+  const content = buildSeedanceReferenceContent(input.references);
+  const duration = input.duration ?? 5;
+  const isMini = input.model === "doubao-seedance-2-0-mini-260615";
+  return {
+    model: input.model,
+    prompt: input.prompt,
+    seconds: String(duration),
+    extra_body: {
+      ...(content.length ? { content } : {}),
+      resolution: input.resolution ?? "720p",
+      ratio: input.ratio ?? "16:9",
+      ...(!isMini ? { duration } : {}),
+      generate_audio: input.generateAudio ?? true,
+      watermark: input.watermark ?? false,
+    },
+  };
 }
 
 export class AihubmixClient {
@@ -201,22 +222,10 @@ export class AihubmixClient {
   }
 
   async createSeedanceVideo(input: SeedanceVideoInput) {
-    const content = buildSeedanceReferenceContent(input.references);
     const task = (await this.request("/v1/videos", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: input.model,
-        prompt: input.prompt,
-        extra_body: {
-          ...(content.length ? { content } : {}),
-          resolution: input.resolution ?? "720p",
-          ratio: input.ratio ?? "16:9",
-          duration: input.duration ?? 5,
-          generate_audio: input.generateAudio ?? true,
-          watermark: input.watermark ?? false,
-        },
-      }),
+      body: JSON.stringify(buildSeedanceVideoRequest(input)),
       signal: AbortSignal.timeout(180_000),
     }).then((response) => response.json())) as VideoTask;
     if (!task.id) throw new Error("AIHUBMIX_INVALID_VIDEO_TASK");
@@ -251,8 +260,10 @@ export class AihubmixClient {
     throw new Error("AIHUBMIX_VIDEO_TIMEOUT");
   }
 
-  async downloadVideo(id: string) {
-    const response = await this.request(`/v1/videos/${encodeURIComponent(id)}/content`);
+  async downloadVideo(id: string, timeoutMs = 10 * 60_000) {
+    const response = await this.request(`/v1/videos/${encodeURIComponent(id)}/content`, {
+      signal: AbortSignal.timeout(timeoutMs),
+    });
     const bytes = new Uint8Array(await response.arrayBuffer());
     if (bytes.byteLength < 1024) throw new Error("AIHUBMIX_INVALID_VIDEO_RESULT");
     return { bytes, mimeType: response.headers.get("content-type") ?? "video/mp4" };

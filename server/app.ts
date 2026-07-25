@@ -107,6 +107,7 @@ import {
   VideoCreateVersionConflictError,
   videoCreateBatchEligibleShots,
   videoCreateJobValues,
+  videoCreateMaterialVersionJobDetails,
   videoCreateMinimumStoryboardCount,
   videoCreateShotNarration,
 } from "./video-create/video-create-store";
@@ -279,6 +280,23 @@ const VideoCreateMaterialVersionSchema = z.object({
   contentId: z.string().uuid().nullable(),
   inputVersionId: z.string().uuid().nullable(),
   jobId: z.string().uuid().nullable(),
+  subtitlesComposed: z.boolean(),
+  generation: z
+    .object({
+      model: z.string().nullable(),
+      durationSec: z.number().nonnegative().nullable(),
+      ratio: z.string().nullable(),
+      resolution: z.string().nullable(),
+      generateAudio: z.boolean().nullable(),
+    })
+    .nullable(),
+  execution: z
+    .object({
+      submittedAt: z.string(),
+      completedAt: z.string().nullable(),
+      durationSec: z.number().nonnegative().nullable(),
+    })
+    .nullable(),
   error: ApiErrorSchema.nullish(),
   available: z.boolean(),
   createdAt: z.string(),
@@ -298,6 +316,7 @@ const VideoCreateShotSchema = z.object({
   videoAssetId: z.string().uuid().nullable(),
   currentMaterialVersionId: z.string().uuid().nullable(),
   materialProcessing: z.boolean(),
+  subtitlesComposed: z.boolean(),
   audioArtifactId: z.string().uuid().nullable(),
   subtitleCues: z.array(
     z.object({
@@ -4295,6 +4314,7 @@ async function enqueueVideoCreateOperation(input: {
           ratio: input.shotOptions?.ratio ?? aggregate.project.input.ratio,
           resolution: input.shotOptions?.resolution ?? "720p",
           generateAudio: String(input.shotOptions?.generateAudio ?? shot.audioEnabled),
+          subtitleEnabled: String(shot.subtitleEnabled),
           ...(input.shotOptions?.referenceMode ? { referenceMode: input.shotOptions.referenceMode } : {}),
           ...(explicitReferences
             ? {
@@ -4339,9 +4359,17 @@ async function enqueueVideoCreateOperation(input: {
       source,
       inputVersionId: shot.currentMaterialVersionId,
       jobId: job.id,
+      subtitlesComposed:
+        input.operation === "subtitle-compose"
+          ? true
+          : input.operation === "audio-replace" && shot.currentMaterialVersionId
+            ? (videoCreates.getMaterialVersion(input.projectId, shot.id, shot.currentMaterialVersionId)
+                ?.subtitlesComposed ?? false)
+            : false,
     });
     videoCreates.updateShot(shot.id, {
       ...(input.operation === "shot" && !shot.currentMaterialVersionId ? { status: "queued" as const } : {}),
+      ...(input.operation === "shot" && input.shotOptions ? { audioEnabled: !input.shotOptions.generateAudio } : {}),
       jobId: job.id,
       error: null,
     });
@@ -4954,6 +4982,9 @@ app.openapi(listVideoCreateShotMaterialVersionsRoute, (c) => {
         {
           versions: versions.map((version) => ({
             ...version,
+            ...videoCreateMaterialVersionJobDetails(
+              version.jobId ? store.getOwned(version.jobId, c.get("userId")) : undefined,
+            ),
             available: Boolean(
               version.status === "succeeded" &&
                 version.contentId &&
@@ -5094,6 +5125,18 @@ app.openapi(processVideoCreateShotMaterialRoute, async (c) => {
         error: {
           code: "SUBTITLE_REQUIRED",
           message: "请先生成字幕",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      409,
+    );
+  if (action === "subtitle-compose" && shot.subtitlesComposed)
+    return c.json(
+      {
+        error: {
+          code: "SUBTITLES_ALREADY_COMPOSED",
+          message: "当前视频已合成字幕，请勿重复合成",
           retryable: false,
           requestId: crypto.randomUUID(),
         },

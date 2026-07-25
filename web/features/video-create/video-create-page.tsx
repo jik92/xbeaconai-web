@@ -1472,7 +1472,13 @@ export function VideoCreatePage() {
                         className="mt-3"
                         variant="outline"
                         size="sm"
-                        disabled={!shot.videoAssetId || !shot.subtitleCues.length || generating || Boolean(busy)}
+                        disabled={
+                          shot.subtitlesComposed ||
+                          !shot.videoAssetId ||
+                          !shot.subtitleCues.length ||
+                          generating ||
+                          Boolean(busy)
+                        }
                         onClick={() => void processShotMaterial(shot.id, "subtitle-compose")}
                       >
                         {busy === `subtitle-compose-${shot.id}` ? (
@@ -1480,7 +1486,7 @@ export function VideoCreatePage() {
                         ) : (
                           <Captions />
                         )}
-                        字幕合成
+                        {shot.subtitlesComposed ? "字幕已合成" : "字幕合成"}
                       </Button>
                     </div>
                   </article>
@@ -1610,7 +1616,14 @@ export function VideoCreatePage() {
                       ? {
                           ...current,
                           shots: current.shots.map((shot) =>
-                            submitted.has(shot.id) ? { ...shot, status: "queued" as const, error: undefined } : shot,
+                            submitted.has(shot.id)
+                              ? {
+                                  ...shot,
+                                  status: "queued" as const,
+                                  audioEnabled: !batchSettings.generateAudio,
+                                  error: undefined,
+                                }
+                              : shot,
                           ),
                         }
                       : current,
@@ -1687,7 +1700,14 @@ export function VideoCreatePage() {
               ? {
                   ...current,
                   shots: current.shots.map((shot) =>
-                    shot.id === shotGenerationShotId ? { ...shot, status: "queued" as const, error: undefined } : shot,
+                    shot.id === shotGenerationShotId
+                      ? {
+                          ...shot,
+                          status: "queued" as const,
+                          audioEnabled: !options.generateAudio,
+                          error: undefined,
+                        }
+                      : shot,
                   ),
                 }
               : current,

@@ -28,7 +28,7 @@ type MaterialVersionRow = typeof videoCreateMaterialVersions.$inferSelect;
 export interface VideoCreateAggregate {
   project: ProjectRow;
   sections: Array<SectionRow & { versions: VersionRow[]; currentVersion?: VersionRow }>;
-  shots: Array<ShotRow & { materialProcessing: boolean }>;
+  shots: Array<ShotRow & { materialProcessing: boolean; subtitlesComposed: boolean }>;
   canCompose: boolean;
 }
 
@@ -50,6 +50,38 @@ export function videoCreateShotNarration(aggregate: VideoCreateAggregate, shot: 
   const savedNarration = shot.narration.trim();
   if (savedNarration) return savedNarration;
   return aggregate.sections.find((section) => section.id === shot.scriptSectionId)?.currentVersion?.text.trim() ?? "";
+}
+
+export function videoCreateMaterialVersionJobDetails(job?: JobRecord) {
+  if (!job) return { generation: null, execution: null };
+  const requestedDuration = Number(job.values.durationSec ?? job.values.duration);
+  const generation =
+    job.videoModel ||
+    job.providerModel ||
+    Number.isFinite(requestedDuration) ||
+    job.values.ratio ||
+    job.values.resolution ||
+    job.values.generateAudio !== undefined
+      ? {
+          model: job.videoModel ?? job.providerModel ?? null,
+          durationSec: Number.isFinite(requestedDuration) && requestedDuration > 0 ? requestedDuration : null,
+          ratio: job.values.ratio ?? null,
+          resolution: job.values.resolution ?? null,
+          generateAudio: job.values.generateAudio === undefined ? null : job.values.generateAudio === "true",
+        }
+      : null;
+  const completedAt = ["succeeded", "partially_succeeded", "failed", "cancelled"].includes(job.status)
+    ? job.updatedAt
+    : null;
+  const elapsedMs = completedAt ? Date.parse(completedAt) - Date.parse(job.createdAt) : Number.NaN;
+  return {
+    generation,
+    execution: {
+      submittedAt: job.createdAt,
+      completedAt,
+      durationSec: Number.isFinite(elapsedMs) && elapsedMs >= 0 ? Number((elapsedMs / 1_000).toFixed(1)) : null,
+    },
+  };
 }
 
 export class VideoCreateStore {
@@ -461,6 +493,7 @@ export class VideoCreateStore {
     source: MaterialVersionRow["source"];
     inputVersionId?: string | null;
     jobId: string;
+    subtitlesComposed?: boolean;
   }) {
     const timestamp = new Date().toISOString();
     const version: typeof videoCreateMaterialVersions.$inferInsert = {
@@ -471,6 +504,7 @@ export class VideoCreateStore {
       status: "pending",
       inputVersionId: input.inputVersionId,
       jobId: input.jobId,
+      subtitlesComposed: input.subtitlesComposed ?? false,
       createdAt: timestamp,
       updatedAt: timestamp,
     };
@@ -487,6 +521,7 @@ export class VideoCreateStore {
     inputVersionId?: string | null;
     jobId?: string | null;
     status?: Extract<VideoCreateShotStatus, "succeeded" | "replaced">;
+    subtitlesComposed?: boolean;
   }) {
     const timestamp = new Date().toISOString();
     return this.db.transaction(
@@ -501,6 +536,7 @@ export class VideoCreateStore {
           contentId: input.contentId,
           inputVersionId: input.inputVersionId,
           jobId: input.jobId,
+          subtitlesComposed: input.subtitlesComposed ?? false,
           createdAt: timestamp,
           updatedAt: timestamp,
         };
@@ -526,6 +562,7 @@ export class VideoCreateStore {
     jobId: string;
     storageKind: NonNullable<MaterialVersionRow["storageKind"]>;
     contentId: string;
+    subtitlesComposed?: boolean;
   }) {
     const timestamp = new Date().toISOString();
     return this.db.transaction(
@@ -541,6 +578,7 @@ export class VideoCreateStore {
             status: "succeeded",
             storageKind: input.storageKind,
             contentId: input.contentId,
+            ...(input.subtitlesComposed === undefined ? {} : { subtitlesComposed: input.subtitlesComposed }),
             error: null,
             updatedAt: timestamp,
           })
@@ -676,6 +714,8 @@ export class VideoCreateStore {
       materialProcessing: materialVersions.some(
         (version) => version.shotId === shot.id && version.status === "pending",
       ),
+      subtitlesComposed:
+        materialVersions.find((version) => version.id === shot.currentMaterialVersionId)?.subtitlesComposed ?? false,
       narration:
         shot.narration.trim() ||
         enriched.find((section) => section.id === shot.scriptSectionId)?.currentVersion?.text.trim() ||
@@ -727,15 +767,21 @@ export function nextVideoCreateStatus(operation: string): VideoCreateProjectStat
 }
 
 export function videoCreateError(error: unknown): JobRecord["error"] {
+  const structured = error as { code?: unknown; retryable?: unknown };
   return {
     code:
       error instanceof VideoCreateVersionConflictError
         ? "VERSION_CONFLICT"
         : error instanceof VideoCreateStateError
           ? "INVALID_STATE"
-          : "VIDEO_CREATE_FAILED",
+          : typeof structured?.code === "string"
+            ? structured.code
+            : "VIDEO_CREATE_FAILED",
     message: error instanceof Error ? error.message : "一键成片任务失败",
-    retryable: !(error instanceof VideoCreateVersionConflictError || error instanceof VideoCreateStateError),
+    retryable:
+      typeof structured?.retryable === "boolean"
+        ? structured.retryable
+        : !(error instanceof VideoCreateVersionConflictError || error instanceof VideoCreateStateError),
     requestId: crypto.randomUUID(),
   };
 }

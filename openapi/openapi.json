@@ -1572,6 +1572,9 @@
                 "materialProcessing": {
                   "type": "boolean"
                 },
+                "subtitlesComposed": {
+                  "type": "boolean"
+                },
                 "audioArtifactId": {
                   "type": "string",
                   "nullable": true,
@@ -1656,6 +1659,7 @@
                 "videoAssetId",
                 "currentMaterialVersionId",
                 "materialProcessing",
+                "subtitlesComposed",
                 "audioArtifactId",
                 "subtitleCues",
                 "audioEnabled",
@@ -9025,6 +9029,66 @@
                             "nullable": true,
                             "format": "uuid"
                           },
+                          "subtitlesComposed": {
+                            "type": "boolean"
+                          },
+                          "generation": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "model": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "durationSec": {
+                                "type": "number",
+                                "nullable": true,
+                                "minimum": 0
+                              },
+                              "ratio": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "resolution": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "generateAudio": {
+                                "type": "boolean",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "model",
+                              "durationSec",
+                              "ratio",
+                              "resolution",
+                              "generateAudio"
+                            ]
+                          },
+                          "execution": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "submittedAt": {
+                                "type": "string"
+                              },
+                              "completedAt": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "durationSec": {
+                                "type": "number",
+                                "nullable": true,
+                                "minimum": 0
+                              }
+                            },
+                            "required": [
+                              "submittedAt",
+                              "completedAt",
+                              "durationSec"
+                            ]
+                          },
                           "error": {
                             "type": "object",
                             "nullable": true,
@@ -9069,6 +9133,9 @@
                           "contentId",
                           "inputVersionId",
                           "jobId",
+                          "subtitlesComposed",
+                          "generation",
+                          "execution",
                           "available",
                           "createdAt",
                           "updatedAt"

@@ -18,14 +18,9 @@ import {
   videoCreateReferenceKind,
   videoCreateReferenceRole,
 } from "../../../shared/video-create/shot-generation";
+import { videoCreateVideoModelOptions } from "./video-create-model-options";
 
 type DraftAttachment = VideoCreateShotGenerationDraft["attachments"][number];
-
-const videoModels = [
-  ["doubao-seedance-2-0-mini-260615", "Seedance 2.0 Mini"],
-  ["doubao-seedance-2-0-260128", "Seedance 2.0 Standard"],
-  ["doubao-seedance-2-0-fast-260128", "Seedance 2.0 Fast"],
-] as const;
 
 function referenceKind(mimeType: string) {
   return videoCreateReferenceKind(mimeType);
@@ -323,8 +318,9 @@ export function VideoCreateShotGenerationDialog({
             <div className="grid gap-2 rounded-xl border border-line bg-canvas-soft p-3 text-xs text-muted sm:grid-cols-2">
               <span>执行模式：{draft.executionMode === "mock" ? "FFmpeg Mock" : "真实 Seedance API"}</span>
               <span>
-                后续配音：{draft.postProcessAudio.model} / {draft.postProcessAudio.voice}
-                {draft.postProcessAudio.replacesNativeAudio ? "，最终合成会替换原生音轨" : ""}
+                {generateAudio
+                  ? "声音：保留生成视频原声，分镜配音将关闭"
+                  : `后续配音：${draft.postProcessAudio.model} / ${draft.postProcessAudio.voice}`}
               </span>
             </div>
             <details className="rounded-xl border border-line bg-canvas-soft text-xs text-muted">
@@ -344,7 +340,7 @@ export function VideoCreateShotGenerationDialog({
               disabled={!draft}
               onChange={(event) => setModel(event.target.value as typeof model)}
             >
-              {videoModels.map(([id, label]) => (
+              {videoCreateVideoModelOptions.map(([id, label]) => (
                 <option value={id} key={id}>
                   {label}
                 </option>

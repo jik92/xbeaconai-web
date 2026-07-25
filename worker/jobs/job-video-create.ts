@@ -22,7 +22,7 @@ import {
 import type { VideoCreateSubtitleCue } from "../../server/video-create/types";
 import { VIDEO_CREATE_ANALYSIS_MODEL } from "../../server/video-create/types";
 import { videoCreateError, videoCreateShotNarration } from "../../server/video-create/video-create-store";
-import { SeedanceVideoJob } from "./job-seedance-video";
+import { SeedanceFlowError, SeedanceVideoJob, seedanceVideoSettings } from "./job-seedance-video";
 import type { JobHandlerContext, WorkerJobHandler } from "./types";
 
 function stage(
@@ -63,13 +63,33 @@ async function saveVideoArtifact(
   bytes: Uint8Array | undefined,
   sourcePath: string | undefined,
   executionMode: "real" | "local" | "mock",
+  subtitleCues?: VideoCreateSubtitleCue[],
+  sampleDurationSec = 4,
 ) {
   const name = `${job.id}-video-create.mp4`;
   const output = resolve(env.dataDir, "results", name);
-  if (bytes) await Bun.write(output, bytes);
-  else if (sourcePath) await Bun.write(output, Bun.file(sourcePath));
-  else await generateSampleVideo(output);
-  await probeMedia(output);
+  const sourceOutput = subtitleCues?.length
+    ? resolve(env.dataDir, "results", `${job.id}-video-create-source.mp4`)
+    : output;
+  const temporaryFiles = subtitleCues?.length ? [sourceOutput] : [];
+  try {
+    if (bytes) await Bun.write(sourceOutput, bytes);
+    else if (sourcePath) await Bun.write(sourceOutput, Bun.file(sourcePath));
+    else await generateSampleVideo(sourceOutput, sampleDurationSec);
+    if (subtitleCues?.length) {
+      const subtitlePath = resolve(env.dataDir, "results", `${job.id}-video-create.srt`);
+      temporaryFiles.push(subtitlePath);
+      await Bun.write(subtitlePath, cuesToSrt(subtitleCues));
+      await burnSubtitleFile(sourceOutput, subtitlePath, output);
+    }
+  } finally {
+    await Promise.all(temporaryFiles.map((file) => unlink(file).catch(() => undefined)));
+  }
+  const metadata = await probeMedia(output);
+  const durationSec = Number(
+    metadata.format.duration ?? metadata.streams.find((item) => item.codec_type === "video")?.duration,
+  );
+  if (!Number.isFinite(durationSec) || durationSec <= 0) throw new Error("VIDEO_CREATE_VIDEO_DURATION_INVALID");
   const id = crypto.randomUUID();
   context.accounts?.createArtifact({
     id,
@@ -80,7 +100,7 @@ async function saveVideoArtifact(
     mimeType: "video/mp4",
     createdAt: new Date().toISOString(),
   });
-  return { id, name, mimeType: "video/mp4", executionMode } as const;
+  return { id, name, mimeType: "video/mp4", executionMode, durationSec } as const;
 }
 
 export function buildSubtitleCues(text: string, durationSec: number): VideoCreateSubtitleCue[] {
@@ -98,8 +118,36 @@ export function buildSubtitleCues(text: string, durationSec: number): VideoCreat
       index === normalized.length - 1
         ? durationSec
         : cursor + durationSec * (Math.max([...phrase].length, 1) / totalWeight);
-    return { startSec, endSec: Number(Math.max(cursor, startSec + 0.01).toFixed(2)), text: phrase };
+    return {
+      startSec,
+      endSec: Number(Math.min(durationSec, Math.max(cursor, startSec + 0.01)).toFixed(2)),
+      text: phrase,
+    };
   });
+}
+
+export function resolveVideoCreateSubtitleDuration(input: {
+  videoDurationSec: number;
+  audioDurationSec: number;
+  generatedWithAudio: boolean;
+}) {
+  if (!input.generatedWithAudio && input.audioDurationSec - input.videoDurationSec > 1)
+    throw new SeedanceFlowError(
+      "VIDEO_AUDIO_DURATION_MISMATCH",
+      `配音时长 ${input.audioDurationSec.toFixed(3)} 秒超过视频时长 ${input.videoDurationSec.toFixed(3)} 秒，请重新生成视频`,
+      true,
+    );
+  return input.generatedWithAudio ? input.videoDurationSec : Math.min(input.audioDurationSec, input.videoDurationSec);
+}
+
+export function resolveVideoCreateShotGenerationSettings(
+  values: Record<string, string>,
+  shot: { audioEnabled: boolean; subtitleEnabled: boolean },
+) {
+  return {
+    generatedWithAudio: values.generateAudio === undefined ? !shot.audioEnabled : values.generateAudio === "true",
+    subtitleEnabled: values.subtitleEnabled === undefined ? shot.subtitleEnabled : values.subtitleEnabled === "true",
+  };
 }
 
 function srtTimestamp(seconds: number) {
@@ -259,21 +307,60 @@ export const videoCreateJob: WorkerJobHandler = {
         );
         const audio = await saveShotAudio(job, context, shot.id, narration, mockAudio);
         audioStage.completedAt = new Date().toISOString();
-        const subtitleCues = buildSubtitleCues(narration, audio.durationSec);
+        const { generatedWithAudio, subtitleEnabled } = resolveVideoCreateShotGenerationSettings(job.values, shot);
+        const subtitleStage = subtitleEnabled ? stage(job, "subtitle-compose", "local", "ffmpeg-subtitle") : undefined;
         let artifact: Awaited<ReturnType<typeof saveVideoArtifact>>;
-        if (job.values.__mockVideo === "true")
-          artifact = await saveVideoArtifact(job, context, undefined, undefined, "mock");
-        else {
+        let videoDurationSec: number;
+        if (job.values.__mockVideo === "true") {
+          videoDurationSec = seedanceVideoSettings(job.values).duration;
+          const subtitleDurationSec = resolveVideoCreateSubtitleDuration({
+            videoDurationSec,
+            audioDurationSec: audio.durationSec,
+            generatedWithAudio,
+          });
+          const subtitleCues = buildSubtitleCues(narration, subtitleDurationSec);
+          artifact = await saveVideoArtifact(
+            job,
+            context,
+            undefined,
+            undefined,
+            "mock",
+            subtitleEnabled ? subtitleCues : undefined,
+            videoDurationSec,
+          );
+          projects.updateShot(shot.id, { subtitleCues });
+        } else {
           if (!job.videoModel || !isSeedanceModelId(job.videoModel)) throw new Error("VIDEO_MODEL_REQUIRED");
           const response = await new SeedanceVideoJob(context).execute(job, job.videoModel);
+          videoDurationSec = response.durationSec;
+          const subtitleDurationSec = resolveVideoCreateSubtitleDuration({
+            videoDurationSec,
+            audioDurationSec: audio.durationSec,
+            generatedWithAudio,
+          });
+          const subtitleCues = buildSubtitleCues(narration, subtitleDurationSec);
           currentStage.executionMode = response.executionMode;
           currentStage.implementation = response.implementation;
           currentStage.provider = response.executionMode === "real" ? "aihubmix" : undefined;
           currentStage.model = response.executionMode === "real" ? job.videoModel : undefined;
-          artifact = await saveVideoArtifact(job, context, response.bytes, undefined, response.executionMode);
+          artifact = await saveVideoArtifact(
+            job,
+            context,
+            response.bytes,
+            undefined,
+            response.executionMode,
+            subtitleEnabled ? subtitleCues : undefined,
+          );
+          projects.updateShot(shot.id, { subtitleCues });
         }
+        if (subtitleStage) subtitleStage.completedAt = new Date().toISOString();
         if (projects.getMaterialVersionByJobId(job.id))
-          projects.completePendingMaterialVersion({ jobId: job.id, storageKind: "artifact", contentId: artifact.id });
+          projects.completePendingMaterialVersion({
+            jobId: job.id,
+            storageKind: "artifact",
+            contentId: artifact.id,
+            subtitlesComposed: subtitleEnabled,
+          });
         else
           projects.createAndApplyMaterialVersion({
             projectId,
@@ -283,17 +370,23 @@ export const videoCreateJob: WorkerJobHandler = {
             contentId: artifact.id,
             inputVersionId: shot.currentMaterialVersionId,
             jobId: job.id,
+            subtitlesComposed: subtitleEnabled,
           });
-        projects.updateShot(shot.id, { audioArtifactId: audio.id, subtitleCues, error: null });
+        projects.updateShot(shot.id, {
+          audioArtifactId: audio.id,
+          audioEnabled: !generatedWithAudio,
+          error: null,
+        });
         projects.setProject(projectId, { status: "storyboard_review", error: null });
         currentStage.completedAt = new Date().toISOString();
         context.change(job.id, {
           status: "succeeded",
           stage: "已完成",
           progress: 100,
-          provenance: [audioStage, currentStage],
-          overallExecutionMode: artifact.executionMode === audioStage.executionMode ? artifact.executionMode : "mixed",
-          result: artifactResult(job, artifact, [audioStage, currentStage]),
+          provenance: [audioStage, currentStage, ...(subtitleStage ? [subtitleStage] : [])],
+          overallExecutionMode:
+            subtitleStage || artifact.executionMode !== audioStage.executionMode ? "mixed" : artifact.executionMode,
+          result: artifactResult(job, artifact, [audioStage, currentStage, ...(subtitleStage ? [subtitleStage] : [])]),
         });
         return;
       } else if (operation === "audio-replace" || operation === "subtitle-compose") {
@@ -306,6 +399,8 @@ export const videoCreateJob: WorkerJobHandler = {
         const version = projects.getMaterialVersion(projectId, shot.id, inputVersionId);
         if (!version?.contentId || !version.storageKind || version.status !== "succeeded")
           throw new Error("SHOT_VIDEO_NOT_AVAILABLE");
+        if (operation === "subtitle-compose" && version.subtitlesComposed)
+          throw new SeedanceFlowError("SUBTITLES_ALREADY_COMPOSED", "当前视频已合成字幕，请勿重复合成", false);
         const inputPath =
           version.storageKind === "artifact"
             ? (() => {
@@ -335,7 +430,12 @@ export const videoCreateJob: WorkerJobHandler = {
           }
           temporaryFiles.push(output);
           const artifact = await saveVideoArtifact(job, context, undefined, output, "local");
-          projects.completePendingMaterialVersion({ jobId: job.id, storageKind: "artifact", contentId: artifact.id });
+          projects.completePendingMaterialVersion({
+            jobId: job.id,
+            storageKind: "artifact",
+            contentId: artifact.id,
+            subtitlesComposed: operation === "subtitle-compose" ? true : version.subtitlesComposed,
+          });
           projects.setProject(projectId, { status: "storyboard_review", error: null });
           currentStage.completedAt = new Date().toISOString();
           context.change(job.id, {
@@ -371,6 +471,9 @@ export const videoCreateJob: WorkerJobHandler = {
             for (const [index, shot] of aggregate.shots.entries()) {
               let prepared = inputs[index];
               if (!prepared) throw new Error("SHOT_VIDEO_NOT_AVAILABLE");
+              const currentMaterialVersion = shot.currentMaterialVersionId
+                ? projects.getMaterialVersion(projectId, shot.id, shot.currentMaterialVersionId)
+                : undefined;
               if (shot.audioEnabled && shot.audioArtifactId) {
                 const audio = context.accounts.getArtifact(job.ownerUserId, shot.audioArtifactId);
                 if (!audio) throw new Error("SHOT_AUDIO_NOT_AVAILABLE");
@@ -379,7 +482,7 @@ export const videoCreateJob: WorkerJobHandler = {
                 prepared = audioOutput;
                 temporaryFiles.push(audioOutput);
               }
-              if (shot.subtitleEnabled && shot.subtitleCues.length) {
+              if (shot.subtitleEnabled && shot.subtitleCues.length && !currentMaterialVersion?.subtitlesComposed) {
                 const subtitlePath = resolve(env.dataDir, "results", `${job.id}-shot-${shot.ordinal}.srt`);
                 const subtitleOutput = resolve(env.dataDir, "results", `${job.id}-shot-${shot.ordinal}-subtitle.mp4`);
                 await Bun.write(subtitlePath, cuesToSrt(shot.subtitleCues));

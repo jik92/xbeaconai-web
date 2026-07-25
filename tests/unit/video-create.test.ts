@@ -15,11 +15,17 @@ import {
   VideoCreateStore,
   VideoCreateVersionConflictError,
   videoCreateBatchEligibleShots,
+  videoCreateMaterialVersionJobDetails,
   videoCreateMinimumStoryboardCount,
   videoCreateShotNarration,
 } from "../../server/video-create/video-create-store";
 import { JobProcessor } from "../../worker/job-processor";
-import { buildSubtitleCues } from "../../worker/jobs/job-video-create";
+import { assertSeedanceDuration, SeedanceFlowError } from "../../worker/jobs/job-seedance-video";
+import {
+  buildSubtitleCues,
+  resolveVideoCreateShotGenerationSettings,
+  resolveVideoCreateSubtitleDuration,
+} from "../../worker/jobs/job-video-create";
 import { createTestAccountStore, registerTestAccount } from "./account-test-helper";
 
 const databases: string[] = [];
@@ -106,6 +112,85 @@ describe("video create domain", () => {
     expect(cues[0]?.startSec).toBe(0);
     expect(cues.at(-1)?.endSec).toBe(9);
     expect(cues.every((cue) => cue.endSec > cue.startSec)).toBe(true);
+    expect(cues.every((cue) => cue.endSec <= 9)).toBe(true);
+  });
+
+  test("rejects video and audio durations that would truncate the requested result", () => {
+    expect(assertSeedanceDuration(15, 14.1, "测试结果")).toBe(14.1);
+    expect(() => assertSeedanceDuration(15, 5.088, "测试结果")).toThrow(SeedanceFlowError);
+    expect(() =>
+      resolveVideoCreateSubtitleDuration({
+        videoDurationSec: 5.088,
+        audioDurationSec: 14.9625,
+        generatedWithAudio: false,
+      }),
+    ).toThrow("配音时长 14.963 秒超过视频时长 5.088 秒");
+    expect(
+      resolveVideoCreateSubtitleDuration({
+        videoDurationSec: 5.088,
+        audioDurationSec: 14.9625,
+        generatedWithAudio: true,
+      }),
+    ).toBe(5.088);
+  });
+
+  test("maps generated native audio and subtitle choices to post-processing settings", () => {
+    const current = { audioEnabled: true, subtitleEnabled: true };
+    expect(
+      resolveVideoCreateShotGenerationSettings({ generateAudio: "true", subtitleEnabled: "true" }, current),
+    ).toEqual({ generatedWithAudio: true, subtitleEnabled: true });
+    expect(
+      resolveVideoCreateShotGenerationSettings({ generateAudio: "false", subtitleEnabled: "false" }, current),
+    ).toEqual({ generatedWithAudio: false, subtitleEnabled: false });
+    expect(resolveVideoCreateShotGenerationSettings({}, current)).toEqual({
+      generatedWithAudio: false,
+      subtitleEnabled: true,
+    });
+  });
+
+  test("derives material history parameters and execution time from the linked job", () => {
+    const createdAt = "2026-07-25T10:00:00.000Z";
+    const details = videoCreateMaterialVersionJobDetails({
+      id: crypto.randomUUID(),
+      ownerUserId: crypto.randomUUID(),
+      moduleId: "video-create",
+      title: "生成分镜视频",
+      status: "succeeded",
+      progress: 100,
+      stage: "已完成",
+      overallExecutionMode: "real",
+      values: {
+        operation: "shot",
+        durationSec: "15",
+        ratio: "9:16",
+        resolution: "720p",
+        generateAudio: "true",
+      },
+      videoModel: "doubao-seedance-2-0-mini-260615",
+      executionPlan: [],
+      provenance: [],
+      cancelRequested: false,
+      providerCancelState: "none",
+      stagingKeys: [],
+      jobSchemaVersion: 2,
+      createdAt,
+      updatedAt: "2026-07-25T10:02:31.500Z",
+    });
+    expect(details).toEqual({
+      generation: {
+        model: "doubao-seedance-2-0-mini-260615",
+        durationSec: 15,
+        ratio: "9:16",
+        resolution: "720p",
+        generateAudio: true,
+      },
+      execution: {
+        submittedAt: createdAt,
+        completedAt: "2026-07-25T10:02:31.500Z",
+        durationSec: 151.5,
+      },
+    });
+    expect(videoCreateMaterialVersionJobDetails()).toEqual({ generation: null, execution: null });
   });
 
   test("normalizes model aliases and drops unsupported recommendation tags", () => {
@@ -357,6 +442,7 @@ describe("video create domain", () => {
       storageKind: "asset",
       contentId: crypto.randomUUID(),
     });
+    expect(firstMaterial.subtitlesComposed).toBe(false);
     const processedMaterial = store.createAndApplyMaterialVersion({
       projectId,
       shotId: storyboard.shots[0].id,
@@ -364,7 +450,10 @@ describe("video create domain", () => {
       storageKind: "artifact",
       contentId: crypto.randomUUID(),
       inputVersionId: firstMaterial.id,
+      subtitlesComposed: true,
     });
+    expect(processedMaterial.subtitlesComposed).toBe(true);
+    expect(store.get(projectId)?.shots[0].subtitlesComposed).toBe(true);
     expect(store.listMaterialVersions(projectId, storyboard.shots[0].id, other.user.id)).toBeUndefined();
     const materialHistory = store.listMaterialVersions(projectId, storyboard.shots[0].id, owner.user.id) ?? [];
     expect(materialHistory).toHaveLength(2);
@@ -372,6 +461,7 @@ describe("video create domain", () => {
     expect(store.get(projectId)?.shots[0].currentMaterialVersionId).toBe(processedMaterial.id);
     store.applyMaterialVersion(projectId, storyboard.shots[0].id, firstMaterial.id, owner.user.id);
     expect(store.get(projectId)?.shots[0].currentMaterialVersionId).toBe(firstMaterial.id);
+    expect(store.get(projectId)?.shots[0].subtitlesComposed).toBe(false);
     expect(store.listMaterialVersions(projectId, storyboard.shots[0].id, owner.user.id)).toHaveLength(2);
     store.updateAllShotSettings(projectId, { audioEnabled: false });
     expect(store.get(projectId)?.shots.every((shot) => !shot.audioEnabled)).toBe(true);
@@ -504,6 +594,8 @@ describe("video create domain", () => {
         shotId: shot.id,
         durationSec: "5",
         ratio: "9:16",
+        generateAudio: "true",
+        subtitleEnabled: "true",
         __mockAudio: "true",
       },
       videoModel: "doubao-seedance-2-0-fast-260128",
@@ -522,17 +614,19 @@ describe("video create domain", () => {
     const processor = new JobProcessor(jobs, accounts, undefined, projects);
     await processor.process(job.id);
     expect(jobs.get(job.id)?.status).toBe("succeeded");
-    expect(jobs.get(job.id)?.overallExecutionMode).toBe("mock");
+    expect(jobs.get(job.id)?.overallExecutionMode).toBe("mixed");
     expect(jobs.get(job.id)?.provenance.some((stage) => stage.implementation === "ffmpeg-seedance-mock")).toBe(true);
     expect(jobs.get(job.id)?.result?.artifacts[0]?.executionMode).toBe("mock");
     expect(jobs.get(job.id)?.providerTaskId).toBeUndefined();
     expect(jobs.get(job.id)?.stagingKeys).toEqual([]);
     expect(projects.get(projectId)?.shots[0].status).toBe("succeeded");
     expect(projects.get(projectId)?.shots[0].audioArtifactId).toBeTruthy();
+    expect(projects.get(projectId)?.shots[0].audioEnabled).toBe(false);
     expect(projects.get(projectId)?.shots[0].subtitleCues.length).toBeGreaterThan(0);
+    expect(projects.getMaterialVersionByJobId(job.id)?.subtitlesComposed).toBe(true);
     expect(projects.get(projectId)?.canCompose).toBe(true);
 
-    for (const operation of ["audio-replace", "subtitle-compose"] as const) {
+    for (const operation of ["audio-replace"] as const) {
       const currentShot = projects.get(projectId)?.shots[0];
       if (!currentShot?.currentMaterialVersionId) throw new Error("SHOT_MATERIAL_VERSION_NOT_CREATED");
       const processJob: JobRecord = {
@@ -570,7 +664,40 @@ describe("video create domain", () => {
         projects.getMaterialVersionByJobId(processJob.id)?.id,
       );
     }
-    expect(projects.listMaterialVersions(projectId, shot.id, owner.user.id)).toHaveLength(3);
+    expect(projects.listMaterialVersions(projectId, shot.id, owner.user.id)).toHaveLength(2);
+
+    const currentShot = projects.get(projectId)?.shots[0];
+    if (!currentShot?.currentMaterialVersionId) throw new Error("SHOT_MATERIAL_VERSION_NOT_CREATED");
+    const duplicateSubtitleJob: JobRecord = {
+      ...job,
+      id: crypto.randomUUID(),
+      title: "duplicate subtitle-compose",
+      status: "queued",
+      values: {
+        operation: "subtitle-compose",
+        projectId,
+        shotId: shot.id,
+        inputMaterialVersionId: currentShot.currentMaterialVersionId,
+        previousShotStatus: currentShot.status,
+      },
+      videoModel: undefined,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    jobs.create(duplicateSubtitleJob);
+    projects.createPendingMaterialVersion({
+      projectId,
+      shotId: shot.id,
+      source: "subtitle_composed",
+      inputVersionId: currentShot.currentMaterialVersionId,
+      jobId: duplicateSubtitleJob.id,
+    });
+    await processor.process(duplicateSubtitleJob.id);
+    expect(jobs.get(duplicateSubtitleJob.id)?.error).toMatchObject({
+      code: "SUBTITLES_ALREADY_COMPOSED",
+      retryable: false,
+    });
+    expect(projects.getMaterialVersionByJobId(duplicateSubtitleJob.id)?.status).toBe("failed");
 
     jobs.close();
     projects.close();

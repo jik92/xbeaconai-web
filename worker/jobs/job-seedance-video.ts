@@ -13,6 +13,7 @@ import { assetIdsFromValues } from "./utils";
 import { materializeRemoteAsset } from "./video-remix-assets";
 
 const wait = (ms: number) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
+export const SEEDANCE_DURATION_TOLERANCE_SECONDS = 1;
 
 export class SeedanceFlowError extends Error {
   constructor(
@@ -22,6 +23,26 @@ export class SeedanceFlowError extends Error {
   ) {
     super(message);
   }
+}
+
+function mediaDurationSec(metadata: Awaited<ReturnType<typeof probeMedia>>) {
+  return Number(
+    metadata.format.duration ??
+      metadata.streams.find((stream) => stream.codec_type === "video")?.duration ??
+      metadata.streams.find((stream) => stream.codec_type === "audio")?.duration,
+  );
+}
+
+export function assertSeedanceDuration(requestedDurationSec: number, actualDurationSec: number, source: string) {
+  if (!Number.isFinite(actualDurationSec) || actualDurationSec <= 0)
+    throw new SeedanceFlowError("VIDEO_DURATION_INVALID", `${source}未返回有效的视频时长`, true);
+  if (Math.abs(actualDurationSec - requestedDurationSec) > SEEDANCE_DURATION_TOLERANCE_SECONDS)
+    throw new SeedanceFlowError(
+      "VIDEO_DURATION_MISMATCH",
+      `请求生成 ${requestedDurationSec} 秒视频，但${source}为 ${actualDurationSec.toFixed(3)} 秒，请重试`,
+      true,
+    );
+  return actualDurationSec;
 }
 
 function referenceKind(mimeType: string): SeedanceReferenceKind | undefined {
@@ -187,7 +208,11 @@ export class SeedanceVideoJob {
           ratio: settings.ratio,
           resolution: settings.resolution,
         });
-        await probeMedia(output);
+        const durationSec = assertSeedanceDuration(
+          settings.duration,
+          mediaDurationSec(await probeMedia(output)),
+          "本地生成结果",
+        );
         if (this.context.store.get(job.id)?.cancelRequested)
           throw new SeedanceFlowError("JOB_CANCELLED", "任务已取消", false);
         return {
@@ -195,6 +220,7 @@ export class SeedanceVideoJob {
           mimeType: "video/mp4",
           executionMode: "mock" as const,
           implementation: "ffmpeg-seedance-mock" as const,
+          durationSec,
         };
       } finally {
         await unlink(output).catch(() => undefined);
@@ -304,11 +330,28 @@ export class SeedanceVideoJob {
           if (reconciliationReason === "cancel") throw new SeedanceFlowError("JOB_CANCELLED", "任务已取消", false);
           if (reconciliationReason === "timeout")
             throw new SeedanceFlowError("UPSTREAM_COMPLETED_AFTER_TIMEOUT", "上游在本地超时后完成，结果已丢弃", true);
-          return {
-            ...(await aihubmix.downloadVideo(taskId)),
-            executionMode: "real" as const,
-            implementation: "aihubmix-video" as const,
-          };
+          const requestedDurationSec = seedanceVideoSettings(job.values).duration;
+          if (task.duration !== undefined)
+            assertSeedanceDuration(requestedDurationSec, Number(task.duration), "上游终态返回时长");
+          const downloaded = await aihubmix.downloadVideo(taskId);
+          const tempDir = await mkdtemp(resolve(tmpdir(), "yaozuo-seedance-result-"));
+          const output = resolve(tempDir, "result.mp4");
+          try {
+            await Bun.write(output, downloaded.bytes);
+            const durationSec = assertSeedanceDuration(
+              requestedDurationSec,
+              mediaDurationSec(await probeMedia(output)),
+              "下载视频实际时长",
+            );
+            return {
+              ...downloaded,
+              executionMode: "real" as const,
+              implementation: "aihubmix-video" as const,
+              durationSec,
+            };
+          } finally {
+            await rm(tempDir, { recursive: true, force: true });
+          }
         }
         if (["failed", "cancelled", "expired"].includes(task.status)) {
           terminalConfirmed = true;

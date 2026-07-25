@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 type OpenApiOperation = {
@@ -17,6 +18,7 @@ describe("video create shot generation API contract", () => {
   test("publishes the owned script clearing operation", async () => {
     const spec = (await Bun.file(resolve(import.meta.dir, "../../openapi/openapi.json")).json()) as {
       paths: Record<string, Record<string, OpenApiOperation>>;
+      components?: { schemas?: Record<string, unknown> };
     };
     const clear = spec.paths["/api/video-create/projects/{projectId}/script"]?.delete;
 
@@ -72,6 +74,7 @@ describe("video create shot generation API contract", () => {
   test("publishes material history, apply, and row-level post-processing operations", async () => {
     const spec = (await Bun.file(resolve(import.meta.dir, "../../openapi/openapi.json")).json()) as {
       paths: Record<string, Record<string, OpenApiOperation>>;
+      components?: { schemas?: Record<string, unknown> };
     };
     const history = spec.paths["/api/video-create/projects/{projectId}/shots/{shotId}/material-versions"]?.get;
     const apply =
@@ -80,6 +83,12 @@ describe("video create shot generation API contract", () => {
     const replacement = spec.paths["/api/video-create/projects/{projectId}/shots/{shotId}/replacement"]?.post;
 
     expect(history?.operationId).toBe("listVideoCreateShotMaterialVersions");
+    expect(JSON.stringify(history?.responses?.["200"])).toContain('"subtitlesComposed"');
+    expect(JSON.stringify(history?.responses?.["200"])).toContain('"generation"');
+    expect(JSON.stringify(history?.responses?.["200"])).toContain('"execution"');
+    expect(JSON.stringify(history?.responses?.["200"])).toContain('"generateAudio"');
+    expect(JSON.stringify(history?.responses?.["200"])).toContain('"submittedAt"');
+    expect(JSON.stringify(spec.components?.schemas?.VideoCreateProject)).toContain('"subtitlesComposed"');
     expect(apply?.operationId).toBe("applyVideoCreateShotMaterialVersion");
     expect(process?.operationId).toBe("processVideoCreateShotMaterial");
     expect(JSON.stringify(process)).toContain('"audio-replace","subtitle-compose"');
@@ -89,5 +98,7 @@ describe("video create shot generation API contract", () => {
     expect(apply?.responses).toHaveProperty("409");
     expect(process?.responses).toHaveProperty("202");
     expect(process?.responses).toHaveProperty("409");
+    const app = readFileSync(resolve(import.meta.dir, "../../server/app.ts"), "utf8");
+    expect(app).toContain('store.getOwned(version.jobId, c.get("userId"))');
   });
 });

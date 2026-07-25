@@ -96,18 +96,21 @@ for (const entry of selected) {
       };
     } else if (entry.capability === "video-generate") {
       if (!isSeedanceModelId(entry.model)) throw new Error(`INVALID_VIDEO_MODEL:${entry.model}`);
+      const requestedDuration = entry.model === "doubao-seedance-2-0-mini-260615" ? (15 as const) : (5 as const);
       const request = {
         model: entry.model,
         prompt: "A single orange ball slowly rolls across a clean white studio floor, static camera",
         resolution: "720p" as const,
         ratio: "16:9" as const,
-        duration: 5 as const,
+        duration: requestedDuration,
         generateAudio: true,
         watermark: false,
         references: [],
       };
       const created = await aihubmix.createSeedanceVideo(request);
       const completed = await aihubmix.waitForVideo(created.id);
+      if (completed.duration !== undefined && Math.abs(Number(completed.duration) - requestedDuration) > 1)
+        throw new Error(`VIDEO_PROVIDER_DURATION_MISMATCH:${completed.duration}`);
       const response = await aihubmix.downloadVideo(completed.id);
       const path = resolve(outputDir, `${entry.id}.mp4`);
       await Bun.write(path, response.bytes);
@@ -117,7 +120,7 @@ for (const entry of selected) {
         duration = Number(media.format.duration ?? video?.duration ?? 0);
       if (video?.width !== 1280 || video.height !== 720)
         throw new Error(`VIDEO_DIMENSIONS_MISMATCH:${video?.width}x${video?.height}`);
-      if (Math.abs(duration - 5) > 1) throw new Error(`VIDEO_DURATION_MISMATCH:${duration}`);
+      if (Math.abs(duration - requestedDuration) > 1) throw new Error(`VIDEO_DURATION_MISMATCH:${duration}`);
       if (!audio) throw new Error("VIDEO_AUDIO_STREAM_MISSING");
       result = {
         bytes: response.bytes.byteLength,
@@ -134,6 +137,7 @@ for (const entry of selected) {
           watermark: request.watermark,
           references: [],
         },
+        providerDuration: completed.duration,
       };
     } else throw new Error(`No test adapter for ${entry.capability}`);
     evidence.push({

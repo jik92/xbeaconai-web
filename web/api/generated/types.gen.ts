@@ -340,6 +340,7 @@ export type VideoCreateProject = {
         videoAssetId: string;
         currentMaterialVersionId: string;
         materialProcessing: boolean;
+        subtitlesComposed: boolean;
         audioArtifactId: string;
         subtitleCues: Array<{
             startSec: number;
@@ -3057,6 +3058,19 @@ export type ListVideoCreateShotMaterialVersionsResponses = {
             contentId: string;
             inputVersionId: string;
             jobId: string;
+            subtitlesComposed: boolean;
+            generation: {
+                model: string;
+                durationSec: number;
+                ratio: string;
+                resolution: string;
+                generateAudio: boolean;
+            };
+            execution: {
+                submittedAt: string;
+                completedAt: string;
+                durationSec: number;
+            };
             error?: {
                 code: string;
                 message: string;

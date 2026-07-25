@@ -506,6 +506,7 @@ export const videoCreateMaterialVersions = sqliteTable(
     contentId: text("content_id"),
     inputVersionId: text("input_version_id"),
     jobId: text("job_id").references(() => jobs.id),
+    subtitlesComposed: integer("subtitles_composed", { mode: "boolean" }).notNull().default(false),
     error: text("error_json", { mode: "json" }).$type<JobRecord["error"]>(),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),

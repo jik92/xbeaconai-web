@@ -24,7 +24,7 @@ async function requireFfmpegFilter(filter: string) {
     throw new Error(`FFMPEG_FILTER_UNAVAILABLE:${filter}:请安装启用 libass 的 FFmpeg`);
 }
 
-export async function generateSampleVideo(output: string) {
+export async function generateSampleVideo(output: string, durationSec = 4) {
   await outputDir(output);
   await run("ffmpeg", [
     "-y",
@@ -37,7 +37,7 @@ export async function generateSampleVideo(output: string) {
     "-i",
     "sine=frequency=440:sample_rate=48000",
     "-t",
-    "4",
+    String(durationSec),
     "-c:v",
     "libx264",
     "-pix_fmt",

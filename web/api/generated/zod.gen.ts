@@ -702,6 +702,7 @@ export const zVideoCreateProject = z.object({
         videoAssetId: z.uuid(),
         currentMaterialVersionId: z.uuid(),
         materialProcessing: z.boolean(),
+        subtitlesComposed: z.boolean(),
         audioArtifactId: z.uuid(),
         subtitleCues: z.array(z.object({
             startSec: z.number().gte(0),
@@ -2195,6 +2196,19 @@ export const zListVideoCreateShotMaterialVersionsResponse = z.object({
         contentId: z.uuid(),
         inputVersionId: z.uuid(),
         jobId: z.uuid(),
+        subtitlesComposed: z.boolean(),
+        generation: z.object({
+            model: z.string(),
+            durationSec: z.number().gte(0),
+            ratio: z.string(),
+            resolution: z.string(),
+            generateAudio: z.boolean()
+        }),
+        execution: z.object({
+            submittedAt: z.string(),
+            completedAt: z.string(),
+            durationSec: z.number().gte(0)
+        }),
         error: z.object({
             code: z.string(),
             message: z.string(),
