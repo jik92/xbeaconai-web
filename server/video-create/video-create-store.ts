@@ -25,7 +25,7 @@ type ProjectRow = typeof videoCreateProjects.$inferSelect;
 type SectionRow = typeof videoCreateScriptSections.$inferSelect;
 type VersionRow = typeof videoCreateScriptVersions.$inferSelect;
 type ShotRow = typeof videoCreateShots.$inferSelect;
-type MaterialVersionRow = typeof videoCreateMaterialVersions.$inferSelect;
+export type MaterialVersionRow = typeof videoCreateMaterialVersions.$inferSelect;
 
 export interface VideoCreateAggregate {
   project: ProjectRow;
@@ -511,17 +511,24 @@ export class VideoCreateStore {
   }
 
   getSubtitleSourceMaterialVersion(projectId: string, shotId: string, versionId: string) {
+    return this.getMaterialVersionLineage(projectId, shotId, versionId).find(
+      (version) => version.status === "succeeded" && !version.subtitlesComposed,
+    );
+  }
+
+  getMaterialVersionLineage(projectId: string, shotId: string, versionId: string) {
+    const lineage: MaterialVersionRow[] = [];
     let current = this.getMaterialVersion(projectId, shotId, versionId);
     const visited = new Set<string>();
-    while (current?.subtitlesComposed && current.inputVersionId && !visited.has(current.id)) {
+    while (current && !visited.has(current.id)) {
       visited.add(current.id);
+      lineage.push(current);
+      if (!current.inputVersionId) break;
       const parent = this.getMaterialVersion(projectId, shotId, current.inputVersionId);
       if (!parent) break;
       current = parent;
     }
-    return current && current.status === "succeeded" && !current.subtitlesComposed
-      ? current
-      : this.getMaterialVersion(projectId, shotId, versionId);
+    return lineage;
   }
 
   getMaterialVersionByJobId(jobId: string) {
@@ -553,7 +560,42 @@ export class VideoCreateStore {
       updatedAt: timestamp,
     };
     this.db.insert(videoCreateMaterialVersions).values(version).run();
-    return version;
+    const created = this.getMaterialVersion(input.projectId, input.shotId, version.id);
+    if (!created) throw new Error("VIDEO_CREATE_MATERIAL_VERSION_NOT_FOUND");
+    return created;
+  }
+
+  createMaterialVersion(input: {
+    projectId: string;
+    shotId: string;
+    source: MaterialVersionRow["source"];
+    storageKind: NonNullable<MaterialVersionRow["storageKind"]>;
+    contentId: string;
+    inputVersionId?: string | null;
+    jobId?: string | null;
+    subtitlesComposed?: boolean;
+    subtitleStyleId?: VideoCreateSubtitleStyleId | null;
+  }) {
+    const timestamp = new Date().toISOString();
+    const version: typeof videoCreateMaterialVersions.$inferInsert = {
+      id: crypto.randomUUID(),
+      projectId: input.projectId,
+      shotId: input.shotId,
+      source: input.source,
+      status: "succeeded",
+      storageKind: input.storageKind,
+      contentId: input.contentId,
+      inputVersionId: input.inputVersionId,
+      jobId: input.jobId,
+      subtitlesComposed: input.subtitlesComposed ?? false,
+      subtitleStyleId: input.subtitleStyleId,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    this.db.insert(videoCreateMaterialVersions).values(version).run();
+    const created = this.getMaterialVersion(input.projectId, input.shotId, version.id);
+    if (!created) throw new Error("VIDEO_CREATE_MATERIAL_VERSION_NOT_FOUND");
+    return created;
   }
 
   createAndApplyMaterialVersion(input: {

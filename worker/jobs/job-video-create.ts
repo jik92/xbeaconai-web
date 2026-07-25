@@ -12,6 +12,7 @@ import {
 } from "../../server/media/ffmpeg";
 import { isSeedanceModelId } from "../../server/models/video-models";
 import { resolvePortraitReference } from "../../server/portraits/portrait-resolver";
+import { arkSeedance } from "../../server/providers/ark-seedance";
 import { volcSpeech } from "../../server/providers/volc-speech";
 import { ossutils } from "../../server/storage/ossutils";
 import type { JobRecord, StageProvenance } from "../../server/types";
@@ -23,7 +24,11 @@ import {
 } from "../../server/video-create/model";
 import type { VideoCreateSubtitleCue } from "../../server/video-create/types";
 import { VIDEO_CREATE_ANALYSIS_MODEL } from "../../server/video-create/types";
-import { videoCreateError, videoCreateShotNarration } from "../../server/video-create/video-create-store";
+import {
+  type MaterialVersionRow,
+  videoCreateError,
+  videoCreateShotNarration,
+} from "../../server/video-create/video-create-store";
 import { normalizePortraitReference } from "../../shared/portraits/portrait-reference";
 import {
   getVideoCreateSubtitlePreset,
@@ -50,7 +55,7 @@ function stage(
     provider:
       executionMode !== "real"
         ? undefined
-        : implementation === "ark-seedance-video"
+        : implementation.startsWith("ark-seedance-")
           ? "ark"
           : implementation === "volc-tts-v3-unidirectional"
             ? "volc-speech"
@@ -125,6 +130,83 @@ async function saveVideoArtifact(
     createdAt: new Date().toISOString(),
   });
   return { id, name, mimeType: "video/mp4", executionMode, durationSec } as const;
+}
+
+export function findLegacyArkSourceJob(
+  lineage: Array<Pick<MaterialVersionRow, "jobId">>,
+  getJob: (jobId: string) => JobRecord | undefined,
+) {
+  for (const version of lineage) {
+    if (!version.jobId) continue;
+    const sourceJob = getJob(version.jobId);
+    if (
+      sourceJob?.providerTaskId &&
+      (sourceJob.executionPlan.some(
+        (item) => item.provider === "ark" || item.implementation === "ark-seedance-video",
+      ) ||
+        (sourceJob.providerModel && isSeedanceModelId(sourceJob.providerModel)))
+    )
+      return sourceJob;
+  }
+  return undefined;
+}
+
+export function videoCreateSubtitleAudioArtifactId(shot: { audioEnabled: boolean; audioArtifactId?: string | null }) {
+  return shot.audioEnabled ? (shot.audioArtifactId ?? undefined) : undefined;
+}
+
+async function recoverLegacySubtitleSource(
+  job: JobRecord,
+  context: JobHandlerContext,
+  projectId: string,
+  shotId: string,
+  versionId: string,
+) {
+  const projects = context.videoCreates;
+  if (!projects) throw new Error("VIDEO_CREATE_STORE_UNAVAILABLE");
+  const lineage = projects.getMaterialVersionLineage(projectId, shotId, versionId);
+  const sourceJob = findLegacyArkSourceJob(lineage, (jobId) => context.store.get(jobId));
+  if (!sourceJob?.providerTaskId)
+    throw new SeedanceFlowError(
+      "LEGACY_SUBTITLE_SOURCE_EXPIRED",
+      "旧素材没有可恢复的无字幕母版，请重新生成分镜视频",
+      false,
+    );
+  try {
+    const task = await arkSeedance.getVideo(sourceJob.providerTaskId);
+    if (task.status !== "succeeded" || !task.content?.video_url) throw new Error("ARK_VIDEO_URL_MISSING");
+    const response = await arkSeedance.downloadVideo(task.content.video_url);
+    const artifact = await saveVideoArtifact(
+      job,
+      context,
+      response.bytes,
+      undefined,
+      "real",
+      undefined,
+      undefined,
+      undefined,
+      "-recovered-source",
+    );
+    const originVersion = lineage.find((version) => version.jobId === sourceJob.id);
+    const version = projects.createMaterialVersion({
+      projectId,
+      shotId,
+      source: "ai_generated",
+      storageKind: "artifact",
+      contentId: artifact.id,
+      inputVersionId: originVersion?.inputVersionId,
+      subtitlesComposed: false,
+      subtitleStyleId: null,
+    });
+    return { version, path: resolve(env.dataDir, "results", artifact.name), sourceJob };
+  } catch (error) {
+    if (error instanceof SeedanceFlowError) throw error;
+    throw new SeedanceFlowError(
+      "LEGACY_SUBTITLE_SOURCE_EXPIRED",
+      "旧素材的无字幕母版已过期，请重新生成分镜视频",
+      false,
+    );
+  }
 }
 
 export function buildSubtitleCues(text: string, durationSec: number): VideoCreateSubtitleCue[] {
@@ -552,17 +634,30 @@ export const videoCreateJob: WorkerJobHandler = {
         if (!shot || !inputVersionId) throw new Error("SHOT_MATERIAL_VERSION_REQUIRED");
         if (shot.currentMaterialVersionId !== (job.values.expectedCurrentMaterialVersionId ?? inputVersionId))
           throw new Error("SHOT_MATERIAL_VERSION_CHANGED");
-        const version = projects.getMaterialVersion(projectId, shot.id, inputVersionId);
-        if (!version?.contentId || !version.storageKind || version.status !== "succeeded")
+        const initialVersion = projects.getMaterialVersion(projectId, shot.id, inputVersionId);
+        if (!initialVersion?.contentId || !initialVersion.storageKind || initialVersion.status !== "succeeded")
           throw new Error("SHOT_VIDEO_NOT_AVAILABLE");
-        if (
-          operation === "subtitle-compose" &&
-          version.subtitlesComposed &&
-          (version.subtitleStyleId ?? aggregate.project.input.subtitleStyleId) === job.values.subtitleStyleId
-        )
-          throw new SeedanceFlowError("SUBTITLES_ALREADY_COMPOSED", "当前视频已合成字幕，请勿重复合成", false);
+        let version: MaterialVersionRow = initialVersion;
+        let recoveredPath: string | undefined;
+        let recoveryStage: StageProvenance | undefined;
+        if (operation === "subtitle-compose" && version.subtitlesComposed) {
+          if (version.subtitleStyleId && version.subtitleStyleId === job.values.subtitleStyleId)
+            throw new SeedanceFlowError("SUBTITLES_ALREADY_COMPOSED", "当前视频已合成字幕，请勿重复合成", false);
+          const recovered = await recoverLegacySubtitleSource(job, context, projectId, shot.id, version.id);
+          version = recovered.version;
+          recoveredPath = recovered.path;
+          recoveryStage = stage(
+            job,
+            "source-recovery",
+            "real",
+            "ark-seedance-source-recovery",
+            recovered.sourceJob.providerModel,
+          );
+          recoveryStage.completedAt = new Date().toISOString();
+        }
         const inputPath =
-          version.storageKind === "artifact"
+          recoveredPath ??
+          (version.storageKind === "artifact"
             ? (() => {
                 const artifact = context.accounts?.getArtifact(job.ownerUserId, version.contentId ?? "");
                 if (!artifact) throw new Error("SHOT_VIDEO_NOT_AVAILABLE");
@@ -572,7 +667,7 @@ export const videoCreateJob: WorkerJobHandler = {
                 const asset = context.accounts?.getOwnedAsset(job.ownerUserId, version.contentId ?? "");
                 if (!asset?.mimeType.startsWith("video/")) throw new Error("SHOT_VIDEO_NOT_AVAILABLE");
                 return resolve(env.dataDir, "uploads", asset.storageKey);
-              })();
+              })());
         const temporaryFiles: string[] = [];
         try {
           const output = resolve(env.dataDir, "results", `${job.id}-${operation}.mp4`);
@@ -586,8 +681,18 @@ export const videoCreateJob: WorkerJobHandler = {
             const subtitlePath = resolve(env.dataDir, "results", `${job.id}.srt`);
             await Bun.write(subtitlePath, cuesToSrt(shot.subtitleCues));
             temporaryFiles.push(subtitlePath);
+            let subtitleInputPath = inputPath;
+            const subtitleAudioArtifactId = videoCreateSubtitleAudioArtifactId(shot);
+            if (subtitleAudioArtifactId) {
+              const audio = context.accounts.getArtifact(job.ownerUserId, subtitleAudioArtifactId);
+              if (!audio) throw new Error("SHOT_AUDIO_NOT_AVAILABLE");
+              const audioOutput = resolve(env.dataDir, "results", `${job.id}-subtitle-audio.mp4`);
+              await composeMedia(inputPath, resolve(env.dataDir, "results", audio.storage_key), audioOutput);
+              subtitleInputPath = audioOutput;
+              temporaryFiles.push(audioOutput);
+            }
             await burnSubtitleFile(
-              inputPath,
+              subtitleInputPath,
               subtitlePath,
               output,
               getVideoCreateSubtitlePreset(job.values.subtitleStyleId as VideoCreateSubtitleStyleId).forceStyle,
@@ -604,6 +709,7 @@ export const videoCreateJob: WorkerJobHandler = {
               operation === "subtitle-compose"
                 ? (job.values.subtitleStyleId as VideoCreateSubtitleStyleId)
                 : version.subtitleStyleId,
+            inputVersionId: operation === "subtitle-compose" ? version.id : undefined,
           });
           projects.setProject(projectId, { status: "storyboard_review", error: null });
           currentStage.completedAt = new Date().toISOString();
@@ -611,9 +717,9 @@ export const videoCreateJob: WorkerJobHandler = {
             status: "succeeded",
             stage: "已完成",
             progress: 100,
-            provenance: [currentStage],
-            overallExecutionMode: "local",
-            result: artifactResult(job, artifact, [currentStage]),
+            provenance: [...(recoveryStage ? [recoveryStage] : []), currentStage],
+            overallExecutionMode: recoveryStage ? "mixed" : "local",
+            result: artifactResult(job, artifact, [...(recoveryStage ? [recoveryStage] : []), currentStage]),
           });
           return;
         } finally {

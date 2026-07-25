@@ -31,8 +31,10 @@ import { JobProcessor } from "../../worker/job-processor";
 import { assertSeedanceDuration, SeedanceFlowError } from "../../worker/jobs/job-seedance-video";
 import {
   buildSubtitleCues,
+  findLegacyArkSourceJob,
   resolveVideoCreateShotGenerationSettings,
   resolveVideoCreateSubtitleDuration,
+  videoCreateSubtitleAudioArtifactId,
 } from "../../worker/jobs/job-video-create";
 import { createTestAccountStore, registerTestAccount } from "./account-test-helper";
 
@@ -128,6 +130,60 @@ describe("video create domain", () => {
     expect(cues.at(-1)?.endSec).toBe(9);
     expect(cues.every((cue) => cue.endSec > cue.startSec)).toBe(true);
     expect(cues.every((cue) => cue.endSec <= 9)).toBe(true);
+  });
+
+  test("finds the original Ark job behind legacy processed material", () => {
+    const timestamp = new Date().toISOString();
+    const sourceJob = {
+      id: crypto.randomUUID(),
+      ownerUserId: crypto.randomUUID(),
+      moduleId: "video-create",
+      title: "旧分镜视频",
+      status: "succeeded",
+      progress: 100,
+      stage: "已完成",
+      overallExecutionMode: "real",
+      values: { operation: "shot" },
+      videoModel: "doubao-seedance-2-0-fast-260128",
+      executionPlan: [
+        {
+          id: "ark-video",
+          capability: "shot",
+          executionMode: "real",
+          implementation: "ark-seedance-video",
+          provider: "ark",
+          startedAt: timestamp,
+        },
+      ],
+      provenance: [],
+      cancelRequested: false,
+      providerTaskId: "ark-task",
+      providerCancelState: "none",
+      stagingKeys: [],
+      jobSchemaVersion: 2,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    } satisfies JobRecord;
+    const localJob: JobRecord = {
+      ...sourceJob,
+      id: crypto.randomUUID(),
+      providerTaskId: undefined,
+      executionPlan: [],
+    };
+    const jobs = new Map<string, JobRecord>([
+      [sourceJob.id, sourceJob],
+      [localJob.id, localJob],
+    ]);
+    expect(
+      findLegacyArkSourceJob([{ jobId: localJob.id }, { jobId: sourceJob.id }], (jobId) => jobs.get(jobId))?.id,
+    ).toBe(sourceJob.id);
+    expect(findLegacyArkSourceJob([{ jobId: localJob.id }], (jobId) => jobs.get(jobId))).toBeUndefined();
+    expect(videoCreateSubtitleAudioArtifactId({ audioEnabled: true, audioArtifactId: "current-audio" })).toBe(
+      "current-audio",
+    );
+    expect(
+      videoCreateSubtitleAudioArtifactId({ audioEnabled: false, audioArtifactId: "current-audio" }),
+    ).toBeUndefined();
   });
 
   test("rejects video and audio durations that would truncate the requested result", () => {
@@ -470,15 +526,33 @@ describe("video create domain", () => {
     });
     expect(processedMaterial.subtitlesComposed).toBe(true);
     expect(store.get(projectId)?.shots[0].subtitlesComposed).toBe(true);
+    expect(store.getSubtitleSourceMaterialVersion(projectId, storyboard.shots[0].id, processedMaterial.id)?.id).toBe(
+      firstMaterial.id,
+    );
+    expect(
+      store.getMaterialVersionLineage(projectId, storyboard.shots[0].id, processedMaterial.id).map((item) => item.id),
+    ).toEqual([processedMaterial.id, firstMaterial.id]);
+    const detachedMaterial = store.createMaterialVersion({
+      projectId,
+      shotId: storyboard.shots[0].id,
+      source: "ai_generated",
+      storageKind: "artifact",
+      contentId: crypto.randomUUID(),
+      subtitlesComposed: false,
+    });
+    expect(store.get(projectId)?.shots[0].currentMaterialVersionId).toBe(processedMaterial.id);
+    expect(detachedMaterial.subtitlesComposed).toBe(false);
     expect(store.listMaterialVersions(projectId, storyboard.shots[0].id, other.user.id)).toBeUndefined();
     const materialHistory = store.listMaterialVersions(projectId, storyboard.shots[0].id, owner.user.id) ?? [];
-    expect(materialHistory).toHaveLength(2);
-    expect(new Set(materialHistory.map((item) => item.id))).toEqual(new Set([processedMaterial.id, firstMaterial.id]));
+    expect(materialHistory).toHaveLength(3);
+    expect(new Set(materialHistory.map((item) => item.id))).toEqual(
+      new Set([processedMaterial.id, firstMaterial.id, detachedMaterial.id]),
+    );
     expect(store.get(projectId)?.shots[0].currentMaterialVersionId).toBe(processedMaterial.id);
     store.applyMaterialVersion(projectId, storyboard.shots[0].id, firstMaterial.id, owner.user.id);
     expect(store.get(projectId)?.shots[0].currentMaterialVersionId).toBe(firstMaterial.id);
     expect(store.get(projectId)?.shots[0].subtitlesComposed).toBe(false);
-    expect(store.listMaterialVersions(projectId, storyboard.shots[0].id, owner.user.id)).toHaveLength(2);
+    expect(store.listMaterialVersions(projectId, storyboard.shots[0].id, owner.user.id)).toHaveLength(3);
     store.updateAllShotSettings(projectId, { audioEnabled: false });
     expect(store.get(projectId)?.shots.every((shot) => !shot.audioEnabled)).toBe(true);
     store.updateAllShotSettings(projectId, { audioEnabled: true });
