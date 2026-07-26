@@ -4,7 +4,7 @@
 
 **Goal:** 为现有 Drizzle 脚本增加 `make db-generate` 和 `make db-migrate` 两个入口。
 
-**Architecture:** Makefile 只作为现有 `package.json` 脚本的薄代理层。命令执行前复用 `_check_bun`，不复制 Drizzle 配置或数据库路径逻辑。
+**Architecture:** Makefile 作为 `package.json` 脚本的薄代理层。迁移执行脚本复用 Server 的 `openDatabase`，避免为 Drizzle Kit 额外引入 SQLite 驱动，并保证数据库路径和迁移行为一致。
 
 **Tech Stack:** GNU Make、Bun、Drizzle Kit
 
@@ -20,9 +20,11 @@
 
 **Files:**
 - Modify: `Makefile`
+- Modify: `package.json`
+- Create: `scripts/migrate-database.ts`
 
 **Interfaces:**
-- Consumes: `package.json` 中的 `db:generate` 与 `db:migrate` scripts。
+- Consumes: `package.json` 中的 `db:generate` script、`server/db/database.ts` 的 `openDatabase` 和 `server/env.ts` 的 `env.databasePath`。
 - Produces: `make db-generate` 与 `make db-migrate` 命令。
 
 - [ ] **Step 1: 验证目标当前不存在**

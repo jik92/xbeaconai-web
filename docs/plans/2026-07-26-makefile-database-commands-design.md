@@ -7,9 +7,10 @@
 ## 设计
 
 - `make db-generate` 调用 `bun run db:generate`，根据 `server/db/schema.ts` 生成版本化迁移。
-- `make db-migrate` 调用 `bun run db:migrate`，将 `drizzle/` 中尚未执行的迁移应用到当前配置数据库。
+- `make db-migrate` 调用 `bun run db:migrate`，通过项目现有 Bun SQLite 连接将 `drizzle/` 中尚未执行的迁移应用到当前配置数据库。
 - 两个目标都依赖 `_check_bun`。
 - 不增加自动组合命令，不改变 Server 启动时的迁移行为。
+- 不为 Drizzle Kit 额外引入 SQLite 驱动；命令与 Server 复用 `openDatabase`。
 
 ## 验证
 
