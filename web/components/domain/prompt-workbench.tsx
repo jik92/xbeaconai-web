@@ -1,5 +1,5 @@
 import { ArrowUp, Expand, FileAudio, FileImage, FileVideo, Plus, Shrink, Trash2 } from "lucide-react";
-import type { ReactNode, RefObject } from "react";
+import { useRef, useState, type ReactNode, type RefObject } from "react";
 import { cn } from "@/lib/utils";
 import { AttachmentPicker, type AttachmentSelection } from "./attachment-picker";
 
@@ -8,6 +8,20 @@ export interface PromptReference {
   name: string;
   kind: "image" | "video" | "audio";
   previewUrl?: string;
+}
+
+/** A controlled prompt mention. The label is also the text persisted in the prompt, for example `Image1`. */
+export interface PromptMention {
+  id: string;
+  label: string;
+  name: string;
+}
+
+function activeMentionQuery(value: string, caret: number) {
+  const beforeCaret = value.slice(0, caret);
+  const match = beforeCaret.match(/(^|[^A-Za-z0-9_-])@([A-Za-z0-9_-]*)$/);
+  if (!match) return undefined;
+  return { start: caret - match[2].length - 1, query: match[2] };
 }
 
 export function PromptWorkbench({
@@ -27,6 +41,7 @@ export function PromptWorkbench({
   submitting = false,
   submitLabel,
   showSubmit = true,
+  mentions = [],
   onChooseAssets,
   onRemoveReference,
   onPromptChange,
@@ -49,12 +64,30 @@ export function PromptWorkbench({
   submitting?: boolean;
   submitLabel?: string;
   showSubmit?: boolean;
+  /** Enables a lightweight `@` picker in the textarea. The parent remains the source of truth for the prompt. */
+  mentions?: PromptMention[];
   onChooseAssets: (assets: AttachmentSelection[]) => void;
   onRemoveReference: (id: string) => void;
   onPromptChange: (value: string) => void;
   onExpandedChange: (expanded: boolean) => void;
   onSubmit: () => void;
 }) {
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [mention, setMention] = useState<{ start: number; end: number; query: string }>();
+  const matchingMentions = mention
+    ? mentions.filter((item) => item.label.toLowerCase().includes(mention.query.toLowerCase()))
+    : [];
+  const selectMention = (item: PromptMention) => {
+    if (!mention) return;
+    const next = `${prompt.slice(0, mention.start)}@${item.label} ${prompt.slice(mention.end)}`;
+    const caret = mention.start + item.label.length + 2;
+    onPromptChange(next);
+    setMention(undefined);
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(caret, caret);
+    });
+  };
   return (
     <section
       className={cn(
@@ -117,7 +150,10 @@ export function PromptWorkbench({
         ))}
       </div>
       <textarea
-        ref={inputRef}
+        ref={(node) => {
+          textareaRef.current = node;
+          if (inputRef) inputRef.current = node;
+        }}
         aria-label={inputLabel}
         placeholder={placeholder}
         value={prompt}
@@ -125,14 +161,53 @@ export function PromptWorkbench({
           "absolute left-20.5 right-9.5 top-4 h-30 w-[calc(100%-126px)] resize-none bg-transparent text-sm leading-relaxed text-ink outline-none placeholder:text-muted-soft",
           expanded && "h-86.5",
         )}
-        onChange={(event) => onPromptChange(event.target.value)}
+        onChange={(event) => {
+          const value = event.target.value;
+          onPromptChange(value);
+          const query = activeMentionQuery(value, event.target.selectionStart);
+          setMention(query ? { ...query, end: event.target.selectionStart } : undefined);
+        }}
+        onClick={(event) => {
+          const query = activeMentionQuery(event.currentTarget.value, event.currentTarget.selectionStart);
+          setMention(query ? { ...query, end: event.currentTarget.selectionStart } : undefined);
+        }}
         onKeyDown={(event) => {
+          if (event.key === "Escape" && mention) {
+            event.preventDefault();
+            setMention(undefined);
+            return;
+          }
           if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
             event.preventDefault();
             onSubmit();
           }
         }}
       />
+      {mention && (
+        <div
+          className="ag-mention-picker absolute left-20.5 top-34 z-30 max-h-48 min-w-44 overflow-y-auto rounded-lg border border-line bg-white p-1 shadow-lg"
+          role="listbox"
+          aria-label="可引用素材"
+        >
+          {matchingMentions.length ? (
+            matchingMentions.map((item) => (
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-ink hover:bg-canvas-soft"
+                key={item.id}
+                role="option"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => selectMention(item)}
+              >
+                <b className="font-medium">@{item.label}</b>
+                <span className="truncate text-muted">{item.name}</span>
+              </button>
+            ))
+          ) : (
+            <p className="px-2 py-1.5 text-xs text-muted">没有匹配的素材</p>
+          )}
+        </div>
+      )}
       <button
         type="button"
         className="ag-expand absolute right-2.5 top-3 grid size-6 place-items-center rounded-md border border-line bg-white text-muted"

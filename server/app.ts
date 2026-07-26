@@ -31,6 +31,7 @@ import {
   remixVoiceModes,
 } from "../shared/video-remix/prompt-tools";
 import { parseRemixAnalysisEntries, parseRemixSources, remixMaxSources } from "../shared/video-remix/workflow";
+import { validateRemixShotReferenceBindings } from "../shared/video-remix/shot-reference";
 import { APP_CONFIG, isModuleOpen } from "../web/app/config";
 import type { ModuleId } from "../web/entities/types";
 import {
@@ -3661,6 +3662,7 @@ const RemixPromptToolRequestSchema = z.object({
   tool: z.enum(remixPromptTools),
   config: RemixPromptToolConfigSchema,
 });
+const RemixReferenceLabelSchema = z.string().regex(/^Image[1-9]\d*$/, "引用标签必须为 Image1、Image2 等格式");
 const RemixShotGenerationRequestSchema = z.object({
   sourceJobId: z.string().uuid(),
   sourceAssetId: z.string().uuid(),
@@ -3669,9 +3671,16 @@ const RemixShotGenerationRequestSchema = z.object({
   ratio: z.string().min(1).max(20),
   resolution: z.string().min(1).max(20),
   duration: z.number().int().min(4).max(15),
-  referenceAssetIds: z.array(z.string().uuid()).max(9).default([]),
-  portraitReferences: z.array(PortraitReferenceSchema).max(9).default([]),
+  references: z
+    .array(z.object({ assetId: z.string().uuid(), label: RemixReferenceLabelSchema }))
+    .max(9)
+    .default([]),
+  portraitReferences: z
+    .array(z.object({ reference: PortraitReferenceSchema, label: RemixReferenceLabelSchema }))
+    .max(9)
+    .default([]),
 });
+
 const RemixComposeRequestSchema = z.object({
   sourceJobId: z.string().uuid(),
   sources: z
@@ -4249,8 +4258,10 @@ app.openapi(remixShotGenerationRoute, async (c) => {
       },
       422,
     );
-  const referenceIds = [...new Set(body.referenceAssetIds)].filter((assetId) => assetId !== body.sourceAssetId);
-  if (referenceIds.length !== body.referenceAssetIds.length)
+  const referenceIds = [...new Set(body.references.map((reference) => reference.assetId))].filter(
+    (assetId) => assetId !== body.sourceAssetId,
+  );
+  if (referenceIds.length !== body.references.length)
     return c.json(
       { error: { code: "INVALID_REFERENCE_ASSETS", message: "参考素材不能重复", retryable: false, requestId } },
       422,
@@ -4270,7 +4281,7 @@ app.openapi(remixShotGenerationRoute, async (c) => {
     );
   const portraitReferences = [
     ...new Map(
-      body.portraitReferences.map((reference) => [
+      body.portraitReferences.map(({ reference }) => [
         reference.type === "general" ? `general:${reference.portraitId}` : `custom:${reference.assetId}`,
         reference,
       ]),
@@ -4279,6 +4290,26 @@ app.openapi(remixShotGenerationRoute, async (c) => {
   if (portraitReferences.length !== body.portraitReferences.length)
     return c.json(
       { error: { code: "INVALID_REFERENCE_ASSETS", message: "参考人像不能重复", retryable: false, requestId } },
+      422,
+    );
+  const bindingError = validateRemixShotReferenceBindings(body.prompt, [
+    ...body.references,
+    ...body.portraitReferences,
+  ]);
+  if (bindingError)
+    return c.json(
+      {
+        error: {
+          code: bindingError.includes("未绑定")
+            ? "UNBOUND_PROMPT_REFERENCE"
+            : bindingError.includes("提示词缺少")
+              ? "MISSING_PROMPT_REFERENCE"
+              : "INVALID_REFERENCE_LABELS",
+          message: bindingError,
+          retryable: false,
+          requestId,
+        },
+      },
       422,
     );
   if (referenceAssets.length + portraitReferences.length > 9)
@@ -4305,6 +4336,9 @@ app.openapi(remixShotGenerationRoute, async (c) => {
     count: "1",
     seed: "",
     duration: String(body.duration),
+    // Seedance 2.0 的图片引用统一使用 omni；该参数是能力校验所需的内部执行配置，非用户输入。
+    referenceMode: "omni",
+    referenceCount: String(body.references.length + body.portraitReferences.length),
   };
   // 爆款二创的分镜生成与一键成片共用 Ark Seedance Worker。
   // 能力检测仅用于管理后台观测，不能阻断已配置的业务模型提交。
@@ -4351,10 +4385,19 @@ app.openapi(remixShotGenerationRoute, async (c) => {
       sourceJobId: sourceJob.id,
       sourceAssetId: sourceAsset.id,
       references: `assets:${JSON.stringify(
-        references.map((asset) => ({ id: asset.id, name: asset.originalName, mimeType: asset.mimeType })),
+        references.map((asset) => ({
+          id: asset.id,
+          label: body.references.find((reference) => reference.assetId === asset.id)?.label,
+          name: asset.originalName,
+          mimeType: asset.mimeType,
+        })),
       )}`,
       referenceAssetIds: JSON.stringify(referenceIds),
       portraitReferences: JSON.stringify(portraitReferences),
+      referenceBindings: JSON.stringify([
+        ...body.references.map((reference) => ({ type: "asset", assetId: reference.assetId, label: reference.label })),
+        ...body.portraitReferences.map((item) => ({ type: "portrait", reference: item.reference, label: item.label })),
+      ]),
       outputFolderId: accounts.getDefaultAssetFolderId(ownerUserId),
     },
     videoModel: body.modelId,

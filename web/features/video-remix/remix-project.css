@@ -1297,6 +1297,11 @@
   resize: none;
   @apply text-sm leading-relaxed;
 }
+.storyboard-proof .ag-composer.embedded .ag-mention-picker {
+  left: 112px;
+  top: 54px;
+  max-width: min(320px, calc(100% - 140px));
+}
 .storyboard-proof .ag-composer.embedded.expanded textarea {
   height: auto;
 }

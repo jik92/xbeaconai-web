@@ -46,10 +46,18 @@ describe("video remix storyboard editor", () => {
     expect(storyboard).toContain('model.enabled ? "" : "（未验证）"');
   });
 
-  test("submits only explicitly @-referenced images and never injects the source video or a default portrait", () => {
+  test("binds explicit @Image labels to assets and never injects the source video or a default portrait", () => {
     expect(page).toContain("const quotedReferences = storyboardReferenceImages.filter");
-    expect(page).toContain("portraitReferences,");
-    expect(remixApi).toContain("portraitReferences: z.array(PortraitReferenceSchema)");
+    expect(page).toContain("const mentionedLabels = new Set");
+    expect(page).toContain("@" + "${unresolved} 未绑定到当前参考素材库");
+    expect(page).toContain("references: quotedReferences.flatMap");
+    expect(page).toContain("portraitReferences: quotedReferences.flatMap");
+    expect(storyboard).toContain("mentions={storyboardReferenceImages.map");
+    expect(remixApi).toContain("const RemixReferenceLabelSchema");
+    expect(remixApi).toContain("referenceBindings: JSON.stringify");
+    expect(remixApi).toContain('referenceMode: "omni"');
+    expect(remixApi).toContain("referenceCount: String(body.references.length + body.portraitReferences.length)");
+    expect(remixApi).toContain("UNBOUND_PROMPT_REFERENCE");
     expect(remixApi).toContain("const references = referenceAssets.filter");
     expect(remixApi).not.toContain("const references = [sourceAsset, ...referenceAssets]");
     expect(remixApi).not.toContain("...(sourceJob.values.portraitReference");

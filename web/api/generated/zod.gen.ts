@@ -2235,14 +2235,23 @@ export const zCreateVideoRemixShotGenerationJobBody = z.object({
     ratio: z.string().min(1).max(20),
     resolution: z.string().min(1).max(20),
     duration: z.int().gte(4).lte(15),
-    referenceAssetIds: z.array(z.uuid()).max(9).optional().default([]),
-    portraitReferences: z.array(z.union([z.object({
-            type: z.enum(['general']),
-            portraitId: z.int().gte(1)
-        }), z.object({
-            type: z.enum(['custom']),
-            assetId: z.uuid()
-        })])).max(9).optional().default([])
+    references: z.array(z.object({
+        assetId: z.uuid(),
+        label: z.string().regex(/^Image[1-9]\d*$/)
+    })).max(9).optional().default([]),
+    portraitReferences: z.array(z.object({
+        reference: z.union([
+            z.object({
+                type: z.enum(['general']),
+                portraitId: z.int().gte(1)
+            }),
+            z.object({
+                type: z.enum(['custom']),
+                assetId: z.uuid()
+            })
+        ]),
+        label: z.string().regex(/^Image[1-9]\d*$/)
+    })).max(9).optional().default([])
 });
 
 /**

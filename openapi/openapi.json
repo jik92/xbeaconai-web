@@ -8831,11 +8831,24 @@
                     "minimum": 4,
                     "maximum": 15
                   },
-                  "referenceAssetIds": {
+                  "references": {
                     "type": "array",
                     "items": {
-                      "type": "string",
-                      "format": "uuid"
+                      "type": "object",
+                      "properties": {
+                        "assetId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "label": {
+                          "type": "string",
+                          "pattern": "^Image[1-9]\\d*$"
+                        }
+                      },
+                      "required": [
+                        "assetId",
+                        "label"
+                      ]
                     },
                     "maxItems": 9,
                     "default": []
@@ -8843,45 +8856,58 @@
                   "portraitReferences": {
                     "type": "array",
                     "items": {
-                      "oneOf": [
-                        {
-                          "type": "object",
-                          "properties": {
-                            "type": {
-                              "type": "string",
-                              "enum": [
-                                "general"
+                      "type": "object",
+                      "properties": {
+                        "reference": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "general"
+                                  ]
+                                },
+                                "portraitId": {
+                                  "type": "integer",
+                                  "minimum": 1
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "portraitId"
                               ]
                             },
-                            "portraitId": {
-                              "type": "integer",
-                              "minimum": 1
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "custom"
+                                  ]
+                                },
+                                "assetId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "assetId"
+                              ]
                             }
-                          },
-                          "required": [
-                            "type",
-                            "portraitId"
                           ]
                         },
-                        {
-                          "type": "object",
-                          "properties": {
-                            "type": {
-                              "type": "string",
-                              "enum": [
-                                "custom"
-                              ]
-                            },
-                            "assetId": {
-                              "type": "string",
-                              "format": "uuid"
-                            }
-                          },
-                          "required": [
-                            "type",
-                            "assetId"
-                          ]
+                        "label": {
+                          "type": "string",
+                          "pattern": "^Image[1-9]\\d*$"
                         }
+                      },
+                      "required": [
+                        "reference",
+                        "label"
                       ]
                     },
                     "maxItems": 9,

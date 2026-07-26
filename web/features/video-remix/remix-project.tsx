@@ -88,6 +88,8 @@ interface ShotGenerationDraft {
   resolution: string;
   duration: number;
   references: AttachmentSelection[];
+  /** Stable labels for the per-shot temporary reference library. */
+  referenceLabels: Record<string, string>;
   expanded: boolean;
 }
 
@@ -97,6 +99,7 @@ interface StoryboardReference {
   url: string;
   mimeType: string;
   source: "product" | "portrait" | "attachment";
+  label: string;
   assetId?: string;
   portraitReference?: Portrait["reference"];
   authenticated?: boolean;
@@ -1104,6 +1107,7 @@ export function RemixProject() {
           duration: defaultVideoModel.supportedDurations.includes(5) ? 5 : defaultVideoModel.supportedDurations[0] || 5,
           // 左侧商品与人像只初始化“参考素材库”，不会自动成为生成入参。
           references: [],
+          referenceLabels: {},
           expanded: true,
         };
         changed = true;
@@ -1555,7 +1559,41 @@ export function RemixProject() {
     }
     if (submitted.status === "failed") setNotice(submitted.error?.message || "分镜视频生成失败");
   }, [shotJobs, submittedShotJobId]);
+  const referenceLibraryKeys = useMemo(
+    () => [
+      ...(selectedProduct?.images ?? []).map((image) => `product:${image.id}`),
+      ...selectedPortraits.map((portrait) => `portrait:${portrait.key}`),
+      ...(activeDraft?.references ?? [])
+        .filter((reference) => reference.mimeType.startsWith("image/"))
+        .map((reference) => `attachment:${reference.id}`),
+    ],
+    [activeDraft?.references, selectedPortraits, selectedProduct],
+  );
+  useEffect(() => {
+    if (!sourceAssetId || !referenceLibraryKeys.length) return;
+    setShotDrafts((current) => {
+      const draft = current[sourceAssetId];
+      if (!draft) return current;
+      const labels = { ...draft.referenceLabels };
+      let nextNumber = Math.max(
+        0,
+        ...Object.values(labels).flatMap((label) => {
+          const match = /^Image(\d+)$/.exec(label);
+          return match ? [Number(match[1])] : [];
+        }),
+      );
+      let changed = false;
+      for (const id of referenceLibraryKeys) {
+        if (labels[id]) continue;
+        nextNumber += 1;
+        labels[id] = `Image${nextNumber}`;
+        changed = true;
+      }
+      return changed ? { ...current, [sourceAssetId]: { ...draft, referenceLabels: labels } } : current;
+    });
+  }, [referenceLibraryKeys, sourceAssetId]);
   const storyboardReferenceImages = useMemo<StoryboardReference[]>(() => {
+    const labelFor = (id: string, fallback: number) => activeDraft?.referenceLabels[id] || `Image${fallback}`;
     const images = [
       ...(selectedProduct?.images ?? []).map((image) => ({
         id: `product:${image.id}`,
@@ -1585,8 +1623,11 @@ export function RemixProject() {
           assetId: reference.id,
         })),
     ];
-    return [...new Map(images.map((image) => [image.id, image])).values()];
-  }, [activeDraft?.references, selectedPortraits, selectedProduct]);
+    return [...new Map(images.map((image) => [image.id, image])).values()].map((image, index) => ({
+      ...image,
+      label: labelFor(image.id, index + 1),
+    }));
+  }, [activeDraft?.references, activeDraft?.referenceLabels, selectedPortraits, selectedProduct]);
   const patchShotDraft = (update: Partial<ShotGenerationDraft>) => {
     if (!sourceAssetId || !activeDraft) return;
     setShotDrafts((current) => ({
@@ -1599,30 +1640,22 @@ export function RemixProject() {
     const known = new Set(activeDraft.references.map((asset) => asset.id));
     patchShotDraft({ references: [...activeDraft.references, ...assets.filter((asset) => !known.has(asset.id))] });
   };
-  const insertShotReference = (reference: { id: string; name: string }) => {
-    setPrompt(`${prompt}${prompt && !/\s$/.test(prompt) ? "\n" : ""}@${reference.name} `);
-  };
   const submitShotGeneration = async () => {
     if (!job?.id || !sourceAssetId || !activeDraft || activeShotRunning) return;
     if (prompt.trim().length < 20) {
       setNotice("分镜生成提示词至少需要 20 个字符");
       return;
     }
-    const quotedReferences = storyboardReferenceImages.filter((reference) => prompt.includes(`@${reference.name}`));
-    const referenceAssetIds = [
-      ...new Set(quotedReferences.flatMap((reference) => (reference.assetId ? [reference.assetId] : []))),
-    ];
-    const portraitReferences = [
-      ...new Map(
-        quotedReferences
-          .flatMap((reference) => (reference.portraitReference ? [reference.portraitReference] : []))
-          .map((reference) => [
-            reference.type === "general" ? `general:${reference.portraitId}` : `custom:${reference.assetId}`,
-            reference,
-          ]),
-      ).values(),
-    ];
-    if (referenceAssetIds.length + portraitReferences.length > 9) {
+    const mentionedLabels = new Set(prompt.match(/@Image\d+/g)?.map((token) => token.slice(1)) ?? []);
+    const unresolved = [...mentionedLabels].find(
+      (label) => !storyboardReferenceImages.some((reference) => reference.label === label),
+    );
+    if (unresolved) {
+      setNotice(`@${unresolved} 未绑定到当前参考素材库`);
+      return;
+    }
+    const quotedReferences = storyboardReferenceImages.filter((reference) => mentionedLabels.has(reference.label));
+    if (quotedReferences.length > 9) {
       setNotice("当前模型单次最多可引用 9 张图片，请减少提示词中的 @ 引用");
       return;
     }
@@ -1636,8 +1669,12 @@ export function RemixProject() {
         ratio: activeDraft.ratio,
         resolution: activeDraft.resolution,
         duration: activeDraft.duration,
-        referenceAssetIds,
-        portraitReferences,
+        references: quotedReferences.flatMap((reference) =>
+          reference.assetId ? [{ assetId: reference.assetId, label: reference.label }] : [],
+        ),
+        portraitReferences: quotedReferences.flatMap((reference) =>
+          reference.portraitReference ? [{ reference: reference.portraitReference, label: reference.label }] : [],
+        ),
       });
       setSubmittedShotJobId(created.id);
       setShotSelectionTouched((current) => ({ ...current, [sourceAssetId]: false }));
@@ -1907,14 +1944,11 @@ export function RemixProject() {
                 <div className="storyboard-editor">
                   <div className="storyboard-reference-cluster">
                     {storyboardReferenceImages.map((reference, index) => (
-                      <button
-                        type="button"
+                      <span
                         className="storyboard-reference-image"
                         key={reference.id}
                         title={reference.name}
-                        aria-label={`在提示词中引用 ${reference.name}`}
                         style={{ "--reference-index": index } as CSSProperties}
-                        onClick={() => insertShotReference(reference)}
                       >
                         {reference.source === "portrait" && !reference.authenticated ? (
                           <PublicPreviewImage url={reference.url} alt={reference.name} />
@@ -1928,7 +1962,7 @@ export function RemixProject() {
                             errorText="图片加载失败"
                           />
                         )}
-                      </button>
+                      </span>
                     ))}
                     <AttachmentPicker
                       accept="image/*"
@@ -1955,6 +1989,11 @@ export function RemixProject() {
                     prompt={prompt}
                     placeholder="描述当前镜头的动作、主体、场景与运镜"
                     inputLabel="当前分镜生成提示词"
+                    mentions={storyboardReferenceImages.map((reference) => ({
+                      id: reference.id,
+                      label: reference.label,
+                      name: reference.name,
+                    }))}
                     accept="image/*"
                     multiple
                     submitting={Boolean(activeShotRunning)}

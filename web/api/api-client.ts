@@ -851,8 +851,8 @@ export async function generateRemixShot(
     ratio: string;
     resolution: string;
     duration: number;
-    referenceAssetIds: string[];
-    portraitReferences: PortraitReference[];
+    references: Array<{ assetId: string; label: string }>;
+    portraitReferences: Array<{ reference: PortraitReference; label: string }>;
   },
   idempotencyKey = randomUuid(),
 ) {
