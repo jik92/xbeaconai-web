@@ -140,6 +140,24 @@ describe("database migration", () => {
     conn.client.close();
   });
 
+  test("repairs video create automation columns skipped by a historical migration collision", () => {
+    const path = tempDbPath();
+    const initial = openDatabase(path);
+    initial.client.run("ALTER TABLE video_create_projects DROP COLUMN auto_generate_run_id");
+    initial.client.run("ALTER TABLE video_create_projects DROP COLUMN auto_generate");
+    initial.client.close();
+
+    const repaired = openDatabase(path);
+    const columns = new Set(
+      (
+        repaired.client.query("PRAGMA table_info(video_create_projects)").all() as Array<{ name: string }>
+      ).map((item) => item.name),
+    );
+    expect(columns.has("auto_generate")).toBe(true);
+    expect(columns.has("auto_generate_run_id")).toBe(true);
+    repaired.client.close();
+  });
+
   test("repairs a missing provider credentials table after historical migrations", () => {
     const path = tempDbPath();
     const initial = openDatabase(path);

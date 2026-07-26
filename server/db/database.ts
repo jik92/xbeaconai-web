@@ -99,6 +99,11 @@ export function openDatabase(path: string) {
   ensureColumn(client, "media_assets", "width", "width INTEGER");
   ensureColumn(client, "media_assets", "height", "height INTEGER");
   ensureColumn(client, "media_assets", "duration_sec", "duration_sec REAL");
+  // A short-lived local Qianchuan migration used the same 0018 sequence as
+  // the video-create automation migration. Those databases recorded a later
+  // timestamp and skipped the automation columns, so repair them on startup.
+  ensureColumn(client, "video_create_projects", "auto_generate", "auto_generate INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(client, "video_create_projects", "auto_generate_run_id", "auto_generate_run_id TEXT");
   ensureProviderCredentialTables(client);
   repairLegacyUserStatusConstraint(client);
 
