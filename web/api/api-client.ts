@@ -1,6 +1,7 @@
 import type { AssetFolder, AssetKind, LibraryAsset, LibraryProduct } from "@/entities/types";
 import { getAuthToken } from "@/features/account/auth-context";
 import { randomUuid } from "@/lib/random-id";
+import type { PortraitReference } from "../../shared/portraits/portrait-reference";
 import type { PortraitGender } from "../../shared/portraits/portrait-tags";
 import type { RemixPromptTool, RemixPromptToolConfig } from "../../shared/video-remix/prompt-tools";
 import { apiBaseUrl, apiUrl } from "./base-url";
@@ -850,9 +851,8 @@ export async function generateRemixShot(
     ratio: string;
     resolution: string;
     duration: number;
-    referenceMode: string;
     referenceAssetIds: string[];
-    generateAudio: boolean;
+    portraitReferences: PortraitReference[];
   },
   idempotencyKey = randomUuid(),
 ) {

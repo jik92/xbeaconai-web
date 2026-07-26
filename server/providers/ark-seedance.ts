@@ -66,11 +66,11 @@ export function buildArkSeedanceVideoRequest(input: ArkSeedanceVideoInput) {
   return {
     model: input.model,
     content: [{ type: "text" as const, text: input.prompt }, ...buildArkSeedanceReferenceContent(input.references)],
-    generate_audio: input.generateAudio ?? false,
+    ...(input.generateAudio === undefined ? {} : { generate_audio: input.generateAudio }),
     resolution: input.resolution ?? "720p",
     ratio: input.ratio ?? "16:9",
     duration: input.duration ?? 5,
-    watermark: input.watermark ?? false,
+    ...(input.watermark === undefined ? {} : { watermark: input.watermark }),
   };
 }
 

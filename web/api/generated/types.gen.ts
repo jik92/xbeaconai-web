@@ -2802,9 +2802,14 @@ export type CreateVideoRemixShotGenerationJobData = {
         ratio: string;
         resolution: string;
         duration: number;
-        referenceMode?: string;
         referenceAssetIds?: Array<string>;
-        generateAudio?: boolean;
+        portraitReferences?: Array<{
+            type: 'general';
+            portraitId: number;
+        } | {
+            type: 'custom';
+            assetId: string;
+        }>;
     };
     path?: never;
     query?: never;

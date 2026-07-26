@@ -111,6 +111,7 @@ import {
   VideoCreateMaterialStorageKindSchema,
   VideoCreateMaterialVersionSourceSchema,
   VideoCreateMaterialVersionStatusSchema,
+  PortraitReferenceSchema,
   VideoCreateProjectStatusSchema,
   VideoCreateRecommendationSchema,
   VideoCreateShotGenerationPlanSchema,
@@ -3668,9 +3669,8 @@ const RemixShotGenerationRequestSchema = z.object({
   ratio: z.string().min(1).max(20),
   resolution: z.string().min(1).max(20),
   duration: z.number().int().min(4).max(15),
-  referenceMode: z.string().min(1).max(40).default("omni"),
-  referenceAssetIds: z.array(z.string().uuid()).max(2).default([]),
-  generateAudio: z.boolean().default(true),
+  referenceAssetIds: z.array(z.string().uuid()).max(9).default([]),
+  portraitReferences: z.array(PortraitReferenceSchema).max(9).default([]),
 });
 const RemixComposeRequestSchema = z.object({
   sourceJobId: z.string().uuid(),
@@ -4256,26 +4256,43 @@ app.openapi(remixShotGenerationRoute, async (c) => {
       422,
     );
   const referenceAssets = referenceIds.map((assetId) => accounts.getOwnedAsset(ownerUserId, assetId));
-  if (
-    referenceAssets.some(
-      (asset) => !asset || (!asset.mimeType.startsWith("image/") && !asset.mimeType.startsWith("audio/")),
-    )
-  )
+  if (referenceAssets.some((asset) => !asset?.mimeType.startsWith("image/")))
     return c.json(
       {
         error: {
           code: "INVALID_REFERENCE_ASSETS",
-          message: "额外参考素材仅支持当前账号的图片或音频",
+          message: "参考素材仅支持当前账号的图片",
           retryable: false,
           requestId,
         },
       },
       422,
     );
-  const referenceKinds = referenceAssets.map((asset) => (asset?.mimeType.startsWith("image/") ? "image" : "audio"));
-  if (new Set(referenceKinds).size !== referenceKinds.length)
+  const portraitReferences = [
+    ...new Map(
+      body.portraitReferences.map((reference) => [
+        reference.type === "general" ? `general:${reference.portraitId}` : `custom:${reference.assetId}`,
+        reference,
+      ]),
+    ).values(),
+  ];
+  if (portraitReferences.length !== body.portraitReferences.length)
     return c.json(
-      { error: { code: "INVALID_REFERENCE_ASSETS", message: "每类额外参考素材最多一个", retryable: false, requestId } },
+      { error: { code: "INVALID_REFERENCE_ASSETS", message: "参考人像不能重复", retryable: false, requestId } },
+      422,
+    );
+  if (referenceAssets.length + portraitReferences.length > 9)
+    return c.json(
+      { error: { code: "TOO_MANY_REFERENCES", message: "当前模型单次最多引用 9 张图片", retryable: false, requestId } },
+      422,
+    );
+  if (
+    portraitReferences.some(
+      (reference) => !resolvePortraitReference({ ownerUserId, reference, accounts, customPortraits }),
+    )
+  )
+    return c.json(
+      { error: { code: "PORTRAIT_NOT_AVAILABLE", message: "引用的人像不存在或尚未就绪", retryable: false, requestId } },
       422,
     );
   const creationValues = {
@@ -4287,20 +4304,15 @@ app.openapi(remixShotGenerationRoute, async (c) => {
     resolution: body.resolution,
     count: "1",
     seed: "",
-    referenceMode: body.referenceMode,
     duration: String(body.duration),
   };
-  const providers = getCreationProviderStatus();
-  const models = creationCapabilities(providers.imageEnabled, providers.videoEnabled);
+  // 爆款二创的分镜生成与一键成片共用 Ark Seedance Worker。
+  // 能力检测仅用于管理后台观测，不能阻断已配置的业务模型提交。
+  const models = creationCapabilities(true, true);
   const validationError = validateCreationValues(creationValues, models);
   if (validationError)
     return c.json(
       { error: { code: "INVALID_CREATION_CONFIG", message: validationError, retryable: false, requestId } },
-      422,
-    );
-  if (!videoModelEnabled(body.modelId))
-    return c.json(
-      { error: { code: "VIDEO_MODEL_NOT_VERIFIED", message: "该视频模型尚未通过验证", retryable: false, requestId } },
       422,
     );
   const quote = quoteCreation(creationValues, models);
@@ -4323,7 +4335,7 @@ app.openapi(remixShotGenerationRoute, async (c) => {
     if (existing) return c.json(existing, 202);
   }
   const timestamp = new Date().toISOString();
-  const references = [sourceAsset, ...referenceAssets].filter((asset) => asset !== undefined);
+  const references = referenceAssets.filter((asset): asset is NonNullable<typeof asset> => asset !== undefined);
   const job: JobRecord = {
     id: crypto.randomUUID(),
     ownerUserId,
@@ -4342,8 +4354,7 @@ app.openapi(remixShotGenerationRoute, async (c) => {
         references.map((asset) => ({ id: asset.id, name: asset.originalName, mimeType: asset.mimeType })),
       )}`,
       referenceAssetIds: JSON.stringify(referenceIds),
-      generateAudio: String(body.generateAudio),
-      ...(sourceJob.values.portraitReference ? { portraitReference: sourceJob.values.portraitReference } : {}),
+      portraitReferences: JSON.stringify(portraitReferences),
       outputFolderId: accounts.getDefaultAssetFolderId(ownerUserId),
     },
     videoModel: body.modelId,

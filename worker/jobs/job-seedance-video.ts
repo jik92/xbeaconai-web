@@ -7,7 +7,7 @@ import { resolvePortraitReference } from "../../server/portraits/portrait-resolv
 import { arkSeedance } from "../../server/providers/ark-seedance";
 import { ossutils } from "../../server/storage/ossutils";
 import type { JobRecord } from "../../server/types";
-import { parsePortraitReference } from "../../shared/portraits/portrait-reference";
+import { parsePortraitReference, type PortraitReference } from "../../shared/portraits/portrait-reference";
 import type { JobHandlerContext } from "./types";
 import { assetIdsFromValues } from "./utils";
 import { materializeRemoteAsset } from "./video-remix-assets";
@@ -51,6 +51,18 @@ function referenceKind(mimeType: string): SeedanceReferenceKind | undefined {
   if (mimeType.startsWith("video/")) return "video";
   if (mimeType.startsWith("audio/")) return "audio";
   return undefined;
+}
+
+function remixPortraitReferences(values: Record<string, string>) {
+  try {
+    const parsed = JSON.parse(values.portraitReferences ?? "[]") as unknown[];
+    return parsed.flatMap((reference) => {
+      const parsedReference = parsePortraitReference(JSON.stringify(reference));
+      return parsedReference ? [parsedReference] : [];
+    });
+  } catch {
+    return [];
+  }
 }
 
 export function seedanceVideoSettings(values: Record<string, string>) {
@@ -147,8 +159,13 @@ export class SeedanceVideoJob {
         throw new SeedanceFlowError("REFERENCES_TOO_LARGE", "参考素材总量超过限制", false);
 
       const references: Array<{ kind: SeedanceReferenceKind; url: string }> = [];
-      const portraitReference = parsePortraitReference(job.values.portraitReference, job.values.portraitId);
-      if (portraitReference) {
+      const portraitReferences: PortraitReference[] =
+        job.moduleId === "video-remix"
+          ? remixPortraitReferences(job.values)
+          : [parsePortraitReference(job.values.portraitReference, job.values.portraitId)].filter(
+              (reference): reference is PortraitReference => Boolean(reference),
+            );
+      for (const portraitReference of portraitReferences) {
         if (!this.context.customPortraits)
           throw new SeedanceFlowError("PORTRAIT_STORE_UNAVAILABLE", "人像服务不可用", false);
         const portrait = resolvePortraitReference({
@@ -236,8 +253,9 @@ export class SeedanceVideoJob {
           resolution: settings.resolution,
           ratio: settings.ratio,
           duration: settings.duration,
-          generateAudio: job.values.generateAudio !== "false",
-          watermark: false,
+          ...(job.moduleId === "video-remix"
+            ? {}
+            : { generateAudio: job.values.generateAudio !== "false", watermark: false }),
           references,
         });
         taskId = created.id;

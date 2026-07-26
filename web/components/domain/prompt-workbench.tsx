@@ -26,6 +26,7 @@ export function PromptWorkbench({
   children,
   submitting = false,
   submitLabel,
+  showSubmit = true,
   onChooseAssets,
   onRemoveReference,
   onPromptChange,
@@ -47,6 +48,7 @@ export function PromptWorkbench({
   children?: ReactNode;
   submitting?: boolean;
   submitLabel?: string;
+  showSubmit?: boolean;
   onChooseAssets: (assets: AttachmentSelection[]) => void;
   onRemoveReference: (id: string) => void;
   onPromptChange: (value: string) => void;
@@ -56,13 +58,13 @@ export function PromptWorkbench({
   return (
     <section
       className={cn(
-        "absolute left-1/2 top-31 z-20 h-51 w-[min(900px,calc(100%-32px))] -translate-x-1/2 rounded-xl border border-line bg-white p-4 shadow-sm transition-[height,top]",
-        expanded && "h-107.5",
+        "ag-composer absolute left-1/2 top-31 z-20 h-51 w-[min(900px,calc(100%-32px))] -translate-x-1/2 rounded-xl border border-line bg-white p-4 shadow-sm transition-[height,top]",
+        expanded && "expanded h-107.5",
         docked && "bottom-11 top-auto",
-        embedded && "relative inset-auto w-full translate-x-0 shadow-none",
+        embedded && "embedded relative inset-auto w-full translate-x-0 shadow-none",
       )}
     >
-      <div className="flex h-18 items-start gap-2 overflow-x-auto">
+      <div className="ag-reference-row flex h-18 items-start gap-2 overflow-x-auto">
         <AttachmentPicker
           accept={accept}
           multiple={multiple}
@@ -133,29 +135,31 @@ export function PromptWorkbench({
       />
       <button
         type="button"
-        className="absolute right-2.5 top-3 grid size-6 place-items-center rounded-md border border-line bg-white text-muted"
+        className="ag-expand absolute right-2.5 top-3 grid size-6 place-items-center rounded-md border border-line bg-white text-muted"
         aria-label={expanded ? "收起输入框" : "展开输入框"}
         onClick={() => onExpandedChange(!expanded)}
       >
         {expanded ? <Shrink className="size-3.5" /> : <Expand className="size-3.5" />}
       </button>
-      <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
+      <div className="ag-parameters absolute bottom-4 left-4 right-4 flex items-center justify-between">
         <div className="flex gap-1 [&>button]:flex [&>button]:h-9 [&>button]:items-center [&>button]:gap-1 [&>button]:rounded-md [&>button]:border [&>button]:border-line [&>button]:bg-white [&>button]:px-3 [&>button]:text-xs [&>button]:text-ink [&_svg]:size-3.5">
           {controls}
         </div>
-        <button
-          type="button"
-          className={cn(
-            "flex h-8.5 items-center justify-center gap-1.5 rounded-full bg-primary px-2.5 text-xs text-white disabled:opacity-50",
-            !submitLabel && "w-8.5 px-0",
-          )}
-          aria-label="提交"
-          disabled={submitting}
-          onClick={onSubmit}
-        >
-          <ArrowUp className="size-4" />
-          {submitLabel && <span>{submitLabel}</span>}
-        </button>
+        {showSubmit && (
+          <button
+            type="button"
+            className={cn(
+              "ag-send flex h-8.5 items-center justify-center gap-1.5 rounded-full bg-primary px-2.5 text-xs text-white disabled:opacity-50",
+              !submitLabel && "w-8.5 px-0",
+            )}
+            aria-label="提交"
+            disabled={submitting}
+            onClick={onSubmit}
+          >
+            <ArrowUp className="size-4" />
+            {submitLabel && <span>{submitLabel}</span>}
+          </button>
+        )}
       </div>
       {children}
     </section>
