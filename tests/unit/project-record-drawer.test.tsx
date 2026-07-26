@@ -35,7 +35,7 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-async function renderDrawer() {
+async function renderDrawer(renamable = true) {
   const fetchPage = mock(async (_input: { query?: string; status?: string; page: number; pageSize: number }) => ({
     items: [
       {
@@ -70,7 +70,7 @@ async function renderDrawer() {
           statusOptions={[{ value: "draft", label: "草稿" }]}
           fetchPage={fetchPage}
           onClose={() => undefined}
-          onRename={onRename}
+          onRename={renamable ? onRename : undefined}
           onContinue={onContinue}
         />
       </QueryClientProvider>,
@@ -130,5 +130,19 @@ describe("ProjectRecordDrawer", () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
     });
     expect(onRename).toHaveBeenCalledWith(expect.objectContaining({ id: "project-1" }), "紧凑生成记录");
+  });
+
+  test("hides rename controls when the project contract is read-only", async () => {
+    const { onContinue } = await renderDrawer(false);
+
+    expect(document.querySelector('button[aria-label="重命名 示例项目"]')).toBeNull();
+    const continueButton = Array.from(document.querySelectorAll("button")).find(
+      (button) => button.textContent === "继续创作",
+    );
+    await act(async () => {
+      continueButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(onContinue).toHaveBeenCalledWith(expect.objectContaining({ id: "project-1" }));
   });
 });

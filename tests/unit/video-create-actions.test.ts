@@ -10,8 +10,10 @@ describe("video create action boundaries", () => {
       "utf8",
     );
     for (const label of ["一键生成", "保存草稿", "生成记录", "新建"]) expect(source).toContain(label);
-    expect(source.match(/<h1[^>]*>新建项目<\/h1>/g)).toHaveLength(1);
-    expect(source.match(/<History \/> 生成记录/g)).toHaveLength(1);
+    expect(source.match(/<VideoCreateWorkflowHeader/g)).toHaveLength(1);
+    expect(source).toContain('<ol className="flex min-w-0 items-center justify-center" aria-label="一键成片创作进度">');
+    expect(source).not.toContain("<h1");
+    expect(source).toContain('<History /> <span className="max-[1100px]:hidden">生成记录</span>');
     expect(source).toContain('className="grid min-h-0 flex-1 grid-cols-[360px_minmax(0,1fr)]');
     expect(source).toContain('runVideoCreateProjectAction(saved.project.id, "full")');
   });

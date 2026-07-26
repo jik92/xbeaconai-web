@@ -41,6 +41,7 @@ import {
   listAdminJobs,
   listAdminProviderAudits,
   listAdminUsers,
+  listAdScriptProjects,
   listCustomPortraits,
   listJobs,
   listVideoCreateProjects,
@@ -589,6 +590,12 @@ export async function fetchAdScriptProject(projectId: string): Promise<AdScriptP
   const { data } = await getAdScriptProject({ path: { projectId }, headers: authHeaders(), throwOnError: true });
   if (!data) throw new Error("口播脚本项目加载失败");
   return data;
+}
+export async function fetchAdScriptProjects(): Promise<AdScriptProject[]> {
+  configure();
+  const { data } = await listAdScriptProjects({ headers: authHeaders(), throwOnError: true });
+  if (!data) throw new Error("口播脚本生成记录加载失败");
+  return data.projects;
 }
 export async function saveAdScriptHumanVersion(input: {
   projectId: string;

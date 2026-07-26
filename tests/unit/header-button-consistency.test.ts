@@ -12,10 +12,8 @@ describe("compact header button consistency", () => {
     const remix = source("web/features/video-remix/remix-project.tsx");
     const remixStyles = source("web/features/video-remix/remix-project.css");
 
-    expect(create).toContain(
-      '<Button className="shrink-0" variant="outline" size="sm" onClick={() => setHistoryOpen(true)}>',
-    );
-    expect(create).toContain('variant="ghost" size="sm" disabled={Boolean(busy) || polling} onClick={reset}');
+    expect(create).toContain('variant="outline"\n              size="sm"\n              aria-label="生成记录"');
+    expect(create).toContain('variant="ghost"\n              size="sm"\n              aria-label="新建一键成片项目"');
     expect(remix).toContain(
       '<Button className="remix-header-action shrink-0" variant="outline" size="sm" onClick={onHistory}>',
     );

@@ -9,8 +9,9 @@ import { QwenVoiceCloneModal } from "../../web/features/voice-clone/qwen-voice-c
 const aiTools = modules.filter((module) => module.group === "AI 工具箱");
 
 describe("AI tool save locations", () => {
-  test("keeps the authoritative AI toolbox module set complete", () => {
-    expect(aiTools.map((module) => module.id)).toEqual([...aiToolModuleIds]);
+  test("keeps every AI task module reachable while grouping video mashup as a utility", () => {
+    expect(aiToolModuleIds.map((id) => modules.find((module) => module.id === id)?.id)).toEqual([...aiToolModuleIds]);
+    expect(modules.find((module) => module.id === "video-mashup")?.group).toBe("实用工具");
   });
 
   test("renders one save-location setting for every common AI tool task form", () => {

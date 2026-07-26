@@ -5,10 +5,13 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  ChevronRight,
   Clipboard,
   Copy,
   Download,
   FileSearch,
+  FileText,
+  History,
   LoaderCircle,
   MapPin,
   Minus,
@@ -24,6 +27,7 @@ import {
   createAdScript,
   downloadAdScriptVersion,
   fetchAdScriptProject,
+  fetchAdScriptProjects,
   fetchJob,
   parseExistingAdScript,
   requestCancel,
@@ -32,6 +36,7 @@ import {
   watchJob,
 } from "@/api/api-client";
 import type { AdScriptInput, AdScriptProject, AdScriptVariant, Job } from "@/api/generated/types.gen";
+import { ProjectRecordDrawer, type ProjectRecordStatusTone } from "@/components/domain/project-record-drawer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -77,6 +82,81 @@ const goals = ["品牌曝光", "App 下载", "电商转化", "门店到店", "�
 const lengths: AdScriptInput["targetLength"][] = ["60-80", "80-120", "100-150", "150-200", "200-250", "250-350"];
 const draftKey = "fenghuo:ad-script:draft:v2";
 const legacyActiveProjectKey = "fenghuo:ad-script:active-project:v1";
+const adScriptWorkflowStages = ["选择场景", "广告诉求", "脚本风格", "生成调优", "脚本结果"];
+
+const adScriptStatusLabels: Record<AdScriptProject["project"]["status"], string> = {
+  draft: "草稿",
+  queued: "等待生成",
+  processing: "生成中",
+  succeeded: "已完成",
+  partially_succeeded: "部分完成",
+  failed: "失败",
+  cancelled: "已取消",
+};
+
+function adScriptStatusTone(status: AdScriptProject["project"]["status"]): ProjectRecordStatusTone {
+  if (status === "failed" || status === "cancelled") return "error";
+  if (status === "succeeded" || status === "partially_succeeded") return "success";
+  if (status === "queued" || status === "processing") return "progress";
+  return "neutral";
+}
+
+function AdScriptWorkflowHeader({
+  stage,
+  onHistory,
+  onNew,
+}: {
+  stage: number;
+  onHistory: () => void;
+  onNew: () => void;
+}) {
+  return (
+    <header className="grid h-14 shrink-0 grid-cols-[132px_minmax(0,1fr)_188px] items-center border-b border-line bg-surface px-3 shadow-sm max-[760px]:grid-cols-[36px_minmax(0,1fr)_80px]">
+      <div className="flex items-center gap-2 whitespace-nowrap type-section-title text-ink">
+        <FileText className="size-5" />
+        <span className="max-[760px]:hidden">口播脚本</span>
+      </div>
+      <ol className="flex min-w-0 items-center justify-center" aria-label="口播脚本创作进度">
+        {adScriptWorkflowStages.map((label, index) => (
+          <li
+            className={cn(
+              "flex min-w-0 items-center gap-1.5 whitespace-nowrap text-muted",
+              index === stage ? "type-body-strong text-ink" : "type-helper",
+              index < stage && "text-success",
+            )}
+            key={label}
+            aria-label={label}
+            aria-current={index === stage ? "step" : undefined}
+          >
+            <i
+              className={cn(
+                "grid size-6 shrink-0 place-items-center rounded-full bg-canvas-soft not-italic type-badge",
+                index === stage && "bg-primary text-on-primary",
+                index < stage && "bg-surface-strong text-success",
+              )}
+            >
+              {index < stage ? <Check className="size-3" /> : index + 1}
+            </i>
+            <span className="max-[1100px]:hidden">{label}</span>
+            {index < adScriptWorkflowStages.length - 1 && (
+              <ChevronRight className="mx-1 size-3 shrink-0 text-muted-soft" />
+            )}
+          </li>
+        ))}
+      </ol>
+      <div className="flex justify-end gap-2">
+        <Button variant="outline" size="sm" aria-label="生成记录" onClick={onHistory}>
+          <History />
+          <span className="max-[760px]:hidden">生成记录</span>
+        </Button>
+        <Button variant="ghost" size="sm" aria-label="新建口播脚本" onClick={onNew}>
+          <Plus />
+          <span className="max-[760px]:hidden">新建</span>
+        </Button>
+      </div>
+    </header>
+  );
+}
 
 const defaultInput: AdScriptInput = {
   sceneCategory: "marketing",
@@ -152,6 +232,7 @@ export function AdScriptPage() {
   const [selectedVersionId, setSelectedVersionId] = useState("");
   const [editor, setEditor] = useState("");
   const [sourceOpen, setSourceOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [extracted, setExtracted] = useState<Partial<AdScriptInput>>();
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
@@ -363,123 +444,150 @@ export function AdScriptPage() {
     }
   };
 
-  if (screen === "progress")
-    return (
-      <ProgressScreen
-        project={project}
-        error={error || (projectQuery.error ? messageOf(projectQuery.error) : "")}
-        onBack={() => setScreen("form")}
-        onCancel={() => void cancelGeneration()}
-        cancelling={busy === "cancel"}
-      />
-    );
-  if (screen === "result" && project && selectedVariant && selectedVersion)
-    return (
-      <ResultScreen
-        project={project}
-        selectedVariant={selectedVariant}
-        selectedVersionId={selectedVersion.id}
-        editor={editor}
-        busy={busy}
-        actionJob={actionJob}
-        error={error}
-        notice={notice}
-        onEditor={setEditor}
-        onVariant={(id) => {
-          setSelectedVariantId(id);
-          setSelectedVersionId("");
-        }}
-        onVersion={setSelectedVersionId}
-        onSave={() => void saveEditor()}
-        onAction={(action) => void runAction(action)}
-        onExport={(format) =>
-          void downloadAdScriptVersion({
-            projectId: project.project.id,
-            variantId: selectedVariant.id,
-            versionId: selectedVersion.id,
-            format,
-          }).catch((cause) => setError(messageOf(cause)))
-        }
-        onReset={() => {
-          setInput(project.project.input);
-          setProjectId("");
-          setScreen("form");
-          setStep(0);
-        }}
-        onRegenerate={() => void regenerate()}
-      />
-    );
+  const startNewProject = () => {
+    setInput(defaultInput);
+    setProjectId("");
+    setSelectedVariantId("");
+    setSelectedVersionId("");
+    setEditor("");
+    setExtracted(undefined);
+    setActionJob(undefined);
+    setBusy("");
+    setError("");
+    setNotice("");
+    setScreen("form");
+    setStep(0);
+    setHistoryOpen(false);
+  };
+  const workflowStage = screen === "form" ? step : screen === "progress" ? 3 : 4;
 
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden bg-surface type-body text-ink">
-      <div className="flex-1 overflow-y-auto p-3 sm:p-6">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
-          <nav
-            className="ad-script-steps grid grid-cols-3 overflow-hidden rounded-xl border border-line"
-            aria-label="脚本配置步骤"
-          >
-            {["选择场景", "广告诉求", "脚本风格"].map((label, index) => (
-              <Button
-                key={label}
-                variant="ghost"
-                className={cn(
-                  "h-11 rounded-none border-line px-2 type-helper sm:type-body [&:not(:last-child)]:border-r",
-                  step === index && "bg-surface-muted text-ink",
-                  step > index && "text-primary",
+      <AdScriptWorkflowHeader stage={workflowStage} onHistory={() => setHistoryOpen(true)} onNew={startNewProject} />
+      {screen === "progress" ? (
+        <ProgressScreen
+          project={project}
+          error={error || (projectQuery.error ? messageOf(projectQuery.error) : "")}
+          onBack={() => setScreen("form")}
+          onCancel={() => void cancelGeneration()}
+          cancelling={busy === "cancel"}
+        />
+      ) : screen === "result" && project && selectedVariant && selectedVersion ? (
+        <ResultScreen
+          project={project}
+          selectedVariant={selectedVariant}
+          selectedVersionId={selectedVersion.id}
+          editor={editor}
+          busy={busy}
+          actionJob={actionJob}
+          error={error}
+          notice={notice}
+          onEditor={setEditor}
+          onVariant={(id) => {
+            setSelectedVariantId(id);
+            setSelectedVersionId("");
+          }}
+          onVersion={setSelectedVersionId}
+          onSave={() => void saveEditor()}
+          onAction={(action) => void runAction(action)}
+          onExport={(format) =>
+            void downloadAdScriptVersion({
+              projectId: project.project.id,
+              variantId: selectedVariant.id,
+              versionId: selectedVersion.id,
+              format,
+            }).catch((cause) => setError(messageOf(cause)))
+          }
+          onRegenerate={() => void regenerate()}
+        />
+      ) : (
+        <div className="flex-1 overflow-y-auto p-3 sm:p-6">
+          <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
+            <Card className="ad-script-card gap-0 py-0 shadow-none">
+              <CardContent className="p-4 sm:p-6">
+                {step === 0 && <SceneStep input={input} update={update} />}
+                {step === 1 && (
+                  <ProductStep
+                    input={input}
+                    update={update}
+                    sourceOpen={sourceOpen}
+                    setSourceOpen={setSourceOpen}
+                    busy={busy}
+                    extracted={extracted}
+                    onParse={() => void parseSource()}
+                    onApply={applyExtracted}
+                    onDismiss={() => setExtracted(undefined)}
+                  />
                 )}
-                onClick={() => index < step && setStep(index)}
-              >
-                <span
-                  className={cn(
-                    "grid size-5 place-items-center rounded-full border border-line type-helper",
-                    (step === index || step > index) && "border-primary bg-primary text-on-primary",
-                  )}
+                {step === 2 && <StyleStep input={input} update={update} />}
+                {(error || notice) && <Feedback message={error || notice} error={Boolean(error)} />}
+              </CardContent>
+              <footer className="flex gap-2 border-t border-line p-3 sm:px-6">
+                {step > 0 && (
+                  <Button variant="outline" className="rounded-full" onClick={() => setStep((value) => value - 1)}>
+                    <ArrowLeft /> 上一步
+                  </Button>
+                )}
+                <Button
+                  className="ml-auto min-w-36 rounded-full"
+                  data-role="ad-script-next"
+                  disabled={!validStep || Boolean(busy)}
+                  onClick={() => (step < 2 ? setStep((value) => value + 1) : void generate())}
                 >
-                  {step > index ? <Check className="size-3" /> : index + 1}
-                </span>
-                {label}
-              </Button>
-            ))}
-          </nav>
-          <Card className="ad-script-card gap-0 py-0 shadow-none">
-            <CardContent className="p-4 sm:p-6">
-              {step === 0 && <SceneStep input={input} update={update} />}
-              {step === 1 && (
-                <ProductStep
-                  input={input}
-                  update={update}
-                  sourceOpen={sourceOpen}
-                  setSourceOpen={setSourceOpen}
-                  busy={busy}
-                  extracted={extracted}
-                  onParse={() => void parseSource()}
-                  onApply={applyExtracted}
-                  onDismiss={() => setExtracted(undefined)}
-                />
-              )}
-              {step === 2 && <StyleStep input={input} update={update} />}
-              {(error || notice) && <Feedback message={error || notice} error={Boolean(error)} />}
-            </CardContent>
-            <footer className="flex gap-2 border-t border-line p-3 sm:px-6">
-              {step > 0 && (
-                <Button variant="outline" className="rounded-full" onClick={() => setStep((value) => value - 1)}>
-                  <ArrowLeft /> 上一步
+                  {busy === "generate" ? <LoaderCircle className="animate-spin" /> : step === 2 ? <Sparkles /> : null}
+                  {step === 2 ? `生成脚本 · ${input.batchCount * 20} 创作点` : "下一步"}
+                  <ArrowRight />
                 </Button>
-              )}
-              <Button
-                className="ml-auto min-w-36 rounded-full"
-                data-role="ad-script-next"
-                disabled={!validStep || Boolean(busy)}
-                onClick={() => (step < 2 ? setStep((value) => value + 1) : void generate())}
-              >
-                {busy === "generate" ? <LoaderCircle className="animate-spin" /> : step === 2 ? <Sparkles /> : null}
-                {step === 2 ? `生成脚本 · ${input.batchCount * 20} 创作点` : "下一步"}
-                <ArrowRight />
-              </Button>
-            </footer>
-          </Card>
+              </footer>
+            </Card>
+          </div>
         </div>
-      </div>
+      )}
+      <ProjectRecordDrawer
+        open={historyOpen}
+        queryKey="ad-script-project-records"
+        currentProjectId={projectId}
+        statusOptions={Object.entries(adScriptStatusLabels).map(([value, label]) => ({ value, label }))}
+        onClose={() => setHistoryOpen(false)}
+        fetchPage={async ({ query, status, page, pageSize }) => {
+          const projects = (await fetchAdScriptProjects())
+            .filter((item) => !status || item.project.status === status)
+            .filter((item) => {
+              const keyword = query?.trim().toLowerCase();
+              return !keyword || item.project.input.productName.toLowerCase().includes(keyword);
+            })
+            .sort((left, right) => right.project.updatedAt.localeCompare(left.project.updatedAt));
+          const offset = (page - 1) * pageSize;
+          return {
+            items: projects.slice(offset, offset + pageSize).map((item) => {
+              const scene = scenes[item.project.input.sceneCategory].find(([id]) => id === item.project.input.sceneId);
+              return {
+                id: item.project.id,
+                title: item.project.input.productName || "未命名产品",
+                status: item.project.status,
+                statusLabel: adScriptStatusLabels[item.project.status],
+                statusTone: adScriptStatusTone(item.project.status),
+                summary: `${scene?.[1] ?? "未选择场景"} · ${item.project.input.batchCount} 条脚本`,
+                updatedAt: item.project.updatedAt,
+              };
+            }),
+            total: projects.length,
+            page,
+            pageSize,
+          };
+        }}
+        onContinue={async (item) => {
+          const selected = await fetchAdScriptProject(item.id);
+          setInput(selected.project.input);
+          setProjectId(selected.project.id);
+          setSelectedVariantId("");
+          setSelectedVersionId("");
+          setScreen("progress");
+          setHistoryOpen(false);
+          setError("");
+          setNotice("");
+        }}
+      />
     </section>
   );
 }
@@ -870,7 +978,7 @@ function ProgressScreen({
     return () => window.clearInterval(timer);
   }, [project]);
   const elapsedSeconds = project ? Math.max(0, Math.floor((now - Date.parse(project.project.createdAt)) / 1_000)) : 0;
-  const progress = project
+  const progress = project?.variants.length
     ? Math.round(
         project.variants.reduce(
           (sum, variant) =>
@@ -879,21 +987,33 @@ function ProgressScreen({
           0,
         ) / project.variants.length,
       )
-    : 4;
+    : project
+      ? 0
+      : 4;
+  const projectStatus = project?.project.status;
+  const progressTitle =
+    projectStatus === "failed" ? "生成失败" : projectStatus === "cancelled" ? "任务已取消" : "AI 智能调优中";
   return (
-    <section className="flex h-full min-h-0 flex-col overflow-hidden bg-surface type-body text-ink">
-      <header className="flex h-14 shrink-0 items-center border-b border-line px-3 sm:px-6">
-        <h1 className="type-page-title">口播脚本</h1>
-      </header>
-      <div className="flex-1 overflow-y-auto p-3 sm:p-6">
+    <div className="contents">
+      <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-6">
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-4">
           <div className="flex items-center gap-3 py-2">
             <span className="grid size-10 place-items-center rounded-full bg-surface-muted">
-              <LoaderCircle className="animate-spin text-muted" />
+              {projectStatus === "failed" ? (
+                <FileSearch className="text-error" />
+              ) : projectStatus === "cancelled" ? (
+                <Minus className="text-muted" />
+              ) : (
+                <LoaderCircle className="animate-spin text-muted" />
+              )}
             </span>
             <div>
-              <h2 className="type-section-title">AI 智能调优中</h2>
-              <p className="type-helper text-muted">已耗时 {elapsedSeconds} 秒 · 目标 1 分钟内完成</p>
+              <h2 className="type-section-title">{progressTitle}</h2>
+              <p className="type-helper text-muted">
+                {projectStatus === "failed" || projectStatus === "cancelled"
+                  ? `任务已结束 · 共耗时 ${elapsedSeconds} 秒`
+                  : `已耗时 ${elapsedSeconds} 秒 · 目标 1 分钟内完成`}
+              </p>
             </div>
           </div>
           <Card className="gap-0 py-0 shadow-none">
@@ -916,6 +1036,7 @@ function ProgressScreen({
                         "status-dot grid size-8 place-items-center rounded-full bg-surface-muted type-helper",
                         variant.status === "succeeded" && "bg-success text-on-primary",
                         variant.status === "failed" && "bg-error/5 text-error",
+                        variant.status === "cancelled" && "text-muted",
                       )}
                     >
                       {variant.status === "succeeded" ? <Check className="size-4" /> : variant.ordinal}
@@ -925,13 +1046,21 @@ function ProgressScreen({
                       <p className="truncate type-helper text-muted">
                         {variant.status === "failed"
                           ? variant.error?.message
-                          : variant.status === "succeeded"
-                            ? `最终得分 ${variant.finalScore} · ${variant.iterationCount} 轮`
-                            : `正在执行第 ${Math.max(1, variant.iterationCount + 1)} 轮`}
+                          : variant.status === "cancelled"
+                            ? "任务已取消"
+                            : variant.status === "succeeded"
+                              ? `最终得分 ${variant.finalScore} · ${variant.iterationCount} 轮`
+                              : `正在执行第 ${Math.max(1, variant.iterationCount + 1)} 轮`}
                       </p>
                     </div>
                     <span className="type-helper text-muted">
-                      {variant.status === "succeeded" ? "完成" : variant.status === "failed" ? "失败" : "处理中"}
+                      {variant.status === "succeeded"
+                        ? "完成"
+                        : variant.status === "failed"
+                          ? "失败"
+                          : variant.status === "cancelled"
+                            ? "已取消"
+                            : "处理中"}
                     </span>
                   </article>
                 )) ?? (
@@ -959,7 +1088,7 @@ function ProgressScreen({
           </div>
         </div>
       </div>
-    </section>
+    </div>
   );
 }
 
@@ -978,7 +1107,6 @@ function ResultScreen({
   onSave,
   onAction,
   onExport,
-  onReset,
   onRegenerate,
 }: {
   project: AdScriptProject;
@@ -995,7 +1123,6 @@ function ResultScreen({
   onSave: () => void;
   onAction: (action: "rescore" | "continue") => void;
   onExport: (format: "txt" | "md") => void;
-  onReset: () => void;
   onRegenerate: () => void;
 }) {
   const version =
@@ -1008,14 +1135,8 @@ function ResultScreen({
     ["行动召唤强度", version.score.scores.callToAction],
   ] as const;
   return (
-    <section className="flex h-full min-h-0 flex-col overflow-hidden bg-surface type-body text-ink">
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-line px-3 sm:px-6">
-        <h1 className="type-page-title">口播脚本</h1>
-        <Button variant="ghost" size="sm" onClick={onReset}>
-          <RefreshCcw /> 重新设置
-        </Button>
-      </header>
-      <div className="flex-1 overflow-y-auto p-3 sm:p-6">
+    <div className="contents">
+      <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-6">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
           <Card className="result-summary gap-0 py-0 shadow-none">
             <CardContent className="grid gap-4 p-4 sm:grid-cols-[minmax(0,1.5fr)_repeat(4,minmax(72px,0.6fr))] sm:items-center">
@@ -1203,6 +1324,6 @@ function ResultScreen({
           </footer>
         </div>
       </div>
-    </section>
+    </div>
   );
 }

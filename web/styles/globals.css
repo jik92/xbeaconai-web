@@ -567,7 +567,7 @@ select:focus-visible {
 }
 .sidebar {
   grid-row: 2;
-  padding: 12px 10px 14px;
+  padding: 4px 0 14px 10px;
   border-right: 1px solid var(--border);
   background: var(--surface);
   position: sticky;
@@ -657,8 +657,12 @@ select:focus-visible {
   justify-content: flex-start;
   scrollbar-width: thin;
 }
+.sidebar-navigation > nav {
+  padding-right: 10px;
+}
 .sidebar-footer {
   flex: none;
+  margin-right: 10px;
   padding-top: 10px;
   border-top: 1px solid var(--border);
   background: var(--surface);
@@ -672,12 +676,23 @@ select:focus-visible {
   min-width: 0;
   flex: 1;
 }
-.sidebar nav h3 {
+.sidebar-group-trigger {
+  width: 100%;
+  height: 32px;
+  justify-content: space-between;
+  padding: 0 10px;
   @apply type-label;
   @apply text-primary;
-  padding: 14px 10px 6px;
-  margin: 0;
   @apply tracking-widest;
+}
+.sidebar-group-trigger svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  @apply text-muted;
+}
+.sidebar-group-collapsed > :not(.sidebar-group-trigger) {
+  display: none;
 }
 .sidebar nav a {
   height: 36px;
@@ -707,7 +722,7 @@ select:focus-visible {
   @apply text-primary;
 }
 .sidebar nav a.active {
-  @apply type-body-strong;
+  @apply type-helper;
   background: var(--canvas-soft);
   @apply text-primary;
 }
@@ -814,7 +829,13 @@ select:focus-visible {
   @apply text-muted;
 }
 .sidebar-collapsed .sidebar {
-  padding-inline: 6px;
+  padding: 4px 0 14px 6px;
+}
+.sidebar-collapsed .sidebar-navigation > nav {
+  padding-right: 6px;
+}
+.sidebar-collapsed .sidebar-footer {
+  margin-right: 6px;
 }
 .sidebar-collapsed .sidebar-footer-actions {
   flex-direction: column;
@@ -824,7 +845,7 @@ select:focus-visible {
   flex: none;
 }
 .sidebar-collapsed .sidebar-footer span,
-.sidebar-collapsed .sidebar nav h3,
+.sidebar-collapsed .sidebar-group-trigger,
 .sidebar-collapsed .sidebar nav a span,
 .sidebar-collapsed .sidebar nav a i,
 .sidebar-collapsed .sidebar-coming-soon span,

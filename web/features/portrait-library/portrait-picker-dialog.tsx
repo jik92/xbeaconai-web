@@ -10,29 +10,35 @@ export function PortraitPickerDialog({
   open,
   portraits,
   loading,
-  selectedKey,
+  error,
+  selectedKeys,
+  maxSelect = 1,
   onClose,
-  onSelect,
+  onConfirm,
 }: {
   open: boolean;
   portraits: Portrait[];
   loading: boolean;
-  selectedKey?: string;
+  error?: unknown;
+  selectedKeys: string[];
+  maxSelect?: number;
   onClose: () => void;
-  onSelect: (portrait: Portrait) => void;
+  onConfirm: (portraits: Portrait[]) => void;
 }) {
   const [query, setQuery] = useState("");
   const [gender, setGender] = useState("全部");
   const [source, setSource] = useState<"general" | "custom">("general");
-  const [pendingKey, setPendingKey] = useState<string | undefined>(selectedKey);
+  const [pendingKeys, setPendingKeys] = useState<string[]>(() => selectedKeys.slice(0, maxSelect));
   const [limit, setLimit] = useState(60);
+  const selectedKeysSignature = selectedKeys.slice(0, maxSelect).join("\u0000");
   useEffect(() => {
     if (!open) return;
-    setPendingKey(selectedKey);
-    const selected = portraits.find((portrait) => portrait.key === selectedKey);
+    const nextKeys = selectedKeysSignature ? selectedKeysSignature.split("\u0000") : [];
+    setPendingKeys(nextKeys);
+    const selected = portraits.find((portrait) => portrait.key === nextKeys[0]);
     setSource(selected?.type ?? "general");
     setLimit(60);
-  }, [open, portraits, selectedKey]);
+  }, [open, portraits, selectedKeysSignature]);
   const filtered = useMemo(() => {
     const keyword = query.trim().toLowerCase();
     return portraits.filter(
@@ -43,10 +49,25 @@ export function PortraitPickerDialog({
         (!keyword || `${portrait.name} ${portrait.description} ${portrait.profession}`.toLowerCase().includes(keyword)),
     );
   }, [gender, portraits, query, source]);
-  const pending = portraits.find((portrait) => portrait.key === pendingKey);
+  const pending = pendingKeys.flatMap((key) => {
+    const portrait = portraits.find((item) => item.key === key);
+    return portrait ? [portrait] : [];
+  });
+  const togglePortrait = (portrait: Portrait) => {
+    setPendingKeys((current) => {
+      if (current.includes(portrait.key)) return current.filter((key) => key !== portrait.key);
+      if (maxSelect === 1) return [portrait.key];
+      if (current.length >= maxSelect) return current;
+      return [...current, portrait.key];
+    });
+  };
 
   return (
-    <ToolCreatorModal open={open} title="选择人像" onClose={onClose}>
+    <ToolCreatorModal
+      open={open}
+      title={maxSelect > 1 ? `选择人像（最多 ${maxSelect} 个）` : "选择人像"}
+      onClose={onClose}
+    >
       <div className="flex items-center gap-2 border-b border-line p-3">
         {(["general", "custom"] as const).map((value) => (
           <Button
@@ -93,24 +114,34 @@ export function PortraitPickerDialog({
           </Button>
         ))}
       </div>
+      {maxSelect > 1 && pendingKeys.length >= maxSelect && (
+        <div className="bg-surface-strong px-3 py-2 type-helper text-muted">
+          已选择 {maxSelect} 个人像，如需更换请先取消已有选择。
+        </div>
+      )}
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {loading ? (
           <div className="flex min-h-48 items-center justify-center type-body text-muted">
             <LoaderCircle className="mr-2 animate-spin" /> 正在加载人像库
           </div>
+        ) : error ? (
+          <div className="flex min-h-48 items-center justify-center type-body text-error">
+            {error instanceof Error ? error.message : "人像清单加载失败"}
+          </div>
         ) : (
           <div className="grid grid-cols-3 gap-2 max-[520px]:grid-cols-2">
             {filtered.slice(0, limit).map((portrait) => {
-              const selected = portrait.key === pendingKey;
+              const selected = pendingKeys.includes(portrait.key);
               return (
                 <Button
                   type="button"
-                  className={`relative overflow-hidden rounded-lg border bg-surface text-left transition-colors ${
+                  variant="ghost"
+                  className={`relative h-auto w-full flex-col items-stretch justify-start gap-0 overflow-hidden whitespace-normal rounded-lg border bg-surface p-0 text-left transition-colors hover:bg-surface ${
                     selected ? "border-primary ring-2 ring-primary/15" : "border-line hover:border-line-strong"
                   }`}
                   key={portrait.key}
                   aria-pressed={selected}
-                  onClick={() => setPendingKey(portrait.key)}
+                  onClick={() => togglePortrait(portrait)}
                 >
                   {portrait.type === "custom" ? (
                     <MediaPreview
@@ -144,7 +175,9 @@ export function PortraitPickerDialog({
             })}
           </div>
         )}
-        {!loading && !filtered.length && <p className="py-12 text-center type-body text-muted">没有匹配的人像</p>}
+        {!loading && !error && !filtered.length && (
+          <p className="py-12 text-center type-body text-muted">没有匹配的人像</p>
+        )}
         {limit < filtered.length && (
           <Button className="mt-3 w-full" size="sm" variant="outline" onClick={() => setLimit((value) => value + 60)}>
             加载更多（{Math.min(limit, filtered.length)}/{filtered.length}）
@@ -152,21 +185,35 @@ export function PortraitPickerDialog({
         )}
       </div>
       <footer className="flex h-16 shrink-0 items-center gap-3 border-t border-line px-3">
-        {pending ? (
+        {pending.length ? (
           <>
-            {pending.type === "custom" ? (
-              <MediaPreview
-                className="h-11 w-9 rounded-md object-cover"
-                url={pending.display_url}
-                mimeType="image/jpeg"
-                alt=""
-                authenticated
-                previewable={false}
-              />
-            ) : (
-              <ImagePreview className="h-11 w-9 rounded-md object-cover" src={pending.display_url} alt="" />
-            )}
-            <span className="min-w-0 flex-1 truncate type-body text-ink">{pending.name}</span>
+            <div className="flex shrink-0 -space-x-1">
+              {pending.map((portrait) =>
+                portrait.type === "custom" ? (
+                  <MediaPreview
+                    className="h-11 w-9 rounded-md border border-surface object-cover"
+                    key={portrait.key}
+                    url={portrait.display_url}
+                    mimeType="image/jpeg"
+                    alt=""
+                    authenticated
+                    previewable={false}
+                  />
+                ) : (
+                  <ImagePreview
+                    className="h-11 w-9 rounded-md border border-surface object-cover"
+                    key={portrait.key}
+                    src={portrait.display_url}
+                    alt=""
+                  />
+                ),
+              )}
+            </div>
+            <span className="min-w-0 flex-1 truncate type-body text-ink">
+              {maxSelect > 1
+                ? `已选择 ${pending.length}/${maxSelect}：${pending.map((item) => item.name).join("、")}`
+                : pending[0]?.name}
+            </span>
           </>
         ) : (
           <span className="flex-1 type-body text-muted">请选择一份人像</span>
@@ -176,9 +223,9 @@ export function PortraitPickerDialog({
         </Button>
         <Button
           size="sm"
-          disabled={!pending}
+          disabled={!pending.length}
           onClick={() => {
-            if (pending) onSelect(pending);
+            if (pending.length) onConfirm(pending);
           }}
         >
           确认选择

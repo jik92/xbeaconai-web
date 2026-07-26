@@ -322,7 +322,7 @@ export const modules: ModuleConfig[] = [
     id: "video-mashup",
     path: "/tools/video-mashup",
     label: "视频混剪",
-    group: "AI 工具箱",
+    group: "实用工具",
     icon: Shuffle,
     eyebrow: "批量组合高效出片",
     description: "按脚本段落与素材标签自动匹配，控制去重率并批量生成差异化混剪。",

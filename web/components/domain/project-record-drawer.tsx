@@ -36,7 +36,7 @@ interface ProjectRecordDrawerProps {
   fetchPage: (input: { query?: string; status?: string; page: number; pageSize: number }) => Promise<ProjectRecordPage>;
   onClose: () => void;
   onContinue: (item: ProjectRecordItem) => void | Promise<void>;
-  onRename: (item: ProjectRecordItem, title: string) => void | Promise<void>;
+  onRename?: (item: ProjectRecordItem, title: string) => void | Promise<void>;
   onRenamed?: (projectId: string, title: string) => void;
 }
 
@@ -120,6 +120,7 @@ export function ProjectRecordDrawer({
   }, [history.fetchNextPage, history.hasNextPage, history.isFetchingNextPage, open]);
 
   const renameItem = async (item: ProjectRecordItem) => {
+    if (!onRename) return;
     const title = editingTitle.trim();
     if (!title || title === item.title) {
       setEditingId("");
@@ -269,7 +270,7 @@ export function ProjectRecordDrawer({
                       >
                         {busy ? <LoaderCircle className="animate-spin" /> : <Check />}
                       </Button>
-                    ) : (
+                    ) : onRename ? (
                       <Button
                         variant="ghost"
                         size="icon-sm"
@@ -284,7 +285,7 @@ export function ProjectRecordDrawer({
                       >
                         <Pencil />
                       </Button>
-                    )}
+                    ) : null}
                   </div>
                   <p className="mt-1 truncate type-helper text-body">{item.summary}</p>
                   <div className="mt-2 flex items-center justify-between gap-3 border-t border-line-soft pt-2">

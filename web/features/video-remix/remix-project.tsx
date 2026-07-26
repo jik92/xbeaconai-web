@@ -48,6 +48,7 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import type { ApiJobResult, LibraryAsset, LibraryProduct } from "@/entities/types";
 import type { CreationModelCapability } from "@/features/ai-creation/ai-creation-composer";
 import { fetchPortraits, type Portrait, portraitDisplayUrl } from "@/features/portrait-library/portrait-data";
+import { PortraitPickerDialog } from "@/features/portrait-library/portrait-picker-dialog";
 import type { RemixPromptTool } from "../../../shared/video-remix/prompt-tools";
 import {
   moveRemixSource,
@@ -75,6 +76,21 @@ interface SelectedPortrait {
   description?: string;
   gender?: string;
   age?: number;
+}
+
+function toSelectedPortrait(portrait: Portrait): SelectedPortrait {
+  return {
+    key: portrait.key,
+    reference: portrait.reference,
+    name: portrait.name,
+    profession: portrait.profession,
+    source_url: portrait.source_url,
+    display_url: portrait.display_url,
+    ...(portrait.type === "general" ? { index: portrait.index } : {}),
+    description: portrait.description,
+    gender: portrait.gender,
+    age: portrait.age,
+  };
 }
 
 interface PromptVersion {
@@ -286,6 +302,7 @@ function ConfigSidebar({
             <Button
               type="button"
               className="portrait-card-remove"
+              variant="ghost"
               aria-label={`移除人像 ${portrait.name}`}
               onClick={() => onRemovePortrait(portrait.key)}
             >
@@ -348,6 +365,8 @@ function ConfigSidebar({
                     </b>
                     <Button
                       type="button"
+                      variant="ghost"
+                      size="icon-sm"
                       aria-label={`删除 ${source.name}`}
                       disabled={sourcesLocked}
                       onClick={() => onRemoveSource(source.id)}
@@ -360,6 +379,7 @@ function ConfigSidebar({
               <Button
                 type="button"
                 className="append-video-button"
+                variant="outline"
                 onClick={open}
                 disabled={sourcesLocked || sources.length >= remixMaxSources}
               >
@@ -375,7 +395,13 @@ function ConfigSidebar({
               </small>
             </div>
           ) : (
-            <Button type="button" className="config-attachment-picker" disabled={sourcesLocked} onClick={open}>
+            <Button
+              type="button"
+              className="config-attachment-picker"
+              variant="outline"
+              disabled={sourcesLocked}
+              onClick={open}
+            >
               <Upload />
               <span>
                 <b>选择分镜视频</b>
@@ -419,7 +445,7 @@ function AssetPickerModal({
         </header>
         <div className="remix-picker-grid">
           {data.map((asset) => (
-            <Button key={asset.id} onClick={() => onSelect(asset)}>
+            <Button key={asset.id} variant="ghost" onClick={() => onSelect(asset)}>
               <span className={kind}>
                 {kind === "product" ? (
                   <AuthenticatedMedia url={asset.url} mimeType={asset.mimeType} alt={asset.name} previewable={false} />
@@ -438,7 +464,10 @@ function AssetPickerModal({
           )}
         </div>
         <footer>
-          <Button onClick={() => window.location.assign(kind === "product" ? "/assets/products" : "/assets/voices")}>
+          <Button
+            variant="outline"
+            onClick={() => window.location.assign(kind === "product" ? "/assets/products" : "/assets/voices")}
+          >
             <Upload />
             管理并上传{kind === "product" ? "商品" : "音色"}
           </Button>
@@ -527,7 +556,7 @@ function ProductPickerModal({
             <X />
           </Button>
         </header>
-        <div className="portrait-picker-controls product-picker-controls">
+        <div className="product-picker-controls">
           <label>
             <Search />
             <input
@@ -540,10 +569,10 @@ function ProductPickerModal({
               placeholder="搜索商品名称或描述…"
             />
           </label>
-          <Button className="product-search-button" onClick={doSearch}>
+          <Button className="product-search-button" variant="default" onClick={doSearch}>
             查询
           </Button>
-          <Button className="product-reset-button" onClick={doReset}>
+          <Button className="product-reset-button" variant="outline" onClick={doReset}>
             重置
           </Button>
         </div>
@@ -554,6 +583,7 @@ function ProductPickerModal({
               <Button
                 key={product.id}
                 className={isSelected ? "selected" : ""}
+                variant="ghost"
                 aria-pressed={isSelected}
                 onClick={() => setPendingId(product.id)}
               >
@@ -603,27 +633,37 @@ function ProductPickerModal({
             </span>
           </div>
           <div className="product-pagination">
-            <Button aria-label="上一页" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+            <Button
+              variant="outline"
+              aria-label="上一页"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
               <ChevronLeft />
             </Button>
             {pageButtons[0] > 1 && (
               <>
-                <Button onClick={() => setPage(1)}>1</Button>
+                <Button variant="outline" onClick={() => setPage(1)}>
+                  1
+                </Button>
                 {pageButtons[0] > 2 && <span className="page-ellipsis">…</span>}
               </>
             )}
             {pageButtons.map((p) => (
-              <Button key={p} className={p === page ? "active" : ""} onClick={() => setPage(p)}>
+              <Button key={p} className={p === page ? "active" : ""} variant="outline" onClick={() => setPage(p)}>
                 {p}
               </Button>
             ))}
             {pageButtons[pageButtons.length - 1] < totalPages && (
               <>
                 {pageButtons[pageButtons.length - 1] < totalPages - 1 && <span className="page-ellipsis">…</span>}
-                <Button onClick={() => setPage(totalPages)}>{totalPages}</Button>
+                <Button variant="outline" onClick={() => setPage(totalPages)}>
+                  {totalPages}
+                </Button>
               </>
             )}
             <Button
+              variant="outline"
               aria-label="下一页"
               disabled={page >= totalPages}
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
@@ -632,192 +672,20 @@ function ProductPickerModal({
             </Button>
           </div>
           <div className="product-footer-actions">
-            <Button className="product-manage" onClick={() => window.location.assign("/assets/products")}>
+            <Button variant="outline" onClick={() => window.location.assign("/assets/products")}>
               <Upload />
               管理商品
             </Button>
-            <Button className="product-cancel" onClick={onClose}>
+            <Button variant="outline" onClick={onClose}>
               取消
             </Button>
             <Button
-              className="product-confirm"
+              variant="default"
               disabled={!pending}
               onClick={() => {
                 if (pending) onSelect(pending);
               }}
             >
-              确定
-            </Button>
-          </div>
-        </footer>
-      </aside>
-    </div>
-  );
-}
-
-function PortraitPickerModal({
-  selected,
-  onClose,
-  onConfirm,
-}: {
-  selected: SelectedPortrait[];
-  onClose: () => void;
-  onConfirm: (portraits: SelectedPortrait[]) => void;
-}) {
-  const {
-    data = [],
-    isLoading,
-    error,
-  } = useQuery({
-    queryKey: ["portrait-library"],
-    queryFn: fetchPortraits,
-    staleTime: Infinity,
-  });
-  const [query, setQuery] = useState("");
-  const [gender, setGender] = useState("全部");
-  const [visibleCount, setVisibleCount] = useState(48);
-  const maxSelect = 3;
-  const [pending, setPending] = useState<SelectedPortrait[]>(() => selected.slice(0, maxSelect));
-
-  useEffect(() => setVisibleCount(48), [gender, query]);
-  useEffect(() => {
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [onClose]);
-
-  const filtered = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    return data.filter((portrait) => {
-      const matchesQuery =
-        !normalizedQuery ||
-        `${portrait.name} ${portrait.profession} ${portrait.description}`.toLowerCase().includes(normalizedQuery);
-      return matchesQuery && (gender === "全部" || portrait.gender === gender);
-    });
-  }, [data, gender, query]);
-
-  const isSelected = (key: string) => pending.some((item) => item.key === key);
-  const togglePortrait = (portrait: Portrait) => {
-    if (portrait.status !== "active") return;
-    setPending((current) => {
-      const exists = current.find((item) => item.key === portrait.key);
-      if (exists) return current.filter((item) => item.key !== portrait.key);
-      if (current.length >= maxSelect) return current;
-      return [
-        ...current,
-        {
-          key: portrait.key,
-          reference: portrait.reference,
-          name: portrait.name,
-          profession: portrait.profession,
-          source_url: portrait.source_url,
-          display_url: portrait.display_url,
-          ...(portrait.type === "general" ? { index: portrait.index } : {}),
-          description: portrait.description,
-          gender: portrait.gender,
-          age: portrait.age,
-        },
-      ];
-    });
-  };
-
-  return (
-    <div className="remix-picker-layer" role="presentation" onMouseDown={onClose}>
-      <aside
-        className="remix-picker portrait-picker-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-label="选择人像"
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <header>
-          <h2 className="type-section-title text-ink">选择人像（最多 {maxSelect} 个）</h2>
-          <Button variant="ghost" size="icon-sm" aria-label="关闭" onClick={onClose}>
-            <X />
-          </Button>
-        </header>
-        <div className="portrait-picker-controls">
-          <label>
-            <Search />
-            <input
-              autoFocus
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="搜索职业、年龄或人物描述…"
-            />
-          </label>
-          <div aria-label="按性别筛选">
-            {["全部", "女", "男"].map((item) => (
-              <Button key={item} className={gender === item ? "active" : ""} onClick={() => setGender(item)}>
-                {item}
-              </Button>
-            ))}
-          </div>
-        </div>
-        {pending.length >= maxSelect && (
-          <div className="portrait-limit-notice">已选择 {maxSelect} 个人像，如需更换请先取消已有选择。</div>
-        )}
-        <div className="remix-picker-grid portrait-picker-grid">
-          {filtered.slice(0, visibleCount).map((portrait) => {
-            const active = isSelected(portrait.key);
-            return (
-              <Button
-                key={portrait.key}
-                className={active ? "selected" : ""}
-                aria-label={`${active ? "已选择，" : ""}${portrait.name}`}
-                disabled={portrait.status !== "active"}
-                onClick={() => togglePortrait(portrait)}
-              >
-                <span className="portrait">
-                  {portrait.type === "custom" ? (
-                    <AuthenticatedMedia
-                      url={portrait.display_url}
-                      mimeType="image/jpeg"
-                      alt={portrait.name}
-                      controls={false}
-                      loadingText=""
-                      errorText="预览失败"
-                      previewable={false}
-                    />
-                  ) : (
-                    <ImagePreview src={portrait.display_url} alt={portrait.name} imageLoading="lazy" />
-                  )}
-                  {active && (
-                    <i>
-                      <CircleCheck /> 已选择
-                    </i>
-                  )}
-                </span>
-                <b>{portrait.profession}</b>
-                <small className="type-helper">
-                  {portrait.age ? `${portrait.age} 岁 · ` : ""}
-                  {portrait.type === "general"
-                    ? `${portrait.gender}性 · NO. ${String(portrait.index).padStart(4, "0")}`
-                    : "自建虚拟人像"}
-                </small>
-              </Button>
-            );
-          })}
-          {isLoading && <p>正在加载人像库…</p>}
-          {error && <p>{error instanceof Error ? error.message : "人像清单加载失败"}</p>}
-          {!isLoading && !error && !filtered.length && <p>没有找到匹配的人像，请调整搜索条件。</p>}
-        </div>
-        <footer className="portrait-picker-footer">
-          <span>
-            共 {filtered.length.toLocaleString()} 个人像
-            {filtered.length > visibleCount && `，已显示 ${visibleCount} 个`}
-            {pending.length > 0 && ` · 已选 ${pending.length}/${maxSelect}`}
-          </span>
-          <div>
-            {filtered.length > visibleCount && (
-              <Button onClick={() => setVisibleCount((count) => count + 48)}>加载更多</Button>
-            )}
-            <Button className="product-cancel" onClick={onClose}>
-              取消
-            </Button>
-            <Button className="product-confirm" disabled={!pending.length} onClick={() => onConfirm(pending)}>
               确定
             </Button>
           </div>
@@ -951,6 +819,16 @@ export function RemixProject() {
   const { data: creationCapabilities } = useQuery({
     queryKey: ["creation-capabilities"],
     queryFn: fetchCreationCapabilities,
+  });
+  const {
+    data: portraitOptions = [],
+    isLoading: portraitsLoading,
+    error: portraitsError,
+  } = useQuery({
+    queryKey: ["portrait-library"],
+    queryFn: fetchPortraits,
+    staleTime: Infinity,
+    enabled: picker === "portrait",
   });
   // 即使模型尚未通过可用性验证，也保留在校对工作台中展示；否则整个编辑器会被错误地替换成空态。
   // 提交按钮仍会根据 enabled 禁用，后端也会做最终校验。
@@ -1411,6 +1289,7 @@ export function RemixProject() {
     <Button
       key={version.id}
       className={version.id === activePromptVersionId ? "active" : ""}
+      variant="outline"
       onClick={() => {
         setPrompt(version.prompt);
         setActivePromptVersionId(version.id);
@@ -1706,7 +1585,7 @@ export function RemixProject() {
         />
         <section className="remix-workspace">
           {notice && (
-            <Button className="remix-toast" onClick={() => setNotice("")}>
+            <Button className="remix-toast" variant="ghost" onClick={() => setNotice("")}>
               <Sparkles />
               {notice}
               <X />
@@ -1743,6 +1622,7 @@ export function RemixProject() {
                   <Button
                     key={source.id}
                     className={source.id === activeSourceId ? "active" : ""}
+                    variant="outline"
                     onClick={() => {
                       setActiveSourceId(source.id);
                       setEditing(false);
@@ -1781,18 +1661,33 @@ export function RemixProject() {
               <div className="prompt-toolbar">
                 <label>
                   对比版本{" "}
-                  <Button className={`toggle ${compare ? "active" : ""}`} onClick={() => setCompare(!compare)} />
+                  <Button
+                    className={`toggle ${compare ? "active" : ""}`}
+                    variant="ghost"
+                    aria-label="切换版本对比"
+                    onClick={() => setCompare(!compare)}
+                  />
                 </label>
                 <div>
-                  <Button disabled={!prompt} onClick={() => setPromptTool("check")}>
+                  <Button variant="default" disabled={!prompt} onClick={() => setPromptTool("check")}>
                     <CircleCheck />
                     智能检查
                   </Button>
-                  <Button className="purple" disabled={!prompt} onClick={() => setPromptTool("modify")}>
+                  <Button
+                    variant="default"
+                    className="purple"
+                    disabled={!prompt}
+                    onClick={() => setPromptTool("modify")}
+                  >
                     <Pencil />
                     智能修改
                   </Button>
-                  <Button className="orange" disabled={!prompt} onClick={() => setPromptTool("voice")}>
+                  <Button
+                    variant="default"
+                    className="orange"
+                    disabled={!prompt}
+                    onClick={() => setPromptTool("voice")}
+                  >
                     <Mic2 />
                     换口播
                   </Button>
@@ -1825,18 +1720,19 @@ export function RemixProject() {
               </div>
               <footer className="stage-actions">
                 <div>
-                  <Button onClick={() => setEditing(!editing)}>
+                  <Button variant="outline" onClick={() => setEditing(!editing)}>
                     <FileText />
                     {editing ? "保存文本" : "编辑文本"}
                   </Button>
                   <Button
+                    variant="outline"
                     onClick={() => void navigator.clipboard.writeText(prompt).then(() => setNotice("脚本已复制"))}
                   >
                     <Copy />
                     复制脚本
                   </Button>
                 </div>
-                <Button className="primary" onClick={next}>
+                <Button variant="default" className="primary" onClick={next}>
                   下一步
                 </Button>
               </footer>
@@ -1934,6 +1830,7 @@ export function RemixProject() {
                         <Button
                           type="button"
                           className="storyboard-add-reference"
+                          variant="ghost"
                           aria-label="添加参考素材"
                           style={{ "--reference-index": storyboardReferenceImages.length } as CSSProperties}
                           onClick={open}
@@ -2075,6 +1972,7 @@ export function RemixProject() {
                         <Button
                           type="button"
                           className="timeline-preview-button"
+                          variant="default"
                           aria-label={`预览第 ${index + 1} 个片段：${source.name}`}
                           onClick={() => setComposePreviewId(source.id)}
                         >
@@ -2137,9 +2035,12 @@ export function RemixProject() {
                       : "全部片段已生成，可以开始合并"}
                   </span>
                   <div>
-                    <Button onClick={() => setStage(3)}>返回分镜</Button>
+                    <Button variant="outline" onClick={() => setStage(3)}>
+                      返回分镜
+                    </Button>
                     <Button
                       className="primary"
+                      variant="default"
                       disabled={composeOrder.length < 2 || Boolean(activeComposeJobId)}
                       onClick={() => void startCompose()}
                     >
@@ -2160,6 +2061,7 @@ export function RemixProject() {
       {stage === 0 && (
         <Button
           className="parse-button"
+          variant="default"
           disabled={!sources.length || !selectedProduct || parsing || Boolean(job)}
           onClick={() => void parse()}
         >
@@ -2189,10 +2091,10 @@ export function RemixProject() {
             <p>任务提交后不可取消、不可停止。</p>
             <small className="type-helper">请确认提示词、引用素材和生成参数无误后再继续。</small>
             <footer>
-              <Button type="button" onClick={() => setPendingShotSubmission(null)}>
+              <Button type="button" variant="outline" onClick={() => setPendingShotSubmission(null)}>
                 返回修改
               </Button>
-              <Button type="button" className="primary" onClick={() => void submitShotGeneration()}>
+              <Button type="button" className="primary" variant="default" onClick={() => void submitShotGeneration()}>
                 确认提交
               </Button>
             </footer>
@@ -2241,11 +2143,16 @@ export function RemixProject() {
         />
       )}
       {picker === "portrait" && (
-        <PortraitPickerModal
-          selected={selectedPortraits}
+        <PortraitPickerDialog
+          open
+          portraits={portraitOptions}
+          loading={portraitsLoading}
+          error={portraitsError}
+          selectedKeys={selectedPortraits.map((portrait) => portrait.key)}
+          maxSelect={3}
           onClose={() => setPicker(null)}
           onConfirm={(portraits) => {
-            setSelectedPortraits(portraits);
+            setSelectedPortraits(portraits.map(toSelectedPortrait));
             setPicker(null);
           }}
         />

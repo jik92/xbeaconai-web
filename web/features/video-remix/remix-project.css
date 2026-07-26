@@ -11,11 +11,6 @@
   @apply type-body;
 }
 
-.remix-project
-  button:not(.remix-header-action):not([aria-label^="关闭"]):not(.dashed-picker-tile):not(.segmented-control-button) {
-  border: 0;
-  background: transparent;
-}
 .remix-project svg {
   width: 16px;
   height: 16px;
@@ -184,13 +179,6 @@
 .portrait-card-remove svg {
   width: 12px;
   height: 12px;
-}
-.portrait-limit-notice {
-  padding: 7px 18px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  @apply text-error;
-  text-align: center;
 }
 .config-portrait {
   display: block;
@@ -1831,15 +1819,9 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  @apply text-primary;
-  border: 1px solid var(--primary);
   border-radius: 7px;
-  background: var(--surface);
 }
-.portrait-picker-modal {
-  width: min(920px, calc(100vw - 40px));
-}
-.portrait-picker-controls {
+.product-picker-controls {
   min-height: 58px;
   flex: none;
   padding: 10px 18px;
@@ -1849,7 +1831,7 @@
   gap: 12px;
   background: var(--surface);
 }
-.portrait-picker-controls > label {
+.product-picker-controls > label {
   height: 36px;
   min-width: 0;
   flex: 1;
@@ -1862,86 +1844,12 @@
   align-items: center;
   gap: 8px;
 }
-.portrait-picker-controls input {
+.product-picker-controls input {
   width: 100%;
   min-width: 0;
   border: 0;
   outline: 0;
   background: transparent;
-}
-.portrait-picker-controls > div {
-  height: 36px;
-  padding: 3px;
-  border-radius: 8px;
-  background: var(--canvas-soft);
-  display: flex;
-}
-.portrait-picker-controls > div button {
-  min-width: 48px;
-  padding: 0 10px;
-  border-radius: 6px;
-  @apply text-primary;
-}
-.portrait-picker-controls > div button.active {
-  background: var(--surface);
-  @apply text-primary;
-  box-shadow: 0 1px 4px var(--shadow-elevated);
-}
-.portrait-picker-grid {
-  min-height: 0;
-  flex: 1;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-auto-rows: 246px;
-  align-content: start;
-}
-.portrait-picker-grid > button {
-  height: 246px;
-}
-.portrait-picker-grid > button.current {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 1px var(--primary);
-}
-.portrait-picker-grid > button > span.portrait {
-  height: 190px;
-  position: relative;
-  padding: 6px;
-  background: var(--canvas-soft);
-}
-.portrait-picker-grid > button > span.portrait > img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  object-position: center;
-}
-.portrait-picker-grid > button > span.portrait > i {
-  position: absolute;
-  left: 8px;
-  bottom: 8px;
-  padding: 5px 7px;
-  border-radius: 999px;
-  background: var(--surface-dark);
-  @apply text-on-primary;
-  @apply type-micro-strong;
-  @apply not-italic;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.portrait-picker-grid > button > span.portrait > i svg {
-  width: 12px;
-  height: 12px;
-}
-.remix-picker > footer.portrait-picker-footer {
-  justify-content: space-between;
-  gap: 12px;
-}
-.portrait-picker-footer > span {
-  @apply text-primary;
-  @apply type-helper;
-}
-.portrait-picker-footer > div {
-  display: flex;
-  gap: 8px;
 }
 .product-picker-modal {
   width: min(920px, calc(100vw - 40px));
@@ -1955,27 +1863,14 @@
 .product-search-button {
   height: 36px;
   padding: 0 16px;
-  border: 1px solid var(--primary);
   border-radius: 8px;
-  background: var(--primary);
-  @apply text-on-primary;
   white-space: nowrap;
-}
-.product-search-button:hover {
-  background: var(--primary);
 }
 .product-reset-button {
   height: 36px;
   padding: 0 14px;
-  border: 1px solid var(--border);
   border-radius: 8px;
-  background: var(--surface);
-  @apply text-primary;
   white-space: nowrap;
-}
-.product-reset-button:hover {
-  border-color: var(--border);
-  background: var(--surface);
 }
 .product-picker-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2043,14 +1938,10 @@
   padding: 0 6px;
   display: grid;
   place-items: center;
-  border: 1px solid var(--border);
   border-radius: 6px;
-  background: var(--surface);
-  @apply text-primary;
 }
 .product-pagination button:hover:not(:disabled):not(.active) {
-  border-color: var(--border);
-  background: var(--surface);
+  border-color: var(--border-strong);
 }
 .product-pagination button.active {
   border-color: var(--primary);
@@ -2080,24 +1971,6 @@
   border-radius: 7px;
   white-space: nowrap;
 }
-.product-manage,
-.product-cancel {
-  border: 1px solid var(--border);
-  background: var(--surface);
-  @apply text-primary;
-}
-.product-cancel {
-  border-color: var(--border);
-}
-.product-confirm {
-  border: 1px solid var(--primary);
-  background: var(--primary);
-  @apply text-on-primary;
-}
-.product-confirm:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
 @media (max-width: 1100px) {
   .remix-header {
     grid-template-columns: 112px 1fr 160px;
@@ -2120,8 +1993,5 @@
   }
   .result-info > pre {
     height: 258px;
-  }
-  .portrait-picker-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

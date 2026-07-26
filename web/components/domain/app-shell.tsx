@@ -5,6 +5,7 @@ import {
   Bell,
   Check,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   CircleHelp,
   Coins,
@@ -52,6 +53,7 @@ import {
 } from "./sidebar-menu-preferences";
 
 const SIDEBAR_MENU_STORAGE_KEY = "yaozuo:sidebar-menu:v2";
+const SIDEBAR_GROUP_STORAGE_KEY = "yaozuo:sidebar-groups:v1";
 const SIDEBAR_GROUPS = ["创作工作流", "AI 工具箱", "实用工具", "投放", "资产"] as const;
 type SidebarGroup = (typeof SIDEBAR_GROUPS)[number];
 
@@ -131,6 +133,16 @@ function loadSidebarMenuPreferences() {
   }
 }
 
+function loadExpandedSidebarGroups() {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(SIDEBAR_GROUP_STORAGE_KEY) ?? "[]");
+    if (!Array.isArray(saved)) return new Set<SidebarGroup>();
+    return new Set(saved.filter((group): group is SidebarGroup => SIDEBAR_GROUPS.includes(group as SidebarGroup)));
+  } catch {
+    return new Set<SidebarGroup>();
+  }
+}
+
 export function AppShell() {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const { status, user, logout } = useAuth();
@@ -176,6 +188,7 @@ export function AppShell() {
     [sidebarCollapsed, setSidebarCollapsed] = useState(
       () => window.localStorage.getItem("sidebar-collapsed") === "true",
     ),
+    [expandedSidebarGroups, setExpandedSidebarGroups] = useState(loadExpandedSidebarGroups),
     [menuEditing, setMenuEditing] = useState(false),
     [menuPreferences, setMenuPreferences] = useState(loadSidebarMenuPreferences),
     [accountMenuOpen, setAccountMenuOpen] = useState(false);
@@ -205,6 +218,9 @@ export function AppShell() {
     window.localStorage.setItem("sidebar-collapsed", String(sidebarCollapsed));
     if (sidebarCollapsed) setMenuEditing(false);
   }, [sidebarCollapsed]);
+  useEffect(() => {
+    window.localStorage.setItem(SIDEBAR_GROUP_STORAGE_KEY, JSON.stringify([...expandedSidebarGroups]));
+  }, [expandedSidebarGroups]);
   useEffect(() => {
     try {
       window.localStorage.setItem(SIDEBAR_MENU_STORAGE_KEY, JSON.stringify(menuPreferences));
@@ -345,9 +361,30 @@ export function AppShell() {
             const groupItems = menuPreferences.order[group]
               .map((itemId) => sidebarMenuItems[group].find((item) => item.id === itemId))
               .filter((item): item is SidebarMenuItem => Boolean(item));
+            const groupExpanded = expandedSidebarGroups.has(group);
             return (
-              <nav key={group} aria-label={group}>
-                <h3 className="type-section-title">{group}</h3>
+              <nav
+                key={group}
+                aria-label={group}
+                className={!groupExpanded && !sidebarCollapsed ? "sidebar-group-collapsed" : undefined}
+              >
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="sidebar-group-trigger"
+                  aria-expanded={groupExpanded}
+                  onClick={() =>
+                    setExpandedSidebarGroups((current) => {
+                      const next = new Set(current);
+                      if (next.has(group)) next.delete(group);
+                      else next.add(group);
+                      return next;
+                    })
+                  }
+                >
+                  <span>{group}</span>
+                  {groupExpanded ? <ChevronDown /> : <ChevronRight />}
+                </Button>
                 {groupItems.map((item, index) => {
                   const hidden = isSidebarMenuItemHidden(menuPreferences, item.id, item.available);
                   const providerAvailability = runtimeAvailability(item);

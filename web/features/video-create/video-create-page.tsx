@@ -6,6 +6,7 @@ import {
   Captions,
   Check,
   ChevronDown,
+  ChevronRight,
   Copy,
   Download,
   Film,
@@ -148,6 +149,59 @@ const statusLabels: Record<VideoCreateProject["project"]["status"], string> = {
   completed: "已完成",
   failed: "生成失败",
 };
+const videoCreateWorkflowStages = ["项目配置", "脚本生成", "分镜制作", "合并成片"];
+
+function videoCreateWorkflowStage(project: VideoCreateProject | null) {
+  if (!project) return 0;
+  if (["analyzing", "script_generating", "script_review"].includes(project.project.status)) return 1;
+  if (["storyboard_generating", "storyboard_review"].includes(project.project.status)) return 2;
+  if (["composing", "completed"].includes(project.project.status)) return 3;
+  if (project.project.status === "failed") {
+    if (project.shots.length) return 2;
+    if (project.sections.length) return 1;
+  }
+  return 0;
+}
+
+function VideoCreateWorkflowHeader({ stage, actions }: { stage: number; actions: ReactNode }) {
+  return (
+    <header className="z-10 grid h-14 shrink-0 grid-cols-[132px_minmax(0,1fr)_auto] items-center border-b border-line bg-surface px-3 shadow-sm max-[760px]:grid-cols-[36px_minmax(0,1fr)_auto]">
+      <div className="flex items-center gap-2 whitespace-nowrap type-section-title text-ink">
+        <Video className="size-5" />
+        <span className="max-[760px]:hidden">一键成片</span>
+      </div>
+      <ol className="flex min-w-0 items-center justify-center" aria-label="一键成片创作进度">
+        {videoCreateWorkflowStages.map((label, index) => (
+          <li
+            className={cn(
+              "flex min-w-0 items-center gap-1.5 whitespace-nowrap text-muted",
+              index === stage ? "type-body-strong text-ink" : "type-helper",
+              index < stage && "text-success",
+            )}
+            key={label}
+            aria-label={label}
+            aria-current={index === stage ? "step" : undefined}
+          >
+            <i
+              className={cn(
+                "grid size-6 shrink-0 place-items-center rounded-full bg-canvas-soft not-italic type-badge",
+                index === stage && "bg-primary text-on-primary",
+                index < stage && "bg-surface-strong text-success",
+              )}
+            >
+              {index < stage ? <Check className="size-3" /> : index + 1}
+            </i>
+            <span className="max-[1100px]:hidden">{label}</span>
+            {index < videoCreateWorkflowStages.length - 1 && (
+              <ChevronRight className="mx-1 size-3 shrink-0 text-muted-soft" />
+            )}
+          </li>
+        ))}
+      </ol>
+      <div className="flex min-w-0 items-center justify-end gap-2">{actions}</div>
+    </header>
+  );
+}
 
 function videoCreateStatusTone(status: VideoCreateProject["project"]["status"]): ProjectRecordStatusTone {
   if (status === "failed") return "error";
@@ -561,50 +615,68 @@ export function VideoCreatePage() {
         total + estimateDuration(drafts[section.id] ?? section.currentVersion?.text ?? "", input.speechRate),
       0,
     ) ?? 0;
+  const workflowStage = videoCreateWorkflowStage(project);
 
   return (
     <div
       className="flex h-[calc(100vh-56px)] min-h-0 flex-col overflow-hidden bg-surface type-body text-body max-[760px]:h-auto max-[760px]:overflow-auto"
       data-testid="video-create-page"
     >
-      <header className="flex h-[52px] shrink-0 items-center justify-between gap-3 border-b border-line px-3">
-        <h1 className="shrink-0 type-page-title text-ink">新建项目</h1>
-        <div className="flex min-w-0 items-center gap-2 overflow-x-auto">
-          <Button
-            className="shrink-0"
-            size="sm"
-            disabled={Boolean(busy) || polling || !input.productAssetIds.length}
-            onClick={generateAll}
-          >
-            {busy === "full" || project?.project.autoGenerate ? (
-              <LoaderCircle className="animate-spin" />
-            ) : (
-              <WandSparkles />
-            )}
-            一键生成
-          </Button>
-          <Button
-            className="shrink-0"
-            variant="outline"
-            size="sm"
-            disabled={
-              Boolean(busy) ||
-              polling ||
-              Boolean(project && !["draft", "script_review", "failed"].includes(project.project.status))
-            }
-            onClick={saveDraft}
-          >
-            {busy === "save-draft" ? <LoaderCircle className="animate-spin" /> : <Check />}
-            保存草稿
-          </Button>
-          <Button className="shrink-0" variant="outline" size="sm" onClick={() => setHistoryOpen(true)}>
-            <History /> 生成记录
-          </Button>
-          <Button className="shrink-0" variant="ghost" size="sm" disabled={Boolean(busy) || polling} onClick={reset}>
-            <Plus /> 新建
-          </Button>
-        </div>
-      </header>
+      <VideoCreateWorkflowHeader
+        stage={workflowStage}
+        actions={
+          <>
+            <Button
+              className="shrink-0"
+              size="sm"
+              aria-label="一键生成"
+              disabled={Boolean(busy) || polling || !input.productAssetIds.length}
+              onClick={generateAll}
+            >
+              {busy === "full" || project?.project.autoGenerate ? (
+                <LoaderCircle className="animate-spin" />
+              ) : (
+                <WandSparkles />
+              )}
+              <span className="max-[1100px]:hidden">一键生成</span>
+            </Button>
+            <Button
+              className="shrink-0"
+              variant="outline"
+              size="sm"
+              aria-label="保存草稿"
+              disabled={
+                Boolean(busy) ||
+                polling ||
+                Boolean(project && !["draft", "script_review", "failed"].includes(project.project.status))
+              }
+              onClick={saveDraft}
+            >
+              {busy === "save-draft" ? <LoaderCircle className="animate-spin" /> : <Check />}
+              <span className="max-[1100px]:hidden">保存草稿</span>
+            </Button>
+            <Button
+              className="shrink-0"
+              variant="outline"
+              size="sm"
+              aria-label="生成记录"
+              onClick={() => setHistoryOpen(true)}
+            >
+              <History /> <span className="max-[1100px]:hidden">生成记录</span>
+            </Button>
+            <Button
+              className="shrink-0"
+              variant="ghost"
+              size="sm"
+              aria-label="新建一键成片项目"
+              disabled={Boolean(busy) || polling}
+              onClick={reset}
+            >
+              <Plus /> <span className="max-[1100px]:hidden">新建</span>
+            </Button>
+          </>
+        }
+      />
       <div className="grid min-h-0 flex-1 grid-cols-[360px_minmax(0,1fr)] overflow-hidden max-[1100px]:grid-cols-[320px_minmax(0,1fr)] max-[760px]:block max-[760px]:overflow-visible">
         <aside
           className="flex min-h-0 min-w-0 flex-col overflow-hidden border-r border-line bg-surface max-[760px]:min-h-[calc(100vh-56px)] max-[760px]:overflow-visible"
@@ -1855,9 +1927,11 @@ export function VideoCreatePage() {
         open={portraitPickerOpen}
         portraits={portraits}
         loading={portraitsLoading}
-        selectedKey={selectedPortraitKey}
+        selectedKeys={selectedPortraitKey ? [selectedPortraitKey] : []}
+        maxSelect={1}
         onClose={() => setPortraitPickerOpen(false)}
-        onSelect={(portrait) => {
+        onConfirm={([portrait]) => {
+          if (!portrait) return;
           setInput((current) => ({ ...current, portraitReference: portrait.reference, portraitId: undefined }));
           setPortraitPickerOpen(false);
         }}

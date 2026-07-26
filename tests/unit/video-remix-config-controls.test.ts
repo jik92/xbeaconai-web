@@ -27,4 +27,26 @@ describe("video remix configuration controls", () => {
     expect(styles).not.toContain(".config-voice");
     expect(styles).not.toContain(".remix-mode-tabs");
   });
+
+  test("reuses the shared portrait picker while preserving the three-person limit", () => {
+    expect(source).toContain('from "@/features/portrait-library/portrait-picker-dialog"');
+    expect(source).toContain("<PortraitPickerDialog");
+    expect(source).toContain("maxSelect={3}");
+    expect(source).toContain("portraits.map(toSelectedPortrait)");
+    expect(source).not.toContain("function PortraitPickerModal");
+    expect(styles).not.toContain(".portrait-picker-modal");
+    expect(styles).not.toContain(".portrait-picker-grid");
+    expect(styles).not.toContain(".portrait-picker-footer");
+  });
+
+  test("keeps shared button variants authoritative across the remix page", () => {
+    const buttonTags = source.match(/<Button\b[\s\S]*?>/g) ?? [];
+    const pickerFooterRule = styles.match(/\.remix-picker > footer button \{([^}]*)\}/)?.[1] ?? "";
+
+    expect(buttonTags.length).toBeGreaterThan(0);
+    for (const tag of buttonTags) expect(tag).toContain("variant=");
+    expect(styles).not.toContain('button:not(.remix-header-action):not([aria-label^="关闭"])');
+    expect(pickerFooterRule).not.toContain("background:");
+    expect(pickerFooterRule).not.toContain("text-on-primary");
+  });
 });
