@@ -15,6 +15,7 @@ import {
   Images,
   LockKeyhole,
   LogOut,
+  Megaphone,
   type LucideIcon,
   Package,
   PanelLeftClose,
@@ -24,11 +25,12 @@ import {
   RotateCcw,
   Settings2,
   UserRound,
+  Store,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { fetchLibraryAssets, fetchProducts } from "@/api/api-client";
 import { listNotifications } from "@/api/generated/sdk.gen";
-import { APP_CONFIG, type AssetFeatureId, isAssetOpen, isModuleOpen } from "@/app/config";
+import { APP_CONFIG, type AssetFeatureId, isAssetOpen, isDeliveryOpen, isModuleOpen } from "@/app/config";
 import { modules } from "@/app/routes";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -50,7 +52,7 @@ import {
 } from "./sidebar-menu-preferences";
 
 const SIDEBAR_MENU_STORAGE_KEY = "yaozuo:sidebar-menu:v2";
-const SIDEBAR_GROUPS = ["创作工作流", "AI 工具箱", "实用工具", "资产"] as const;
+const SIDEBAR_GROUPS = ["创作工作流", "AI 工具箱", "实用工具", "投放", "资产"] as const;
 type SidebarGroup = (typeof SIDEBAR_GROUPS)[number];
 
 interface SidebarMenuItem {
@@ -93,6 +95,22 @@ const sidebarMenuItems: Record<SidebarGroup, SidebarMenuItem[]> = {
   实用工具: modules
     .filter((item) => item.group === "实用工具")
     .map((item) => ({ ...item, id: `module:${item.id}`, available: isModuleOpen(item.id) })),
+  投放: [
+    {
+      id: "delivery:qianchuan-merchants",
+      path: "/delivery/qianchuan-merchants",
+      label: "千川商户绑定",
+      icon: Store,
+      available: isDeliveryOpen("qianchuan-merchants"),
+    },
+    {
+      id: "delivery:qianchuan-pc",
+      path: "/delivery/qianchuan-pc",
+      label: "千川PC投放",
+      icon: Megaphone,
+      available: isDeliveryOpen("qianchuan-pc"),
+    },
+  ],
   资产: ASSET_MENU_ITEMS.map((item) => ({
     ...item,
     id: `asset:${item.id}`,

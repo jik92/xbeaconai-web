@@ -10,13 +10,15 @@ import { AiBillingPage } from "@/features/billing/ai-billing-page";
 import { MediaUnderstandPage } from "@/features/media-understand/media-understand-page";
 import { PortraitLibrary } from "@/features/portrait-library/portrait-library";
 import { ProviderFeatureGate } from "@/features/provider/provider-feature-gate";
+import { QianchuanMerchantBindingPage } from "@/features/qianchuan/qianchuan-merchant-binding-page";
+import { QianchuanPcDeliveryPage } from "@/features/qianchuan/qianchuan-pc-delivery-page";
 import { SceneLibrary } from "@/features/scene-library/scene-library";
 import { VideoCreatePage } from "@/features/video-create/video-create-page";
 import { VideoEditorPage } from "@/features/video-editor/video-editor-page";
 import { VideoExtractPage } from "@/features/video-extract/video-extract-page";
 import { VideoMashupPage } from "@/features/video-mashup/video-mashup-page";
 import { RemixProject } from "@/features/video-remix/remix-project";
-import { isAssetOpen, isModuleOpen } from "./config";
+import { isAssetOpen, isDeliveryOpen, isModuleOpen } from "./config";
 import { homeDestination, modules } from "./routes";
 
 const rootRoute = createRootRoute({ component: AppShell });
@@ -109,6 +111,26 @@ const aiBillingRoute = createRoute({
   path: "/billing/ai",
   component: AiBillingPage,
 });
+const qianchuanMerchantsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/delivery/qianchuan-merchants",
+  component: () =>
+    isDeliveryOpen("qianchuan-merchants") ? (
+      <QianchuanMerchantBindingPage />
+    ) : (
+      <ComingSoonPage config={{ id: "qianchuan-merchants", label: "千川商户绑定" }} />
+    ),
+});
+const qianchuanPcRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/delivery/qianchuan-pc",
+  component: () =>
+    isDeliveryOpen("qianchuan-pc") ? (
+      <QianchuanPcDeliveryPage />
+    ) : (
+      <ComingSoonPage config={{ id: "qianchuan-pc", label: "千川PC投放" }} />
+    ),
+});
 const routeTree = rootRoute.addChildren([
   indexRoute,
   ...moduleRoutes,
@@ -118,6 +140,8 @@ const routeTree = rootRoute.addChildren([
   sceneRoute,
   voiceRoute,
   aiBillingRoute,
+  qianchuanMerchantsRoute,
+  qianchuanPcRoute,
   adminRoute,
 ]);
 export const router = createRouter({ routeTree, defaultPreload: "intent" });

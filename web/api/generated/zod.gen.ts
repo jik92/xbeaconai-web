@@ -91,7 +91,10 @@ export const zJobModuleId = z.enum([
     'kickart',
     'douyin-video-import',
     'share-content-import',
-    'portrait-asset-register'
+    'portrait-asset-register',
+    'qianchuan-material-upload',
+    'qianchuan-pc-submit',
+    'qianchuan-pc-sync'
 ]);
 
 export const zAiConsumptionRecord = z.object({
@@ -112,7 +115,8 @@ export const zProviderId = z.enum([
     'volc-speech',
     'tos',
     'mediakit',
-    'qwen-audio'
+    'qwen-audio',
+    'qianchuan'
 ]);
 
 export const zSeedanceModelId = z.enum([
@@ -277,7 +281,9 @@ export const zProviderCredentialName = z.enum([
     'TOS_SECRET_ACCESS_KEY',
     'MEDIAKIT_API_KEY',
     'QWEN_AUDIO_API_KEY',
-    'QWEN_AUDIO_WORKSPACE_ID'
+    'QWEN_AUDIO_WORKSPACE_ID',
+    'QIANCHUAN_APP_ID',
+    'QIANCHUAN_APP_SECRET'
 ]);
 
 export const zModuleId = z.enum([
@@ -2908,3 +2914,195 @@ export const zGetShareImportPath = z.object({
  * Import job
  */
 export const zGetShareImportResponse = zShareImportJob;
+
+/**
+ * Qianchuan application configuration status
+ */
+export const zGetQianchuanConfigResponse = z.object({
+    configured: z.boolean(),
+    appIdMasked: z.string().optional(),
+    callbackUrl: z.enum(['https://api.xbeaconai.com/callback'])
+});
+
+/**
+ * Qianchuan OAuth URL
+ */
+export const zStartQianchuanOauthResponse = z.object({
+    authorizationUrl: z.url()
+});
+
+/**
+ * Owned Qianchuan bindings
+ */
+export const zListQianchuanBindingsResponse = z.object({
+    bindings: z.array(z.object({
+        id: z.uuid(),
+        authUserId: z.string(),
+        subjectName: z.string(),
+        subjectType: z.string(),
+        accessTokenExpiresAt: z.string(),
+        refreshTokenExpiresAt: z.string(),
+        defaultAdvertiserId: z.string(),
+        status: z.enum([
+            'active',
+            'reauthorization_required',
+            'revoked'
+        ]),
+        advertisers: z.array(z.object({
+            advertiserId: z.string(),
+            name: z.string(),
+            accountRole: z.string(),
+            status: z.string()
+        }))
+    }))
+});
+
+export const zSetQianchuanDefaultAdvertiserBody = z.object({
+    advertiserId: z.string().regex(/^\d+$/)
+});
+
+export const zSetQianchuanDefaultAdvertiserPath = z.object({
+    bindingId: z.uuid()
+});
+
+/**
+ * Updated
+ */
+export const zSetQianchuanDefaultAdvertiserResponse = z.object({
+    updated: z.literal(true)
+});
+
+export const zDeleteQianchuanBindingPath = z.object({
+    bindingId: z.uuid()
+});
+
+/**
+ * Deleted
+ */
+export const zDeleteQianchuanBindingResponse = z.object({
+    deleted: z.literal(true)
+});
+
+export const zGetQianchuanLookupsQuery = z.object({
+    bindingId: z.uuid(),
+    advertiserId: z.string().regex(/^\d+$/)
+});
+
+/**
+ * Products and authorized Douyin accounts
+ */
+export const zGetQianchuanLookupsResponse = z.object({
+    products: z.array(z.unknown()),
+    awemeAccounts: z.array(z.unknown())
+});
+
+export const zListQianchuanMaterialsQuery = z.object({
+    advertiserId: z.string().optional()
+});
+
+/**
+ * Materials
+ */
+export const zListQianchuanMaterialsResponse = z.object({
+    materials: z.array(z.unknown())
+});
+
+export const zCreateQianchuanMaterialUploadBody = z.object({
+    bindingId: z.uuid(),
+    advertiserId: z.string().regex(/^\d+$/),
+    assetId: z.uuid(),
+    kind: z.enum(['video', 'image'])
+});
+
+/**
+ * Queued
+ */
+export const zCreateQianchuanMaterialUploadResponse = z.object({
+    materialId: z.uuid(),
+    jobId: z.uuid()
+});
+
+/**
+ * Deliveries
+ */
+export const zListQianchuanPcDeliveriesResponse = z.object({
+    deliveries: z.array(z.unknown())
+});
+
+export const zCreateQianchuanPcDeliveryBody = z.object({
+    bindingId: z.uuid(),
+    advertiserId: z.string().regex(/^\d+$/),
+    name: z.string().min(1).max(100),
+    productId: z.string().regex(/^\d+$/),
+    awemeId: z.string().regex(/^\d+$/),
+    videoMaterialId: z.string().min(1),
+    imageMaterialId: z.string().optional(),
+    title: z.string().min(1).max(60),
+    budget: z.number().gt(true),
+    bid: z.number().gt(true).optional(),
+    roiGoal: z.number().gt(true).optional(),
+    startTime: z.string().min(1),
+    endTime: z.string().min(1),
+    schedule: z.string().min(1),
+    regions: z.array(z.string()).optional().default([]),
+    gender: z.enum([
+        'ALL',
+        'MALE',
+        'FEMALE'
+    ]).optional().default('ALL'),
+    age: z.array(z.string()).optional().default([]),
+    marketingGoal: z.enum(['VIDEO_PROM_GOODS']).optional().default('VIDEO_PROM_GOODS'),
+    optimizationGoal: z.string().min(1).optional().default('AD_CONVERT_TYPE_SHOPPING'),
+    confirmed: z.literal(true)
+});
+
+export const zCreateQianchuanPcDeliveryHeaders = z.object({
+    'idempotency-key': z.uuid()
+});
+
+/**
+ * Queued
+ */
+export const zCreateQianchuanPcDeliveryResponse = z.object({
+    delivery: z.unknown().optional(),
+    jobId: z.uuid()
+});
+
+export const zSyncQianchuanPcDeliveryPath = z.object({
+    deliveryId: z.uuid()
+});
+
+/**
+ * Queued
+ */
+export const zSyncQianchuanPcDeliveryResponse = z.object({
+    jobId: z.uuid()
+});
+
+export const zUpdateQianchuanPcDeliveryStatusBody = z.object({
+    enabled: z.boolean(),
+    confirmed: z.literal(true)
+});
+
+export const zUpdateQianchuanPcDeliveryStatusPath = z.object({
+    deliveryId: z.uuid()
+});
+
+/**
+ * Updated
+ */
+export const zUpdateQianchuanPcDeliveryStatusResponse = z.object({
+    updated: z.literal(true)
+});
+
+export const zListQianchuanReportsQuery = z.object({
+    startDate: z.string(),
+    endDate: z.string()
+});
+
+/**
+ * Reports
+ */
+export const zListQianchuanReportsResponse = z.object({
+    reports: z.array(z.unknown())
+});

@@ -84,9 +84,9 @@ export type AiConsumptionRecord = {
     createdAt: string;
 };
 
-export type JobModuleId = 'video-remix' | 'video-create' | 'ad-script' | 'ai-generate' | 'video-cut' | 'media-understand' | 'video-mashup' | 'voice-clone' | 'video-renewal' | 'subtitle-erase' | 'video-enhancement' | 'video-extract' | 'video-editor' | 'kickart' | 'douyin-video-import' | 'share-content-import' | 'portrait-asset-register';
+export type JobModuleId = 'video-remix' | 'video-create' | 'ad-script' | 'ai-generate' | 'video-cut' | 'media-understand' | 'video-mashup' | 'voice-clone' | 'video-renewal' | 'subtitle-erase' | 'video-enhancement' | 'video-extract' | 'video-editor' | 'kickart' | 'douyin-video-import' | 'share-content-import' | 'portrait-asset-register' | 'qianchuan-material-upload' | 'qianchuan-pc-submit' | 'qianchuan-pc-sync';
 
-export type ProviderId = 'aihubmix' | 'ark' | 'volc-speech' | 'tos' | 'mediakit' | 'qwen-audio';
+export type ProviderId = 'aihubmix' | 'ark' | 'volc-speech' | 'tos' | 'mediakit' | 'qwen-audio' | 'qianchuan';
 
 export type Job = {
     id: string;
@@ -189,7 +189,7 @@ export type AssetFolder = {
 
 export type AiToolModuleId = 'ai-generate' | 'video-cut' | 'media-understand' | 'video-mashup' | 'voice-clone' | 'video-renewal' | 'subtitle-erase' | 'video-enhancement' | 'kickart';
 
-export type ProviderCredentialName = 'OPENAI_KEY' | 'ARK_API_KEY' | 'VOLC_SPEECH_API_KEY_ID' | 'VOLC_SPEECH_API_KEY' | 'TOS_ACCESS_KEY_ID' | 'TOS_SECRET_ACCESS_KEY' | 'MEDIAKIT_API_KEY' | 'QWEN_AUDIO_API_KEY' | 'QWEN_AUDIO_WORKSPACE_ID';
+export type ProviderCredentialName = 'OPENAI_KEY' | 'ARK_API_KEY' | 'VOLC_SPEECH_API_KEY_ID' | 'VOLC_SPEECH_API_KEY' | 'TOS_ACCESS_KEY_ID' | 'TOS_SECRET_ACCESS_KEY' | 'MEDIAKIT_API_KEY' | 'QWEN_AUDIO_API_KEY' | 'QWEN_AUDIO_WORKSPACE_ID' | 'QIANCHUAN_APP_ID' | 'QIANCHUAN_APP_SECRET';
 
 export type ModuleId = 'video-remix' | 'video-create' | 'ad-script' | 'ai-generate' | 'video-cut' | 'media-understand' | 'video-mashup' | 'voice-clone' | 'video-renewal' | 'subtitle-erase' | 'video-enhancement' | 'video-extract' | 'video-editor' | 'kickart';
 
@@ -4182,3 +4182,387 @@ export type GetShareImportResponses = {
 };
 
 export type GetShareImportResponse = GetShareImportResponses[keyof GetShareImportResponses];
+
+export type GetQianchuanConfigData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/qianchuan/config';
+};
+
+export type GetQianchuanConfigResponses = {
+    /**
+     * Qianchuan application configuration status
+     */
+    200: {
+        configured: boolean;
+        appIdMasked?: string;
+        callbackUrl: 'https://api.xbeaconai.com/callback';
+    };
+};
+
+export type GetQianchuanConfigResponse = GetQianchuanConfigResponses[keyof GetQianchuanConfigResponses];
+
+export type StartQianchuanOauthData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/qianchuan/oauth/start';
+};
+
+export type StartQianchuanOauthErrors = {
+    /**
+     * Not configured
+     */
+    503: ApiErrorResponse;
+};
+
+export type StartQianchuanOauthError = StartQianchuanOauthErrors[keyof StartQianchuanOauthErrors];
+
+export type StartQianchuanOauthResponses = {
+    /**
+     * Qianchuan OAuth URL
+     */
+    200: {
+        authorizationUrl: string;
+    };
+};
+
+export type StartQianchuanOauthResponse = StartQianchuanOauthResponses[keyof StartQianchuanOauthResponses];
+
+export type ListQianchuanBindingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/qianchuan/bindings';
+};
+
+export type ListQianchuanBindingsResponses = {
+    /**
+     * Owned Qianchuan bindings
+     */
+    200: {
+        bindings: Array<{
+            id: string;
+            authUserId: string;
+            subjectName: string;
+            subjectType: string;
+            accessTokenExpiresAt: string;
+            refreshTokenExpiresAt: string;
+            defaultAdvertiserId: string;
+            status: 'active' | 'reauthorization_required' | 'revoked';
+            advertisers: Array<{
+                advertiserId: string;
+                name: string;
+                accountRole: string;
+                status: string;
+            }>;
+        }>;
+    };
+};
+
+export type ListQianchuanBindingsResponse = ListQianchuanBindingsResponses[keyof ListQianchuanBindingsResponses];
+
+export type SetQianchuanDefaultAdvertiserData = {
+    body?: {
+        advertiserId: string;
+    };
+    path: {
+        bindingId: string;
+    };
+    query?: never;
+    url: '/api/qianchuan/bindings/{bindingId}/default-advertiser';
+};
+
+export type SetQianchuanDefaultAdvertiserErrors = {
+    /**
+     * Not found
+     */
+    404: ApiErrorResponse;
+};
+
+export type SetQianchuanDefaultAdvertiserError = SetQianchuanDefaultAdvertiserErrors[keyof SetQianchuanDefaultAdvertiserErrors];
+
+export type SetQianchuanDefaultAdvertiserResponses = {
+    /**
+     * Updated
+     */
+    200: {
+        updated: true;
+    };
+};
+
+export type SetQianchuanDefaultAdvertiserResponse = SetQianchuanDefaultAdvertiserResponses[keyof SetQianchuanDefaultAdvertiserResponses];
+
+export type DeleteQianchuanBindingData = {
+    body?: never;
+    path: {
+        bindingId: string;
+    };
+    query?: never;
+    url: '/api/qianchuan/bindings/{bindingId}';
+};
+
+export type DeleteQianchuanBindingErrors = {
+    /**
+     * Not found
+     */
+    404: ApiErrorResponse;
+};
+
+export type DeleteQianchuanBindingError = DeleteQianchuanBindingErrors[keyof DeleteQianchuanBindingErrors];
+
+export type DeleteQianchuanBindingResponses = {
+    /**
+     * Deleted
+     */
+    200: {
+        deleted: true;
+    };
+};
+
+export type DeleteQianchuanBindingResponse = DeleteQianchuanBindingResponses[keyof DeleteQianchuanBindingResponses];
+
+export type GetQianchuanLookupsData = {
+    body?: never;
+    path?: never;
+    query: {
+        bindingId: string;
+        advertiserId: string;
+    };
+    url: '/api/qianchuan/lookups';
+};
+
+export type GetQianchuanLookupsErrors = {
+    /**
+     * Not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Upstream failure
+     */
+    502: ApiErrorResponse;
+};
+
+export type GetQianchuanLookupsError = GetQianchuanLookupsErrors[keyof GetQianchuanLookupsErrors];
+
+export type GetQianchuanLookupsResponses = {
+    /**
+     * Products and authorized Douyin accounts
+     */
+    200: {
+        products: Array<unknown>;
+        awemeAccounts: Array<unknown>;
+    };
+};
+
+export type GetQianchuanLookupsResponse = GetQianchuanLookupsResponses[keyof GetQianchuanLookupsResponses];
+
+export type ListQianchuanMaterialsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        advertiserId?: string;
+    };
+    url: '/api/qianchuan/materials';
+};
+
+export type ListQianchuanMaterialsResponses = {
+    /**
+     * Materials
+     */
+    200: {
+        materials: Array<unknown>;
+    };
+};
+
+export type ListQianchuanMaterialsResponse = ListQianchuanMaterialsResponses[keyof ListQianchuanMaterialsResponses];
+
+export type CreateQianchuanMaterialUploadData = {
+    body?: {
+        bindingId: string;
+        advertiserId: string;
+        assetId: string;
+        kind: 'video' | 'image';
+    };
+    path?: never;
+    query?: never;
+    url: '/api/qianchuan/materials';
+};
+
+export type CreateQianchuanMaterialUploadErrors = {
+    /**
+     * Not found
+     */
+    404: ApiErrorResponse;
+};
+
+export type CreateQianchuanMaterialUploadError = CreateQianchuanMaterialUploadErrors[keyof CreateQianchuanMaterialUploadErrors];
+
+export type CreateQianchuanMaterialUploadResponses = {
+    /**
+     * Queued
+     */
+    202: {
+        materialId: string;
+        jobId: string;
+    };
+};
+
+export type CreateQianchuanMaterialUploadResponse = CreateQianchuanMaterialUploadResponses[keyof CreateQianchuanMaterialUploadResponses];
+
+export type ListQianchuanPcDeliveriesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/qianchuan/pc-deliveries';
+};
+
+export type ListQianchuanPcDeliveriesResponses = {
+    /**
+     * Deliveries
+     */
+    200: {
+        deliveries: Array<unknown>;
+    };
+};
+
+export type ListQianchuanPcDeliveriesResponse = ListQianchuanPcDeliveriesResponses[keyof ListQianchuanPcDeliveriesResponses];
+
+export type CreateQianchuanPcDeliveryData = {
+    body?: {
+        bindingId: string;
+        advertiserId: string;
+        name: string;
+        productId: string;
+        awemeId: string;
+        videoMaterialId: string;
+        imageMaterialId?: string;
+        title: string;
+        budget: number;
+        bid?: number;
+        roiGoal?: number;
+        startTime: string;
+        endTime: string;
+        schedule: string;
+        regions?: Array<string>;
+        gender?: 'ALL' | 'MALE' | 'FEMALE';
+        age?: Array<string>;
+        marketingGoal?: 'VIDEO_PROM_GOODS';
+        optimizationGoal?: string;
+        confirmed: true;
+    };
+    headers: {
+        'idempotency-key': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/qianchuan/pc-deliveries';
+};
+
+export type CreateQianchuanPcDeliveryErrors = {
+    /**
+     * Not found
+     */
+    404: ApiErrorResponse;
+};
+
+export type CreateQianchuanPcDeliveryError = CreateQianchuanPcDeliveryErrors[keyof CreateQianchuanPcDeliveryErrors];
+
+export type CreateQianchuanPcDeliveryResponses = {
+    /**
+     * Queued
+     */
+    202: {
+        delivery?: unknown;
+        jobId: string;
+    };
+};
+
+export type CreateQianchuanPcDeliveryResponse = CreateQianchuanPcDeliveryResponses[keyof CreateQianchuanPcDeliveryResponses];
+
+export type SyncQianchuanPcDeliveryData = {
+    body?: never;
+    path: {
+        deliveryId: string;
+    };
+    query?: never;
+    url: '/api/qianchuan/pc-deliveries/{deliveryId}/sync';
+};
+
+export type SyncQianchuanPcDeliveryErrors = {
+    /**
+     * Not found
+     */
+    404: ApiErrorResponse;
+};
+
+export type SyncQianchuanPcDeliveryError = SyncQianchuanPcDeliveryErrors[keyof SyncQianchuanPcDeliveryErrors];
+
+export type SyncQianchuanPcDeliveryResponses = {
+    /**
+     * Queued
+     */
+    202: {
+        jobId: string;
+    };
+};
+
+export type SyncQianchuanPcDeliveryResponse = SyncQianchuanPcDeliveryResponses[keyof SyncQianchuanPcDeliveryResponses];
+
+export type UpdateQianchuanPcDeliveryStatusData = {
+    body?: {
+        enabled: boolean;
+        confirmed: true;
+    };
+    path: {
+        deliveryId: string;
+    };
+    query?: never;
+    url: '/api/qianchuan/pc-deliveries/{deliveryId}/status';
+};
+
+export type UpdateQianchuanPcDeliveryStatusErrors = {
+    /**
+     * Not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Upstream failure
+     */
+    502: ApiErrorResponse;
+};
+
+export type UpdateQianchuanPcDeliveryStatusError = UpdateQianchuanPcDeliveryStatusErrors[keyof UpdateQianchuanPcDeliveryStatusErrors];
+
+export type UpdateQianchuanPcDeliveryStatusResponses = {
+    /**
+     * Updated
+     */
+    200: {
+        updated: true;
+    };
+};
+
+export type UpdateQianchuanPcDeliveryStatusResponse = UpdateQianchuanPcDeliveryStatusResponses[keyof UpdateQianchuanPcDeliveryStatusResponses];
+
+export type ListQianchuanReportsData = {
+    body?: never;
+    path?: never;
+    query: {
+        startDate: string;
+        endDate: string;
+    };
+    url: '/api/qianchuan/reports';
+};
+
+export type ListQianchuanReportsResponses = {
+    /**
+     * Reports
+     */
+    200: {
+        reports: Array<unknown>;
+    };
+};
+
+export type ListQianchuanReportsResponse = ListQianchuanReportsResponses[keyof ListQianchuanReportsResponses];

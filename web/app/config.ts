@@ -4,12 +4,14 @@ export type CreationWorkflowId = "video-remix" | "video-create" | "ad-script";
 export type UtilityId = "video-extract" | "video-editor";
 export type AiToolboxId = Exclude<ModuleId, CreationWorkflowId | UtilityId>;
 export type AssetFeatureId = "materials" | "portraits" | "products" | "scenes" | "voices";
+export type DeliveryFeatureId = "qianchuan-merchants" | "qianchuan-pc";
 
 export interface MenuFeatureConfig {
   readonly creationWorkflow: Readonly<Record<CreationWorkflowId, boolean>>;
   readonly aiToolbox: Readonly<Record<AiToolboxId, boolean>>;
   readonly utilities: Readonly<Record<UtilityId, boolean>>;
   readonly assets: Readonly<Record<AssetFeatureId, boolean>>;
+  readonly delivery: Readonly<Record<DeliveryFeatureId, boolean>>;
 }
 
 export interface PublicAppConfig {
@@ -88,6 +90,10 @@ export const APP_CONFIG = {
       scenes: true,
       voices: true,
     },
+    delivery: {
+      "qianchuan-merchants": true,
+      "qianchuan-pc": true,
+    },
   },
 } as const satisfies PublicAppConfig;
 
@@ -118,6 +124,10 @@ export function isModuleOpen(moduleId: ModuleId, config: PublicAppConfig = APP_C
 
 export function isAssetOpen(assetId: AssetFeatureId, config: PublicAppConfig = APP_CONFIG): boolean {
   return config.menuFeatures.assets[assetId];
+}
+
+export function isDeliveryOpen(deliveryId: DeliveryFeatureId, config: PublicAppConfig = APP_CONFIG): boolean {
+  return config.menuFeatures.delivery[deliveryId];
 }
 
 export type HomeDestination = { kind: "route"; path: string } | { kind: "project-coming-soon" };

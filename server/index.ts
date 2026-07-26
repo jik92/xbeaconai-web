@@ -11,7 +11,8 @@ const indexFile = Bun.file(resolve(distRoot, "index.html"));
 
 async function fetch(request: Request) {
   const url = new URL(request.url);
-  if (url.pathname.startsWith("/api/") || url.pathname === "/openapi.json") return app.fetch(request);
+  if (url.pathname.startsWith("/api/") || url.pathname === "/openapi.json" || url.pathname === "/callback")
+    return app.fetch(request);
   let pathname: string;
   try {
     pathname = decodeURIComponent(url.pathname);

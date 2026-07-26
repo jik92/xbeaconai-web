@@ -2,7 +2,13 @@ import type { ModuleId } from "../web/entities/types";
 import type { SeedanceModelId } from "./models/video-models";
 
 /** Background job types not tied to navigation modules. */
-export type BackgroundJobType = "douyin-video-import" | "share-content-import" | "portrait-asset-register";
+export type BackgroundJobType =
+  | "douyin-video-import"
+  | "share-content-import"
+  | "portrait-asset-register"
+  | "qianchuan-material-upload"
+  | "qianchuan-pc-submit"
+  | "qianchuan-pc-sync";
 export type JobModuleId = ModuleId | BackgroundJobType;
 
 export type JobStatus = "queued" | "processing" | "succeeded" | "partially_succeeded" | "failed" | "cancelled";

@@ -8,11 +8,13 @@ export const providerCredentialNames = [
   "MEDIAKIT_API_KEY",
   "QWEN_AUDIO_API_KEY",
   "QWEN_AUDIO_WORKSPACE_ID",
+  "QIANCHUAN_APP_ID",
+  "QIANCHUAN_APP_SECRET",
 ] as const;
 
 export type ProviderCredentialName = (typeof providerCredentialNames)[number];
 
-export const providerIds = ["aihubmix", "ark", "volc-speech", "tos", "mediakit", "qwen-audio"] as const;
+export const providerIds = ["aihubmix", "ark", "volc-speech", "tos", "mediakit", "qwen-audio", "qianchuan"] as const;
 export type ProviderId = (typeof providerIds)[number];
 
 export const providerCredentialCatalog = [
@@ -87,6 +89,22 @@ export const providerCredentialCatalog = [
     label: "Workspace ID",
     secret: false,
     docsUrl: "https://help.aliyun.com/zh/model-studio/speech-synthesis-api-reference/",
+  },
+  {
+    name: "QIANCHUAN_APP_ID",
+    providerId: "qianchuan",
+    provider: "巨量千川",
+    label: "APP ID",
+    secret: false,
+    docsUrl: "https://open.oceanengine.com/labels/34",
+  },
+  {
+    name: "QIANCHUAN_APP_SECRET",
+    providerId: "qianchuan",
+    provider: "巨量千川",
+    label: "APP Secret",
+    secret: true,
+    docsUrl: "https://open.oceanengine.com/labels/34",
   },
 ] as const satisfies ReadonlyArray<{
   name: ProviderCredentialName;

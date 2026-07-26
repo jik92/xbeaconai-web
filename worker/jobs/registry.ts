@@ -5,6 +5,7 @@ import { douyinVideoImportJob } from "./job-douyin-video-import";
 import { genericCreationJob } from "./job-generic-creation";
 import { subtitleEraseJob, videoEnhancementJob } from "./job-mediakit-video";
 import { portraitAssetRegisterJob } from "./job-portrait-asset-register";
+import { qianchuanPcJob } from "./job-qianchuan-pc";
 import { qwenVoiceCloneJob } from "./job-qwen-voice-clone";
 import { videoClipMergeJob } from "./job-video-clip-merge";
 import { videoCreateJob } from "./job-video-create";
@@ -22,6 +23,7 @@ import type { WorkerJobHandler } from "./types";
 export const jobHandlers: readonly WorkerJobHandler[] = [
   douyinVideoImportJob,
   portraitAssetRegisterJob,
+  qianchuanPcJob,
   adScriptJob,
   aiGenerateJob,
   videoCreateJob,

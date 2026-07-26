@@ -183,6 +183,16 @@ export const activeCredentialDoctorProviders: CredentialDoctorProvider[] = [
       throw new InvalidCredentialError("AI MediaKit 接口未通过可用性检查");
     },
   },
+  {
+    providerId: "qianchuan",
+    provider: "巨量千川",
+    credentials: ["QIANCHUAN_APP_ID", "QIANCHUAN_APP_SECRET"],
+    probe: async (values) => {
+      if (!/^\d{8,24}$/.test(values.QIANCHUAN_APP_ID ?? "")) throw new InvalidCredentialError("APP ID 格式不正确");
+      if ((values.QIANCHUAN_APP_SECRET ?? "").length < 16) throw new InvalidCredentialError("APP Secret 格式不正确");
+      return "应用凭据已配置，需完成商户 OAuth 授权";
+    },
+  },
 ];
 
 export class CredentialDoctor {

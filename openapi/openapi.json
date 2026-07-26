@@ -342,7 +342,10 @@
           "kickart",
           "douyin-video-import",
           "share-content-import",
-          "portrait-asset-register"
+          "portrait-asset-register",
+          "qianchuan-material-upload",
+          "qianchuan-pc-submit",
+          "qianchuan-pc-sync"
         ]
       },
       "ProviderId": {
@@ -353,7 +356,8 @@
           "volc-speech",
           "tos",
           "mediakit",
-          "qwen-audio"
+          "qwen-audio",
+          "qianchuan"
         ]
       },
       "Job": {
@@ -804,7 +808,9 @@
           "TOS_SECRET_ACCESS_KEY",
           "MEDIAKIT_API_KEY",
           "QWEN_AUDIO_API_KEY",
-          "QWEN_AUDIO_WORKSPACE_ID"
+          "QWEN_AUDIO_WORKSPACE_ID",
+          "QIANCHUAN_APP_ID",
+          "QIANCHUAN_APP_SECRET"
         ]
       },
       "ModuleId": {
@@ -12035,6 +12041,857 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/qianchuan/config": {
+      "get": {
+        "operationId": "getQianchuanConfig",
+        "responses": {
+          "200": {
+            "description": "Qianchuan application configuration status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "configured": {
+                      "type": "boolean"
+                    },
+                    "appIdMasked": {
+                      "type": "string"
+                    },
+                    "callbackUrl": {
+                      "type": "string",
+                      "enum": [
+                        "https://api.xbeaconai.com/callback"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "configured",
+                    "callbackUrl"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/qianchuan/oauth/start": {
+      "post": {
+        "operationId": "startQianchuanOauth",
+        "responses": {
+          "200": {
+            "description": "Qianchuan OAuth URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "authorizationUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  },
+                  "required": [
+                    "authorizationUrl"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/qianchuan/bindings": {
+      "get": {
+        "operationId": "listQianchuanBindings",
+        "responses": {
+          "200": {
+            "description": "Owned Qianchuan bindings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "bindings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "authUserId": {
+                            "type": "string"
+                          },
+                          "subjectName": {
+                            "type": "string"
+                          },
+                          "subjectType": {
+                            "type": "string"
+                          },
+                          "accessTokenExpiresAt": {
+                            "type": "string"
+                          },
+                          "refreshTokenExpiresAt": {
+                            "type": "string"
+                          },
+                          "defaultAdvertiserId": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "active",
+                              "reauthorization_required",
+                              "revoked"
+                            ]
+                          },
+                          "advertisers": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "advertiserId": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "accountRole": {
+                                  "type": "string"
+                                },
+                                "status": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "advertiserId",
+                                "name",
+                                "accountRole",
+                                "status"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "authUserId",
+                          "subjectName",
+                          "subjectType",
+                          "accessTokenExpiresAt",
+                          "refreshTokenExpiresAt",
+                          "defaultAdvertiserId",
+                          "status",
+                          "advertisers"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "bindings"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/qianchuan/bindings/{bindingId}/default-advertiser": {
+      "put": {
+        "operationId": "setQianchuanDefaultAdvertiser",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "bindingId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "advertiserId": {
+                    "type": "string",
+                    "pattern": "^\\d+$"
+                  }
+                },
+                "required": [
+                  "advertiserId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "updated": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "updated"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/qianchuan/bindings/{bindingId}": {
+      "delete": {
+        "operationId": "deleteQianchuanBinding",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "bindingId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "deleted"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/qianchuan/lookups": {
+      "get": {
+        "operationId": "getQianchuanLookups",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "bindingId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "advertiserId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Products and authorized Douyin accounts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "products": {
+                      "type": "array",
+                      "items": {
+                        "nullable": true
+                      }
+                    },
+                    "awemeAccounts": {
+                      "type": "array",
+                      "items": {
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "required": [
+                    "products",
+                    "awemeAccounts"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/qianchuan/materials": {
+      "post": {
+        "operationId": "createQianchuanMaterialUpload",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "bindingId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "advertiserId": {
+                    "type": "string",
+                    "pattern": "^\\d+$"
+                  },
+                  "assetId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "video",
+                      "image"
+                    ]
+                  }
+                },
+                "required": [
+                  "bindingId",
+                  "advertiserId",
+                  "assetId",
+                  "kind"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "materialId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "jobId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "materialId",
+                    "jobId"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listQianchuanMaterials",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "advertiserId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Materials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "materials": {
+                      "type": "array",
+                      "items": {
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "required": [
+                    "materials"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/qianchuan/pc-deliveries": {
+      "post": {
+        "operationId": "createQianchuanPcDelivery",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "idempotency-key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "bindingId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "advertiserId": {
+                    "type": "string",
+                    "pattern": "^\\d+$"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "productId": {
+                    "type": "string",
+                    "pattern": "^\\d+$"
+                  },
+                  "awemeId": {
+                    "type": "string",
+                    "pattern": "^\\d+$"
+                  },
+                  "videoMaterialId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "imageMaterialId": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  },
+                  "budget": {
+                    "type": "number",
+                    "minimum": 0,
+                    "exclusiveMinimum": true
+                  },
+                  "bid": {
+                    "type": "number",
+                    "minimum": 0,
+                    "exclusiveMinimum": true
+                  },
+                  "roiGoal": {
+                    "type": "number",
+                    "minimum": 0,
+                    "exclusiveMinimum": true
+                  },
+                  "startTime": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "endTime": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "schedule": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "regions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "default": []
+                  },
+                  "gender": {
+                    "type": "string",
+                    "enum": [
+                      "ALL",
+                      "MALE",
+                      "FEMALE"
+                    ],
+                    "default": "ALL"
+                  },
+                  "age": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "default": []
+                  },
+                  "marketingGoal": {
+                    "type": "string",
+                    "enum": [
+                      "VIDEO_PROM_GOODS"
+                    ],
+                    "default": "VIDEO_PROM_GOODS"
+                  },
+                  "optimizationGoal": {
+                    "type": "string",
+                    "minLength": 1,
+                    "default": "AD_CONVERT_TYPE_SHOPPING"
+                  },
+                  "confirmed": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ]
+                  }
+                },
+                "required": [
+                  "bindingId",
+                  "advertiserId",
+                  "name",
+                  "productId",
+                  "awemeId",
+                  "videoMaterialId",
+                  "title",
+                  "budget",
+                  "startTime",
+                  "endTime",
+                  "schedule",
+                  "confirmed"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "delivery": {
+                      "nullable": true
+                    },
+                    "jobId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "jobId"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listQianchuanPcDeliveries",
+        "responses": {
+          "200": {
+            "description": "Deliveries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deliveries": {
+                      "type": "array",
+                      "items": {
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "required": [
+                    "deliveries"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/qianchuan/pc-deliveries/{deliveryId}/sync": {
+      "post": {
+        "operationId": "syncQianchuanPcDelivery",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "deliveryId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jobId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "jobId"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/qianchuan/pc-deliveries/{deliveryId}/status": {
+      "post": {
+        "operationId": "updateQianchuanPcDeliveryStatus",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "deliveryId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "confirmed": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ]
+                  }
+                },
+                "required": [
+                  "enabled",
+                  "confirmed"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "updated": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "updated"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/qianchuan/reports": {
+      "get": {
+        "operationId": "listQianchuanReports",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "startDate",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "endDate",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reports",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "reports": {
+                      "type": "array",
+                      "items": {
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "required": [
+                    "reports"
+                  ]
                 }
               }
             }

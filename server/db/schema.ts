@@ -630,3 +630,153 @@ export const migrationState = sqliteTable("migration_state", {
   value: text("value").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
+
+export const qianchuanOauthStates = sqliteTable(
+  "qianchuan_oauth_states",
+  {
+    stateHash: text("state_hash").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expiresAt: text("expires_at").notNull(),
+    consumedAt: text("consumed_at"),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [index("qianchuan_oauth_states_owner_idx").on(table.ownerUserId, table.createdAt)],
+);
+
+export const qianchuanBindings = sqliteTable(
+  "qianchuan_bindings",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    authUserId: text("auth_user_id").notNull(),
+    subjectId: text("subject_id"),
+    subjectName: text("subject_name").notNull().default(""),
+    subjectType: text("subject_type").notNull().default("AGENCY"),
+    accessTokenCiphertext: text("access_token_ciphertext").notNull(),
+    accessTokenNonce: text("access_token_nonce").notNull(),
+    accessTokenAuthTag: text("access_token_auth_tag").notNull(),
+    refreshTokenCiphertext: text("refresh_token_ciphertext").notNull(),
+    refreshTokenNonce: text("refresh_token_nonce").notNull(),
+    refreshTokenAuthTag: text("refresh_token_auth_tag").notNull(),
+    accessTokenExpiresAt: text("access_token_expires_at").notNull(),
+    refreshTokenExpiresAt: text("refresh_token_expires_at").notNull(),
+    defaultAdvertiserId: text("default_advertiser_id"),
+    status: text("status", { enum: ["active", "reauthorization_required", "revoked"] })
+      .notNull()
+      .default("active"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("qianchuan_bindings_owner_auth_user_idx").on(table.ownerUserId, table.authUserId),
+    index("qianchuan_bindings_owner_idx").on(table.ownerUserId, table.updatedAt),
+  ],
+);
+
+export const qianchuanAdvertisers = sqliteTable(
+  "qianchuan_advertisers",
+  {
+    id: text("id").primaryKey(),
+    bindingId: text("binding_id")
+      .notNull()
+      .references(() => qianchuanBindings.id, { onDelete: "cascade" }),
+    advertiserId: text("advertiser_id").notNull(),
+    name: text("name").notNull(),
+    accountRole: text("account_role").notNull().default("ADVERTISER"),
+    status: text("status").notNull().default("ACTIVE"),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("qianchuan_advertisers_binding_advertiser_idx").on(table.bindingId, table.advertiserId),
+    index("qianchuan_advertisers_binding_idx").on(table.bindingId),
+  ],
+);
+
+export const qianchuanMaterials = sqliteTable(
+  "qianchuan_materials",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    bindingId: text("binding_id")
+      .notNull()
+      .references(() => qianchuanBindings.id, { onDelete: "cascade" }),
+    advertiserId: text("advertiser_id").notNull(),
+    assetId: text("asset_id")
+      .notNull()
+      .references(() => mediaAssets.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["video", "image"] }).notNull(),
+    upstreamMaterialId: text("upstream_material_id"),
+    status: text("status", { enum: ["queued", "uploading", "ready", "failed"] })
+      .notNull()
+      .default("queued"),
+    requestId: text("request_id"),
+    errorMessage: text("error_message"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("qianchuan_materials_account_asset_idx").on(table.advertiserId, table.assetId, table.kind),
+    index("qianchuan_materials_owner_idx").on(table.ownerUserId, table.updatedAt),
+  ],
+);
+
+export const qianchuanDeliveries = sqliteTable(
+  "qianchuan_deliveries",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    bindingId: text("binding_id")
+      .notNull()
+      .references(() => qianchuanBindings.id, { onDelete: "cascade" }),
+    advertiserId: text("advertiser_id").notNull(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    name: text("name").notNull(),
+    status: text("status", {
+      enum: ["draft", "queued", "submitting", "paused", "reviewing", "active", "rejected", "failed"],
+    })
+      .notNull()
+      .default("queued"),
+    campaignId: text("campaign_id"),
+    adId: text("ad_id"),
+    creativeId: text("creative_id"),
+    requestPayload: text("request_payload_json", { mode: "json" }).$type<Record<string, unknown>>().notNull(),
+    reportSummary: text("report_summary_json", { mode: "json" }).$type<Record<string, number>>(),
+    requestId: text("request_id"),
+    errorMessage: text("error_message"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("qianchuan_deliveries_owner_idempotency_idx").on(table.ownerUserId, table.idempotencyKey),
+    index("qianchuan_deliveries_owner_updated_idx").on(table.ownerUserId, table.updatedAt),
+  ],
+);
+
+export const qianchuanReports = sqliteTable(
+  "qianchuan_reports",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    deliveryId: text("delivery_id")
+      .notNull()
+      .references(() => qianchuanDeliveries.id, { onDelete: "cascade" }),
+    reportDate: text("report_date").notNull(),
+    level: text("level", { enum: ["account", "campaign", "material"] }).notNull(),
+    metrics: text("metrics_json", { mode: "json" }).$type<Record<string, number>>().notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("qianchuan_reports_delivery_date_level_idx").on(table.deliveryId, table.reportDate, table.level),
+    index("qianchuan_reports_owner_date_idx").on(table.ownerUserId, table.reportDate),
+  ],
+);

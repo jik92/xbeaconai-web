@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { applyVideoCreateShotMaterialVersion, batchGenerateVideoCreateAudio, batchGenerateVideoCreateShots, cancelJob, changePassword, clearVideoCreateScript, completeDirectUpload, createAdScriptAction, createAdScriptProject, createAiGenerateJob, createDirectUpload, createJob, createRechargeOrder, createShareImport, createVideoCreateProject, createVideoRemixComposeJob, createVideoRemixPromptToolJob, createVideoRemixShotGenerationJob, deleteAdminCredential, deleteAsset, deleteProduct, downloadArtifact, exportAdminEnvKey, exportAdScriptVersion, generateVideoCreateShot, getAdminCredentialDoctorResults, getAdminProviderAudit, getAdScriptProject, getAssetContent, getCapabilities, getCreationCapabilities, getCurrentUser, getHealth, getJob, getModels, getPortraitContent, getPreferences, getProviderFeatures, getShareImport, getToolOutputFolder, getVideoCreateProject, getVideoCreateShotGenerationDraft, getVideoRemixProject, grantAdminUserCredits, importAdminEnvKey, listAdminCredentials, listAdminJobs, listAdminProviderAudits, listAdminUsers, listAdScriptProjects, listAiConsumptionRecords, listAiRechargeRecords, listAssets, listCustomPortraits, listJobs, listNotifications, listRechargeOrders, listRechargePackages, listVideoCreateProjects, listVideoCreateShotMaterialVersions, listVideoRemixProjects, listVideoRemixShotGenerationJobs, login, logout, markAllNotificationsRead, markNotificationRead, type Options, parseAdScriptSource, parseShareContent, preflightQwenVoiceSample, previewAdminProviderAuditAsset, previewVideoCreateVoice, processVideoCreateShotMaterial, regenerateVideoCreateSection, register, registerCustomPortrait, replaceVideoCreateShot, retryJob, runAdminCredentialDoctor, runVideoCreateAction, saveAdScriptVersion, saveAssetMetadata, savePreferences, saveVideoCreateSection, sendSmsVerificationCode, setToolOutputFolder, setupPassword, stopAllAdminJobs, updateAdminCredential, updateAdminUserStatus, updateAllVideoCreateShotSettings, updateProfile, updateVideoCreateMediaSettings, updateVideoCreateProject, updateVideoCreateShotSettings, updateVideoRemixProject, uploadMedia, verifyPasswordReset } from '../sdk.gen';
-import type { ApplyVideoCreateShotMaterialVersionData, ApplyVideoCreateShotMaterialVersionError, ApplyVideoCreateShotMaterialVersionResponse, BatchGenerateVideoCreateAudioData, BatchGenerateVideoCreateAudioError, BatchGenerateVideoCreateAudioResponse, BatchGenerateVideoCreateShotsData, BatchGenerateVideoCreateShotsError, BatchGenerateVideoCreateShotsResponse, CancelJobData, CancelJobError, CancelJobResponse, ChangePasswordData, ChangePasswordError, ChangePasswordResponse, ClearVideoCreateScriptData, ClearVideoCreateScriptError, ClearVideoCreateScriptResponse, CompleteDirectUploadData, CompleteDirectUploadError, CompleteDirectUploadResponse, CreateAdScriptActionData, CreateAdScriptActionError, CreateAdScriptActionResponse, CreateAdScriptProjectData, CreateAdScriptProjectError, CreateAdScriptProjectResponse, CreateAiGenerateJobData, CreateAiGenerateJobError, CreateAiGenerateJobResponse, CreateDirectUploadData, CreateDirectUploadError, CreateDirectUploadResponse, CreateJobData, CreateJobError, CreateJobResponse, CreateRechargeOrderData, CreateRechargeOrderError, CreateRechargeOrderResponse, CreateShareImportData, CreateShareImportError, CreateShareImportResponse, CreateVideoCreateProjectData, CreateVideoCreateProjectError, CreateVideoCreateProjectResponse, CreateVideoRemixComposeJobData, CreateVideoRemixComposeJobError, CreateVideoRemixComposeJobResponse, CreateVideoRemixPromptToolJobData, CreateVideoRemixPromptToolJobError, CreateVideoRemixPromptToolJobResponse, CreateVideoRemixShotGenerationJobData, CreateVideoRemixShotGenerationJobError, CreateVideoRemixShotGenerationJobResponse, DeleteAdminCredentialData, DeleteAdminCredentialError, DeleteAdminCredentialResponse, DeleteAssetData, DeleteAssetError, DeleteAssetResponse, DeleteProductData, DeleteProductError, DeleteProductResponse, DownloadArtifactData, DownloadArtifactError, DownloadArtifactResponse, ExportAdminEnvKeyData, ExportAdminEnvKeyError, ExportAdminEnvKeyResponse, ExportAdScriptVersionData, ExportAdScriptVersionError, ExportAdScriptVersionResponse, GenerateVideoCreateShotData, GenerateVideoCreateShotError, GenerateVideoCreateShotResponse, GetAdminCredentialDoctorResultsData, GetAdminCredentialDoctorResultsError, GetAdminCredentialDoctorResultsResponse, GetAdminProviderAuditData, GetAdminProviderAuditError, GetAdminProviderAuditResponse, GetAdScriptProjectData, GetAdScriptProjectError, GetAdScriptProjectResponse, GetAssetContentData, GetAssetContentError, GetAssetContentResponse, GetCapabilitiesData, GetCapabilitiesResponse, GetCreationCapabilitiesData, GetCreationCapabilitiesResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetHealthData, GetHealthResponse, GetJobData, GetJobError, GetJobResponse, GetModelsData, GetModelsResponse, GetPortraitContentData, GetPortraitContentError, GetPortraitContentResponse, GetPreferencesData, GetPreferencesResponse, GetProviderFeaturesData, GetProviderFeaturesResponse, GetShareImportData, GetShareImportError, GetShareImportResponse, GetToolOutputFolderData, GetToolOutputFolderError, GetToolOutputFolderResponse, GetVideoCreateProjectData, GetVideoCreateProjectError, GetVideoCreateProjectResponse, GetVideoCreateShotGenerationDraftData, GetVideoCreateShotGenerationDraftError, GetVideoCreateShotGenerationDraftResponse, GetVideoRemixProjectData, GetVideoRemixProjectError, GetVideoRemixProjectResponse, GrantAdminUserCreditsData, GrantAdminUserCreditsError, GrantAdminUserCreditsResponse, ImportAdminEnvKeyData, ImportAdminEnvKeyError, ImportAdminEnvKeyResponse, ListAdminCredentialsData, ListAdminCredentialsError, ListAdminCredentialsResponse, ListAdminJobsData, ListAdminJobsError, ListAdminJobsResponse, ListAdminProviderAuditsData, ListAdminProviderAuditsError, ListAdminProviderAuditsResponse, ListAdminUsersData, ListAdminUsersError, ListAdminUsersResponse, ListAdScriptProjectsData, ListAdScriptProjectsResponse, ListAiConsumptionRecordsData, ListAiConsumptionRecordsResponse, ListAiRechargeRecordsData, ListAiRechargeRecordsResponse, ListAssetsData, ListAssetsResponse, ListCustomPortraitsData, ListCustomPortraitsResponse, ListJobsData, ListJobsResponse, ListNotificationsData, ListNotificationsResponse, ListRechargeOrdersData, ListRechargeOrdersResponse, ListRechargePackagesData, ListRechargePackagesResponse, ListVideoCreateProjectsData, ListVideoCreateProjectsResponse, ListVideoCreateShotMaterialVersionsData, ListVideoCreateShotMaterialVersionsError, ListVideoCreateShotMaterialVersionsResponse, ListVideoRemixProjectsData, ListVideoRemixProjectsResponse, ListVideoRemixShotGenerationJobsData, ListVideoRemixShotGenerationJobsError, ListVideoRemixShotGenerationJobsResponse, LoginData, LoginError, LoginResponse, LogoutData, LogoutError, LogoutResponse, MarkAllNotificationsReadData, MarkAllNotificationsReadResponse, MarkNotificationReadData, MarkNotificationReadError, MarkNotificationReadResponse, ParseAdScriptSourceData, ParseAdScriptSourceError, ParseAdScriptSourceResponse, ParseShareContentData, ParseShareContentResponse, PreflightQwenVoiceSampleData, PreflightQwenVoiceSampleError, PreflightQwenVoiceSampleResponse, PreviewAdminProviderAuditAssetData, PreviewAdminProviderAuditAssetError, PreviewAdminProviderAuditAssetResponse, PreviewVideoCreateVoiceData, PreviewVideoCreateVoiceError, PreviewVideoCreateVoiceResponse, ProcessVideoCreateShotMaterialData, ProcessVideoCreateShotMaterialError, ProcessVideoCreateShotMaterialResponse, RegenerateVideoCreateSectionData, RegenerateVideoCreateSectionError, RegenerateVideoCreateSectionResponse, RegisterCustomPortraitData, RegisterCustomPortraitError, RegisterCustomPortraitResponse, RegisterData, RegisterError, RegisterResponse, ReplaceVideoCreateShotData, ReplaceVideoCreateShotError, ReplaceVideoCreateShotResponse, RetryJobData, RetryJobError, RetryJobResponse, RunAdminCredentialDoctorData, RunAdminCredentialDoctorError, RunAdminCredentialDoctorResponse, RunVideoCreateActionData, RunVideoCreateActionError, RunVideoCreateActionResponse, SaveAdScriptVersionData, SaveAdScriptVersionError, SaveAdScriptVersionResponse, SaveAssetMetadataData, SaveAssetMetadataError, SaveAssetMetadataResponse, SavePreferencesData, SavePreferencesResponse, SaveVideoCreateSectionData, SaveVideoCreateSectionError, SaveVideoCreateSectionResponse, SendSmsVerificationCodeData, SendSmsVerificationCodeError, SendSmsVerificationCodeResponse, SetToolOutputFolderData, SetToolOutputFolderError, SetToolOutputFolderResponse, SetupPasswordData, SetupPasswordError, SetupPasswordResponse, StopAllAdminJobsData, StopAllAdminJobsError, StopAllAdminJobsResponse, UpdateAdminCredentialData, UpdateAdminCredentialError, UpdateAdminCredentialResponse, UpdateAdminUserStatusData, UpdateAdminUserStatusError, UpdateAdminUserStatusResponse, UpdateAllVideoCreateShotSettingsData, UpdateAllVideoCreateShotSettingsError, UpdateAllVideoCreateShotSettingsResponse, UpdateProfileData, UpdateProfileResponse, UpdateVideoCreateMediaSettingsData, UpdateVideoCreateMediaSettingsError, UpdateVideoCreateMediaSettingsResponse, UpdateVideoCreateProjectData, UpdateVideoCreateProjectError, UpdateVideoCreateProjectResponse, UpdateVideoCreateShotSettingsData, UpdateVideoCreateShotSettingsError, UpdateVideoCreateShotSettingsResponse, UpdateVideoRemixProjectData, UpdateVideoRemixProjectError, UpdateVideoRemixProjectResponse, UploadMediaData, UploadMediaError, UploadMediaResponse, VerifyPasswordResetData, VerifyPasswordResetError, VerifyPasswordResetResponse } from '../types.gen';
+import { applyVideoCreateShotMaterialVersion, batchGenerateVideoCreateAudio, batchGenerateVideoCreateShots, cancelJob, changePassword, clearVideoCreateScript, completeDirectUpload, createAdScriptAction, createAdScriptProject, createAiGenerateJob, createDirectUpload, createJob, createQianchuanMaterialUpload, createQianchuanPcDelivery, createRechargeOrder, createShareImport, createVideoCreateProject, createVideoRemixComposeJob, createVideoRemixPromptToolJob, createVideoRemixShotGenerationJob, deleteAdminCredential, deleteAsset, deleteProduct, deleteQianchuanBinding, downloadArtifact, exportAdminEnvKey, exportAdScriptVersion, generateVideoCreateShot, getAdminCredentialDoctorResults, getAdminProviderAudit, getAdScriptProject, getAssetContent, getCapabilities, getCreationCapabilities, getCurrentUser, getHealth, getJob, getModels, getPortraitContent, getPreferences, getProviderFeatures, getQianchuanConfig, getQianchuanLookups, getShareImport, getToolOutputFolder, getVideoCreateProject, getVideoCreateShotGenerationDraft, getVideoRemixProject, grantAdminUserCredits, importAdminEnvKey, listAdminCredentials, listAdminJobs, listAdminProviderAudits, listAdminUsers, listAdScriptProjects, listAiConsumptionRecords, listAiRechargeRecords, listAssets, listCustomPortraits, listJobs, listNotifications, listQianchuanBindings, listQianchuanMaterials, listQianchuanPcDeliveries, listQianchuanReports, listRechargeOrders, listRechargePackages, listVideoCreateProjects, listVideoCreateShotMaterialVersions, listVideoRemixProjects, listVideoRemixShotGenerationJobs, login, logout, markAllNotificationsRead, markNotificationRead, type Options, parseAdScriptSource, parseShareContent, preflightQwenVoiceSample, previewAdminProviderAuditAsset, previewVideoCreateVoice, processVideoCreateShotMaterial, regenerateVideoCreateSection, register, registerCustomPortrait, replaceVideoCreateShot, retryJob, runAdminCredentialDoctor, runVideoCreateAction, saveAdScriptVersion, saveAssetMetadata, savePreferences, saveVideoCreateSection, sendSmsVerificationCode, setQianchuanDefaultAdvertiser, setToolOutputFolder, setupPassword, startQianchuanOauth, stopAllAdminJobs, syncQianchuanPcDelivery, updateAdminCredential, updateAdminUserStatus, updateAllVideoCreateShotSettings, updateProfile, updateQianchuanPcDeliveryStatus, updateVideoCreateMediaSettings, updateVideoCreateProject, updateVideoCreateShotSettings, updateVideoRemixProject, uploadMedia, verifyPasswordReset } from '../sdk.gen';
+import type { ApplyVideoCreateShotMaterialVersionData, ApplyVideoCreateShotMaterialVersionError, ApplyVideoCreateShotMaterialVersionResponse, BatchGenerateVideoCreateAudioData, BatchGenerateVideoCreateAudioError, BatchGenerateVideoCreateAudioResponse, BatchGenerateVideoCreateShotsData, BatchGenerateVideoCreateShotsError, BatchGenerateVideoCreateShotsResponse, CancelJobData, CancelJobError, CancelJobResponse, ChangePasswordData, ChangePasswordError, ChangePasswordResponse, ClearVideoCreateScriptData, ClearVideoCreateScriptError, ClearVideoCreateScriptResponse, CompleteDirectUploadData, CompleteDirectUploadError, CompleteDirectUploadResponse, CreateAdScriptActionData, CreateAdScriptActionError, CreateAdScriptActionResponse, CreateAdScriptProjectData, CreateAdScriptProjectError, CreateAdScriptProjectResponse, CreateAiGenerateJobData, CreateAiGenerateJobError, CreateAiGenerateJobResponse, CreateDirectUploadData, CreateDirectUploadError, CreateDirectUploadResponse, CreateJobData, CreateJobError, CreateJobResponse, CreateQianchuanMaterialUploadData, CreateQianchuanMaterialUploadError, CreateQianchuanMaterialUploadResponse, CreateQianchuanPcDeliveryData, CreateQianchuanPcDeliveryError, CreateQianchuanPcDeliveryResponse, CreateRechargeOrderData, CreateRechargeOrderError, CreateRechargeOrderResponse, CreateShareImportData, CreateShareImportError, CreateShareImportResponse, CreateVideoCreateProjectData, CreateVideoCreateProjectError, CreateVideoCreateProjectResponse, CreateVideoRemixComposeJobData, CreateVideoRemixComposeJobError, CreateVideoRemixComposeJobResponse, CreateVideoRemixPromptToolJobData, CreateVideoRemixPromptToolJobError, CreateVideoRemixPromptToolJobResponse, CreateVideoRemixShotGenerationJobData, CreateVideoRemixShotGenerationJobError, CreateVideoRemixShotGenerationJobResponse, DeleteAdminCredentialData, DeleteAdminCredentialError, DeleteAdminCredentialResponse, DeleteAssetData, DeleteAssetError, DeleteAssetResponse, DeleteProductData, DeleteProductError, DeleteProductResponse, DeleteQianchuanBindingData, DeleteQianchuanBindingError, DeleteQianchuanBindingResponse, DownloadArtifactData, DownloadArtifactError, DownloadArtifactResponse, ExportAdminEnvKeyData, ExportAdminEnvKeyError, ExportAdminEnvKeyResponse, ExportAdScriptVersionData, ExportAdScriptVersionError, ExportAdScriptVersionResponse, GenerateVideoCreateShotData, GenerateVideoCreateShotError, GenerateVideoCreateShotResponse, GetAdminCredentialDoctorResultsData, GetAdminCredentialDoctorResultsError, GetAdminCredentialDoctorResultsResponse, GetAdminProviderAuditData, GetAdminProviderAuditError, GetAdminProviderAuditResponse, GetAdScriptProjectData, GetAdScriptProjectError, GetAdScriptProjectResponse, GetAssetContentData, GetAssetContentError, GetAssetContentResponse, GetCapabilitiesData, GetCapabilitiesResponse, GetCreationCapabilitiesData, GetCreationCapabilitiesResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetHealthData, GetHealthResponse, GetJobData, GetJobError, GetJobResponse, GetModelsData, GetModelsResponse, GetPortraitContentData, GetPortraitContentError, GetPortraitContentResponse, GetPreferencesData, GetPreferencesResponse, GetProviderFeaturesData, GetProviderFeaturesResponse, GetQianchuanConfigData, GetQianchuanConfigResponse, GetQianchuanLookupsData, GetQianchuanLookupsError, GetQianchuanLookupsResponse, GetShareImportData, GetShareImportError, GetShareImportResponse, GetToolOutputFolderData, GetToolOutputFolderError, GetToolOutputFolderResponse, GetVideoCreateProjectData, GetVideoCreateProjectError, GetVideoCreateProjectResponse, GetVideoCreateShotGenerationDraftData, GetVideoCreateShotGenerationDraftError, GetVideoCreateShotGenerationDraftResponse, GetVideoRemixProjectData, GetVideoRemixProjectError, GetVideoRemixProjectResponse, GrantAdminUserCreditsData, GrantAdminUserCreditsError, GrantAdminUserCreditsResponse, ImportAdminEnvKeyData, ImportAdminEnvKeyError, ImportAdminEnvKeyResponse, ListAdminCredentialsData, ListAdminCredentialsError, ListAdminCredentialsResponse, ListAdminJobsData, ListAdminJobsError, ListAdminJobsResponse, ListAdminProviderAuditsData, ListAdminProviderAuditsError, ListAdminProviderAuditsResponse, ListAdminUsersData, ListAdminUsersError, ListAdminUsersResponse, ListAdScriptProjectsData, ListAdScriptProjectsResponse, ListAiConsumptionRecordsData, ListAiConsumptionRecordsResponse, ListAiRechargeRecordsData, ListAiRechargeRecordsResponse, ListAssetsData, ListAssetsResponse, ListCustomPortraitsData, ListCustomPortraitsResponse, ListJobsData, ListJobsResponse, ListNotificationsData, ListNotificationsResponse, ListQianchuanBindingsData, ListQianchuanBindingsResponse, ListQianchuanMaterialsData, ListQianchuanMaterialsResponse, ListQianchuanPcDeliveriesData, ListQianchuanPcDeliveriesResponse, ListQianchuanReportsData, ListQianchuanReportsResponse, ListRechargeOrdersData, ListRechargeOrdersResponse, ListRechargePackagesData, ListRechargePackagesResponse, ListVideoCreateProjectsData, ListVideoCreateProjectsResponse, ListVideoCreateShotMaterialVersionsData, ListVideoCreateShotMaterialVersionsError, ListVideoCreateShotMaterialVersionsResponse, ListVideoRemixProjectsData, ListVideoRemixProjectsResponse, ListVideoRemixShotGenerationJobsData, ListVideoRemixShotGenerationJobsError, ListVideoRemixShotGenerationJobsResponse, LoginData, LoginError, LoginResponse, LogoutData, LogoutError, LogoutResponse, MarkAllNotificationsReadData, MarkAllNotificationsReadResponse, MarkNotificationReadData, MarkNotificationReadError, MarkNotificationReadResponse, ParseAdScriptSourceData, ParseAdScriptSourceError, ParseAdScriptSourceResponse, ParseShareContentData, ParseShareContentResponse, PreflightQwenVoiceSampleData, PreflightQwenVoiceSampleError, PreflightQwenVoiceSampleResponse, PreviewAdminProviderAuditAssetData, PreviewAdminProviderAuditAssetError, PreviewAdminProviderAuditAssetResponse, PreviewVideoCreateVoiceData, PreviewVideoCreateVoiceError, PreviewVideoCreateVoiceResponse, ProcessVideoCreateShotMaterialData, ProcessVideoCreateShotMaterialError, ProcessVideoCreateShotMaterialResponse, RegenerateVideoCreateSectionData, RegenerateVideoCreateSectionError, RegenerateVideoCreateSectionResponse, RegisterCustomPortraitData, RegisterCustomPortraitError, RegisterCustomPortraitResponse, RegisterData, RegisterError, RegisterResponse, ReplaceVideoCreateShotData, ReplaceVideoCreateShotError, ReplaceVideoCreateShotResponse, RetryJobData, RetryJobError, RetryJobResponse, RunAdminCredentialDoctorData, RunAdminCredentialDoctorError, RunAdminCredentialDoctorResponse, RunVideoCreateActionData, RunVideoCreateActionError, RunVideoCreateActionResponse, SaveAdScriptVersionData, SaveAdScriptVersionError, SaveAdScriptVersionResponse, SaveAssetMetadataData, SaveAssetMetadataError, SaveAssetMetadataResponse, SavePreferencesData, SavePreferencesResponse, SaveVideoCreateSectionData, SaveVideoCreateSectionError, SaveVideoCreateSectionResponse, SendSmsVerificationCodeData, SendSmsVerificationCodeError, SendSmsVerificationCodeResponse, SetQianchuanDefaultAdvertiserData, SetQianchuanDefaultAdvertiserError, SetQianchuanDefaultAdvertiserResponse, SetToolOutputFolderData, SetToolOutputFolderError, SetToolOutputFolderResponse, SetupPasswordData, SetupPasswordError, SetupPasswordResponse, StartQianchuanOauthData, StartQianchuanOauthError, StartQianchuanOauthResponse, StopAllAdminJobsData, StopAllAdminJobsError, StopAllAdminJobsResponse, SyncQianchuanPcDeliveryData, SyncQianchuanPcDeliveryError, SyncQianchuanPcDeliveryResponse, UpdateAdminCredentialData, UpdateAdminCredentialError, UpdateAdminCredentialResponse, UpdateAdminUserStatusData, UpdateAdminUserStatusError, UpdateAdminUserStatusResponse, UpdateAllVideoCreateShotSettingsData, UpdateAllVideoCreateShotSettingsError, UpdateAllVideoCreateShotSettingsResponse, UpdateProfileData, UpdateProfileResponse, UpdateQianchuanPcDeliveryStatusData, UpdateQianchuanPcDeliveryStatusError, UpdateQianchuanPcDeliveryStatusResponse, UpdateVideoCreateMediaSettingsData, UpdateVideoCreateMediaSettingsError, UpdateVideoCreateMediaSettingsResponse, UpdateVideoCreateProjectData, UpdateVideoCreateProjectError, UpdateVideoCreateProjectResponse, UpdateVideoCreateShotSettingsData, UpdateVideoCreateShotSettingsError, UpdateVideoCreateShotSettingsResponse, UpdateVideoRemixProjectData, UpdateVideoRemixProjectError, UpdateVideoRemixProjectResponse, UploadMediaData, UploadMediaError, UploadMediaResponse, VerifyPasswordResetData, VerifyPasswordResetError, VerifyPasswordResetResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -1625,4 +1625,192 @@ export const getShareImportOptions = (options: Options<GetShareImportData>) => q
         return data;
     },
     queryKey: getShareImportQueryKey(options)
+});
+
+export const getQianchuanConfigQueryKey = (options?: Options<GetQianchuanConfigData>) => createQueryKey('getQianchuanConfig', options);
+
+export const getQianchuanConfigOptions = (options?: Options<GetQianchuanConfigData>) => queryOptions<GetQianchuanConfigResponse, DefaultError, GetQianchuanConfigResponse, ReturnType<typeof getQianchuanConfigQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getQianchuanConfig({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getQianchuanConfigQueryKey(options)
+});
+
+export const startQianchuanOauthMutation = (options?: Partial<Options<StartQianchuanOauthData>>): UseMutationOptions<StartQianchuanOauthResponse, StartQianchuanOauthError, Options<StartQianchuanOauthData>> => {
+    const mutationOptions: UseMutationOptions<StartQianchuanOauthResponse, StartQianchuanOauthError, Options<StartQianchuanOauthData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await startQianchuanOauth({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const listQianchuanBindingsQueryKey = (options?: Options<ListQianchuanBindingsData>) => createQueryKey('listQianchuanBindings', options);
+
+export const listQianchuanBindingsOptions = (options?: Options<ListQianchuanBindingsData>) => queryOptions<ListQianchuanBindingsResponse, DefaultError, ListQianchuanBindingsResponse, ReturnType<typeof listQianchuanBindingsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listQianchuanBindings({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listQianchuanBindingsQueryKey(options)
+});
+
+export const setQianchuanDefaultAdvertiserMutation = (options?: Partial<Options<SetQianchuanDefaultAdvertiserData>>): UseMutationOptions<SetQianchuanDefaultAdvertiserResponse, SetQianchuanDefaultAdvertiserError, Options<SetQianchuanDefaultAdvertiserData>> => {
+    const mutationOptions: UseMutationOptions<SetQianchuanDefaultAdvertiserResponse, SetQianchuanDefaultAdvertiserError, Options<SetQianchuanDefaultAdvertiserData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await setQianchuanDefaultAdvertiser({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const deleteQianchuanBindingMutation = (options?: Partial<Options<DeleteQianchuanBindingData>>): UseMutationOptions<DeleteQianchuanBindingResponse, DeleteQianchuanBindingError, Options<DeleteQianchuanBindingData>> => {
+    const mutationOptions: UseMutationOptions<DeleteQianchuanBindingResponse, DeleteQianchuanBindingError, Options<DeleteQianchuanBindingData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await deleteQianchuanBinding({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getQianchuanLookupsQueryKey = (options: Options<GetQianchuanLookupsData>) => createQueryKey('getQianchuanLookups', options);
+
+export const getQianchuanLookupsOptions = (options: Options<GetQianchuanLookupsData>) => queryOptions<GetQianchuanLookupsResponse, GetQianchuanLookupsError, GetQianchuanLookupsResponse, ReturnType<typeof getQianchuanLookupsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getQianchuanLookups({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getQianchuanLookupsQueryKey(options)
+});
+
+export const listQianchuanMaterialsQueryKey = (options?: Options<ListQianchuanMaterialsData>) => createQueryKey('listQianchuanMaterials', options);
+
+export const listQianchuanMaterialsOptions = (options?: Options<ListQianchuanMaterialsData>) => queryOptions<ListQianchuanMaterialsResponse, DefaultError, ListQianchuanMaterialsResponse, ReturnType<typeof listQianchuanMaterialsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listQianchuanMaterials({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listQianchuanMaterialsQueryKey(options)
+});
+
+export const createQianchuanMaterialUploadMutation = (options?: Partial<Options<CreateQianchuanMaterialUploadData>>): UseMutationOptions<CreateQianchuanMaterialUploadResponse, CreateQianchuanMaterialUploadError, Options<CreateQianchuanMaterialUploadData>> => {
+    const mutationOptions: UseMutationOptions<CreateQianchuanMaterialUploadResponse, CreateQianchuanMaterialUploadError, Options<CreateQianchuanMaterialUploadData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await createQianchuanMaterialUpload({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const listQianchuanPcDeliveriesQueryKey = (options?: Options<ListQianchuanPcDeliveriesData>) => createQueryKey('listQianchuanPcDeliveries', options);
+
+export const listQianchuanPcDeliveriesOptions = (options?: Options<ListQianchuanPcDeliveriesData>) => queryOptions<ListQianchuanPcDeliveriesResponse, DefaultError, ListQianchuanPcDeliveriesResponse, ReturnType<typeof listQianchuanPcDeliveriesQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listQianchuanPcDeliveries({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listQianchuanPcDeliveriesQueryKey(options)
+});
+
+export const createQianchuanPcDeliveryMutation = (options?: Partial<Options<CreateQianchuanPcDeliveryData>>): UseMutationOptions<CreateQianchuanPcDeliveryResponse, CreateQianchuanPcDeliveryError, Options<CreateQianchuanPcDeliveryData>> => {
+    const mutationOptions: UseMutationOptions<CreateQianchuanPcDeliveryResponse, CreateQianchuanPcDeliveryError, Options<CreateQianchuanPcDeliveryData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await createQianchuanPcDelivery({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const syncQianchuanPcDeliveryMutation = (options?: Partial<Options<SyncQianchuanPcDeliveryData>>): UseMutationOptions<SyncQianchuanPcDeliveryResponse, SyncQianchuanPcDeliveryError, Options<SyncQianchuanPcDeliveryData>> => {
+    const mutationOptions: UseMutationOptions<SyncQianchuanPcDeliveryResponse, SyncQianchuanPcDeliveryError, Options<SyncQianchuanPcDeliveryData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await syncQianchuanPcDelivery({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const updateQianchuanPcDeliveryStatusMutation = (options?: Partial<Options<UpdateQianchuanPcDeliveryStatusData>>): UseMutationOptions<UpdateQianchuanPcDeliveryStatusResponse, UpdateQianchuanPcDeliveryStatusError, Options<UpdateQianchuanPcDeliveryStatusData>> => {
+    const mutationOptions: UseMutationOptions<UpdateQianchuanPcDeliveryStatusResponse, UpdateQianchuanPcDeliveryStatusError, Options<UpdateQianchuanPcDeliveryStatusData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await updateQianchuanPcDeliveryStatus({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const listQianchuanReportsQueryKey = (options: Options<ListQianchuanReportsData>) => createQueryKey('listQianchuanReports', options);
+
+export const listQianchuanReportsOptions = (options: Options<ListQianchuanReportsData>) => queryOptions<ListQianchuanReportsResponse, DefaultError, ListQianchuanReportsResponse, ReturnType<typeof listQianchuanReportsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listQianchuanReports({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listQianchuanReportsQueryKey(options)
 });

@@ -86,6 +86,10 @@ import { getPortraitById } from "./portraits/catalog";
 import { type CustomPortraitRecord, CustomPortraitStore } from "./portraits/custom-portrait-store";
 import { resolvePortraitReference } from "./portraits/portrait-resolver";
 import { volcSpeech } from "./providers/volc-speech";
+import { qianchuanClient } from "./qianchuan/client";
+import { consumeQianchuanOauthState, createQianchuanOauthState } from "./qianchuan/oauth-state";
+import { qianchuanStore } from "./qianchuan/store";
+import { QianchuanUpstreamError } from "./qianchuan/types";
 import { auditSdkRegistry } from "./sdk-registry";
 import { ossutils } from "./storage/ossutils";
 import { rollbackUploadedObjects, uploadFilesStrictly } from "./storage/strict-library-upload";
@@ -153,7 +157,14 @@ const moduleIds = [
   "video-editor",
   "kickart",
 ] as const;
-const backgroundJobTypes = ["douyin-video-import", "share-content-import", "portrait-asset-register"] as const;
+const backgroundJobTypes = [
+  "douyin-video-import",
+  "share-content-import",
+  "portrait-asset-register",
+  "qianchuan-material-upload",
+  "qianchuan-pc-submit",
+  "qianchuan-pc-sync",
+] as const;
 const jobModuleIds = [...moduleIds, ...backgroundJobTypes] as const;
 const ModuleSchema = z.enum(moduleIds).openapi("ModuleId");
 const AiToolModuleSchema = z.enum(aiToolModuleIds).openapi("AiToolModuleId");
@@ -7334,6 +7345,566 @@ app.openapi(getShareImportRoute, (c) => {
       404,
     );
   return c.json(job, 200);
+});
+
+const QianchuanBindingSchema = z.object({
+  id: z.string().uuid(),
+  authUserId: z.string(),
+  subjectName: z.string(),
+  subjectType: z.string(),
+  accessTokenExpiresAt: z.string(),
+  refreshTokenExpiresAt: z.string(),
+  defaultAdvertiserId: z.string().nullable(),
+  status: z.enum(["active", "reauthorization_required", "revoked"]),
+  advertisers: z.array(
+    z.object({
+      advertiserId: z.string(),
+      name: z.string(),
+      accountRole: z.string(),
+      status: z.string(),
+    }),
+  ),
+});
+const QianchuanDeliveryInputSchema = z.object({
+  bindingId: z.string().uuid(),
+  advertiserId: z.string().regex(/^\d+$/),
+  name: z.string().trim().min(1).max(100),
+  productId: z.string().regex(/^\d+$/),
+  awemeId: z.string().regex(/^\d+$/),
+  videoMaterialId: z.string().min(1),
+  imageMaterialId: z.string().optional(),
+  title: z.string().trim().min(1).max(60),
+  budget: z.number().positive(),
+  bid: z.number().positive().optional(),
+  roiGoal: z.number().positive().optional(),
+  startTime: z.string().min(1),
+  endTime: z.string().min(1),
+  schedule: z.string().min(1),
+  regions: z.array(z.string()).default([]),
+  gender: z.enum(["ALL", "MALE", "FEMALE"]).default("ALL"),
+  age: z.array(z.string()).default([]),
+  marketingGoal: z.literal("VIDEO_PROM_GOODS").default("VIDEO_PROM_GOODS"),
+  optimizationGoal: z.string().min(1).default("AD_CONVERT_TYPE_SHOPPING"),
+  confirmed: z.literal(true),
+});
+
+function qianchuanBindingResponse(binding: ReturnType<typeof qianchuanStore.listBindings>[number]) {
+  return {
+    id: binding.id,
+    authUserId: binding.authUserId,
+    subjectName: binding.subjectName,
+    subjectType: binding.subjectType,
+    accessTokenExpiresAt: binding.accessTokenExpiresAt,
+    refreshTokenExpiresAt: binding.refreshTokenExpiresAt,
+    defaultAdvertiserId: binding.defaultAdvertiserId,
+    status: binding.status,
+    advertisers: qianchuanStore.listAdvertisers(binding.id).map((item) => ({
+      advertiserId: item.advertiserId,
+      name: item.name,
+      accountRole: item.accountRole,
+      status: item.status,
+    })),
+  };
+}
+
+function qianchuanJob(
+  ownerUserId: string,
+  moduleId: "qianchuan-material-upload" | "qianchuan-pc-submit" | "qianchuan-pc-sync",
+  title: string,
+  values: Record<string, string>,
+  idempotencyKey?: string,
+): JobRecord {
+  const timestamp = new Date().toISOString();
+  return {
+    id: crypto.randomUUID(),
+    ownerUserId,
+    moduleId,
+    title,
+    status: "queued",
+    progress: 0,
+    stage: "queued",
+    overallExecutionMode: "real",
+    values,
+    executionPlan: [
+      {
+        id: `${moduleId}:0`,
+        capability: moduleId,
+        executionMode: "real",
+        implementation: "oceanengine-qianchuan-api",
+        provider: "巨量千川",
+        startedAt: timestamp,
+      },
+    ],
+    provenance: [],
+    idempotencyKey,
+    cancelRequested: false,
+    providerCancelState: "none",
+    stagingKeys: [],
+    jobSchemaVersion: 2,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+}
+
+const qianchuanConfigRoute = createRoute({
+  method: "get",
+  path: "/api/qianchuan/config",
+  operationId: "getQianchuanConfig",
+  responses: {
+    200: {
+      description: "Qianchuan application configuration status",
+      content: {
+        "application/json": {
+          schema: z.object({
+            configured: z.boolean(),
+            appIdMasked: z.string().optional(),
+            callbackUrl: z.literal("https://api.xbeaconai.com/callback"),
+          }),
+        },
+      },
+    },
+  },
+});
+app.openapi(qianchuanConfigRoute, (c) => {
+  const appId = providerCredentials.get("QIANCHUAN_APP_ID");
+  const secret = providerCredentials.get("QIANCHUAN_APP_SECRET");
+  return c.json(
+    {
+      configured: Boolean(appId && secret),
+      appIdMasked: appId ? `${appId.slice(0, 4)}••••${appId.slice(-4)}` : undefined,
+      callbackUrl: "https://api.xbeaconai.com/callback" as const,
+    },
+    200,
+  );
+});
+
+const qianchuanOauthStartRoute = createRoute({
+  method: "post",
+  path: "/api/qianchuan/oauth/start",
+  operationId: "startQianchuanOauth",
+  responses: {
+    200: {
+      description: "Qianchuan OAuth URL",
+      content: { "application/json": { schema: z.object({ authorizationUrl: z.string().url() }) } },
+    },
+    503: { description: "Not configured", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(qianchuanOauthStartRoute, (c) => {
+  try {
+    const state = createQianchuanOauthState(c.get("userId"));
+    return c.json({ authorizationUrl: qianchuanClient.authorizationUrl(state) }, 200);
+  } catch {
+    return c.json(
+      {
+        error: {
+          code: "QIANCHUAN_NOT_CONFIGURED",
+          message: "请先在密钥管理配置千川 APP ID 和 APP Secret",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      503,
+    );
+  }
+});
+
+app.get("/callback", async (c) => {
+  const state = c.req.query("state") ?? "";
+  const authCode = c.req.query("auth_code") ?? "";
+  const ownerUserId = state ? consumeQianchuanOauthState(state) : undefined;
+  const redirect = new URL("https://app.xbeaconai.com/delivery/qianchuan-merchants");
+  if (!ownerUserId || !authCode) {
+    redirect.searchParams.set("oauth", "invalid");
+    return c.redirect(redirect.toString(), 302);
+  }
+  try {
+    const token = await qianchuanClient.exchangeCode(authCode);
+    const binding = qianchuanStore.upsertBinding(ownerUserId, token);
+    if (!binding) throw new Error("BINDING_NOT_CREATED");
+    const advertisers = await qianchuanClient.listAuthorizedAdvertisers(token.accessToken);
+    qianchuanStore.replaceAdvertisers(binding.id, advertisers);
+    if (!binding.defaultAdvertiserId && advertisers[0])
+      qianchuanStore.setDefaultAdvertiser(ownerUserId, binding.id, advertisers[0].advertiserId);
+    redirect.searchParams.set("oauth", "success");
+    return c.redirect(redirect.toString(), 302);
+  } catch {
+    redirect.searchParams.set("oauth", "failed");
+    return c.redirect(redirect.toString(), 302);
+  }
+});
+
+const qianchuanBindingsRoute = createRoute({
+  method: "get",
+  path: "/api/qianchuan/bindings",
+  operationId: "listQianchuanBindings",
+  responses: {
+    200: {
+      description: "Owned Qianchuan bindings",
+      content: { "application/json": { schema: z.object({ bindings: z.array(QianchuanBindingSchema) }) } },
+    },
+  },
+});
+app.openapi(qianchuanBindingsRoute, (c) =>
+  c.json({ bindings: qianchuanStore.listBindings(c.get("userId")).map(qianchuanBindingResponse) }, 200),
+);
+
+const setQianchuanDefaultAdvertiserRoute = createRoute({
+  method: "put",
+  path: "/api/qianchuan/bindings/{bindingId}/default-advertiser",
+  operationId: "setQianchuanDefaultAdvertiser",
+  request: {
+    params: z.object({ bindingId: z.string().uuid() }),
+    body: { content: { "application/json": { schema: z.object({ advertiserId: z.string().regex(/^\d+$/) }) } } },
+  },
+  responses: {
+    200: {
+      description: "Updated",
+      content: { "application/json": { schema: z.object({ updated: z.literal(true) }) } },
+    },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(setQianchuanDefaultAdvertiserRoute, (c) => {
+  const updated = qianchuanStore.setDefaultAdvertiser(
+    c.get("userId"),
+    c.req.valid("param").bindingId,
+    c.req.valid("json").advertiserId,
+  );
+  if (!updated)
+    return c.json(
+      { error: { code: "NOT_FOUND", message: "千川账户不存在", retryable: false, requestId: crypto.randomUUID() } },
+      404,
+    );
+  return c.json({ updated: true as const }, 200);
+});
+
+const deleteQianchuanBindingRoute = createRoute({
+  method: "delete",
+  path: "/api/qianchuan/bindings/{bindingId}",
+  operationId: "deleteQianchuanBinding",
+  request: { params: z.object({ bindingId: z.string().uuid() }) },
+  responses: {
+    200: {
+      description: "Deleted",
+      content: { "application/json": { schema: z.object({ deleted: z.literal(true) }) } },
+    },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(deleteQianchuanBindingRoute, (c) => {
+  if (!qianchuanStore.deleteBinding(c.get("userId"), c.req.valid("param").bindingId))
+    return c.json(
+      { error: { code: "NOT_FOUND", message: "千川绑定不存在", retryable: false, requestId: crypto.randomUUID() } },
+      404,
+    );
+  return c.json({ deleted: true as const }, 200);
+});
+
+async function qianchuanOwnedClient(ownerUserId: string, bindingId: string, advertiserId: string) {
+  let binding = qianchuanStore.getOwnedBinding(ownerUserId, bindingId);
+  if (!binding || !qianchuanStore.listAdvertisers(binding.id).some((item) => item.advertiserId === advertiserId))
+    return undefined;
+  if (Date.parse(binding.accessTokenExpiresAt) <= Date.now() + 5 * 60_000) {
+    if (Date.parse(binding.refreshTokenExpiresAt) <= Date.now()) return undefined;
+    const refreshed = await qianchuanClient.refreshToken(qianchuanStore.refreshToken(binding));
+    binding =
+      qianchuanStore.upsertBinding(ownerUserId, {
+        ...refreshed,
+        authUserId: refreshed.authUserId || binding.authUserId,
+      }) ?? binding;
+  }
+  return { binding, accessToken: qianchuanStore.accessToken(binding) };
+}
+
+const qianchuanLookupRoute = createRoute({
+  method: "get",
+  path: "/api/qianchuan/lookups",
+  operationId: "getQianchuanLookups",
+  request: { query: z.object({ bindingId: z.string().uuid(), advertiserId: z.string().regex(/^\d+$/) }) },
+  responses: {
+    200: {
+      description: "Products and authorized Douyin accounts",
+      content: {
+        "application/json": {
+          schema: z.object({ products: z.array(z.unknown()), awemeAccounts: z.array(z.unknown()) }),
+        },
+      },
+    },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },
+    502: { description: "Upstream failure", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(qianchuanLookupRoute, async (c) => {
+  const query = c.req.valid("query");
+  const owned = await qianchuanOwnedClient(c.get("userId"), query.bindingId, query.advertiserId);
+  if (!owned)
+    return c.json(
+      { error: { code: "NOT_FOUND", message: "千川账户不存在", retryable: false, requestId: crypto.randomUUID() } },
+      404,
+    );
+  try {
+    const [products, aweme] = await Promise.all([
+      qianchuanClient.listProducts(owned.accessToken, query.advertiserId),
+      qianchuanClient.listAwemeAccounts(owned.accessToken, query.advertiserId),
+    ]);
+    return c.json({ products: products.data.list ?? [], awemeAccounts: aweme.data.list ?? [] }, 200);
+  } catch (error) {
+    const detail =
+      error instanceof QianchuanUpstreamError
+        ? error.detail
+        : {
+            code: "QIANCHUAN_LOOKUP_FAILED",
+            message: "千川基础数据查询失败",
+            retryable: true,
+            requestId: crypto.randomUUID(),
+          };
+    return c.json({ error: detail }, 502);
+  }
+});
+
+const createQianchuanMaterialRoute = createRoute({
+  method: "post",
+  path: "/api/qianchuan/materials",
+  operationId: "createQianchuanMaterialUpload",
+  request: {
+    body: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            bindingId: z.string().uuid(),
+            advertiserId: z.string().regex(/^\d+$/),
+            assetId: z.string().uuid(),
+            kind: z.enum(["video", "image"]),
+          }),
+        },
+      },
+    },
+  },
+  responses: {
+    202: {
+      description: "Queued",
+      content: {
+        "application/json": { schema: z.object({ materialId: z.string().uuid(), jobId: z.string().uuid() }) },
+      },
+    },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(createQianchuanMaterialRoute, async (c) => {
+  const ownerUserId = c.get("userId");
+  const body = c.req.valid("json");
+  const asset = accounts.getOwnedAsset(ownerUserId, body.assetId);
+  const binding = qianchuanStore.getOwnedBinding(ownerUserId, body.bindingId);
+  if (
+    !asset ||
+    !binding ||
+    !qianchuanStore.listAdvertisers(binding.id).some((item) => item.advertiserId === body.advertiserId)
+  )
+    return c.json(
+      {
+        error: { code: "NOT_FOUND", message: "素材或千川账户不存在", retryable: false, requestId: crypto.randomUUID() },
+      },
+      404,
+    );
+  const material = qianchuanStore.createMaterial(
+    ownerUserId,
+    body.bindingId,
+    body.advertiserId,
+    body.assetId,
+    body.kind,
+  );
+  const jobKey = `qianchuan-material:${material.id}`;
+  const existingJob = store.getByIdempotencyKey(ownerUserId, jobKey);
+  const job =
+    existingJob ??
+    qianchuanJob(
+      ownerUserId,
+      "qianchuan-material-upload",
+      `上传千川素材：${asset.displayName}`,
+      { materialId: material.id },
+      jobKey,
+    );
+  if (!existingJob) {
+    store.create(job);
+    await queue.enqueue(job.id);
+  }
+  return c.json({ materialId: material.id, jobId: job.id }, 202);
+});
+
+const listQianchuanMaterialsRoute = createRoute({
+  method: "get",
+  path: "/api/qianchuan/materials",
+  operationId: "listQianchuanMaterials",
+  request: { query: z.object({ advertiserId: z.string().optional() }) },
+  responses: {
+    200: {
+      description: "Materials",
+      content: { "application/json": { schema: z.object({ materials: z.array(z.unknown()) }) } },
+    },
+  },
+});
+app.openapi(listQianchuanMaterialsRoute, (c) =>
+  c.json({ materials: qianchuanStore.listMaterials(c.get("userId"), c.req.valid("query").advertiserId) }, 200),
+);
+
+const createQianchuanDeliveryRoute = createRoute({
+  method: "post",
+  path: "/api/qianchuan/pc-deliveries",
+  operationId: "createQianchuanPcDelivery",
+  request: {
+    headers: z.object({ "idempotency-key": z.string().uuid() }),
+    body: { content: { "application/json": { schema: QianchuanDeliveryInputSchema } } },
+  },
+  responses: {
+    202: {
+      description: "Queued",
+      content: { "application/json": { schema: z.object({ delivery: z.unknown(), jobId: z.string().uuid() }) } },
+    },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(createQianchuanDeliveryRoute, async (c) => {
+  const ownerUserId = c.get("userId");
+  const body = c.req.valid("json");
+  const binding = qianchuanStore.getOwnedBinding(ownerUserId, body.bindingId);
+  if (!binding || !qianchuanStore.listAdvertisers(binding.id).some((item) => item.advertiserId === body.advertiserId))
+    return c.json(
+      { error: { code: "NOT_FOUND", message: "千川账户不存在", retryable: false, requestId: crypto.randomUUID() } },
+      404,
+    );
+  const input = { ...body };
+  delete (input as Partial<typeof body>).confirmed;
+  const idempotencyKey = c.req.valid("header")["idempotency-key"];
+  const delivery = qianchuanStore.createDelivery(ownerUserId, body.bindingId, input, idempotencyKey);
+  const jobKey = `qianchuan-delivery:${delivery.id}`;
+  const existingJob = store.getByIdempotencyKey(ownerUserId, jobKey);
+  const job =
+    existingJob ??
+    qianchuanJob(
+      ownerUserId,
+      "qianchuan-pc-submit",
+      `提交千川PC投放：${body.name}`,
+      { deliveryId: delivery.id },
+      jobKey,
+    );
+  if (!existingJob) {
+    store.create(job);
+    await queue.enqueue(job.id);
+  }
+  return c.json({ delivery, jobId: job.id }, 202);
+});
+
+const listQianchuanDeliveriesRoute = createRoute({
+  method: "get",
+  path: "/api/qianchuan/pc-deliveries",
+  operationId: "listQianchuanPcDeliveries",
+  responses: {
+    200: {
+      description: "Deliveries",
+      content: { "application/json": { schema: z.object({ deliveries: z.array(z.unknown()) }) } },
+    },
+  },
+});
+app.openapi(listQianchuanDeliveriesRoute, (c) =>
+  c.json({ deliveries: qianchuanStore.listDeliveries(c.get("userId")) }, 200),
+);
+
+const syncQianchuanDeliveryRoute = createRoute({
+  method: "post",
+  path: "/api/qianchuan/pc-deliveries/{deliveryId}/sync",
+  operationId: "syncQianchuanPcDelivery",
+  request: { params: z.object({ deliveryId: z.string().uuid() }) },
+  responses: {
+    202: { description: "Queued", content: { "application/json": { schema: z.object({ jobId: z.string().uuid() }) } } },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(syncQianchuanDeliveryRoute, async (c) => {
+  const delivery = qianchuanStore.getOwnedDelivery(c.get("userId"), c.req.valid("param").deliveryId);
+  if (!delivery)
+    return c.json(
+      { error: { code: "NOT_FOUND", message: "投放记录不存在", retryable: false, requestId: crypto.randomUUID() } },
+      404,
+    );
+  const job = qianchuanJob(c.get("userId"), "qianchuan-pc-sync", `同步千川投放：${delivery.name}`, {
+    deliveryId: delivery.id,
+  });
+  store.create(job);
+  await queue.enqueue(job.id);
+  return c.json({ jobId: job.id }, 202);
+});
+
+const updateQianchuanDeliveryStatusRoute = createRoute({
+  method: "post",
+  path: "/api/qianchuan/pc-deliveries/{deliveryId}/status",
+  operationId: "updateQianchuanPcDeliveryStatus",
+  request: {
+    params: z.object({ deliveryId: z.string().uuid() }),
+    body: {
+      content: { "application/json": { schema: z.object({ enabled: z.boolean(), confirmed: z.literal(true) }) } },
+    },
+  },
+  responses: {
+    200: {
+      description: "Updated",
+      content: { "application/json": { schema: z.object({ updated: z.literal(true) }) } },
+    },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },
+    502: { description: "Upstream failure", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(updateQianchuanDeliveryStatusRoute, async (c) => {
+  const delivery = qianchuanStore.getOwnedDelivery(c.get("userId"), c.req.valid("param").deliveryId);
+  if (!delivery?.adId)
+    return c.json(
+      { error: { code: "NOT_FOUND", message: "千川广告尚未创建", retryable: false, requestId: crypto.randomUUID() } },
+      404,
+    );
+  const owned = await qianchuanOwnedClient(c.get("userId"), delivery.bindingId, delivery.advertiserId);
+  if (!owned)
+    return c.json(
+      { error: { code: "NOT_FOUND", message: "千川绑定不存在", retryable: false, requestId: crypto.randomUUID() } },
+      404,
+    );
+  try {
+    await qianchuanClient.updateAdStatus(
+      owned.accessToken,
+      delivery.advertiserId,
+      delivery.adId,
+      c.req.valid("json").enabled ? "ENABLE" : "DISABLE",
+    );
+    qianchuanStore.updateDelivery(delivery.id, { status: c.req.valid("json").enabled ? "active" : "paused" });
+    return c.json({ updated: true as const }, 200);
+  } catch (error) {
+    const detail =
+      error instanceof QianchuanUpstreamError
+        ? error.detail
+        : {
+            code: "QIANCHUAN_STATUS_FAILED",
+            message: "千川状态更新失败",
+            retryable: true,
+            requestId: crypto.randomUUID(),
+          };
+    return c.json({ error: detail }, 502);
+  }
+});
+
+const qianchuanReportsRoute = createRoute({
+  method: "get",
+  path: "/api/qianchuan/reports",
+  operationId: "listQianchuanReports",
+  request: { query: z.object({ startDate: z.string(), endDate: z.string() }) },
+  responses: {
+    200: {
+      description: "Reports",
+      content: { "application/json": { schema: z.object({ reports: z.array(z.unknown()) }) } },
+    },
+  },
+});
+app.openapi(qianchuanReportsRoute, (c) => {
+  const query = c.req.valid("query");
+  return c.json({ reports: qianchuanStore.listReports(c.get("userId"), query.startDate, query.endDate) }, 200);
 });
 
 app.doc("/openapi.json", {
