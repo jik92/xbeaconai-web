@@ -1,8 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Files, Folder, FolderOpen, FolderPlus, Pencil, Trash2 } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { createAssetFolder, deleteAssetFolder, renameAssetFolder } from "@/api/api-client";
 import { Button } from "@/components/ui/button";
+import { TextInputModal } from "@/components/ui/text-input-modal";
 import type { AssetFolder } from "@/entities/types";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +16,7 @@ interface AssetFolderSpaceProps {
 
 export function AssetFolderSpace({ folders, selectedFolderId, loading, onSelect }: AssetFolderSpaceProps) {
   const queryClient = useQueryClient();
+  const [folderEditor, setFolderEditor] = useState<{ mode: "create" } | { mode: "rename"; folder: AssetFolder }>();
   const orderedFolders = useMemo(() => {
     const result: Array<{ folder: AssetFolder; depth: number }> = [];
     const appendChildren = (parentId: string | undefined, depth: number) => {
@@ -29,25 +31,17 @@ export function AssetFolderSpace({ folders, selectedFolderId, loading, onSelect 
   const selectedFolder = folders.find((folder) => folder.id === selectedFolderId);
 
   const refreshFolders = () => queryClient.invalidateQueries({ queryKey: ["asset-folders"] });
-  const addFolder = async () => {
-    const name = window.prompt("请输入新文件夹名称");
-    if (!name?.trim()) return;
-    try {
-      const folder = await createAssetFolder(name.trim());
+  const submitFolder = async (name: string) => {
+    if (folderEditor?.mode === "create") {
+      const folder = await createAssetFolder(name);
       await refreshFolders();
       onSelect(folder.id);
-    } catch (error) {
-      window.alert(error instanceof Error ? error.message : "文件夹创建失败");
+      return;
     }
-  };
-  const renameFolder = async (folder: AssetFolder) => {
-    const name = window.prompt("请输入新的文件夹名称", folder.name);
-    if (!name?.trim() || name.trim() === folder.name) return;
-    try {
-      await renameAssetFolder(folder.id, name.trim());
+
+    if (folderEditor?.mode === "rename" && name !== folderEditor.folder.name) {
+      await renameAssetFolder(folderEditor.folder.id, name);
       await refreshFolders();
-    } catch (error) {
-      window.alert(error instanceof Error ? error.message : "文件夹重命名失败");
     }
   };
   const removeFolder = async (folder: AssetFolder) => {
@@ -71,7 +65,7 @@ export function AssetFolderSpace({ folders, selectedFolderId, loading, onSelect 
           variant="ghost"
           aria-label="新建文件夹"
           title="新建文件夹"
-          onClick={() => void addFolder()}
+          onClick={() => setFolderEditor({ mode: "create" })}
         >
           <FolderPlus />
         </Button>
@@ -111,7 +105,7 @@ export function AssetFolderSpace({ folders, selectedFolderId, loading, onSelect 
                 variant="ghost"
                 aria-label={`重命名 ${folder.name}`}
                 title="重命名"
-                onClick={() => void renameFolder(folder)}
+                onClick={() => setFolderEditor({ mode: "rename", folder })}
               >
                 <Pencil />
               </Button>
@@ -136,6 +130,21 @@ export function AssetFolderSpace({ folders, selectedFolderId, loading, onSelect 
           {selectedFolder?.storagePrefix ?? (loading ? "正在初始化…" : "全部素材")}
         </b>
       </footer>
+      <TextInputModal
+        open={Boolean(folderEditor)}
+        title={folderEditor?.mode === "rename" ? "重命名文件夹" : "新建文件夹"}
+        label="文件夹名称"
+        initialValue={folderEditor?.mode === "rename" ? folderEditor.folder.name : ""}
+        placeholder="输入文件夹名称"
+        confirmLabel={folderEditor?.mode === "rename" ? "保存" : "创建"}
+        submittingLabel={folderEditor?.mode === "rename" ? "保存中…" : "创建中…"}
+        maxLength={80}
+        requiredMessage="请输入文件夹名称"
+        onOpenChange={(open) => {
+          if (!open) setFolderEditor(undefined);
+        }}
+        onSubmit={submitFolder}
+      />
     </aside>
   );
 }
