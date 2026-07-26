@@ -1,5 +1,5 @@
 import { and, desc, eq, gte, lte } from "drizzle-orm";
-import { openDatabase, type AppDatabase } from "../db/database";
+import { type AppDatabase, openDatabase } from "../db/database";
 import {
   qianchuanAdvertisers,
   qianchuanBindings,
@@ -240,7 +240,7 @@ export class QianchuanStore {
       idempotencyKey,
       name: input.name,
       status: "queued" as const,
-      requestPayload: input,
+      requestPayload: { ...input },
       createdAt: now,
       updatedAt: now,
     };

@@ -117,7 +117,7 @@ export const qianchuanPcJob: WorkerJobHandler = {
         if (!adId) {
           const ad = await qianchuanClient.createAd(accessToken, campaignId, input);
           adId = String(ad.data.ad_id);
-          creativeId = ad.data.creative_id ? String(ad.data.creative_id) : undefined;
+          creativeId = ad.data.creative_id ? String(ad.data.creative_id) : null;
           requestId = ad.requestId;
           qianchuanStore.updateDelivery(delivery.id, { adId, creativeId, requestId });
         }

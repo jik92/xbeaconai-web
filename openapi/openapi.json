@@ -12737,18 +12737,15 @@
                   },
                   "budget": {
                     "type": "number",
-                    "minimum": 0,
-                    "exclusiveMinimum": true
+                    "exclusiveMinimum": 0
                   },
                   "bid": {
                     "type": "number",
-                    "minimum": 0,
-                    "exclusiveMinimum": true
+                    "exclusiveMinimum": 0
                   },
                   "roiGoal": {
                     "type": "number",
-                    "minimum": 0,
-                    "exclusiveMinimum": true
+                    "exclusiveMinimum": 0
                   },
                   "startTime": {
                     "type": "string",
