@@ -39,10 +39,12 @@ import {
 import type { Job, SeedanceModelId } from "@/api/generated/types.gen";
 import { AttachmentPicker, type AttachmentSelection } from "@/components/domain/attachment-picker";
 import { AuthenticatedMedia } from "@/components/domain/authenticated-media";
+import { DashedPickerTile } from "@/components/domain/dashed-picker-tile";
 import { ImagePreview } from "@/components/domain/media-preview";
 import { ProjectRecordDrawer, type ProjectRecordStatusTone } from "@/components/domain/project-record-drawer";
 import { PromptWorkbench } from "@/components/domain/prompt-workbench";
 import { Button } from "@/components/ui/button";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import type { ApiJobResult, LibraryAsset, LibraryProduct } from "@/entities/types";
 import type { CreationModelCapability } from "@/features/ai-creation/ai-creation-composer";
 import { fetchPortraits, type Portrait, portraitDisplayUrl } from "@/features/portrait-library/portrait-data";
@@ -57,6 +59,10 @@ import { PromptToolModal } from "./prompt-tool-modal";
 import "./remix-project.css";
 
 const stages = ["上传配置", "AI 解析", "提示词校对", "分镜校对", "合并成片"];
+const remixModeOptions = [
+  { value: "product", label: "含商品模式" },
+  { value: "talking", label: "纯口播模式" },
+] as const;
 
 interface SelectedPortrait {
   key: string;
@@ -222,14 +228,13 @@ function ConfigSidebar({
 }) {
   return (
     <aside className="remix-config">
-      <div className="remix-mode-tabs">
-        <Button className={mode === "product" ? "active" : ""} onClick={() => setMode("product")}>
-          含商品模式
-        </Button>
-        <Button className={mode === "talking" ? "active" : ""} onClick={() => setMode("talking")}>
-          纯口播模式
-        </Button>
-      </div>
+      <SegmentedControl
+        ariaLabel="创作模式"
+        value={mode}
+        options={remixModeOptions}
+        onValueChange={setMode}
+        fullWidth
+      />
       <input
         className="remix-project-name"
         aria-label="项目名称"
@@ -242,67 +247,70 @@ function ConfigSidebar({
         <b>
           商品 <em>*</em>
         </b>
-        <Button onClick={() => onPick("product")}>⚙ 商品库</Button>
       </div>
-      <Button className="config-product" onClick={() => onPick("product")}>
-        {selectedProduct ? (
-          <span className="product-thumb product-asset-thumb">
+      <DashedPickerTile
+        presentation="wide"
+        title={selectedProduct?.name || "未选择商品"}
+        description={selectedProduct ? `${selectedProduct.images.length} 张商品图` : undefined}
+        icon={<Plus />}
+        preview={
+          selectedProduct ? (
             <AuthenticatedMedia
               url={selectedProduct.images[0]?.url || ""}
               mimeType={selectedProduct.images[0]?.mimeType || "image/png"}
               alt={selectedProduct.name}
               previewable={false}
             />
-          </span>
-        ) : (
-          <span className="product-thumb" />
-        )}
-        <span>{selectedProduct?.name || "未选择商品"}</span>
-      </Button>
+          ) : undefined
+        }
+        aria-label={selectedProduct ? "更换商品" : "选择商品"}
+        onClick={() => onPick("product")}
+      />
       <div className="config-field-title">
         <b>人像</b>
-        <Button onClick={() => onPick("portrait")}>{selectedPortraits.length ? "更换" : "+ 添加"}</Button>
       </div>
-      {selectedPortraits.length ? (
-        <div className="portrait-cards-row">
-          {selectedPortraits.map((portrait) => (
-            <div className="remix-portrait-card" key={portrait.key}>
-              {portrait.reference.type === "custom" ? (
-                <AuthenticatedMedia
-                  className="config-portrait"
-                  url={portrait.display_url}
-                  mimeType="image/jpeg"
-                  alt={portrait.name}
-                  previewable={false}
-                />
-              ) : (
-                <ImagePreview className="config-portrait" src={portrait.display_url} alt={portrait.name} />
-              )}
-              <Button
-                type="button"
-                className="portrait-card-remove"
-                aria-label={`移除人像 ${portrait.name}`}
-                onClick={() => onRemovePortrait(portrait.key)}
-              >
-                <X />
-              </Button>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <span className="config-empty">未添加人像</span>
-      )}
+      <div className="portrait-cards-row">
+        {selectedPortraits.map((portrait) => (
+          <div className="remix-portrait-card" key={portrait.key}>
+            {portrait.reference.type === "custom" ? (
+              <AuthenticatedMedia
+                className="config-portrait"
+                url={portrait.display_url}
+                mimeType="image/jpeg"
+                alt={portrait.name}
+                previewable={false}
+              />
+            ) : (
+              <ImagePreview className="config-portrait" src={portrait.display_url} alt={portrait.name} />
+            )}
+            <Button
+              type="button"
+              className="portrait-card-remove"
+              aria-label={`移除人像 ${portrait.name}`}
+              onClick={() => onRemovePortrait(portrait.key)}
+            >
+              <X />
+            </Button>
+          </div>
+        ))}
+        <DashedPickerTile
+          title={selectedPortraits.length ? "更换" : "添加"}
+          icon={<Plus />}
+          aria-label={selectedPortraits.length ? "更换人像" : "添加人像"}
+          onClick={() => onPick("portrait")}
+        />
+      </div>
       <div className="config-field-title">
         <b>口播音色</b>
-        <Button onClick={() => onPick("voice")}>{selectedVoice ? "更换" : "+ 选择"}</Button>
       </div>
-      <Button className="config-voice" onClick={() => onPick("voice")}>
-        <Mic2 />
-        <span>
-          <b>{selectedVoice?.name || "未选择音色"}</b>
-          <small className="type-helper">{selectedVoice?.description || "使用视频原声或从音色库选择"}</small>
-        </span>
-      </Button>
+      <DashedPickerTile
+        presentation="wide"
+        title={selectedVoice?.name || "未选择音色"}
+        description={selectedVoice?.description || "使用视频原声或从音色库选择"}
+        icon={<Mic2 />}
+        aria-label={selectedVoice ? "更换口播音色" : "选择口播音色"}
+        onClick={() => onPick("voice")}
+      />
       <label className="config-description">
         需求描述
         <textarea

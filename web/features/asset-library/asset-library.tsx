@@ -140,7 +140,12 @@ function ProductLibrary() {
       >
         <section className="asset-library-grid h-full overflow-y-auto pb-3">
           {filtered.map((product) => (
-            <Button className="library-asset-card" key={product.id} onClick={() => setSelected(product)}>
+            <Button
+              variant="ghost"
+              className="library-asset-card flex-col items-stretch justify-start gap-0 whitespace-normal hover:bg-surface"
+              key={product.id}
+              onClick={() => setSelected(product)}
+            >
               <div className="library-asset-preview product">
                 <AuthenticatedMedia
                   url={product.images[0]?.url || ""}
@@ -435,6 +440,7 @@ function MediaAssetTable({
         cell: ({ row }) => (
           <Button
             type="button"
+            variant="ghost"
             className="media-asset-delete"
             disabled={deletingRef.current}
             aria-label={`删除 ${row.original.name}`}
@@ -651,7 +657,12 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
                 <div className="grid size-8 shrink-0 place-items-center rounded-full bg-surface-muted text-muted">
                   <FileAudio className="size-4" />
                 </div>
-                <Button type="button" className="min-w-0 flex-1 text-left" onClick={() => setSelected(asset)}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="min-w-0 flex-1 flex-col items-start justify-center gap-0 whitespace-normal text-left"
+                  onClick={() => setSelected(asset)}
+                >
                   <b className="block truncate type-label text-ink">{asset.name}</b>
                   <span className="block truncate type-helper text-muted">
                     {asset.description || asset.originalName}

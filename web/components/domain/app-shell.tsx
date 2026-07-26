@@ -273,8 +273,9 @@ export function AppShell() {
               <div className="grid gap-1 py-2">
                 <Button
                   type="button"
+                  variant="ghost"
                   role="menuitem"
-                  className="flex h-9 items-center gap-2 rounded-md px-2 text-left type-body text-ink hover:bg-surface-muted"
+                  className="flex h-9 w-full items-center justify-start gap-2 rounded-md px-2 text-left type-body text-ink hover:bg-surface-muted"
                   onClick={() => {
                     setAccountMenuOpen(false);
                     setPanel("profile");
@@ -285,8 +286,9 @@ export function AppShell() {
                 </Button>
                 <Button
                   type="button"
+                  variant="ghost"
                   role="menuitem"
-                  className="flex h-9 items-center gap-2 rounded-md px-2 text-left type-body text-ink hover:bg-surface-muted"
+                  className="flex h-9 w-full items-center justify-start gap-2 rounded-md px-2 text-left type-body text-ink hover:bg-surface-muted"
                   onClick={() => {
                     setAccountMenuOpen(false);
                     setPanel("security");
@@ -318,8 +320,9 @@ export function AppShell() {
               </div>
               <Button
                 type="button"
+                variant="ghost"
                 role="menuitem"
-                className="flex h-9 w-full items-center gap-2 border-t border-line px-2 pt-2 text-left type-body text-error"
+                className="flex h-9 w-full items-center justify-start gap-2 border-t border-line px-2 pt-2 text-left type-body text-error hover:bg-surface-muted"
                 onClick={() => {
                   setAccountMenuOpen(false);
                   void logout();

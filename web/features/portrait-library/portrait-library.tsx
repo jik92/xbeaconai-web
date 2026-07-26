@@ -197,7 +197,13 @@ export function PortraitLibrary() {
                 }}
               >
                 {filtered.slice(row.index * columns, row.index * columns + columns).map((item) => (
-                  <Button type="button" className="portrait-card" key={item.key} onClick={() => setSelected(item)}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="portrait-card h-auto w-full flex-col items-stretch justify-start gap-0 whitespace-normal p-0 hover:bg-surface"
+                    key={item.key}
+                    onClick={() => setSelected(item)}
+                  >
                     <div className="portrait-image">
                       <MediaPreview
                         url={item.display_url}

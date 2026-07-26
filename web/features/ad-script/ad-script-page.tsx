@@ -37,6 +37,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useAuth } from "@/features/account/auth-context";
 import { cn } from "@/lib/utils";
 
@@ -57,6 +58,11 @@ const scenes = {
     ["brand-ad", "品牌广告", "视觉冲击 · 品牌声量", "60-80"],
   ],
 } as const;
+
+const sceneCategoryOptions = [
+  { value: "marketing", label: "营销场景" },
+  { value: "placement", label: "投放场景" },
+] as const;
 
 const roles = [
   ["好物推荐员", "亲切推荐，真实种草"],
@@ -502,24 +508,17 @@ function SceneStep({
     <div className="ad-script-section space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="type-section-title">选择{input.sceneCategory === "marketing" ? "营销" : "投放"}场景</h2>
-        <div className="scene-tabs flex rounded-lg bg-surface-muted p-1">
-          {(["marketing", "placement"] as const).map((category) => (
-            <Button
-              variant="ghost"
-              size="sm"
-              key={category}
-              className={cn("rounded-md", input.sceneCategory === category && "bg-surface shadow-sm hover:bg-surface")}
-              onClick={() => {
-                update("sceneCategory", category);
-                const next = scenes[category][0];
-                update("sceneId", next[0]);
-                update("targetLength", next[3]);
-              }}
-            >
-              {category === "marketing" ? "营销场景" : "投放场景"}
-            </Button>
-          ))}
-        </div>
+        <SegmentedControl
+          ariaLabel="场景类型"
+          value={input.sceneCategory}
+          options={sceneCategoryOptions}
+          onValueChange={(category) => {
+            update("sceneCategory", category);
+            const next = scenes[category][0];
+            update("sceneId", next[0]);
+            update("targetLength", next[3]);
+          }}
+        />
       </div>
       <div className="scene-grid grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {scenes[input.sceneCategory].map(([id, name, description, length]) => (

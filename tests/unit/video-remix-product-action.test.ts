@@ -3,11 +3,12 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 describe("video remix product action", () => {
-  test("keeps the product library entry without a duplicate change label", () => {
+  test("uses one shared dashed trigger without a duplicate product action", () => {
     const source = readFileSync(resolve(import.meta.dir, "../../web/features/video-remix/remix-project.tsx"), "utf8");
 
-    expect(source).toContain('<Button onClick={() => onPick("product")}>⚙ 商品库</Button>');
-    expect(source).toContain('<Button className="config-product" onClick={() => onPick("product")}>');
-    expect(source).not.toContain('<b>{selectedProduct ? "更换" : "选择"}</b>');
+    expect(source).toContain("<DashedPickerTile");
+    expect(source).toContain('aria-label={selectedProduct ? "更换商品" : "选择商品"}');
+    expect(source).not.toContain("⚙ 商品库");
+    expect(source).not.toContain('className="config-product"');
   });
 });

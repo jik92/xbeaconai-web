@@ -12,6 +12,18 @@ describe("scene library page", () => {
     expect(html).toContain('aria-label="场景属性"');
     expect(html.match(/object-contain/g) ?? []).toHaveLength(47);
     expect(html.match(/block h-auto w-full object-contain/g) ?? []).toHaveLength(47);
+    const sceneCardClasses = Array.from(
+      html.matchAll(/<button[^>]*class="([^"]*\bgroup\b[^"]*)"/g),
+      (match) => match[1],
+    );
+    expect(sceneCardClasses).toHaveLength(47);
+    for (const className of sceneCardClasses) {
+      expect(className).toContain("h-auto");
+      expect(className).toContain("w-full");
+      expect(className).toContain("p-0");
+      expect(className).not.toContain("h-8");
+      expect(className).not.toContain("px-3");
+    }
     expect(html).not.toContain("object-cover");
     expect(html).not.toContain("aspect-[4/5]");
     expect(html).toContain("auto-rows-max");

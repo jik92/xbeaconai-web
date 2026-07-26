@@ -20,6 +20,10 @@ describe("ad script entry", () => {
     expect(source).toContain('from "@/components/ui/input"');
     expect(source).toContain('from "@/components/ui/label"');
     expect(source).toContain('from "@/components/ui/native-select"');
+    expect(source).toContain('from "@/components/ui/segmented-control"');
+    expect(source).toContain('<SegmentedControl\n          ariaLabel="场景类型"');
+    expect(source).toContain("options={sceneCategoryOptions}");
+    expect(source).not.toContain('className="scene-tabs');
     expect(source).not.toMatch(/deepseek/i);
     expect(source).not.toContain('import "./ad-script-page.css"');
   });

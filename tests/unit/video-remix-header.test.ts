@@ -25,7 +25,7 @@ describe("video remix workflow header", () => {
     expect(header).toContain(
       '<Button className="remix-header-action shrink-0" variant="ghost" size="sm" onClick={onReset}>',
     );
-    expect(styles).toContain('.remix-project button:not(.remix-header-action):not([aria-label^="关闭"])');
+    expect(styles).toContain(":not(.dashed-picker-tile):not(.segmented-control-button)");
     expect(styles).toContain(".remix-header-actions {");
     expect(styles).toContain("gap: 8px;");
     expect(styles).not.toContain(".remix-header-actions button");

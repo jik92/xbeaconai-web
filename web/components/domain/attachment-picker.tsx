@@ -233,12 +233,20 @@ export function AttachmentPicker({
             <div className="attachment-source-tabs">
               <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 className={source === "library" ? "active" : ""}
                 onClick={() => setSource("library")}
               >
                 <FolderOpen /> 从素材库选择
               </Button>
-              <Button type="button" className={source === "upload" ? "active" : ""} onClick={() => setSource("upload")}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className={source === "upload" ? "active" : ""}
+                onClick={() => setSource("upload")}
+              >
                 <Upload /> 从本地上传
               </Button>
             </div>
@@ -251,6 +259,8 @@ export function AttachmentPicker({
                       {orderedFolders.map(({ folder, depth }) => (
                         <Button
                           type="button"
+                          variant="ghost"
+                          size="sm"
                           key={folder.id}
                           className={folder.id === folderId ? "active" : ""}
                           style={{ paddingLeft: `${10 + depth * 16}px` }}
@@ -279,7 +289,7 @@ export function AttachmentPicker({
                       {breadcrumbs.map((folder, index) => (
                         <span key={folder.id}>
                           {index > 0 && <ChevronRight />}
-                          <Button type="button" onClick={() => setFolderId(folder.id)}>
+                          <Button type="button" variant="ghost" size="sm" onClick={() => setFolderId(folder.id)}>
                             {folder.name}
                           </Button>
                         </span>
@@ -290,6 +300,8 @@ export function AttachmentPicker({
                         childFolders.map((folder) => (
                           <Button
                             type="button"
+                            variant="ghost"
+                            size="sm"
                             key={folder.id}
                             className="attachment-folder-card"
                             onClick={() => {
@@ -313,6 +325,8 @@ export function AttachmentPicker({
                         return (
                           <Button
                             type="button"
+                            variant="ghost"
+                            size="sm"
                             key={asset.id}
                             className={active ? "active" : ""}
                             onClick={() => {
@@ -410,18 +424,19 @@ export function AttachmentPicker({
             )}
             {error && source === "library" && <p className="attachment-error">{error}</p>}
             <footer>
-              <Button type="button" onClick={close}>
+              <Button type="button" variant="outline" size="sm" onClick={close}>
                 取消
               </Button>
               {source === "library" && (
-                <Button type="button" className="primary" disabled={!selected.length} onClick={chooseLibrary}>
+                <Button type="button" variant="default" size="sm" disabled={!selected.length} onClick={chooseLibrary}>
                   使用所选素材{selected.length ? `（${selected.length}）` : ""}
                 </Button>
               )}
               {source === "upload" && uploadedFiles.length > 0 && (
                 <Button
                   type="button"
-                  className="primary"
+                  variant="default"
+                  size="sm"
                   onClick={() => {
                     onSelect(uploadedFiles);
                     close();

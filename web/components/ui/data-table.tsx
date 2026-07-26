@@ -55,7 +55,7 @@ export function DataTable<TData>({
               {headerGroup.headers.map((header) => (
                 <th
                   key={header.id}
-                  className="sticky top-0 z-10 h-10 overflow-hidden text-ellipsis whitespace-nowrap px-2 text-left align-middle type-label text-muted"
+                  className="sticky top-0 z-10 h-10 overflow-hidden bg-surface-muted px-2 text-left align-middle type-label text-ink whitespace-nowrap text-ellipsis"
                   style={{ width: `${(header.getSize() / table.getTotalSize()) * 100}%` }}
                   colSpan={header.colSpan}
                 >
@@ -65,15 +65,15 @@ export function DataTable<TData>({
             </tr>
           ))}
         </thead>
-        <tbody className="[&_tr:last-child]:border-0">
+        <tbody>
           {!loading &&
             !error &&
             rows.map((row) => (
-              <tr key={row.id} className="border-b border-line/60 transition-colors hover:bg-surface-muted/50">
+              <tr key={row.id} className="transition-colors hover:bg-surface-muted/50">
                 {row.getVisibleCells().map((cell) => (
                   <td
                     key={cell.id}
-                    className="h-14 max-w-0 overflow-hidden text-ellipsis whitespace-nowrap p-2 align-middle text-ink/75"
+                    className="h-14 max-w-0 overflow-hidden border-0 p-2 align-middle text-ink/75 whitespace-nowrap text-ellipsis"
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>

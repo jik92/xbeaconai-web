@@ -74,8 +74,9 @@ export function AssetFolderSpace({ folders, selectedFolderId, loading, onSelect 
         <div>
           <Button
             type="button"
+            variant="ghost"
             className={cn(
-              "flex h-8 w-full items-center gap-2 rounded-md px-2 text-left type-helper text-muted hover:bg-surface-muted",
+              "flex h-8 w-full items-center justify-start gap-2 rounded-md px-2 text-left type-helper text-muted hover:bg-surface-muted",
               !selectedFolderId && "bg-surface-muted text-ink",
             )}
             onClick={() => onSelect("")}
@@ -88,8 +89,9 @@ export function AssetFolderSpace({ folders, selectedFolderId, loading, onSelect 
           <div className="group flex items-center" key={folder.id}>
             <Button
               type="button"
+              variant="ghost"
               className={cn(
-                "flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md pr-1 text-left type-helper text-muted hover:bg-surface-muted",
+                "flex h-8 min-w-0 flex-1 items-center justify-start gap-2 rounded-md pr-1 text-left type-helper text-muted hover:bg-surface-muted",
                 selectedFolderId === folder.id && "bg-surface-muted text-ink",
               )}
               style={{ paddingLeft: 8 + depth * 16 }}

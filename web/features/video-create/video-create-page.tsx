@@ -54,6 +54,7 @@ import {
 import type { VideoCreateInput, VideoCreateProject } from "@/api/generated/types.gen";
 import { AttachmentPicker, type AttachmentSelection } from "@/components/domain/attachment-picker";
 import { AuthenticatedMedia } from "@/components/domain/authenticated-media";
+import { DashedPickerTile } from "@/components/domain/dashed-picker-tile";
 import { ImagePreview } from "@/components/domain/media-preview";
 import { ProjectRecordDrawer, type ProjectRecordStatusTone } from "@/components/domain/project-record-drawer";
 import { Button } from "@/components/ui/button";
@@ -322,16 +323,7 @@ function ProductImages({
           accept="image/*"
           multiple
           onSelect={onAdd}
-          trigger={(open) => (
-            <Button
-              className="h-20 w-16 flex-col rounded-lg border-dashed px-0 text-muted"
-              variant="outline"
-              onClick={open}
-            >
-              <Plus />
-              添加
-            </Button>
-          )}
+          trigger={(open) => <DashedPickerTile title="添加" icon={<Plus />} aria-label="添加产品图片" onClick={open} />}
         />
       )}
     </div>

@@ -85,7 +85,8 @@ export function SceneLibrary() {
           {filtered.map((scene) => (
             <Button
               type="button"
-              className="group self-start overflow-hidden rounded-lg border border-line bg-surface text-left transition hover:-translate-y-0.5 hover:border-line-strong hover:shadow-sm"
+              variant="ghost"
+              className="group h-auto w-full flex-col items-stretch justify-start gap-0 whitespace-normal self-start overflow-hidden rounded-lg border border-line bg-surface p-0 text-left transition hover:-translate-y-0.5 hover:border-line-strong hover:bg-surface hover:shadow-sm"
               key={scene.id}
               onClick={() => setSelected(scene)}
             >
