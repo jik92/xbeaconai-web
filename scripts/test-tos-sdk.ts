@@ -13,7 +13,8 @@ await mkdir(artifactsDir, { recursive: true });
 const sha256 = (bytes: Uint8Array) => new Bun.CryptoHasher("sha256").update(bytes).digest("hex");
 const evidence: Record<string, unknown> = {
   region: env.tos.region,
-  endpoint: env.tos.endpoint,
+  internalEndpoint: env.tos.internalEndpoint,
+  publicEndpoint: env.tos.publicEndpoint,
   bucket: env.tos.bucket,
 };
 let key: string | undefined;
@@ -42,7 +43,7 @@ try {
   if (!signedResponse.ok) throw new Error(`TOS_SIGNED_READ_${signedResponse.status}`);
   const downloaded = new Uint8Array(await signedResponse.arrayBuffer());
   if (sha256(downloaded) !== expectedHash) throw new Error("TOS_SHA256_MISMATCH");
-  const unsignedUrl = `https://${env.tos.bucket}.${env.tos.endpoint}/${key}`;
+  const unsignedUrl = `https://${env.tos.bucket}.${env.tos.publicEndpoint}/${key}`;
   const unsignedStatus = (await fetch(unsignedUrl, { redirect: "manual", signal: AbortSignal.timeout(15_000) })).status;
   if (unsignedStatus < 400) throw new Error("TOS_BUCKET_NOT_PRIVATE");
   await ossutils.markCleanupReady(key);

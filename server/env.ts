@@ -15,6 +15,22 @@ export function resolveWorkerConcurrencies(input: { network?: string; ffmpeg?: s
     ffmpeg: positiveInteger(input.ffmpeg, legacy ?? 2),
   };
 }
+export function resolveTosConfig(input: {
+  region?: string;
+  bucket?: string;
+  endpoint?: string;
+  internalEndpoint?: string;
+  publicEndpoint?: string;
+}) {
+  const defaults = APP_CONFIG.providerDefaults.tos;
+  const legacyEndpoint = input.endpoint?.trim();
+  return {
+    region: input.region?.trim() || defaults.region,
+    bucket: input.bucket?.trim() || defaults.bucket,
+    internalEndpoint: input.internalEndpoint?.trim() || legacyEndpoint || defaults.endpoint,
+    publicEndpoint: input.publicEndpoint?.trim() || legacyEndpoint || defaults.endpoint,
+  };
+}
 const workerConcurrencies = resolveWorkerConcurrencies({
   network: process.env.NETWORK_WORKER_CONCURRENCY,
   ffmpeg: process.env.FFMPEG_WORKER_CONCURRENCY,
@@ -68,7 +84,13 @@ export const env = {
     pollIntervalMs: Math.max(1_000, Number(process.env.MEDIAKIT_POLL_INTERVAL_MS ?? 5_000)),
     pollTimeoutMs: Math.max(30_000, Number(process.env.MEDIAKIT_POLL_TIMEOUT_MS ?? 30 * 60_000)),
   },
-  tos: APP_CONFIG.providerDefaults.tos,
+  tos: resolveTosConfig({
+    region: process.env.TOS_REGION,
+    bucket: process.env.TOS_BUCKET,
+    endpoint: process.env.TOS_ENDPOINT,
+    internalEndpoint: process.env.TOS_INTERNAL_ENDPOINT,
+    publicEndpoint: process.env.TOS_PUBLIC_ENDPOINT,
+  }),
   jwtSecret: process.env.JWT_SECRET ?? generatedJwtSecret,
   authRateLimitMax: Number(process.env.AUTH_RATE_LIMIT_MAX ?? 12),
   adminPhones: configuredAdminPhones,

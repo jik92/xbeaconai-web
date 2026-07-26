@@ -69,7 +69,8 @@ class WeightedUploadGate {
 const uploadGate = new WeightedUploadGate();
 
 export class OssUtils {
-  private client?: TosClient;
+  private internalClient?: TosClient;
+  private publicClient?: TosClient;
   private credentialFingerprint = "";
 
   private credentials() {
@@ -84,23 +85,30 @@ export class OssUtils {
     return Boolean(credentials.accessKeyId && credentials.accessKeySecret);
   }
 
-  private ready() {
+  private ready(kind: "internal" | "public" = "internal") {
     const credentials = this.credentials();
     if (!credentials.accessKeyId || !credentials.accessKeySecret) throw new Error("TOS_NOT_CONFIGURED");
     const fingerprint = `${credentials.accessKeyId}\0${credentials.accessKeySecret}`;
-    if (this.client && fingerprint === this.credentialFingerprint) return this.client;
-    this.client = new TosClient({
+    if (fingerprint !== this.credentialFingerprint) {
+      this.internalClient = undefined;
+      this.publicClient = undefined;
+      this.credentialFingerprint = fingerprint;
+    }
+    const existing = kind === "internal" ? this.internalClient : this.publicClient;
+    if (existing) return existing;
+    const client = new TosClient({
       ...credentials,
       region: env.tos.region,
-      endpoint: env.tos.endpoint,
+      endpoint: kind === "internal" ? env.tos.internalEndpoint : env.tos.publicEndpoint,
       bucket: env.tos.bucket,
       secure: true,
       requestTimeout: 10 * 60_000,
       connectionTimeout: 15_000,
       maxRetryCount: 2,
     });
-    this.credentialFingerprint = fingerprint;
-    return this.client;
+    if (kind === "internal") this.internalClient = client;
+    else this.publicClient = client;
+    return client;
   }
 
   private async abortDanglingUploads(key: string) {
@@ -349,7 +357,7 @@ export class OssUtils {
   }
 
   createSignedUploadUrl(key: string, expiresSeconds = 15 * 60) {
-    return this.ready().getPreSignedUrl({
+    return this.ready("public").getPreSignedUrl({
       bucket: env.tos.bucket,
       key: key.replace(/^\/+/, ""),
       method: "PUT",
@@ -400,7 +408,12 @@ export class OssUtils {
   }
 
   createSignedReadUrl(key: string, expiresSeconds = 24 * 60 * 60) {
-    return this.ready().getPreSignedUrl({ bucket: env.tos.bucket, key, method: "GET", expires: expiresSeconds });
+    return this.ready("public").getPreSignedUrl({
+      bucket: env.tos.bucket,
+      key,
+      method: "GET",
+      expires: expiresSeconds,
+    });
   }
 
   headObject(key: string) {

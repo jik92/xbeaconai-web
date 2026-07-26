@@ -156,7 +156,7 @@ export const activeCredentialDoctorProviders: CredentialDoctorProvider[] = [
         accessKeyId: values.TOS_ACCESS_KEY_ID ?? "",
         accessKeySecret: values.TOS_SECRET_ACCESS_KEY ?? "",
         region: env.tos.region,
-        endpoint: env.tos.endpoint,
+        endpoint: env.tos.internalEndpoint,
         bucket: env.tos.bucket,
         secure: true,
         connectionTimeout: 8_000,
