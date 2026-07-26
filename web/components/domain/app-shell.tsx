@@ -19,6 +19,7 @@ import {
   Package,
   PanelLeftClose,
   PanelLeftOpen,
+  PanelsTopLeft,
   ReceiptText,
   RotateCcw,
   Settings2,
@@ -36,6 +37,7 @@ import { AuthScreen } from "@/features/account/auth-screen";
 import { type WorkspacePanel, WorkspacePanelDrawer } from "@/features/account/workspace-panels";
 import { fetchPortraits } from "@/features/portrait-library/portrait-data";
 import { moduleProviderAvailability, useProviderFeatures } from "@/features/provider/provider-features";
+import { sceneCatalog } from "../../../shared/scenes/scene-catalog";
 import { BrandLogo } from "./brand-logo";
 import { GlobalSearch } from "./global-search";
 import {
@@ -63,6 +65,7 @@ const ASSET_MENU_ITEMS = [
   { id: "materials", path: "/assets/materials", label: "素材库", icon: Files },
   { id: "portraits", path: "/assets/portraits", label: "人像库", icon: Images },
   { id: "products", path: "/assets/products", label: "商品库", icon: Package },
+  { id: "scenes", path: "/assets/scenes", label: "场景库", icon: PanelsTopLeft },
   { id: "voices", path: "/assets/voices", label: "音色库", icon: AudioLines },
 ] as const;
 
@@ -70,6 +73,7 @@ export function assetSidebarCounts(input: {
   materials?: readonly unknown[];
   portraits?: readonly unknown[];
   products?: readonly unknown[];
+  scenes?: readonly unknown[];
   voices?: readonly unknown[];
 }): Partial<Record<AssetFeatureId, string>> {
   return Object.fromEntries(
@@ -142,6 +146,7 @@ export function AppShell() {
     materials: materials.data,
     portraits: portraits.data,
     products: products.data,
+    scenes: sceneCatalog,
     voices: voices.data,
   });
   const runtimeAvailability = (item: SidebarMenuItem) => {

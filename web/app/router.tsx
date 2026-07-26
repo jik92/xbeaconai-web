@@ -10,6 +10,7 @@ import { AiBillingPage } from "@/features/billing/ai-billing-page";
 import { MediaUnderstandPage } from "@/features/media-understand/media-understand-page";
 import { PortraitLibrary } from "@/features/portrait-library/portrait-library";
 import { ProviderFeatureGate } from "@/features/provider/provider-feature-gate";
+import { SceneLibrary } from "@/features/scene-library/scene-library";
 import { VideoCreatePage } from "@/features/video-create/video-create-page";
 import { VideoEditorPage } from "@/features/video-editor/video-editor-page";
 import { VideoExtractPage } from "@/features/video-extract/video-extract-page";
@@ -82,6 +83,12 @@ const productRoute = createRoute({
       <ComingSoonPage config={{ id: "products", label: "商品库" }} />
     ),
 });
+const sceneRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/assets/scenes",
+  component: () =>
+    isAssetOpen("scenes") ? <SceneLibrary /> : <ComingSoonPage config={{ id: "scenes", label: "场景库" }} />,
+});
 const voiceRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/assets/voices",
@@ -108,6 +115,7 @@ const routeTree = rootRoute.addChildren([
   materialRoute,
   portraitRoute,
   productRoute,
+  sceneRoute,
   voiceRoute,
   aiBillingRoute,
   adminRoute,

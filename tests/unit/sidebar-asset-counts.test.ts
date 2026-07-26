@@ -8,12 +8,14 @@ describe("sidebar asset counts", () => {
         materials: [{ id: "material-1" }, { id: "material-2" }],
         portraits: [{ index: 1 }, { index: 2 }, { index: 3 }],
         products: [],
+        scenes: Array.from({ length: 47 }),
         voices: [{ id: "voice-1" }],
       }),
     ).toEqual({
       materials: "2",
       portraits: "3",
       products: "0",
+      scenes: "47",
       voices: "1",
     });
   });
