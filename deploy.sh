@@ -16,6 +16,9 @@ readonly CERTIFICATE_PATH="/etc/letsencrypt/live/app.xbeaconai.com/fullchain.pem
 readonly NPM_REGISTRY="https://registry.npmmirror.com"
 readonly LOCK_FILE="/var/lock/xbeaconai-web-deploy.lock"
 readonly API_HEALTH_URL="http://127.0.0.1:8787/api/health"
+readonly BUILD_SWAP_FILE="${BUILD_SWAP_FILE:-${DATA_DIR}/build.swap}"
+readonly BUILD_SWAP_SIZE_MB="${BUILD_SWAP_SIZE_MB:-2048}"
+readonly BUILD_NODE_OPTIONS="${BUILD_NODE_OPTIONS:---max-old-space-size=1536}"
 readonly APP_ORIGIN="${APP_ORIGIN:-https://app.xbeaconai.com}"
 readonly API_ORIGIN="${API_ORIGIN:-https://api.xbeaconai.com}"
 readonly DIRECT_ORIGIN="${DIRECT_ORIGIN:-http://118.196.101.57:9000}"
@@ -108,6 +111,31 @@ ensure_redis() {
     redis-cli -h 127.0.0.1 CONFIG SET maxmemory-policy noeviction >/dev/null
 }
 
+ensure_build_capacity() {
+    local available_kb
+    local swap_total_kb
+    available_kb="$(awk '$1 == "MemAvailable:" { print $2 }' /proc/meminfo)"
+    swap_total_kb="$(awk '$1 == "SwapTotal:" { print $2 }' /proc/meminfo)"
+    if (( available_kb + swap_total_kb >= 2 * 1024 * 1024 )); then
+        return 0
+    fi
+    if [[ ! "$BUILD_SWAP_SIZE_MB" =~ ^[0-9]+$ ]] || (( BUILD_SWAP_SIZE_MB < 512 )); then
+        log "BUILD_SWAP_SIZE_MB 必须是至少 512 的整数。"
+        return 1
+    fi
+    install -d -m 0700 "$DATA_DIR"
+    if [[ ! -f "$BUILD_SWAP_FILE" ]]; then
+        log "可用内存不足，为生产构建创建 ${BUILD_SWAP_SIZE_MB}MB Swap..."
+        fallocate -l "${BUILD_SWAP_SIZE_MB}M" "$BUILD_SWAP_FILE"
+        chmod 0600 "$BUILD_SWAP_FILE"
+        mkswap "$BUILD_SWAP_FILE" >/dev/null
+    fi
+    chmod 0600 "$BUILD_SWAP_FILE"
+    if ! swapon --noheadings --show=NAME | grep -Fxq "$BUILD_SWAP_FILE"; then
+        swapon "$BUILD_SWAP_FILE"
+    fi
+}
+
 wait_for_api() {
     local attempt
     for attempt in $(seq 1 30); do
@@ -195,7 +223,8 @@ log "使用国内镜像安装依赖..."
 bun install --frozen-lockfile --registry="$NPM_REGISTRY"
 
 log "构建生产版本..."
-VITE_API_BASE_URL="$API_ORIGIN" bun run build
+ensure_build_capacity
+NODE_OPTIONS="${NODE_OPTIONS:-$BUILD_NODE_OPTIONS}" VITE_API_BASE_URL="$API_ORIGIN" bun run build
 
 log "配置 Redis、Bun API 和 BullMQ Worker..."
 ensure_runtime_environment

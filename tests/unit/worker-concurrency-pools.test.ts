@@ -56,4 +56,13 @@ describe("worker concurrency pools", () => {
     expect(deploy).toContain(`upsert_env "NETWORK_WORKER_CONCURRENCY" "\${NETWORK_WORKER_CONCURRENCY:-40}"`);
     expect(deploy).toContain(`upsert_env "FFMPEG_WORKER_CONCURRENCY" "\${FFMPEG_WORKER_CONCURRENCY:-2}"`);
   });
+
+  test("provisions build swap before running TypeScript on low-memory hosts", async () => {
+    const deploy = await Bun.file("deploy.sh").text();
+    expect(deploy).toContain(`readonly BUILD_SWAP_SIZE_MB="\${BUILD_SWAP_SIZE_MB:-2048}"`);
+    expect(deploy).toContain("ensure_build_capacity");
+    expect(deploy).toContain(
+      `NODE_OPTIONS="\${NODE_OPTIONS:-$BUILD_NODE_OPTIONS}" VITE_API_BASE_URL="$API_ORIGIN" bun run build`,
+    );
+  });
 });
