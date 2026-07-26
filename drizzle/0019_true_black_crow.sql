@@ -1,4 +1,4 @@
-CREATE TABLE `qianchuan_advertisers` (
+CREATE TABLE IF NOT EXISTS `qianchuan_advertisers` (
 	`id` text PRIMARY KEY NOT NULL,
 	`binding_id` text NOT NULL,
 	`advertiser_id` text NOT NULL,
@@ -9,9 +9,9 @@ CREATE TABLE `qianchuan_advertisers` (
 	FOREIGN KEY (`binding_id`) REFERENCES `qianchuan_bindings`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `qianchuan_advertisers_binding_advertiser_idx` ON `qianchuan_advertisers` (`binding_id`,`advertiser_id`);--> statement-breakpoint
-CREATE INDEX `qianchuan_advertisers_binding_idx` ON `qianchuan_advertisers` (`binding_id`);--> statement-breakpoint
-CREATE TABLE `qianchuan_bindings` (
+CREATE UNIQUE INDEX IF NOT EXISTS `qianchuan_advertisers_binding_advertiser_idx` ON `qianchuan_advertisers` (`binding_id`,`advertiser_id`);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `qianchuan_advertisers_binding_idx` ON `qianchuan_advertisers` (`binding_id`);--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS `qianchuan_bindings` (
 	`id` text PRIMARY KEY NOT NULL,
 	`owner_user_id` text NOT NULL,
 	`auth_user_id` text NOT NULL,
@@ -33,9 +33,9 @@ CREATE TABLE `qianchuan_bindings` (
 	FOREIGN KEY (`owner_user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `qianchuan_bindings_owner_auth_user_idx` ON `qianchuan_bindings` (`owner_user_id`,`auth_user_id`);--> statement-breakpoint
-CREATE INDEX `qianchuan_bindings_owner_idx` ON `qianchuan_bindings` (`owner_user_id`,`updated_at`);--> statement-breakpoint
-CREATE TABLE `qianchuan_deliveries` (
+CREATE UNIQUE INDEX IF NOT EXISTS `qianchuan_bindings_owner_auth_user_idx` ON `qianchuan_bindings` (`owner_user_id`,`auth_user_id`);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `qianchuan_bindings_owner_idx` ON `qianchuan_bindings` (`owner_user_id`,`updated_at`);--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS `qianchuan_deliveries` (
 	`id` text PRIMARY KEY NOT NULL,
 	`owner_user_id` text NOT NULL,
 	`binding_id` text NOT NULL,
@@ -56,9 +56,9 @@ CREATE TABLE `qianchuan_deliveries` (
 	FOREIGN KEY (`binding_id`) REFERENCES `qianchuan_bindings`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `qianchuan_deliveries_owner_idempotency_idx` ON `qianchuan_deliveries` (`owner_user_id`,`idempotency_key`);--> statement-breakpoint
-CREATE INDEX `qianchuan_deliveries_owner_updated_idx` ON `qianchuan_deliveries` (`owner_user_id`,`updated_at`);--> statement-breakpoint
-CREATE TABLE `qianchuan_materials` (
+CREATE UNIQUE INDEX IF NOT EXISTS `qianchuan_deliveries_owner_idempotency_idx` ON `qianchuan_deliveries` (`owner_user_id`,`idempotency_key`);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `qianchuan_deliveries_owner_updated_idx` ON `qianchuan_deliveries` (`owner_user_id`,`updated_at`);--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS `qianchuan_materials` (
 	`id` text PRIMARY KEY NOT NULL,
 	`owner_user_id` text NOT NULL,
 	`binding_id` text NOT NULL,
@@ -76,9 +76,9 @@ CREATE TABLE `qianchuan_materials` (
 	FOREIGN KEY (`asset_id`) REFERENCES `media_assets`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `qianchuan_materials_account_asset_idx` ON `qianchuan_materials` (`advertiser_id`,`asset_id`,`kind`);--> statement-breakpoint
-CREATE INDEX `qianchuan_materials_owner_idx` ON `qianchuan_materials` (`owner_user_id`,`updated_at`);--> statement-breakpoint
-CREATE TABLE `qianchuan_oauth_states` (
+CREATE UNIQUE INDEX IF NOT EXISTS `qianchuan_materials_account_asset_idx` ON `qianchuan_materials` (`advertiser_id`,`asset_id`,`kind`);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `qianchuan_materials_owner_idx` ON `qianchuan_materials` (`owner_user_id`,`updated_at`);--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS `qianchuan_oauth_states` (
 	`state_hash` text PRIMARY KEY NOT NULL,
 	`owner_user_id` text NOT NULL,
 	`expires_at` text NOT NULL,
@@ -87,8 +87,8 @@ CREATE TABLE `qianchuan_oauth_states` (
 	FOREIGN KEY (`owner_user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE INDEX `qianchuan_oauth_states_owner_idx` ON `qianchuan_oauth_states` (`owner_user_id`,`created_at`);--> statement-breakpoint
-CREATE TABLE `qianchuan_reports` (
+CREATE INDEX IF NOT EXISTS `qianchuan_oauth_states_owner_idx` ON `qianchuan_oauth_states` (`owner_user_id`,`created_at`);--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS `qianchuan_reports` (
 	`id` text PRIMARY KEY NOT NULL,
 	`owner_user_id` text NOT NULL,
 	`delivery_id` text NOT NULL,
@@ -100,5 +100,5 @@ CREATE TABLE `qianchuan_reports` (
 	FOREIGN KEY (`delivery_id`) REFERENCES `qianchuan_deliveries`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `qianchuan_reports_delivery_date_level_idx` ON `qianchuan_reports` (`delivery_id`,`report_date`,`level`);--> statement-breakpoint
-CREATE INDEX `qianchuan_reports_owner_date_idx` ON `qianchuan_reports` (`owner_user_id`,`report_date`);
+CREATE UNIQUE INDEX IF NOT EXISTS `qianchuan_reports_delivery_date_level_idx` ON `qianchuan_reports` (`delivery_id`,`report_date`,`level`);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `qianchuan_reports_owner_date_idx` ON `qianchuan_reports` (`owner_user_id`,`report_date`);
