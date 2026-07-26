@@ -111,6 +111,12 @@ ensure_redis() {
     redis-cli -h 127.0.0.1 CONFIG SET maxmemory-policy noeviction >/dev/null
 }
 
+ensure_playwright_runtime() {
+    log "安装并验证 Playwright Chromium 运行环境..."
+    DEBIAN_FRONTEND=noninteractive bun x playwright install --with-deps chromium
+    bun scripts/check-playwright-production.ts
+}
+
 ensure_build_capacity() {
     local available_kb
     local swap_total_kb
@@ -249,6 +255,8 @@ fi
 
 log "使用国内镜像安装依赖..."
 bun install --frozen-lockfile --registry="$NPM_REGISTRY"
+
+ensure_playwright_runtime
 
 log "构建生产版本..."
 ensure_build_capacity

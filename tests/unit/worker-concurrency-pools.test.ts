@@ -66,4 +66,19 @@ describe("worker concurrency pools", () => {
     expect(deploy).toContain("build_production");
     expect(deploy).toContain("grep -Eq 'BullMQ workers? ready'");
   });
+
+  test("installs and launches the locked Playwright Chromium before replacing production services", async () => {
+    const deploy = await Bun.file("deploy.sh").text();
+    const mediaDependencies = await Bun.file("deploy/install-media-dependencies.sh").text();
+    const installCommand = "bun x playwright install --with-deps chromium";
+
+    expect(deploy).toContain(installCommand);
+    expect(deploy).toContain("bun scripts/check-playwright-production.ts");
+    const runtimeCheck = deploy.lastIndexOf("\nensure_playwright_runtime\n");
+    expect(runtimeCheck).toBeGreaterThan(deploy.indexOf("bun install --frozen-lockfile"));
+    expect(runtimeCheck).toBeLessThan(deploy.indexOf('log "构建生产版本..."'));
+    expect(mediaDependencies).toContain("/usr/local/bin/bun x playwright install --with-deps chromium");
+    expect(mediaDependencies).toContain("/usr/local/bin/bun scripts/check-playwright-production.ts");
+    expect(mediaDependencies).toContain("node_modules/playwright/package.json");
+  });
 });
