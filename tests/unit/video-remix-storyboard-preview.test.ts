@@ -36,8 +36,20 @@ describe("video remix storyboard editor", () => {
     expect(storyboard).toContain("submitting={Boolean(activeShotRunning)}");
     expect(storyboard).toContain('submitLabel="生成视频"');
     expect(storyboard).not.toContain("进入合并成片");
+    expect(page).toContain("setPendingShotSubmission({");
     expect(page).toContain("setSubmittedShotJobId(created.id)");
     expect(page).toContain("setStage(4)");
+  });
+
+  test("confirms submission, then renders a read-only execution snapshot", () => {
+    expect(page).toContain("任务提交后不可取消、不可停止。");
+    expect(page).toContain('className="shot-submit-confirm"');
+    expect(page).toContain('className="shot-execution-panel"');
+    expect(page).toContain("正在生成视频，预计耗时约 4–5 分钟");
+    expect(page).toContain("引用素材库");
+    expect(page).toContain("已提交提示词");
+    expect(page).toContain("生成参数");
+    expect(storyboard).toContain("visibleExecutionSnapshot ? (");
   });
 
   test("shows unverified video models in the workbench instead of replacing it with an empty state", () => {
@@ -49,7 +61,7 @@ describe("video remix storyboard editor", () => {
   test("binds explicit @Image labels to assets and never injects the source video or a default portrait", () => {
     expect(page).toContain("const quotedReferences = storyboardReferenceImages.filter");
     expect(page).toContain("const mentionedLabels = new Set");
-    expect(page).toContain("@" + "${unresolved} 未绑定到当前参考素材库");
+    expect(page).toContain("@".concat("$", "{unresolved} 未绑定到当前参考素材库"));
     expect(page).toContain("references: quotedReferences.flatMap");
     expect(page).toContain("portraitReferences: quotedReferences.flatMap");
     expect(storyboard).toContain("mentions={storyboardReferenceImages.map");

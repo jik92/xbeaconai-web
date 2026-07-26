@@ -105,6 +105,40 @@ interface StoryboardReference {
   authenticated?: boolean;
 }
 
+interface ShotSubmissionSnapshot {
+  jobId: string;
+  prompt: string;
+  references: StoryboardReference[];
+  modelId: SeedanceModelId;
+  ratio: string;
+  resolution: string;
+  duration: number;
+}
+
+interface PendingShotSubmission {
+  request: {
+    sourceJobId: string;
+    sourceAssetId: string;
+    prompt: string;
+    modelId: SeedanceModelId;
+    ratio: string;
+    resolution: string;
+    duration: number;
+    references: Array<{ assetId: string; label: string }>;
+    portraitReferences: Array<{ reference: Portrait["reference"]; label: string }>;
+  };
+  snapshot: Omit<ShotSubmissionSnapshot, "jobId">;
+}
+
+function submittedReferenceLabels(value?: string) {
+  try {
+    const parsed = JSON.parse(value || "[]") as Array<{ label?: unknown }>;
+    return new Set(parsed.flatMap((item) => (typeof item.label === "string" ? [item.label] : [])));
+  } catch {
+    return new Set<string>();
+  }
+}
+
 function PublicPreviewImage({ url, alt }: { url: string; alt: string }) {
   const [failed, setFailed] = useState(false);
 
@@ -1040,6 +1074,8 @@ export function RemixProject() {
   const [selectedShotAssets, setSelectedShotAssets] = useState<Record<string, string>>({});
   const [shotSelectionTouched, setShotSelectionTouched] = useState<Record<string, boolean>>({});
   const [submittedShotJobId, setSubmittedShotJobId] = useState("");
+  const [pendingShotSubmission, setPendingShotSubmission] = useState<PendingShotSubmission | null>(null);
+  const [submittedShotSnapshot, setSubmittedShotSnapshot] = useState<ShotSubmissionSnapshot | null>(null);
   const [draggingSourceId, setDraggingSourceId] = useState("");
   const [mode, setMode] = useState<"product" | "talking">("product");
   const [projectName, setProjectName] = useState("");
@@ -1373,6 +1409,8 @@ export function RemixProject() {
     setSelectedShotAssets({});
     setShotSelectionTouched({});
     setSubmittedShotJobId("");
+    setPendingShotSubmission(null);
+    setSubmittedShotSnapshot(null);
     setDraggingSourceId("");
     setProjectName("");
     setDescription("");
@@ -1483,6 +1521,8 @@ export function RemixProject() {
       setActiveSourceId(detail.workspace.composePreviewId || restoredSources[0]?.id || "");
       setComposeJob(latestCompose);
       setShotDrafts({});
+      setPendingShotSubmission(null);
+      setSubmittedShotSnapshot(null);
       setEditing(false);
       setPromptTool(null);
       setHistoryOpen(false);
@@ -1557,7 +1597,10 @@ export function RemixProject() {
       setStage(4);
       return;
     }
-    if (submitted.status === "failed") setNotice(submitted.error?.message || "分镜视频生成失败");
+    if (submitted.status === "failed") {
+      setSubmittedShotSnapshot(null);
+      setNotice(submitted.error?.message || "分镜视频生成失败");
+    }
   }, [shotJobs, submittedShotJobId]);
   const referenceLibraryKeys = useMemo(
     () => [
@@ -1640,7 +1683,25 @@ export function RemixProject() {
     const known = new Set(activeDraft.references.map((asset) => asset.id));
     patchShotDraft({ references: [...activeDraft.references, ...assets.filter((asset) => !known.has(asset.id))] });
   };
-  const submitShotGeneration = async () => {
+  const executionSnapshot = useMemo<ShotSubmissionSnapshot | null>(() => {
+    if (!activeShotRunning) return null;
+    if (submittedShotSnapshot?.jobId === activeShotRunning.id) return submittedShotSnapshot;
+    const labels = submittedReferenceLabels(activeShotRunning.values.referenceBindings);
+    const taskPrompt = activeShotRunning.values.prompt || prompt;
+    return {
+      jobId: activeShotRunning.id,
+      prompt: taskPrompt,
+      references: storyboardReferenceImages.filter((reference) => labels.has(reference.label)),
+      modelId: (activeShotRunning.values.modelId ||
+        activeShotRunning.videoModel ||
+        activeDraft?.modelId) as SeedanceModelId,
+      ratio: activeShotRunning.values.ratio || activeDraft?.ratio || "9:16",
+      resolution: activeShotRunning.values.resolution || activeDraft?.resolution || "720p",
+      duration: Number(activeShotRunning.values.duration || activeDraft?.duration || 5),
+    };
+  }, [activeDraft, activeShotRunning, prompt, storyboardReferenceImages, submittedShotSnapshot]);
+  const visibleExecutionSnapshot = executionSnapshot ?? submittedShotSnapshot;
+  const prepareShotSubmission = () => {
     if (!job?.id || !sourceAssetId || !activeDraft || activeShotRunning) return;
     if (prompt.trim().length < 20) {
       setNotice("分镜生成提示词至少需要 20 个字符");
@@ -1659,9 +1720,8 @@ export function RemixProject() {
       setNotice("当前模型单次最多可引用 9 张图片，请减少提示词中的 @ 引用");
       return;
     }
-    setNotice("");
-    try {
-      const created = await generateRemixShot({
+    setPendingShotSubmission({
+      request: {
         sourceJobId: job.id,
         sourceAssetId,
         prompt,
@@ -1675,9 +1735,27 @@ export function RemixProject() {
         portraitReferences: quotedReferences.flatMap((reference) =>
           reference.portraitReference ? [{ reference: reference.portraitReference, label: reference.label }] : [],
         ),
-      });
+      },
+      snapshot: {
+        prompt,
+        references: quotedReferences,
+        modelId: activeDraft.modelId,
+        ratio: activeDraft.ratio,
+        resolution: activeDraft.resolution,
+        duration: activeDraft.duration,
+      },
+    });
+  };
+  const submitShotGeneration = async () => {
+    const submission = pendingShotSubmission;
+    if (!submission) return;
+    setPendingShotSubmission(null);
+    setNotice("");
+    try {
+      const created = await generateRemixShot(submission.request);
       setSubmittedShotJobId(created.id);
-      setShotSelectionTouched((current) => ({ ...current, [sourceAssetId]: false }));
+      setSubmittedShotSnapshot({ ...submission.snapshot, jobId: created.id });
+      setShotSelectionTouched((current) => ({ ...current, [submission.request.sourceAssetId]: false }));
       setNotice("分镜视频已提交生成，完成后将自动进入合并成片");
       await refetchShotJobs();
     } catch (error) {
@@ -1940,7 +2018,66 @@ export function RemixProject() {
           )}
           {stage === 3 && (
             <div className="storyboard-proof">
-              {activeDraft && (
+              {visibleExecutionSnapshot ? (
+                <section className="shot-execution-panel" aria-label="分镜视频生成任务">
+                  <header>
+                    <span>
+                      <Video />
+                      结果预览
+                    </span>
+                    <small>{activeShotRunning?.stage || "正在生成当前分镜"}</small>
+                  </header>
+                  <div className="shot-execution-content">
+                    <div className="shot-execution-preview" role="status" aria-live="polite">
+                      <LoaderCircle className="animate-spin" />
+                      <p>
+                        正在生成视频，预计耗时约 4–5 分钟，
+                        <br />
+                        请耐心等待
+                      </p>
+                    </div>
+                    <div className="shot-execution-details">
+                      <section>
+                        <b>引用素材库</b>
+                        <div className="submitted-reference-list">
+                          {visibleExecutionSnapshot.references.map((reference) => (
+                            <span key={reference.id} title={`@${reference.label} · ${reference.name}`}>
+                              {reference.source === "portrait" && !reference.authenticated ? (
+                                <PublicPreviewImage url={reference.url} alt={reference.name} />
+                              ) : (
+                                <AuthenticatedMedia
+                                  url={reference.url}
+                                  mimeType={reference.mimeType}
+                                  alt={reference.name}
+                                  previewable={false}
+                                  loadingText=""
+                                  errorText="图片加载失败"
+                                />
+                              )}
+                              <small>@{reference.label}</small>
+                            </span>
+                          ))}
+                          {!visibleExecutionSnapshot.references.length && <i>本次未引用素材</i>}
+                        </div>
+                      </section>
+                      <section>
+                        <b>已提交提示词</b>
+                        <pre>{visibleExecutionSnapshot.prompt}</pre>
+                      </section>
+                      <section className="submitted-model-settings">
+                        <b>生成参数</b>
+                        <span>
+                          {videoModels.find((model) => model.id === visibleExecutionSnapshot.modelId)?.displayName ||
+                            visibleExecutionSnapshot.modelId}
+                        </span>
+                        <span>{visibleExecutionSnapshot.ratio}</span>
+                        <span>{visibleExecutionSnapshot.resolution}</span>
+                        <span>{visibleExecutionSnapshot.duration}秒</span>
+                      </section>
+                    </div>
+                  </div>
+                </section>
+              ) : activeDraft ? (
                 <div className="storyboard-editor">
                   <div className="storyboard-reference-cluster">
                     {storyboardReferenceImages.map((reference, index) => (
@@ -2007,7 +2144,7 @@ export function RemixProject() {
                       setActivePromptVersionId("");
                     }}
                     onExpandedChange={(expanded) => patchShotDraft({ expanded })}
-                    onSubmit={() => void submitShotGeneration()}
+                    onSubmit={prepareShotSubmission}
                     controls={
                       <>
                         <select
@@ -2070,8 +2207,10 @@ export function RemixProject() {
                     }
                   />
                 </div>
+              ) : null}
+              {!visibleExecutionSnapshot && !activeDraft && (
+                <div className="shot-generation-unavailable">当前没有已启用的视频生成模型</div>
               )}
-              {!activeDraft && <div className="shot-generation-unavailable">当前没有已启用的视频生成模型</div>}
             </div>
           )}
           {stage === 4 && (
@@ -2206,6 +2345,36 @@ export function RemixProject() {
           <Sparkles />
           {parsing ? "解析中" : job ? "已提交解析" : "视频解析"}
         </button>
+      )}
+      {pendingShotSubmission && (
+        <div
+          className="remix-picker-layer shot-submit-confirm-layer"
+          role="presentation"
+          onMouseDown={() => setPendingShotSubmission(null)}
+        >
+          <section
+            className="shot-submit-confirm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="shot-submit-confirm-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header>
+              <Video />
+              <h2 id="shot-submit-confirm-title">确认提交视频生成任务</h2>
+            </header>
+            <p>任务提交后不可取消、不可停止。</p>
+            <small>请确认提示词、引用素材和生成参数无误后再继续。</small>
+            <footer>
+              <button type="button" onClick={() => setPendingShotSubmission(null)}>
+                返回修改
+              </button>
+              <button type="button" className="primary" onClick={() => void submitShotGeneration()}>
+                确认提交
+              </button>
+            </footer>
+          </section>
+        </div>
       )}
       <ProjectHistoryDrawer
         open={historyOpen}

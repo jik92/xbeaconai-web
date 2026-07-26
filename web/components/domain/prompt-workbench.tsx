@@ -24,6 +24,38 @@ function activeMentionQuery(value: string, caret: number) {
   return { start: caret - match[2].length - 1, query: match[2] };
 }
 
+export function promptMentionRanges(value: string, mentions: PromptMention[]) {
+  return mentions.flatMap((mention) => {
+    const escaped = mention.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(`@${escaped}(?![A-Za-z0-9_-])`, "g");
+    const ranges: Array<{ start: number; end: number }> = [];
+    for (const match of value.matchAll(pattern)) {
+      const start = match.index ?? 0;
+      ranges.push({ start, end: start + match[0].length });
+    }
+    return ranges;
+  });
+}
+
+export function promptMentionDeletionRange(
+  value: string,
+  mentions: PromptMention[],
+  start: number,
+  end: number,
+  key: "Backspace" | "Delete",
+) {
+  const ranges = promptMentionRanges(value, mentions);
+  const selectedRanges = ranges.filter((range) => start < range.end && end > range.start);
+  if (selectedRanges.length > 0)
+    return {
+      start: Math.min(start, ...selectedRanges.map((range) => range.start)),
+      end: Math.max(end, ...selectedRanges.map((range) => range.end)),
+    };
+  return key === "Backspace"
+    ? ranges.find((range) => range.start < start && start <= range.end)
+    : ranges.find((range) => range.start <= start && start < range.end);
+}
+
 export function PromptWorkbench({
   expanded,
   docked = false,
@@ -81,6 +113,16 @@ export function PromptWorkbench({
     if (!mention) return;
     const next = `${prompt.slice(0, mention.start)}@${item.label} ${prompt.slice(mention.end)}`;
     const caret = mention.start + item.label.length + 2;
+    onPromptChange(next);
+    setMention(undefined);
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(caret, caret);
+    });
+  };
+  const replacePromptRange = (start: number, end: number, replacement = "") => {
+    const next = `${prompt.slice(0, start)}${replacement}${prompt.slice(end)}`;
+    const caret = start + replacement.length;
     onPromptChange(next);
     setMention(undefined);
     requestAnimationFrame(() => {
@@ -171,10 +213,38 @@ export function PromptWorkbench({
           const query = activeMentionQuery(event.currentTarget.value, event.currentTarget.selectionStart);
           setMention(query ? { ...query, end: event.currentTarget.selectionStart } : undefined);
         }}
+        onPaste={(event) => {
+          const caret = event.currentTarget.selectionStart;
+          const containing = promptMentionRanges(prompt, mentions).find(
+            (range) => range.start < caret && caret < range.end,
+          );
+          if (!containing) return;
+          event.preventDefault();
+          replacePromptRange(containing.end, containing.end, event.clipboardData.getData("text"));
+        }}
         onKeyDown={(event) => {
           if (event.key === "Escape" && mention) {
             event.preventDefault();
             setMention(undefined);
+            return;
+          }
+          const target = event.currentTarget;
+          const start = target.selectionStart;
+          const end = target.selectionEnd;
+          const ranges = promptMentionRanges(prompt, mentions);
+          const containing = ranges.find((range) => range.start < start && start < range.end);
+          const deletionRange =
+            event.key === "Backspace" || event.key === "Delete"
+              ? promptMentionDeletionRange(prompt, mentions, start, end, event.key)
+              : undefined;
+          if ((event.key === "Backspace" || event.key === "Delete") && deletionRange) {
+            event.preventDefault();
+            replacePromptRange(deletionRange.start, deletionRange.end);
+            return;
+          }
+          if (containing && event.key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey) {
+            event.preventDefault();
+            replacePromptRange(containing.end, containing.end, event.key);
             return;
           }
           if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
