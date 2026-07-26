@@ -6,12 +6,12 @@ import type { MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
 import { aiToolModuleIds, isAiToolModuleId } from "../shared/jobs/ai-tool-modules";
-import { parseVideoMashupConfig, type VideoMashupConfig } from "../shared/video-mashup/config";
 import {
   normalizePortraitReference,
-  serializePortraitReference,
   type PortraitReference,
+  serializePortraitReference,
 } from "../shared/portraits/portrait-reference";
+import { parseVideoMashupConfig, type VideoMashupConfig } from "../shared/video-mashup/config";
 import { parseRemixWorkspace, remixProjectStages } from "../shared/video-remix/project-records";
 import {
   defaultRemixPromptToolConfig,
@@ -63,6 +63,7 @@ import {
   moduleFeatureAvailability,
   providerFeatureAvailability,
 } from "./byok/provider-feature-gate";
+import { AiGenerateRequestSchema, normalizeAiGenerateValues } from "./creation/ai-generate-contract";
 import { creationCapabilities, quoteCreation, validateCreationValues } from "./creation/capabilities";
 import { env } from "./env";
 import { emitLog } from "./imports/import-logger";
@@ -74,9 +75,9 @@ const shareParser = new ShareContentParser(platformAdapters);
 import { stopAllAdminJobs } from "./jobs/admin-job-control";
 import { BullJobQueue } from "./jobs/bull-job-queue";
 import { InsufficientCreditsError, SqliteJobStore } from "./jobs/sqlite-job-store";
-import { seedanceModelIds, videoModels } from "./models/video-models";
+import { isSeedanceModelId, seedanceModelIds, videoModels } from "./models/video-models";
 import { getPortraitById } from "./portraits/catalog";
-import { CustomPortraitStore, type CustomPortraitRecord } from "./portraits/custom-portrait-store";
+import { type CustomPortraitRecord, CustomPortraitStore } from "./portraits/custom-portrait-store";
 import { resolvePortraitReference } from "./portraits/portrait-resolver";
 import { auditSdkRegistry } from "./sdk-registry";
 import { ossutils } from "./storage/ossutils";
@@ -1454,6 +1455,8 @@ const creationModelSchema = z.object({
   supportsSeed: z.boolean(),
   referenceModes: z.array(z.string()),
   acceptedReferenceKinds: z.array(z.string()),
+  minReferences: z.number().int().min(0),
+  maxReferences: z.number().int().min(0),
   pricing: z.object({ baseCredits: z.number().int(), perOutputCredits: z.number().int() }),
   dimensions: z
     .record(z.string(), z.record(z.string(), z.object({ width: z.number().int(), height: z.number().int() })))
@@ -1482,6 +1485,248 @@ app.openapi(creationCapabilitiesRoute, (c) =>
     200,
   ),
 );
+
+app.use("/api/ai-generate/jobs", async (c, next) => {
+  if (c.req.method === "POST") {
+    const body = (await c.req.raw
+      .clone()
+      .json()
+      .catch(() => undefined)) as { values?: unknown } | undefined;
+    if (body && "values" in body)
+      return c.json(
+        {
+          error: {
+            code: "DEDICATED_WORKFLOW_REQUIRED",
+            message: "AI 创作必须通过专用强类型接口提交",
+            retryable: false,
+            requestId: crypto.randomUUID(),
+          },
+        },
+        422,
+      );
+  }
+  await next();
+});
+
+const createAiGenerateJobRoute = createRoute({
+  method: "post",
+  path: "/api/ai-generate/jobs",
+  operationId: "createAiGenerateJob",
+  request: {
+    body: {
+      content: { "application/json": { schema: AiGenerateRequestSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    202: { description: "Accepted", content: { "application/json": { schema: JobSchema } } },
+    401: { description: "Unauthorized", content: { "application/json": { schema: ErrorSchema } } },
+    403: { description: "Provider not verified", content: { "application/json": { schema: ErrorSchema } } },
+    422: { description: "Invalid creation request", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+
+app.openapi(createAiGenerateJobRoute, async (c) => {
+  const ownerUserId = c.get("userId");
+  const body = c.req.valid("json");
+  const requiredProviders =
+    body.kind === "image"
+      ? (["aihubmix"] as const)
+      : body.referenceAssetIds.length
+        ? (["ark", "tos"] as const)
+        : (["ark"] as const);
+  const availability = providerFeatureAvailability([...requiredProviders]);
+  if (!availability.enabled)
+    return c.json(
+      {
+        error: {
+          code: "PROVIDER_NOT_VERIFIED",
+          message: availability.disabledReason ?? "相关 Provider 尚未检测通过",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      403,
+    );
+
+  const models = creationCapabilities(
+    videoModelEnabled,
+    env.mockGenerateVideoApi ? "mock" : "real",
+    getVerifiedSdkIds().has("aihubmix-image"),
+  );
+  const capabilityValues = {
+    creationKind: body.kind,
+    prompt: body.prompt,
+    modelId: body.modelId,
+    ratio: body.ratio,
+    resolution: body.resolution,
+    count: String(body.kind === "image" ? body.count : 1),
+    duration: String(body.kind === "video" ? body.duration : 0),
+    referenceMode: body.kind === "video" ? body.referenceMode : "",
+    referenceCount: String(
+      body.referenceAssetIds.length || (body.parentJobId && body.revisionMode !== "new" ? 1 : 0),
+    ),
+    seed: "",
+  };
+  const validationError = validateCreationValues(capabilityValues, models);
+  if (validationError)
+    return c.json(
+      {
+        error: {
+          code: "INVALID_AI_GENERATE_CONFIG",
+          message: validationError,
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      422,
+    );
+  const model = models.find((item) => item.id === body.modelId && item.kind === body.kind);
+  if (!model)
+    return c.json(
+      {
+        error: {
+          code: "INVALID_AI_GENERATE_CONFIG",
+          message: "所选模型当前不可用",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      422,
+    );
+  const referenceMetadata: Array<{
+    id: string;
+    name: string;
+    mimeType: string;
+    label: string;
+    source: "library";
+  }> = [];
+  const referenceCounts = new Map<string, number>();
+  for (const assetId of body.referenceAssetIds) {
+    const asset = accounts.getOwnedAsset(ownerUserId, assetId);
+    if (!asset)
+      return c.json(
+        {
+          error: {
+            code: "ASSET_NOT_AVAILABLE",
+            message: "引用的素材不存在或不属于当前账号",
+            retryable: false,
+            requestId: crypto.randomUUID(),
+          },
+        },
+        422,
+      );
+    const kind = asset.mimeType.startsWith("image/")
+      ? "image"
+      : asset.mimeType.startsWith("video/")
+        ? "video"
+        : asset.mimeType.startsWith("audio/")
+          ? "audio"
+          : undefined;
+    if (!kind || !model.acceptedReferenceKinds.includes(kind))
+      return c.json(
+        {
+          error: {
+            code: "UNSUPPORTED_REFERENCE_TYPE",
+            message: `所选模型不支持 ${asset.mimeType} 参考素材`,
+            retryable: false,
+            requestId: crypto.randomUUID(),
+          },
+        },
+        422,
+      );
+    const referenceNumber = (referenceCounts.get(kind) ?? 0) + 1;
+    referenceCounts.set(kind, referenceNumber);
+    referenceMetadata.push({
+      id: asset.id,
+      name: asset.displayName,
+      mimeType: asset.mimeType,
+      label: `${kind === "image" ? "图片" : kind === "video" ? "视频" : "音频"}${referenceNumber}`,
+      source: "library",
+    });
+  }
+
+  const parentJob = body.parentJobId ? store.getOwned(body.parentJobId, ownerUserId) : undefined;
+  if (body.parentJobId && (!parentJob || parentJob.moduleId !== "ai-generate" || parentJob.status !== "succeeded"))
+    return c.json(
+      {
+        error: {
+          code: "INVALID_PARENT_JOB",
+          message: "关联的上游任务不存在、未完成或不属于当前账号",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      422,
+    );
+
+  const idempotencyKey = c.req.header("Idempotency-Key")?.trim().slice(0, 128);
+  if (idempotencyKey) {
+    const existing = store.getByIdempotencyKey(ownerUserId, idempotencyKey);
+    if (existing) return c.json(existing, 202);
+  }
+  const credits = quoteCreation(capabilityValues, models);
+  const user = accounts.getUser(ownerUserId);
+  if (!user || user.credits < credits)
+    return c.json(
+      {
+        error: {
+          code: "INSUFFICIENT_CREDITS",
+          message: `本次预计消耗 ${credits} 创作点，当前余额不足`,
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      422,
+    );
+
+  const now = new Date().toISOString();
+  const job: JobRecord = {
+    id: crypto.randomUUID(),
+    ownerUserId,
+    moduleId: "ai-generate",
+    title: body.title,
+    status: "queued",
+    progress: 0,
+    stage: "排队中",
+    overallExecutionMode: "real",
+    values: {
+      ...normalizeAiGenerateValues(body),
+      referenceMetadata: JSON.stringify(referenceMetadata),
+      allowMockFallback: "false",
+    },
+    videoModel: body.kind === "video" && isSeedanceModelId(body.modelId) ? body.modelId : undefined,
+    executionPlan: [],
+    provenance: [],
+    idempotencyKey,
+    parentJobId: parentJob?.id,
+    cancelRequested: false,
+    providerCancelState: "none",
+    stagingKeys: [],
+    jobSchemaVersion: 2,
+    createdAt: now,
+    updatedAt: now,
+  };
+  try {
+    store.createCharged(job, credits);
+  } catch (error) {
+    if (error instanceof InsufficientCreditsError)
+      return c.json(
+        {
+          error: {
+            code: "INSUFFICIENT_CREDITS",
+            message: "创作点余额发生变化，请刷新后重试",
+            retryable: false,
+            requestId: crypto.randomUUID(),
+          },
+        },
+        422,
+      );
+    throw error;
+  }
+  await queue.enqueue(job.id);
+  return c.json(job, 202);
+});
 
 const libraryAssetResponse = (asset: MediaAsset) => ({
   id: asset.id,
@@ -5928,12 +6173,17 @@ const createJobRoute = createRoute({
 });
 app.openapi(createJobRoute, async (c) => {
   const moduleId = c.req.valid("param").moduleId as ModuleId;
-  if (moduleId === "ad-script" || moduleId === "video-create")
+  if (moduleId === "ad-script" || moduleId === "video-create" || moduleId === "ai-generate")
     return c.json(
       {
         error: {
           code: "DEDICATED_WORKFLOW_REQUIRED",
-          message: moduleId === "ad-script" ? "口播脚本必须通过专用创作流程提交" : "一键成片必须通过专用项目流程提交",
+          message:
+            moduleId === "ad-script"
+              ? "口播脚本必须通过专用创作流程提交"
+              : moduleId === "video-create"
+                ? "一键成片必须通过专用项目流程提交"
+                : "AI 创作必须通过专用强类型接口提交",
           retryable: false,
           requestId: crypto.randomUUID(),
         },
@@ -6106,54 +6356,7 @@ app.openapi(createJobRoute, async (c) => {
       );
     }
   }
-  const needsVideoModel = moduleId === "video-remix" || (moduleId === "ai-generate" && body.values.type === "视频");
-  let creationQuote = 0;
-  if (moduleId === "ai-generate" && body.values.creationKind) {
-    const models = creationCapabilities(
-      videoModelEnabled,
-      env.mockGenerateVideoApi ? "mock" : "real",
-      getVerifiedSdkIds().has("aihubmix-image"),
-    );
-    const validationError = validateCreationValues(body.values, models);
-    if (validationError)
-      return c.json(
-        {
-          error: {
-            code: "INVALID_CREATION_CONFIG",
-            message: validationError,
-            retryable: false,
-            requestId: crypto.randomUUID(),
-          },
-        },
-        422,
-      );
-    creationQuote = quoteCreation(body.values, models);
-    const user = accounts.getUser(ownerUserId);
-    if (!user || user.credits < creationQuote)
-      return c.json(
-        {
-          error: {
-            code: "INSUFFICIENT_CREDITS",
-            message: `本次预计消耗 ${creationQuote} 创作点，当前余额不足`,
-            retryable: false,
-            requestId: crypto.randomUUID(),
-          },
-        },
-        422,
-      );
-    if (body.values.creationKind === "video" && body.videoModel !== body.values.modelId)
-      return c.json(
-        {
-          error: {
-            code: "INVALID_VIDEO_MODEL",
-            message: "视频模型与创作配置不一致",
-            retryable: false,
-            requestId: crypto.randomUUID(),
-          },
-        },
-        422,
-      );
-  }
+  const needsVideoModel = moduleId === "video-remix";
   if (needsVideoModel && !body.videoModel)
     return c.json(
       {
@@ -6275,24 +6478,7 @@ app.openapi(createJobRoute, async (c) => {
     createdAt: now,
     updatedAt: now,
   };
-  try {
-    if (creationQuote > 0) store.createCharged(job, creationQuote);
-    else store.create(job);
-  } catch (error) {
-    if (error instanceof InsufficientCreditsError)
-      return c.json(
-        {
-          error: {
-            code: "INSUFFICIENT_CREDITS",
-            message: "创作点余额发生变化，请刷新后重试",
-            retryable: false,
-            requestId: crypto.randomUUID(),
-          },
-        },
-        422,
-      );
-    throw error;
-  }
+  store.create(job);
   await queue.enqueue(id);
   return c.json(job, 202);
 });

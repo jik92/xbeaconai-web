@@ -26,13 +26,13 @@ describe("assistant-ui AI Generate page", () => {
     const page = readFileSync(resolve(root, "web/features/ai-generate/ai-generate-page.tsx"), "utf8");
     const apiClient = readFileSync(resolve(root, "web/api/api-client.ts"), "utf8");
     const server = readFileSync(resolve(root, "server/app.ts"), "utf8");
-    const worker = readFileSync(resolve(root, "worker/jobs/job-generic-creation.ts"), "utf8");
+    const worker = readFileSync(resolve(root, "worker/jobs/job-ai-generate.ts"), "utf8");
 
-    expect(page).toContain("allowMockFallback: false");
+    expect(page).toContain("submitAiGenerateJob");
     expect(page).toContain("parentJobId");
     expect(page).toContain("revisionMode");
-    expect(apiClient).toContain("allowMockFallback");
-    expect(server).toContain("jobValues.allowMockFallback = String(body.allowMockFallback)");
-    expect(worker).toContain('job.values.allowMockFallback !== "false"');
+    expect(apiClient).toContain("createAiGenerateJob");
+    expect(server).toContain('operationId: "createAiGenerateJob"');
+    expect(worker).toContain('initialJob.values.allowMockFallback !== "false"');
   });
 });

@@ -1,5 +1,5 @@
 import type { ThreadMessageLike } from "@assistant-ui/react";
-import type { Job, SeedanceModelId } from "@/api/generated/types.gen";
+import type { CreateAiGenerateJobData, Job } from "@/api/generated/types.gen";
 
 export type AiGenerateKind = "image" | "video";
 export type AiGenerateRevisionMode = "new" | "edit" | "variant";
@@ -39,6 +39,25 @@ export interface AiGenerateResultData {
   artifacts: NonNullable<Job["result"]>["artifacts"];
 }
 
+export function validateModelReferenceCount(
+  model: { minReferences?: number; maxReferences?: number },
+  referenceCount: number,
+) {
+  const minReferences = model.minReferences ?? 0;
+  const maxReferences = model.maxReferences ?? 12;
+  if (referenceCount < minReferences) return `该模型至少需要 ${minReferences} 张参考图`;
+  if (referenceCount > maxReferences) return `该模型最多支持 ${maxReferences} 张参考图`;
+  return undefined;
+}
+
+export function countEffectiveReferences(
+  explicitCount: number,
+  parentJobId: string | undefined,
+  revisionMode: AiGenerateRevisionMode,
+) {
+  return explicitCount || (parentJobId && revisionMode !== "new" ? 1 : 0);
+}
+
 const mentionPattern = /@(图片|视频|音频|人像)\d+/g;
 
 export function resolveAssetMentions(text: string, references: AiGenerateReference[]) {
@@ -50,30 +69,30 @@ export function resolveAssetMentions(text: string, references: AiGenerateReferen
   };
 }
 
-export function buildAiGenerateValues(draft: AiGenerateDraft): Record<string, string> {
-  return {
-    type: draft.kind === "image" ? "图片" : "视频",
-    creationKind: draft.kind,
+export function buildAiGenerateRequest(draft: AiGenerateDraft, title: string): CreateAiGenerateJobData["body"] {
+  const common = {
+    kind: draft.kind,
+    title,
     prompt: draft.prompt.trim(),
     modelId: draft.modelId,
     ratio: draft.ratio,
     resolution: draft.resolution,
-    count: String(draft.count),
-    duration: String(draft.duration),
-    seed: draft.seed,
-    referenceMode: draft.referenceMode,
-    references: `assets:${JSON.stringify(draft.references)}`,
+    referenceAssetIds: draft.references.map((reference) => reference.id),
     revisionMode: draft.revisionMode,
     ...(draft.parentJobId ? { parentJobId: draft.parentJobId } : {}),
   };
-}
-
-export function videoModelForDraft(draft: AiGenerateDraft): SeedanceModelId | undefined {
-  return draft.kind === "video" ? (draft.modelId as SeedanceModelId) : undefined;
+  return draft.kind === "image"
+    ? { ...common, kind: "image", count: draft.count }
+    : {
+        ...common,
+        kind: "video",
+        duration: draft.duration,
+        referenceMode: draft.referenceMode,
+      };
 }
 
 export function parseJobReferences(job: Job): AiGenerateReference[] {
-  const raw = job.values.references?.replace(/^assets:/, "");
+  const raw = job.values.referenceMetadata ?? job.values.references?.replace(/^assets:/, "");
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw) as AiGenerateReference[];

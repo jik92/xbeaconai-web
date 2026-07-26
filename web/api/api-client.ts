@@ -11,6 +11,7 @@ import {
   clearVideoCreateScript as clearVideoCreateScriptRequest,
   createAdScriptAction,
   createAdScriptProject,
+  createAiGenerateJob as createAiGenerateJobRequest,
   createJob,
   createVideoCreateProject,
   createVideoRemixComposeJob,
@@ -46,8 +47,8 @@ import {
   parseAdScriptSource,
   preflightQwenVoiceSample as preflightQwenVoiceSampleRequest,
   processVideoCreateShotMaterial,
-  registerCustomPortrait,
   regenerateVideoCreateSection,
+  registerCustomPortrait,
   replaceVideoCreateShot,
   retryJob,
   runAdminCredentialDoctor as runAdminCredentialDoctorRequest,
@@ -65,6 +66,7 @@ import {
 import type {
   AdScriptInput,
   AdScriptProject,
+  CreateAiGenerateJobData,
   GenerateVideoCreateShotData,
   GetAdminProviderAuditResponse,
   GetProviderFeaturesResponse,
@@ -76,8 +78,8 @@ import type {
   ListAdminProviderAuditsData,
   ListAdminProviderAuditsResponse,
   ListAdminUsersResponse,
-  ListVideoCreateShotMaterialVersionsResponse,
   ListCustomPortraitsResponse,
+  ListVideoCreateShotMaterialVersionsResponse,
   ListVideoRemixProjectsResponse,
   ModuleId,
   ProviderCredentialName,
@@ -581,6 +583,16 @@ export async function submitJob(
     throwOnError: true,
   });
   if (!data) throw new Error("任务创建失败");
+  return data;
+}
+export async function submitAiGenerateJob(body: CreateAiGenerateJobData["body"], idempotencyKey = randomUuid()) {
+  configure();
+  const { data } = await createAiGenerateJobRequest({
+    body,
+    headers: { ...authHeaders(), "Idempotency-Key": idempotencyKey },
+    throwOnError: true,
+  });
+  if (!data) throw new Error("AI 创作任务创建失败");
   return data;
 }
 export async function checkQwenVoiceSample(assetId: string) {

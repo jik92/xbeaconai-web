@@ -19,7 +19,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDown, Download, Image, Library, LoaderCircle, RefreshCw, Send, Sparkles, Video, X } from "lucide-react";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { downloadAuthenticated, fetchCreationCapabilities, fetchJobs, submitJob } from "@/api/api-client";
+import { downloadAuthenticated, fetchCreationCapabilities, fetchJobs, submitAiGenerateJob } from "@/api/api-client";
 import type { Job } from "@/api/generated/types.gen";
 import { AttachmentPicker, type AttachmentSelection } from "@/components/domain/attachment-picker";
 import { MediaPreview } from "@/components/domain/media-preview";
@@ -32,11 +32,12 @@ import {
   type AiGenerateKind,
   type AiGenerateReference,
   type AiGenerateResultData,
-  buildAiGenerateValues,
+  buildAiGenerateRequest,
+  countEffectiveReferences,
   jobsToThreadMessages,
   parseJobReferences,
   resolveAssetMentions,
-  videoModelForDraft,
+  validateModelReferenceCount,
 } from "./ai-generate-runtime";
 
 type RuntimeContextValue = {
@@ -105,8 +106,8 @@ function initialDraft(): AiGenerateDraft {
     kind: "image",
     prompt: "",
     modelId: "",
-    ratio: "4:3",
-    resolution: "2k",
+    ratio: "1:1",
+    resolution: "1k",
     count: 1,
     duration: 5,
     seed: "",
@@ -170,14 +171,13 @@ function AiGenerateProvider({ children }: { children: React.ReactNode }) {
     };
     const model = models.find((item) => item.id === nextDraft.modelId && item.kind === nextDraft.kind);
     if (!model?.enabled) throw new Error(model?.disabledReason ?? "所选模型当前不可用");
-    await submitJob(
-      "ai-generate",
-      `${nextDraft.kind === "image" ? "图片" : "视频"}创作 · ${new Date().toLocaleTimeString()}`,
-      buildAiGenerateValues(nextDraft),
-      videoModelForDraft(nextDraft),
-      randomUuid(),
-      { allowMockFallback: false },
+    const referenceError = validateModelReferenceCount(
+      model as typeof model & { minReferences?: number; maxReferences?: number },
+      countEffectiveReferences(resolved.references.length, parentJobId, mode),
     );
+    if (referenceError) throw new Error(referenceError);
+    const title = `${nextDraft.kind === "image" ? "图片" : "视频"}创作 · ${new Date().toLocaleTimeString()}`;
+    await submitAiGenerateJob(buildAiGenerateRequest(nextDraft, title), randomUuid());
     setDraft((current) => ({ ...current, prompt: "", references: [], parentJobId: undefined, revisionMode: "new" }));
     await queryClient.invalidateQueries({ queryKey: ["api-tasks", "ai-generate"] });
   };
@@ -202,7 +202,13 @@ function AiGenerateProvider({ children }: { children: React.ReactNode }) {
     },
     onEdit: async (message) => {
       const sourceJobId = message.sourceId?.replace(/:(user|assistant)$/, "");
-      await submit(textFromMessage(message), referencesFromMessage(message), sourceJobId, "edit");
+      const source = jobs.find((job) => job.id === sourceJobId);
+      await submit(
+        textFromMessage(message),
+        source ? parseJobReferences(source) : referencesFromMessage(message),
+        sourceJobId,
+        "edit",
+      );
     },
     onReload: async (parentId) => {
       const sourceJobId = parentId?.replace(/:(user|assistant)$/, "");
@@ -293,7 +299,7 @@ function AssistantMessage() {
     if (!source) return;
     setDraft((current) => ({
       ...current,
-      kind: source.values.creationKind === "video" ? "video" : "image",
+      kind: source.values.kind === "video" ? "video" : "image",
       modelId: source.values.modelId ?? current.modelId,
       ratio: source.values.ratio ?? current.ratio,
       resolution: source.values.resolution ?? current.resolution,
@@ -375,6 +381,12 @@ function AiGenerateComposer() {
   });
   const filteredModels = models.filter((model) => model.kind === draft.kind);
   const model = filteredModels.find((item) => item.id === draft.modelId);
+  const referenceError = model
+    ? validateModelReferenceCount(
+        model as typeof model & { minReferences?: number; maxReferences?: number },
+        countEffectiveReferences(attachedReferences.length, draft.parentJobId, draft.revisionMode),
+      )
+    : undefined;
   const addAssets = async (assets: AttachmentSelection[]) => {
     const current = aui
       .composer()
@@ -402,8 +414,8 @@ function AiGenerateComposer() {
       kind,
       modelId: "",
       references: [],
-      ratio: kind === "image" ? "4:3" : "9:16",
-      resolution: kind === "image" ? "2k" : "720p",
+      ratio: kind === "image" ? "1:1" : "9:16",
+      resolution: kind === "image" ? "1k" : "720p",
       referenceMode: kind === "image" ? "" : "omni",
     }));
   return (
@@ -509,7 +521,12 @@ function AiGenerateComposer() {
           )}
         />
         <ComposerPrimitive.Send asChild>
-          <Button className="ml-auto rounded-full" aria-label="发送生成任务" disabled={!model?.enabled}>
+          <Button
+            className="ml-auto rounded-full"
+            aria-label="发送生成任务"
+            disabled={!model?.enabled || Boolean(referenceError)}
+            title={referenceError}
+          >
             <Send />
             生成
           </Button>

@@ -3,18 +3,37 @@ import type { Job } from "../../web/api/generated/types.gen";
 import {
   type AiGenerateDraft,
   type AiGenerateReference,
-  buildAiGenerateValues,
+  buildAiGenerateRequest,
+  countEffectiveReferences,
   jobsToThreadMessages,
   resolveAssetMentions,
+  validateModelReferenceCount,
 } from "../../web/features/ai-generate/ai-generate-runtime";
 
 const reference: AiGenerateReference = {
-  id: "asset-1",
+  id: "11111111-1111-4111-8111-111111111111",
   name: "商品图.png",
   mimeType: "image/png",
   label: "图片1",
   source: "library",
 };
+
+test("blocks reference counts outside the selected real model capability", () => {
+  expect(validateModelReferenceCount({ minReferences: 1, maxReferences: 1 }, 0)).toBe(
+    "该模型至少需要 1 张参考图",
+  );
+  expect(validateModelReferenceCount({ minReferences: 0, maxReferences: 0 }, 1)).toBe(
+    "该模型最多支持 0 张参考图",
+  );
+  expect(validateModelReferenceCount({ minReferences: 0, maxReferences: 12 }, 2)).toBeUndefined();
+});
+
+test("counts a parent result as the implicit reference only when no explicit references are attached", () => {
+  expect(countEffectiveReferences(0, "parent-job", "edit")).toBe(1);
+  expect(countEffectiveReferences(0, "parent-job", "variant")).toBe(1);
+  expect(countEffectiveReferences(2, "parent-job", "edit")).toBe(2);
+  expect(countEffectiveReferences(0, "parent-job", "new")).toBe(0);
+});
 
 function job(patch: Partial<Job> = {}): Job {
   return {
@@ -27,12 +46,13 @@ function job(patch: Partial<Job> = {}): Job {
     overallExecutionMode: "real",
     values: {
       prompt: "让 @图片1 出现在海边",
-      creationKind: "image",
-      modelId: "seedream-5-pro",
+      kind: "image",
+      modelId: "gpt-image-1-mini",
       ratio: "1:1",
-      resolution: "2k",
+      resolution: "1k",
       count: "1",
-      references: JSON.stringify([reference]),
+      referenceAssetIds: JSON.stringify([reference.id]),
+      referenceMetadata: JSON.stringify([reference]),
     },
     executionPlan: [],
     provenance: [],
@@ -73,23 +93,28 @@ describe("AI Generate assistant runtime", () => {
     const draft: AiGenerateDraft = {
       kind: "image",
       prompt: "改成夜景，保留 @图片1",
-      modelId: "seedream-5-pro",
+      modelId: "gpt-image-1-mini",
       ratio: "1:1",
-      resolution: "2k",
+      resolution: "1k",
       count: 1,
       duration: 5,
       seed: "",
       referenceMode: "",
       references: [reference],
-      parentJobId: "job-parent",
+      parentJobId: "33333333-3333-4333-8333-333333333333",
       revisionMode: "edit",
     };
 
-    expect(buildAiGenerateValues(draft)).toMatchObject({
-      type: "图片",
-      creationKind: "image",
+    expect(buildAiGenerateRequest(draft, "图片创作")).toEqual({
+      kind: "image",
+      title: "图片创作",
       prompt: "改成夜景，保留 @图片1",
-      parentJobId: "job-parent",
+      modelId: "gpt-image-1-mini",
+      ratio: "1:1",
+      resolution: "1k",
+      count: 1,
+      referenceAssetIds: [reference.id],
+      parentJobId: "33333333-3333-4333-8333-333333333333",
       revisionMode: "edit",
     });
   });
