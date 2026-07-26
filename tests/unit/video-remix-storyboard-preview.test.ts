@@ -5,29 +5,42 @@ import { resolve } from "node:path";
 const page = readFileSync(resolve(import.meta.dir, "../../web/features/video-remix/remix-project.tsx"), "utf8");
 const storyboard = page.split("{stage === 3 && (")[1]?.split("{stage === 4 && (")[0] ?? "";
 
-describe("video remix storyboard media preview", () => {
-  test("previews the selected original or generated version through an authenticated asset route", () => {
-    expect(page).toContain("activeGeneratedVersion?.artifact ??");
-    expect(page).toContain("`/api/assets/${sourceAssetId}/content`");
-    expect(storyboard).toContain("url={activePreview.url}");
-    expect(storyboard).toContain('loadingText="正在载入分镜视频…"');
-    expect(storyboard).toContain('errorText="分镜视频加载失败"');
-    expect(storyboard).not.toContain('<div className="warehouse-scene">');
+describe("video remix storyboard editor", () => {
+  test("uses the source strip as the only clip switcher and keeps the correction canvas focused", () => {
+    expect(page).toContain('className="source-strip"');
+    expect(storyboard).toContain('className="storyboard-editor"');
+    expect(storyboard).toContain("<PromptWorkbench");
+    expect(storyboard).not.toContain('className="result-card"');
+    expect(storyboard).not.toContain('className="shot-version-strip"');
   });
 
-  test("renders selected product images and portraits instead of empty placeholders", () => {
-    expect(storyboard).toContain("selectedProduct?.images.slice(0, 4).map");
-    expect(storyboard).toContain("url={image.url}");
-    expect(storyboard).toContain("selectedPortraits.map");
-    expect(storyboard).toContain('portrait.reference.type === "custom"');
-    expect(storyboard).toContain("<AuthenticatedMedia url={portrait.display_url}");
-    expect(storyboard).toContain("<PublicPreviewImage url={portrait.display_url}");
-    expect(storyboard).not.toContain("<span />");
+  test("keeps all product, portrait, and attached images beside the prompt", () => {
+    expect(page).toContain("const storyboardReferenceImages = useMemo");
+    expect(page).toContain("...selectedPortraits.map");
+    expect(page).toContain("...(selectedProduct?.images ?? []).map");
+    expect(storyboard).toContain("storyboard-reference-cluster");
+    expect(storyboard).toContain('className="storyboard-reference-image"');
+    expect(storyboard).toContain('className="storyboard-add-reference"');
+    expect(storyboard).toContain('className="storyboard-reference-toggle"');
+    expect(storyboard).toContain("setReferencesExpanded((current) => !current)");
+    expect(storyboard).toContain("onSelect={appendShotReferences}");
+    expect(page).toContain("patchShotDraft({ references: merged.slice(0, 2) })");
   });
 
-  test("handles public portrait failures and disables unavailable result downloads", () => {
+  test("handles public portrait failures and keeps generation controls in the editor", () => {
     expect(page).toContain('className="public-image-error"');
     expect(page).toContain("onImageError={() => setFailed(true)}");
-    expect(storyboard).toContain("disabled={!activeGeneratedVersion?.artifact.url}");
+    expect(storyboard).toContain('aria-label="视频模型"');
+    expect(storyboard).toContain("submitting={Boolean(activeShotRunning) || !activeModel?.enabled}");
+    expect(storyboard).toContain('submitLabel="生成视频"');
+    expect(storyboard).not.toContain("进入合并成片");
+    expect(page).toContain("setSubmittedShotJobId(created.id)");
+    expect(page).toContain("setStage(4)");
+  });
+
+  test("shows unverified video models in the workbench instead of replacing it with an empty state", () => {
+    expect(page).toContain('model.kind === "video"');
+    expect(page).not.toContain('model.kind === "video" && model.enabled');
+    expect(storyboard).toContain('model.enabled ? "" : "（未验证）"');
   });
 });

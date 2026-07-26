@@ -7,6 +7,7 @@ export interface PromptReference {
   id: string;
   name: string;
   kind: "image" | "video" | "audio";
+  previewUrl?: string;
 }
 
 export function PromptWorkbench({
@@ -24,6 +25,7 @@ export function PromptWorkbench({
   controls,
   children,
   submitting = false,
+  submitLabel,
   onChooseAssets,
   onRemoveReference,
   onPromptChange,
@@ -44,6 +46,7 @@ export function PromptWorkbench({
   controls: ReactNode;
   children?: ReactNode;
   submitting?: boolean;
+  submitLabel?: string;
   onChooseAssets: (assets: AttachmentSelection[]) => void;
   onRemoveReference: (id: string) => void;
   onPromptChange: (value: string) => void;
@@ -81,7 +84,13 @@ export function PromptWorkbench({
             className="flex h-15.5 min-w-42.5 max-w-57.5 items-center gap-2 rounded-md border border-line bg-canvas-soft px-2"
             key={reference.id}
           >
-            {reference.kind === "image" ? (
+            {reference.previewUrl && reference.kind === "image" ? (
+              <img
+                className="size-11 shrink-0 rounded-sm object-cover"
+                src={reference.previewUrl}
+                alt={reference.name}
+              />
+            ) : reference.kind === "image" ? (
               <FileImage className="size-5 text-primary" />
             ) : reference.kind === "video" ? (
               <FileVideo className="size-5 text-primary" />
@@ -136,12 +145,16 @@ export function PromptWorkbench({
         </div>
         <button
           type="button"
-          className="grid size-8.5 place-items-center rounded-full bg-primary text-white disabled:opacity-50"
+          className={cn(
+            "flex h-8.5 items-center justify-center gap-1.5 rounded-full bg-primary px-2.5 text-xs text-white disabled:opacity-50",
+            !submitLabel && "w-8.5 px-0",
+          )}
           aria-label="提交"
           disabled={submitting}
           onClick={onSubmit}
         >
           <ArrowUp className="size-4" />
+          {submitLabel && <span>{submitLabel}</span>}
         </button>
       </div>
       {children}
