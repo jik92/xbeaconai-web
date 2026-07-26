@@ -37,7 +37,7 @@ export interface PublicAppConfig {
  * true = 开放；false = Coming Soon。
  */
 export const APP_CONFIG = {
-  projectName: "烽火AI",
+  projectName: "烽火AI内容创作平台",
   providerDefaults: {
     openai: {
       videoAnalysisModel: "gemini-3.6-flash",
