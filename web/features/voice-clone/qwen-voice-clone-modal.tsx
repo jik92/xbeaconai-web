@@ -96,11 +96,11 @@ export function QwenVoiceCloneModal({ open, onClose, onCreated }: QwenVoiceClone
               }
             }}
             trigger={(openPicker) => (
-              <button type="button" className="upload-zone w-full" onClick={openPicker}>
+              <Button type="button" className="upload-zone w-full" onClick={openPicker}>
                 <span className="upload-icon">{sample ? <FileAudio2 size={22} /> : <UploadCloud size={22} />}</span>
                 <span>
                   <b>{sample ? sample.split(":").slice(2).join(":") : "选择声音复刻录音"}</b>
-                  <small>
+                  <small className="type-helper">
                     {sampleChecking
                       ? "正在校验录音…"
                       : samplePreflight
@@ -110,8 +110,8 @@ export function QwenVoiceCloneModal({ open, onClose, onCreated }: QwenVoiceClone
                           : "5–60 秒清晰单人声，最大 10MB"}
                   </small>
                 </span>
-                {sample && <Check className="ml-auto text-emerald-600" size={20} />}
-              </button>
+                {sample && <Check className="ml-auto text-success" size={20} />}
+              </Button>
             )}
           />
           {sampleError && <div className="field-error">{sampleError}</div>}
@@ -161,7 +161,7 @@ export function QwenVoiceCloneModal({ open, onClose, onCreated }: QwenVoiceClone
           <Label htmlFor="qwen-voice-demo">音频转换文本</Label>
           <textarea
             id="qwen-voice-demo"
-            className="min-h-24 w-full resize-y rounded-md border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+            className="min-h-24 w-full resize-y rounded-md border border-line bg-surface px-3 py-2 type-body text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             value={demoText}
             maxLength={300}
             onChange={(event) => setDemoText(event.target.value)}

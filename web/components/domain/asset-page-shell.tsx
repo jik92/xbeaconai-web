@@ -13,12 +13,12 @@ interface AssetPageShellProps {
 
 export function AssetPageShell({ sidebar, toolbar, count, children }: AssetPageShellProps) {
   return (
-    <main className="flex h-[calc(100vh-56px)] min-h-[520px] overflow-hidden bg-white p-3">
+    <main className="flex h-[calc(100vh-56px)] min-h-[520px] overflow-hidden bg-surface p-3">
       {sidebar && <div className="mr-3 w-56 shrink-0 overflow-hidden border-r border-line pr-3">{sidebar}</div>}
       <section className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <div className="flex-none">{toolbar}</div>
         <div className="mt-2 flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
-        <small className="flex flex-none justify-end pt-1 text-2xs text-muted">共 {count} 项</small>
+        <small className="flex flex-none justify-end pt-1 type-helper text-muted">共 {count} 项</small>
       </section>
     </main>
   );

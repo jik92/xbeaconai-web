@@ -34,30 +34,30 @@ export function QianchuanMerchantBindingPage() {
   });
 
   return (
-    <main className="flex h-[calc(100vh-56px)] min-h-0 flex-col gap-3 overflow-y-auto bg-white p-4 text-ink">
+    <main className="flex h-[calc(100vh-56px)] min-h-0 flex-col gap-3 overflow-y-auto bg-surface p-4 text-ink">
       <header className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">千川商户绑定</h1>
-        <Button disabled={!config.data?.configured || oauth.isPending} onClick={() => oauth.mutate()}>
+        <h1 className="type-page-title">千川商户绑定</h1>
+        <Button size="sm" disabled={!config.data?.configured || oauth.isPending} onClick={() => oauth.mutate()}>
           {oauth.isPending ? <LoaderCircle className="animate-spin" /> : <Link2 />}
           授权千川商户
         </Button>
       </header>
 
       <Card className="gap-3 py-4">
-        <CardContent className="grid gap-3 px-4 text-sm sm:grid-cols-3">
+        <CardContent className="grid gap-3 px-4 type-body sm:grid-cols-3">
           <div>
-            <span className="block text-xs text-muted">应用状态</span>
+            <span className="block type-helper text-muted">应用状态</span>
             <b className={config.data?.configured ? "text-success" : "text-warning"}>
               {config.data?.configured ? "已配置" : "未配置"}
             </b>
           </div>
           <div>
-            <span className="block text-xs text-muted">APP ID</span>
+            <span className="block type-helper text-muted">APP ID</span>
             <b>{config.data?.appIdMasked ?? "—"}</b>
           </div>
           <div>
-            <span className="block text-xs text-muted">回调地址</span>
-            <code className="text-xs">{config.data?.callbackUrl ?? "—"}</code>
+            <span className="block type-helper text-muted">回调地址</span>
+            <code className="type-helper">{config.data?.callbackUrl ?? "—"}</code>
           </div>
         </CardContent>
       </Card>
@@ -69,14 +69,14 @@ export function QianchuanMerchantBindingPage() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <b>{binding.subjectName || `授权用户 ${binding.authUserId}`}</b>
-                  <span className="ml-2 rounded-full bg-surface-muted px-2 py-1 text-xs text-muted">
+                  <span className="ml-2 rounded-full bg-surface-muted px-2 py-1 type-helper text-muted">
                     {binding.status === "active" ? "授权有效" : "需要重新授权"}
                   </span>
                 </div>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-danger"
+                  className="text-error"
                   disabled={remove.isPending}
                   onClick={() => {
                     if (window.confirm("确定解除这个千川商户绑定？")) remove.mutate(binding.id);
@@ -87,7 +87,7 @@ export function QianchuanMerchantBindingPage() {
                 </Button>
               </div>
               <div className="flex flex-wrap items-center gap-3">
-                <span className="text-xs text-muted">默认投放账户</span>
+                <span className="type-helper text-muted">默认投放账户</span>
                 <NativeSelect
                   className="min-w-64"
                   value={binding.defaultAdvertiserId ?? ""}
@@ -101,7 +101,7 @@ export function QianchuanMerchantBindingPage() {
                     </option>
                   ))}
                 </NativeSelect>
-                <span className="text-xs text-muted">
+                <span className="type-helper text-muted">
                   Token 到期：{new Date(binding.accessTokenExpiresAt).toLocaleString()}
                 </span>
               </div>
@@ -109,7 +109,7 @@ export function QianchuanMerchantBindingPage() {
           </Card>
         ))}
         {!bindings.isLoading && !bindings.data?.bindings.length && (
-          <div className="grid min-h-52 place-items-center rounded-xl border border-dashed border-line text-sm text-muted">
+          <div className="grid min-h-52 place-items-center rounded-xl border border-dashed border-line type-body text-muted">
             暂无已授权千川商户
           </div>
         )}
@@ -120,7 +120,7 @@ export function QianchuanMerchantBindingPage() {
         )}
       </section>
 
-      <footer className="flex items-center gap-2 text-xs text-muted">
+      <footer className="flex items-center gap-2 type-helper text-muted">
         <RefreshCw className="size-3.5" />
         授权完成后会自动同步代理主体和关联投放账户
         <a

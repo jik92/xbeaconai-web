@@ -95,7 +95,7 @@ export function PortraitPickerDialog({
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {loading ? (
-          <div className="flex min-h-48 items-center justify-center text-sm text-muted">
+          <div className="flex min-h-48 items-center justify-center type-body text-muted">
             <LoaderCircle className="mr-2 animate-spin" /> 正在加载人像库
           </div>
         ) : (
@@ -103,9 +103,9 @@ export function PortraitPickerDialog({
             {filtered.slice(0, limit).map((portrait) => {
               const selected = portrait.key === pendingKey;
               return (
-                <button
+                <Button
                   type="button"
-                  className={`relative overflow-hidden rounded-lg border bg-white text-left transition-colors ${
+                  className={`relative overflow-hidden rounded-lg border bg-surface text-left transition-colors ${
                     selected ? "border-primary ring-2 ring-primary/15" : "border-line hover:border-line-strong"
                   }`}
                   key={portrait.key}
@@ -129,22 +129,22 @@ export function PortraitPickerDialog({
                     />
                   )}
                   {selected && (
-                    <span className="absolute right-2 top-2 flex size-6 items-center justify-center rounded-full bg-primary text-white">
+                    <span className="absolute right-2 top-2 flex size-6 items-center justify-center rounded-full bg-primary text-on-primary">
                       <Check className="size-4" />
                     </span>
                   )}
-                  <span className="block truncate px-2 pt-2 text-xs font-medium text-ink">{portrait.profession}</span>
-                  <span className="block truncate px-2 pb-2 text-xs text-muted">
+                  <span className="block truncate px-2 pt-2 type-label text-ink">{portrait.profession}</span>
+                  <span className="block truncate px-2 pb-2 type-helper text-muted">
                     {portrait.type === "general"
                       ? `${portrait.age} 岁 · ${portrait.gender}性 · NO.${String(portrait.index).padStart(4, "0")}`
                       : "自建虚拟人像"}
                   </span>
-                </button>
+                </Button>
               );
             })}
           </div>
         )}
-        {!loading && !filtered.length && <p className="py-12 text-center text-sm text-muted">没有匹配的人像</p>}
+        {!loading && !filtered.length && <p className="py-12 text-center type-body text-muted">没有匹配的人像</p>}
         {limit < filtered.length && (
           <Button className="mt-3 w-full" size="sm" variant="outline" onClick={() => setLimit((value) => value + 60)}>
             加载更多（{Math.min(limit, filtered.length)}/{filtered.length}）
@@ -166,10 +166,10 @@ export function PortraitPickerDialog({
             ) : (
               <ImagePreview className="h-11 w-9 rounded-md object-cover" src={pending.display_url} alt="" />
             )}
-            <span className="min-w-0 flex-1 truncate text-sm text-ink">{pending.name}</span>
+            <span className="min-w-0 flex-1 truncate type-body text-ink">{pending.name}</span>
           </>
         ) : (
-          <span className="flex-1 text-sm text-muted">请选择一份人像</span>
+          <span className="flex-1 type-body text-muted">请选择一份人像</span>
         )}
         <Button variant="outline" size="sm" onClick={onClose}>
           取消

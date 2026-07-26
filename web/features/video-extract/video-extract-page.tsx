@@ -197,19 +197,22 @@ export function VideoExtractPage() {
     if (!isShareImport(job)) {
       if (job.result?.artifacts?.length) {
         return (
-          <a href="/assets/materials" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+          <a
+            href="/assets/materials"
+            className="inline-flex items-center gap-1 type-helper text-primary hover:underline"
+          >
             <FolderOpen size={12} /> 查看素材
           </a>
         );
       }
-      return <span className="text-xs text-muted">—</span>;
+      return <span className="type-helper text-muted">—</span>;
     }
 
     const platformId = job.values?.platformId ?? "";
 
     if (job.status === "succeeded" || job.status === "partially_succeeded") {
       return (
-        <a href="/assets/materials" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+        <a href="/assets/materials" className="inline-flex items-center gap-1 type-helper text-primary hover:underline">
           <FolderOpen size={12} /> 已保存到素材库
         </a>
       );
@@ -217,20 +220,20 @@ export function VideoExtractPage() {
 
     if (job.status === "failed") {
       if (platformId && RECOGNITION_ONLY_PLATFORMS.has(platformId)) {
-        return <span className="text-xs text-warning">暂不支持下载</span>;
+        return <span className="type-helper text-warning">暂不支持下载</span>;
       }
       const msg = job.error?.message ?? "";
       if (msg.includes("不支持") || msg.includes("not supported")) {
-        return <span className="text-xs text-warning">暂不支持下载</span>;
+        return <span className="type-helper text-warning">暂不支持下载</span>;
       }
-      return <span className="text-xs text-danger">{msg || "导入失败"}</span>;
+      return <span className="type-helper text-error">{msg || "导入失败"}</span>;
     }
 
     if (job.status === "cancelled") {
-      return <span className="text-xs text-muted">已取消</span>;
+      return <span className="type-helper text-muted">已取消</span>;
     }
 
-    return <span className="text-xs text-muted">—</span>;
+    return <span className="type-helper text-muted">—</span>;
   }
 
   const showCandidateStep = candidates.length > 0 && !submitting;
@@ -248,13 +251,13 @@ export function VideoExtractPage() {
       cell: (info) => (
         <div className="flex min-w-0 items-center gap-2">
           {isShareImport(info.row.original) ? (
-            <span className="shrink-0 rounded-full bg-surface-muted px-2 py-1 text-2xs text-muted">
+            <span className="shrink-0 rounded-full bg-surface-muted px-2 py-1 type-helper text-muted">
               {platformName(info.row.original)}
             </span>
           ) : (
             <Download className="size-4 shrink-0 text-muted" />
           )}
-          <span className="truncate font-medium text-ink">{info.getValue()}</span>
+          <span className="truncate type-body-strong text-ink">{info.getValue()}</span>
         </div>
       ),
     }),
@@ -265,7 +268,7 @@ export function VideoExtractPage() {
         <div className="min-w-0">
           <span>{info.row.original.stage}</span>
           {info.row.original.error?.message && !isShareImport(info.row.original) && (
-            <small className="block truncate text-2xs text-red-600" title={info.row.original.error.message}>
+            <small className="block truncate type-helper text-error" title={info.row.original.error.message}>
               {info.row.original.error.message}
             </small>
           )}
@@ -280,7 +283,7 @@ export function VideoExtractPage() {
           <div className="h-1.5 w-20 overflow-hidden rounded-full bg-surface-muted">
             <span className="block h-full rounded-full bg-primary" style={{ width: `${info.getValue()}%` }} />
           </div>
-          <span className="text-2xs text-muted">{info.getValue()}%</span>
+          <span className="type-helper text-muted">{info.getValue()}%</span>
         </div>
       ),
     }),
@@ -323,13 +326,13 @@ export function VideoExtractPage() {
       <ToolCreatorModal open={dialogOpen} title={newTaskLabel} onClose={closeDialog}>
         {!showCandidateStep ? (
           <>
-            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4 text-sm">
-              <Label className="flex-col items-start text-xs text-muted">
+            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4 type-body">
+              <Label className="flex-col items-start type-label text-muted">
                 <span>
-                  分享内容或视频链接 <b className="text-red-500">*</b>
+                  分享内容或视频链接 <b className="text-error">*</b>
                 </span>
                 <textarea
-                  className="min-h-24 w-full resize-y rounded-md border border-line bg-transparent p-3 text-sm text-ink outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                  className="min-h-24 w-full resize-y rounded-md border border-line bg-transparent p-3 type-body text-ink outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
                   value={inputText}
                   maxLength={4096}
                   rows={4}
@@ -337,11 +340,11 @@ export function VideoExtractPage() {
                   placeholder="粘贴分享链接、复制文案或直接视频 URL"
                 />
               </Label>
-              <Label className="flex-col items-start text-xs text-muted">
+              <Label className="flex-col items-start type-label text-muted">
                 目标存储文件夹
                 <SaveLocationPicker required value={folderId} onChange={setFolderId} />
               </Label>
-              {error && <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
+              {error && <p className="rounded-md bg-error/5 px-3 py-2 type-helper text-error">{error}</p>}
             </div>
             <footer className="flex h-13 flex-none items-center justify-end gap-2 border-t border-line px-4">
               <Button size="sm" variant="outline" onClick={closeDialog}>
@@ -359,40 +362,40 @@ export function VideoExtractPage() {
           </>
         ) : (
           <>
-            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4 text-sm">
-              <Label className="flex-col items-start text-xs text-muted">
+            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4 type-body">
+              <Label className="flex-col items-start type-label text-muted">
                 检测到多个分享链接，请选择要导入的内容
                 <div className="grid w-full gap-2">
                   {candidates.map((candidate, index) => (
-                    <button
+                    <Button
                       type="button"
                       key={`${candidate.platformId}-${index}`}
                       className={cn(
-                        "flex w-full items-center gap-2 rounded-md border border-line px-3 py-2 text-left text-xs",
+                        "flex w-full items-center gap-2 rounded-md border border-line px-3 py-2 text-left type-helper",
                         selectedCandidate?.raw === candidate.raw && "border-primary bg-surface-muted",
                       )}
                       onClick={() => setSelectedCandidate(candidate)}
                     >
-                      <span className="rounded-full bg-surface-muted px-2 py-1 text-2xs">
+                      <span className="rounded-full bg-surface-muted px-2 py-1 type-helper">
                         {PLATFORM_LABELS[candidate.platformId] ?? candidate.platformId}
                       </span>
                       <span className="min-w-0 flex-1 truncate">{candidate.label}</span>
-                      <span className="text-2xs text-muted">
+                      <span className="type-helper text-muted">
                         {candidate.confidence === "high"
                           ? "高置信"
                           : candidate.confidence === "medium"
                             ? "中置信"
                             : "低置信"}
                       </span>
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </Label>
-              <Label className="flex-col items-start text-xs text-muted">
+              <Label className="flex-col items-start type-label text-muted">
                 保存到文件夹
                 <SaveLocationPicker required value={folderId} onChange={setFolderId} />
               </Label>
-              {error && <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
+              {error && <p className="rounded-md bg-error/5 px-3 py-2 type-helper text-error">{error}</p>}
             </div>
             <footer className="flex h-13 flex-none items-center justify-end gap-2 border-t border-line px-4">
               <Button

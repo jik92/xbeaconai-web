@@ -21,7 +21,7 @@ describe("shared enabled tool layout", () => {
     expect(html).toContain("新建视频分割任务");
     expect(html).toContain("任务列表");
     expect(html).toContain("共 2 个任务");
-    expect(html).toContain("bg-white p-3");
+    expect(html).toContain("bg-surface p-3");
     expect(html).not.toContain("页面说明");
   });
 

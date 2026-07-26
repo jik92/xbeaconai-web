@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 import { cn } from "@/lib/utils";
-import { Button } from "../ui/button";
+import { Button } from "@/components/ui/button";
 import { Label } from "../ui/label";
 import { AuthenticatedMedia } from "./authenticated-media";
 import { MediaPreview } from "./media-preview";
@@ -158,7 +158,7 @@ export function FileUpload({
           "min-h-28 rounded-lg border border-dashed border-line bg-surface p-4 transition-colors",
           !hasFiles && !disabled && !uploading && "cursor-pointer hover:border-primary/60 hover:bg-primary/[0.03]",
           dragging && "border-primary bg-primary/[0.06] ring-2 ring-primary/15",
-          visibleError && "border-red-300",
+          visibleError && "border-error/40",
           disabled && "opacity-50",
         )}
         role={!hasFiles ? "button" : undefined}
@@ -174,11 +174,11 @@ export function FileUpload({
           <div className="flex min-h-20 flex-col items-center justify-center gap-2 text-center">
             <UploadCloud className="size-6 text-muted" aria-hidden="true" />
             <div>
-              <b className="text-sm font-medium text-ink">
+              <b className="type-body-strong text-ink">
                 {dragging ? "松开即可添加文件" : "拖拽文件到这里，或点击选择"}
               </b>
               {description && (
-                <p id={descriptionId} className="mt-1 text-xs leading-5 text-muted">
+                <p id={descriptionId} className="mt-1 type-helper leading-relaxed text-muted">
                   {description}
                 </p>
               )}
@@ -188,7 +188,7 @@ export function FileUpload({
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <b className="block truncate text-sm font-medium text-ink">
+                <b className="block truncate type-body-strong text-ink">
                   {uploadedFiles.length && files.length
                     ? `${uploadedFiles.length} 个已上传，${files.length} 个待处理`
                     : uploadedFiles.length
@@ -197,7 +197,7 @@ export function FileUpload({
                         ? `已选择 ${files.length} 个文件`
                         : files[0]?.name}
                 </b>
-                <span className="text-xs text-muted">
+                <span className="type-helper text-muted">
                   {uploading
                     ? `正在上传 · ${normalizedProgress}%`
                     : visibleError
@@ -213,7 +213,7 @@ export function FileUpload({
                     重新选择
                   </Button>
                   {onClear && (
-                    <Button variant="ghost" size="icon" aria-label="移除文件" onClick={onClear}>
+                    <Button variant="ghost" size="icon-sm" aria-label="移除文件" onClick={onClear}>
                       <X />
                     </Button>
                   )}
@@ -234,10 +234,10 @@ export function FileUpload({
                     )}
                   </div>
                   <div className="px-2 py-1.5">
-                    <b className="block truncate text-xs font-medium text-ink" title={file.name}>
+                    <b className="block truncate type-label text-ink" title={file.name}>
                       {file.name}
                     </b>
-                    <span className="text-2xs text-muted">{formatBytes(file.size) || file.mimeType}</span>
+                    <span className="type-helper text-muted">{formatBytes(file.size) || file.mimeType}</span>
                   </div>
                 </div>
               ))}
@@ -254,10 +254,10 @@ export function FileUpload({
                     )}
                   </div>
                   <div className="px-2 py-1.5">
-                    <b className="block truncate text-xs font-medium text-ink" title={file.name}>
+                    <b className="block truncate type-label text-ink" title={file.name}>
                       {file.name}
                     </b>
-                    <span className="text-2xs text-muted">{formatBytes(file.size)}</span>
+                    <span className="type-helper text-muted">{formatBytes(file.size)}</span>
                   </div>
                 </div>
               ))}
@@ -277,7 +277,7 @@ export function FileUpload({
                     style={{ width: `${normalizedProgress}%` }}
                   />
                 </div>
-                <span className="inline-flex items-center gap-1.5 text-xs text-muted" role="status">
+                <span className="inline-flex items-center gap-1.5 type-helper text-muted" role="status">
                   <LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" />
                   正在上传文件
                 </span>
@@ -287,7 +287,7 @@ export function FileUpload({
         )}
       </div>
       {visibleError && (
-        <div className="flex items-center justify-between gap-3 text-xs text-red-600" role="alert">
+        <div className="flex items-center justify-between gap-3 type-helper text-error" role="alert">
           <span>{visibleError}</span>
           {onRetry && !uploading && (
             <Button variant="ghost" size="sm" onClick={onRetry}>

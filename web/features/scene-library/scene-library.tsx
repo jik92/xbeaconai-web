@@ -2,6 +2,7 @@ import { Download, Image as ImageIcon, Shuffle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { AssetPageShell, AssetPageToolbar } from "@/components/domain/asset-page-shell";
 import { ToolCreatorModal } from "@/components/domain/tool-creator-modal";
+import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/native-select";
 import { type SceneCatalogEntry, sceneCatalog } from "../../../shared/scenes/scene-catalog";
 
@@ -82,9 +83,9 @@ export function SceneLibrary() {
       >
         <section className="grid min-h-0 flex-1 auto-rows-max grid-cols-2 content-start items-start gap-3 overflow-y-auto pb-3 md:grid-cols-8 xl:grid-cols-10 2xl:grid-cols-12">
           {filtered.map((scene) => (
-            <button
+            <Button
               type="button"
-              className="group self-start overflow-hidden rounded-lg border border-line bg-white text-left transition hover:-translate-y-0.5 hover:border-line-strong hover:shadow-sm"
+              className="group self-start overflow-hidden rounded-lg border border-line bg-surface text-left transition hover:-translate-y-0.5 hover:border-line-strong hover:shadow-sm"
               key={scene.id}
               onClick={() => setSelected(scene)}
             >
@@ -95,18 +96,18 @@ export function SceneLibrary() {
                   alt={scene.name}
                   loading="lazy"
                 />
-                <span className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-1 text-2xs font-medium text-ink shadow-sm backdrop-blur-sm">
+                <span className="absolute left-2 top-2 rounded-full bg-surface/90 px-2 py-1 type-micro-strong text-ink shadow-sm backdrop-blur-sm">
                   {scene.sceneType}
                 </span>
               </div>
               <div className="p-3">
-                <h3 className="truncate text-sm font-medium text-ink">{scene.name}</h3>
-                <p className="mt-1 line-clamp-2 text-xs text-muted">{scene.description}</p>
+                <h3 className="truncate type-card-title text-ink">{scene.name}</h3>
+                <p className="mt-1 line-clamp-2 type-helper text-muted">{scene.description}</p>
               </div>
-            </button>
+            </Button>
           ))}
           {!filtered.length && (
-            <div className="col-span-full grid min-h-64 place-items-center text-xs text-muted">
+            <div className="col-span-full grid min-h-64 place-items-center type-helper text-muted">
               <span className="grid justify-items-center gap-2">
                 <ImageIcon className="size-6" />
                 没有符合条件的场景
@@ -130,27 +131,27 @@ export function SceneLibrary() {
               <div className="flex min-w-0 flex-col gap-3">
                 <div className="flex flex-wrap gap-1.5">
                   {sceneTags(selected).map((tag) => (
-                    <span className="rounded-full bg-surface-strong px-2.5 py-1 text-xs font-medium text-ink" key={tag}>
+                    <span className="rounded-full bg-surface-strong px-2.5 py-1 type-label text-ink" key={tag}>
                       {tag}
                     </span>
                   ))}
                 </div>
-                <p className="text-sm text-body">{selected.description}</p>
-                <dl className="mt-auto grid gap-2 border-t border-line pt-3 text-xs">
+                <p className="type-body text-body">{selected.description}</p>
+                <dl className="mt-auto grid gap-2 border-t border-line pt-3 type-helper">
                   <div className="flex justify-between gap-4">
                     <dt className="text-muted">资产编号</dt>
-                    <dd className="font-medium text-ink">SC-{String(selected.id).padStart(4, "0")}</dd>
+                    <dd className="type-body-strong text-ink">SC-{String(selected.id).padStart(4, "0")}</dd>
                   </div>
                   <div className="flex justify-between gap-4">
                     <dt className="text-muted">来源</dt>
-                    <dd className="font-medium text-ink">通用场景库</dd>
+                    <dd className="type-body-strong text-ink">通用场景库</dd>
                   </div>
                 </dl>
               </div>
             </div>
             <footer className="flex h-13 flex-none items-center justify-end border-t border-line px-4">
               <a
-                className="inline-flex h-8 items-center justify-center gap-2 rounded-md bg-primary px-3 text-xs font-medium text-white shadow-sm transition-colors hover:bg-primary/90 [&_svg]:size-4"
+                className="inline-flex h-8 items-center justify-center gap-2 rounded-md bg-primary px-3 type-label text-on-primary shadow-sm transition-colors hover:bg-primary/90 [&_svg]:size-4"
                 href={selected.imageUrl}
                 download={`${selected.name}.jpg`}
               >

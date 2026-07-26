@@ -81,7 +81,7 @@ export function TextInputModal({
           }}
         >
           <div className="grid gap-2">
-            <label className="text-xs font-medium text-ink" htmlFor={inputId}>
+            <label className="type-label text-ink" htmlFor={inputId}>
               {label}
             </label>
             <Input
@@ -99,7 +99,7 @@ export function TextInputModal({
               }}
             />
             {error && (
-              <p id={`${inputId}-error`} className="text-xs text-danger" role="alert">
+              <p id={`${inputId}-error`} className="type-helper text-error" role="alert">
                 {error}
               </p>
             )}

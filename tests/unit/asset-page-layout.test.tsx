@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { AssetPageShell, AssetPageToolbar } from "../../web/components/domain/asset-page-shell";
 
 describe("shared asset page layout", () => {
-  test("renders the compact toolbar, content, and count on a white page", () => {
+  test("renders the compact toolbar, content, and count on the shared surface", () => {
     const html = renderToStaticMarkup(
       <AssetPageShell
         count={12}
@@ -21,7 +21,7 @@ describe("shared asset page layout", () => {
       </AssetPageShell>,
     );
 
-    expect(html).toContain("bg-white p-3");
+    expect(html).toContain("bg-surface p-3");
     expect(html).toContain("h-[calc(100vh-56px)]");
     expect(html).toContain("搜索素材名称或描述");
     expect(html).toContain("上传素材");

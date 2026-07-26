@@ -229,7 +229,7 @@ function ResultPart({ data }: { data: AiGenerateResultData }) {
   if (data.status === "queued" || data.status === "processing")
     return (
       <div className="rounded-xl border border-line bg-surface p-4">
-        <div className="flex items-center gap-2 text-sm text-ink">
+        <div className="flex items-center gap-2 type-body text-ink">
           <LoaderCircle className="size-4 animate-spin" />
           {data.stage} · {data.progress}%
         </div>
@@ -240,7 +240,7 @@ function ResultPart({ data }: { data: AiGenerateResultData }) {
     );
   if (data.error)
     return (
-      <div className="rounded-xl border border-error/30 bg-error/5 p-4 text-sm text-error">{data.error.message}</div>
+      <div className="rounded-xl border border-error/30 bg-error/5 p-4 type-body text-error">{data.error.message}</div>
     );
   return (
     <div className="grid gap-3 sm:grid-cols-2">
@@ -255,15 +255,15 @@ function ResultPart({ data }: { data: AiGenerateResultData }) {
               className="h-64 w-full object-contain"
             />
           ) : (
-            <pre className="max-h-64 overflow-auto whitespace-pre-wrap p-4 text-xs">{artifact.text}</pre>
+            <pre className="max-h-64 overflow-auto whitespace-pre-wrap p-4 type-helper">{artifact.text}</pre>
           )}
           <footer className="flex items-center justify-between border-t border-line px-3 py-2">
-            <span className="truncate text-xs text-muted">
+            <span className="truncate type-helper text-muted">
               {artifact.name} · {artifact.executionMode}
             </span>
             {artifact.url && (
               <Button
-                size="icon"
+                size="icon-sm"
                 variant="ghost"
                 aria-label="下载"
                 onClick={() => {
@@ -283,7 +283,7 @@ function ResultPart({ data }: { data: AiGenerateResultData }) {
 function UserMessage() {
   return (
     <MessagePrimitive.Root className="mx-auto grid w-full max-w-4xl justify-items-end px-4 py-3">
-      <div className="max-w-2xl rounded-2xl bg-primary px-4 py-3 text-sm text-white">
+      <div className="max-w-2xl rounded-2xl bg-primary px-4 py-3 type-body text-on-primary">
         <MessagePrimitive.Parts />
       </div>
     </MessagePrimitive.Root>
@@ -317,13 +317,13 @@ function AssistantMessage() {
   };
   return (
     <MessagePrimitive.Root className="mx-auto w-full max-w-4xl px-4 py-3">
-      <div className="mb-2 flex items-center gap-2 text-xs text-muted">
+      <div className="mb-2 flex items-center gap-2 type-helper text-muted">
         <Sparkles className="size-4" />
         AI 创作
       </div>
       <MessagePrimitive.Parts>
         {({ part }) => {
-          if (part.type === "text") return <MessagePartPrimitive.Text className="text-sm text-ink" />;
+          if (part.type === "text") return <MessagePartPrimitive.Text className="type-body text-ink" />;
           if (part.type === "data" && part.name === "ai-generate-result")
             return <ResultPart data={part.data as unknown as AiGenerateResultData} />;
           return null;
@@ -346,8 +346,8 @@ function AssistantMessage() {
 function ComposerAttachment() {
   return (
     <AttachmentPrimitive.Root className="flex max-w-44 items-center gap-2 rounded-lg border border-line bg-surface-muted px-2 py-1.5">
-      <AttachmentPrimitive.unstable_Thumb className="flex size-8 items-center justify-center rounded-md bg-surface text-xs" />
-      <span className="min-w-0 flex-1 truncate text-xs text-ink">
+      <AttachmentPrimitive.unstable_Thumb className="flex size-8 items-center justify-center rounded-md bg-surface type-helper" />
+      <span className="min-w-0 flex-1 truncate type-helper text-ink">
         <AttachmentPrimitive.Name />
       </span>
       <AttachmentPrimitive.Remove className="rounded-full p-1 text-muted hover:bg-surface" aria-label="移除素材">
@@ -427,12 +427,12 @@ function AiGenerateComposer() {
         <ComposerPrimitive.Input
           rows={2}
           placeholder="描述要生成或修改的内容，输入 @引用已添加的素材"
-          className="max-h-40 min-h-16 w-full resize-none bg-transparent px-1 py-2 text-sm text-ink outline-none placeholder:text-muted"
+          className="max-h-40 min-h-16 w-full resize-none bg-transparent px-1 py-2 type-body text-ink outline-none placeholder:text-muted"
         />
         <ComposerPrimitive.Unstable_TriggerPopover
           char="@"
           adapter={mention.adapter}
-          className="absolute bottom-full left-3 z-30 mb-2 w-72 overflow-hidden rounded-lg border border-line bg-white p-1 shadow-sm"
+          className="absolute bottom-full left-3 z-30 mb-2 w-72 overflow-hidden rounded-lg border border-line bg-surface p-1 shadow-sm"
           aria-label="引用素材"
         >
           <ComposerPrimitive.Unstable_TriggerPopover.Directive {...mention.directive} />
@@ -443,10 +443,10 @@ function AiGenerateComposer() {
                   item={item}
                   index={index}
                   key={item.id}
-                  className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm text-ink hover:bg-surface-muted data-highlighted:bg-surface-muted"
+                  className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left type-body text-ink hover:bg-surface-muted data-highlighted:bg-surface-muted"
                 >
                   <span>@{item.label}</span>
-                  <small className="truncate text-xs text-muted">{item.description}</small>
+                  <small className="truncate type-helper text-muted">{item.description}</small>
                 </ComposerPrimitive.Unstable_TriggerPopoverItem>
               ))
             }
@@ -538,14 +538,14 @@ function AiGenerateComposer() {
 
 function AiGenerateThread() {
   return (
-    <ThreadPrimitive.Root className="relative flex min-h-0 flex-1 flex-col bg-white">
+    <ThreadPrimitive.Root className="relative flex min-h-0 flex-1 flex-col bg-surface">
       <ThreadPrimitive.Viewport className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <ThreadPrimitive.Empty>
           <div className="m-auto flex max-w-md flex-col items-center px-6 text-center">
             <div className="mb-4 flex size-12 items-center justify-center rounded-full bg-surface-muted">
               <Sparkles className="size-5 text-ink" />
             </div>
-            <h1 className="text-2xl font-medium text-ink">AI 创作</h1>
+            <h1 className="type-page-title text-ink">AI 创作</h1>
           </div>
         </ThreadPrimitive.Empty>
         <ThreadPrimitive.Messages
@@ -554,11 +554,11 @@ function AiGenerateThread() {
             AssistantMessage,
           }}
         />
-        <ThreadPrimitive.ViewportFooter className="sticky bottom-0 mx-auto w-full max-w-4xl bg-white/95 px-4 pb-4 pt-2 backdrop-blur">
+        <ThreadPrimitive.ViewportFooter className="sticky bottom-0 mx-auto w-full max-w-4xl bg-surface/95 px-4 pb-4 pt-2 backdrop-blur">
           <ThreadPrimitive.ScrollToBottom asChild>
             <Button
               variant="outline"
-              size="icon"
+              size="icon-sm"
               className="absolute -top-10 left-1/2 -translate-x-1/2 rounded-full"
               aria-label="滚动到底部"
             >
@@ -575,7 +575,7 @@ function AiGenerateThread() {
 export function AiGeneratePage() {
   return (
     <AiGenerateProvider>
-      <div className="flex h-full min-h-0 bg-white">
+      <div className="flex h-full min-h-0 bg-surface">
         <AiGenerateThread />
       </div>
     </AiGenerateProvider>

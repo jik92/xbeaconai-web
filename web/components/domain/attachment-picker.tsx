@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { fetchAssetFolders, fetchLibraryAssets, uploadMediaFile } from "@/api/api-client";
+import { Button } from "@/components/ui/button";
 import type { AssetFolder, LibraryAsset } from "@/entities/types";
 import { AuthenticatedMedia } from "./authenticated-media";
 import { FileUpload } from "./file-upload";
@@ -224,22 +225,22 @@ export function AttachmentPicker({
             onMouseDown={(event) => event.stopPropagation()}
           >
             <header>
-              <h2 className="text-ink">选择附件</h2>
-              <button type="button" aria-label="关闭" onClick={close}>
+              <h2 className="type-section-title text-ink">选择附件</h2>
+              <Button type="button" variant="ghost" size="icon-sm" aria-label="关闭" onClick={close}>
                 <X />
-              </button>
+              </Button>
             </header>
             <div className="attachment-source-tabs">
-              <button
+              <Button
                 type="button"
                 className={source === "library" ? "active" : ""}
                 onClick={() => setSource("library")}
               >
                 <FolderOpen /> 从素材库选择
-              </button>
-              <button type="button" className={source === "upload" ? "active" : ""} onClick={() => setSource("upload")}>
+              </Button>
+              <Button type="button" className={source === "upload" ? "active" : ""} onClick={() => setSource("upload")}>
                 <Upload /> 从本地上传
-              </button>
+              </Button>
             </div>
             {source === "library" ? (
               <div className="attachment-library-panel">
@@ -248,7 +249,7 @@ export function AttachmentPicker({
                     <b>全部文件夹</b>
                     <nav>
                       {orderedFolders.map(({ folder, depth }) => (
-                        <button
+                        <Button
                           type="button"
                           key={folder.id}
                           className={folder.id === folderId ? "active" : ""}
@@ -261,7 +262,7 @@ export function AttachmentPicker({
                         >
                           {folder.id === folderId ? <FolderOpen /> : <Folder />}
                           <span>{folder.name}</span>
-                        </button>
+                        </Button>
                       ))}
                     </nav>
                   </aside>
@@ -278,16 +279,16 @@ export function AttachmentPicker({
                       {breadcrumbs.map((folder, index) => (
                         <span key={folder.id}>
                           {index > 0 && <ChevronRight />}
-                          <button type="button" onClick={() => setFolderId(folder.id)}>
+                          <Button type="button" onClick={() => setFolderId(folder.id)}>
                             {folder.name}
-                          </button>
+                          </Button>
                         </span>
                       ))}
                     </div>
                     <div className="attachment-grid">
                       {!query.trim() &&
                         childFolders.map((folder) => (
-                          <button
+                          <Button
                             type="button"
                             key={folder.id}
                             className="attachment-folder-card"
@@ -302,15 +303,15 @@ export function AttachmentPicker({
                             </i>
                             <span>
                               <b>{folder.name}</b>
-                              <small>文件夹</small>
+                              <small className="type-helper">文件夹</small>
                             </span>
                             <ChevronRight />
-                          </button>
+                          </Button>
                         ))}
                       {filtered.map((asset) => {
                         const active = selected.includes(asset.id);
                         return (
-                          <button
+                          <Button
                             type="button"
                             key={asset.id}
                             className={active ? "active" : ""}
@@ -330,10 +331,10 @@ export function AttachmentPicker({
                             </i>
                             <span>
                               <b>{asset.name}</b>
-                              <small>{asset.mimeType}</small>
+                              <small className="type-helper">{asset.mimeType}</small>
                             </span>
                             {active && <Check className="attachment-check" />}
-                          </button>
+                          </Button>
                         );
                       })}
                       {(isLoading || foldersLoading) && <p>正在加载素材库…</p>}
@@ -347,11 +348,17 @@ export function AttachmentPicker({
                       <header>
                         <span>
                           <b>内容预览</b>
-                          <small>{previewAsset.mimeType}</small>
+                          <small className="type-helper">{previewAsset.mimeType}</small>
                         </span>
-                        <button type="button" aria-label="关闭文件预览" onClick={() => setPreviewId("")}>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label="关闭文件预览"
+                          onClick={() => setPreviewId("")}
+                        >
                           <X />
-                        </button>
+                        </Button>
                       </header>
                       <div className={`attachment-media-preview preview-${previewAsset.mimeType.split("/")[0]}`}>
                         <AuthenticatedMedia
@@ -403,16 +410,16 @@ export function AttachmentPicker({
             )}
             {error && source === "library" && <p className="attachment-error">{error}</p>}
             <footer>
-              <button type="button" onClick={close}>
+              <Button type="button" onClick={close}>
                 取消
-              </button>
+              </Button>
               {source === "library" && (
-                <button type="button" className="primary" disabled={!selected.length} onClick={chooseLibrary}>
+                <Button type="button" className="primary" disabled={!selected.length} onClick={chooseLibrary}>
                   使用所选素材{selected.length ? `（${selected.length}）` : ""}
-                </button>
+                </Button>
               )}
               {source === "upload" && uploadedFiles.length > 0 && (
-                <button
+                <Button
                   type="button"
                   className="primary"
                   onClick={() => {
@@ -421,7 +428,7 @@ export function AttachmentPicker({
                   }}
                 >
                   使用已上传文件
-                </button>
+                </Button>
               )}
             </footer>
           </section>

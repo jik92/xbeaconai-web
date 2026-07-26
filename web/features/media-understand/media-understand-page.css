@@ -3,8 +3,8 @@
 .mu-page {
   min-height: calc(100vh - 56px);
   padding: 42px clamp(24px, 4vw, 64px) 80px;
-  background: radial-gradient(circle at 56% 20%, #f9fbff 0, #f0f5ff 45%, #eaf1ff 100%);
-  color: #242c38;
+  background: var(--canvas-soft);
+  @apply text-ink;
 }
 .mu-workbench {
   position: relative;
@@ -22,12 +22,12 @@
   height: 430px;
 }
 .mu-workbench .ag-composer textarea {
-  @apply text-base;
+  @apply type-section-title;
 }
 .mu-workbench .ag-parameters > div > button {
   height: 42px;
   padding: 0 15px;
-  @apply text-xs;
+  @apply type-badge;
 }
 .mu-workbench .ag-send {
   width: 40px;
@@ -49,7 +49,7 @@
 }
 .mu-model-panel > button:hover,
 .mu-reasoning-panel > button:hover {
-  background: #f4f7fc;
+  background: var(--canvas-soft);
 }
 .mu-model-panel b,
 .mu-model-panel small {
@@ -57,12 +57,12 @@
 }
 .mu-model-panel small {
   margin-top: 4px;
-  color: #8993a2;
+  @apply text-primary;
 }
 .mu-model-panel svg,
 .mu-reasoning-panel svg {
   width: 15px;
-  color: #4d83e3;
+  @apply text-primary;
 }
 .mu-reasoning-panel {
   left: 205px;
@@ -86,8 +86,8 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  color: #66748a;
-  @apply text-xs;
+  @apply text-primary;
+  @apply type-helper;
 }
 .mu-loading svg {
   width: 15px;
@@ -101,10 +101,10 @@
 .mu-notice {
   height: 36px;
   padding: 0 10px 0 14px;
-  border: 1px solid #dfe5ed;
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: #fff;
-  box-shadow: 0 6px 20px #263a5b1b;
+  background: var(--surface);
+  box-shadow: 0 6px 20px var(--shadow-elevated);
 }
 .mu-notice svg {
   width: 14px;
@@ -113,9 +113,9 @@
   width: min(1120px, 100%);
   margin: 28px auto 0;
   padding: 20px;
-  border: 1px solid #e1e7f0;
+  border: 1px solid var(--border);
   border-radius: 16px;
-  background: #ffffffc7;
+  background: var(--surface);
 }
 .mu-tasks > header {
   display: flex;
@@ -124,16 +124,16 @@
   margin-bottom: 14px;
 }
 .mu-tasks header span {
-  color: #6b7890;
-  @apply text-2xs;
+  @apply text-primary;
+  @apply type-helper;
   @apply tracking-widest;
 }
 .mu-tasks h2 {
   margin: 3px 0 0;
-  @apply text-lg;
+  @apply type-section-title;
 }
 .mu-tasks header small {
-  color: #8c96a5;
+  @apply text-primary;
 }
 .mu-tasks > div {
   display: grid;
@@ -146,14 +146,14 @@
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  border: 1px solid #e3e8ef;
+  border: 1px solid var(--border);
   border-radius: 9px;
-  background: #fff;
+  background: var(--surface);
   text-align: left;
 }
 .mu-tasks > div > button > svg {
   width: 21px;
-  color: #5a86d7;
+  @apply text-primary;
 }
 .mu-tasks > div span {
   min-width: 0;
@@ -167,23 +167,23 @@
   white-space: nowrap;
 }
 .mu-tasks b {
-  @apply text-xs;
+  @apply type-helper;
 }
 .mu-tasks small {
   margin-top: 4px;
-  color: #929ba9;
-  @apply text-2xs;
+  @apply text-primary;
+  @apply type-helper;
 }
 .mu-tasks i {
-  color: #607089;
-  @apply text-2xs;
-  font-style: normal;
+  @apply text-primary;
+  @apply type-helper;
+  @apply not-italic;
 }
 .mu-tasks i.succeeded {
-  color: #1b9b5d;
+  @apply text-success;
 }
 .mu-tasks i.failed {
-  color: #d85262;
+  @apply text-error;
 }
 .mu-result-mask {
   position: fixed;
@@ -191,14 +191,14 @@
   inset: 0;
   display: grid;
   place-items: center;
-  background: #131b2966;
+  background: var(--overlay);
 }
 .mu-result-mask > section {
   width: min(720px, calc(100vw - 32px));
   max-height: 80vh;
   overflow: hidden;
   border-radius: 14px;
-  background: #fff;
+  background: var(--surface);
 }
 .mu-result-mask header {
   height: 62px;
@@ -206,22 +206,11 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 18px;
-  border-bottom: 1px solid #e6eaf0;
+  border-bottom: 1px solid var(--border);
 }
 .mu-result-mask h2 {
   margin: 0;
-  @apply text-lg;
-}
-.mu-result-mask header button {
-  width: 30px;
-  height: 30px;
-  display: grid;
-  place-items: center;
-  border: 0;
-  border-radius: 7px;
-}
-.mu-result-mask header svg {
-  width: 15px;
+  @apply type-section-title;
 }
 .mu-result-mask pre {
   max-height: calc(80vh - 62px);
@@ -229,8 +218,8 @@
   padding: 20px;
   overflow: auto;
   white-space: pre-wrap;
-  color: #424d5e;
-  @apply text-xs leading-relaxed;
+  @apply text-primary;
+  @apply type-helper leading-relaxed;
 }
 @media (max-width: 900px) {
   .mu-page {

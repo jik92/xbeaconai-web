@@ -140,7 +140,7 @@ function ProductLibrary() {
       >
         <section className="asset-library-grid h-full overflow-y-auto pb-3">
           {filtered.map((product) => (
-            <button className="library-asset-card" key={product.id} onClick={() => setSelected(product)}>
+            <Button className="library-asset-card" key={product.id} onClick={() => setSelected(product)}>
               <div className="library-asset-preview product">
                 <AuthenticatedMedia
                   url={product.images[0]?.url || ""}
@@ -153,13 +153,13 @@ function ProductLibrary() {
                 </i>
               </div>
               <div>
-                <h3>{product.name}</h3>
+                <h3 className="type-card-title">{product.name}</h3>
                 <p>{product.description || "暂无形态描述"}</p>
-                <small>
+                <small className="type-helper">
                   {scopeLabel(product.sharingScope)} · {new Date(product.createdAt).toLocaleDateString("zh-CN")}
                 </small>
               </div>
-            </button>
+            </Button>
           ))}
           <LibraryState
             loading={isLoading}
@@ -174,10 +174,10 @@ function ProductLibrary() {
       </AssetPageShell>
 
       <ToolCreatorModal open={uploadOpen} title="创建商品" onClose={() => setUploadOpen(false)}>
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4 text-sm">
-          <Label className="flex-col items-start text-xs text-muted">
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4 type-body">
+          <Label className="flex-col items-start type-label text-muted">
             <span>
-              产品名称 <b className="text-danger">*</b>
+              产品名称 <b className="text-error">*</b>
             </span>
             <Input
               value={name}
@@ -186,9 +186,9 @@ function ProductLibrary() {
               placeholder="请输入产品名称"
             />
           </Label>
-          <fieldset className="flex flex-wrap gap-3 text-xs text-muted">
-            <legend className="mb-2 w-full font-medium text-ink">
-              共享范围 <b className="text-danger">*</b>
+          <fieldset className="flex flex-wrap gap-3 type-helper text-muted">
+            <legend className="mb-2 w-full type-label text-ink">
+              共享范围 <b className="text-error">*</b>
             </legend>
             {(["private", "team", "organization"] as const).map((scope) => (
               <label className="flex items-center gap-1.5" key={scope}>
@@ -221,10 +221,10 @@ function ProductLibrary() {
               setUploadProgress(0);
             }}
           />
-          <Label className="flex-col items-start text-xs text-muted">
+          <Label className="flex-col items-start type-label text-muted">
             形态描述
             <textarea
-              className="min-h-20 w-full resize-y rounded-md border border-line bg-transparent p-3 text-sm text-ink outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+              className="min-h-20 w-full resize-y rounded-md border border-line bg-transparent p-3 type-body text-ink outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
               value={description}
               maxLength={1000}
               onChange={(event) => setDescription(event.target.value)}
@@ -253,11 +253,11 @@ function ProductLibrary() {
                 <Check /> 已绑定 {selected.images.length} 张商品图，创作时整组加载
               </span>
               <p>{selected.description || "暂无形态描述"}</p>
-              <small>{scopeLabel(selected.sharingScope)}</small>
+              <small className="type-helper">{scopeLabel(selected.sharingScope)}</small>
             </div>
             <footer className="flex h-13 flex-none items-center justify-end gap-2 border-t border-line px-4">
               <Button
-                className="mr-auto text-danger"
+                className="mr-auto text-error"
                 size="sm"
                 variant="outline"
                 disabled={remove.isPending}
@@ -398,7 +398,7 @@ function MediaAssetTable({
         cell: ({ row }) => (
           <>
             <b className="media-table-name">{row.original.name}</b>
-            <small>{row.original.originalName}</small>
+            <small className="type-helper">{row.original.originalName}</small>
           </>
         ),
       },
@@ -433,7 +433,7 @@ function MediaAssetTable({
         header: "操作",
         size: 90,
         cell: ({ row }) => (
-          <button
+          <Button
             type="button"
             className="media-asset-delete"
             disabled={deletingRef.current}
@@ -441,7 +441,7 @@ function MediaAssetTable({
             onClick={() => onDeleteRef.current(row.original)}
           >
             <Trash2 /> 删除
-          </button>
+          </Button>
         ),
       },
     ],
@@ -629,7 +629,7 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
         }
       >
         {!!requestedAssetIds.size && (
-          <div className="mb-2 flex flex-none items-center gap-1.5 rounded-md bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+          <div className="mb-2 flex flex-none items-center gap-1.5 rounded-md bg-surface-strong px-3 py-2 type-helper text-success">
             <Check /> 已在当前文件夹中定位 {data.filter((asset) => requestedAssetIds.has(asset.id)).length} 个切片
           </div>
         )}
@@ -651,13 +651,15 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
                 <div className="grid size-8 shrink-0 place-items-center rounded-full bg-surface-muted text-muted">
                   <FileAudio className="size-4" />
                 </div>
-                <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setSelected(asset)}>
-                  <b className="block truncate text-xs font-medium text-ink">{asset.name}</b>
-                  <span className="block truncate text-2xs text-muted">{asset.description || asset.originalName}</span>
-                  <small className="block text-2xs text-muted">
+                <Button type="button" className="min-w-0 flex-1 text-left" onClick={() => setSelected(asset)}>
+                  <b className="block truncate type-label text-ink">{asset.name}</b>
+                  <span className="block truncate type-helper text-muted">
+                    {asset.description || asset.originalName}
+                  </span>
+                  <small className="block type-helper text-muted">
                     {(asset.size / 1024 / 1024).toFixed(1)} MB · {new Date(asset.createdAt).toLocaleDateString("zh-CN")}
                   </small>
-                </button>
+                </Button>
                 {previewingVoiceId === asset.id ? (
                   <div className="w-56 max-w-[40%]">
                     <AuthenticatedMedia url={asset.url} mimeType={asset.mimeType} alt={asset.name} autoPlay controls />
@@ -686,7 +688,7 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
         title={kind === "voice" ? "上传音色" : "上传素材"}
         onClose={() => setUploadOpen(false)}
       >
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4 text-sm">
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4 type-body">
           <FileUpload
             label={kind === "voice" ? "音色文件" : "素材文件"}
             files={file ? [file] : []}
@@ -717,7 +719,7 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
               setUploadProgress(0);
             }}
           />
-          <Label className="flex-col items-start text-xs text-muted">
+          <Label className="flex-col items-start type-label text-muted">
             资产名称
             <Input
               value={name}
@@ -726,10 +728,10 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
               placeholder="请输入便于识别的名称"
             />
           </Label>
-          <Label className="flex-col items-start text-xs text-muted">
+          <Label className="flex-col items-start type-label text-muted">
             资产说明
             <textarea
-              className="min-h-20 w-full resize-y rounded-md border border-line bg-transparent p-3 text-sm text-ink outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+              className="min-h-20 w-full resize-y rounded-md border border-line bg-transparent p-3 type-body text-ink outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
               value={description}
               maxLength={300}
               onChange={(event) => setDescription(event.target.value)}
@@ -759,13 +761,13 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
                 <Check /> 已上传，可用于创作
               </span>
               <p>{selected.description || selected.originalName}</p>
-              <small>
+              <small className="type-helper">
                 {selected.mimeType} · {(selected.size / 1024 / 1024).toFixed(2)} MB
               </small>
             </div>
             <footer className="flex h-13 flex-none items-center justify-end gap-2 border-t border-line px-4">
               <Button
-                className="mr-auto text-danger"
+                className="mr-auto text-error"
                 size="sm"
                 variant="outline"
                 disabled={remove.isPending}

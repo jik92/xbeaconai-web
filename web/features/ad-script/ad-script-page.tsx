@@ -405,7 +405,7 @@ export function AdScriptPage() {
     );
 
   return (
-    <section className="flex h-full min-h-0 flex-col overflow-hidden bg-white text-sm text-ink">
+    <section className="flex h-full min-h-0 flex-col overflow-hidden bg-surface type-body text-ink">
       <div className="flex-1 overflow-y-auto p-3 sm:p-6">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
           <nav
@@ -417,7 +417,7 @@ export function AdScriptPage() {
                 key={label}
                 variant="ghost"
                 className={cn(
-                  "h-11 rounded-none border-line px-2 text-xs sm:text-sm [&:not(:last-child)]:border-r",
+                  "h-11 rounded-none border-line px-2 type-helper sm:type-body [&:not(:last-child)]:border-r",
                   step === index && "bg-surface-muted text-ink",
                   step > index && "text-primary",
                 )}
@@ -425,8 +425,8 @@ export function AdScriptPage() {
               >
                 <span
                   className={cn(
-                    "grid size-5 place-items-center rounded-full border border-line text-2xs",
-                    (step === index || step > index) && "border-primary bg-primary text-white",
+                    "grid size-5 place-items-center rounded-full border border-line type-helper",
+                    (step === index || step > index) && "border-primary bg-primary text-on-primary",
                   )}
                 >
                   {step > index ? <Check className="size-3" /> : index + 1}
@@ -482,8 +482,8 @@ function Feedback({ message, error }: { message: string; error: boolean }) {
   return (
     <p
       className={cn(
-        "ad-script-feedback mt-4 rounded-lg border px-3 py-2 text-xs",
-        error ? "border-danger/20 bg-danger/5 text-danger" : "border-success/20 bg-success/5 text-success",
+        "ad-script-feedback mt-4 rounded-lg border px-3 py-2 type-helper",
+        error ? "border-error/20 bg-error/5 text-error" : "border-success/20 bg-success/5 text-success",
       )}
     >
       {message}
@@ -501,14 +501,14 @@ function SceneStep({
   return (
     <div className="ad-script-section space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-medium">选择{input.sceneCategory === "marketing" ? "营销" : "投放"}场景</h2>
+        <h2 className="type-section-title">选择{input.sceneCategory === "marketing" ? "营销" : "投放"}场景</h2>
         <div className="scene-tabs flex rounded-lg bg-surface-muted p-1">
           {(["marketing", "placement"] as const).map((category) => (
             <Button
               variant="ghost"
               size="sm"
               key={category}
-              className={cn("rounded-md", input.sceneCategory === category && "bg-white shadow-sm hover:bg-white")}
+              className={cn("rounded-md", input.sceneCategory === category && "bg-surface shadow-sm hover:bg-surface")}
               onClick={() => {
                 update("sceneCategory", category);
                 const next = scenes[category][0];
@@ -538,33 +538,31 @@ function SceneStep({
             <span className="grid size-8 place-items-center rounded-lg bg-surface-muted text-muted">
               {id === "local-store" ? <MapPin /> : <Target />}
             </span>
-            <b className="font-medium text-ink">{name}</b>
-            <small className="text-xs font-normal text-muted">{description}</small>
-            <span className="mt-auto rounded-full bg-surface-muted px-2 py-1 text-2xs font-normal text-muted">
-              {length}字
-            </span>
+            <b className="text-ink">{name}</b>
+            <small className="type-helper text-muted">{description}</small>
+            <span className="mt-auto rounded-full bg-surface-muted px-2 py-1 type-helper text-muted">{length}字</span>
           </Button>
         ))}
       </div>
       <div className="batch-row flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line p-4">
         <div>
-          <b className="font-medium">批量生成</b>
-          <span className="mt-1 block text-xs text-muted">同时生成多条差异化变体</span>
+          <b className="">批量生成</b>
+          <span className="mt-1 block type-helper text-muted">同时生成多条差异化变体</span>
         </div>
         <div className="counter flex items-center gap-3">
           <Button
             variant="outline"
-            size="icon"
+            size="icon-sm"
             className="size-8 rounded-full"
             aria-label="减少生成数量"
             onClick={() => update("batchCount", Math.max(1, input.batchCount - 1))}
           >
             <Minus />
           </Button>
-          <b className="min-w-5 text-center font-medium">{input.batchCount}</b>
+          <b className="min-w-5 text-center">{input.batchCount}</b>
           <Button
             variant="outline"
-            size="icon"
+            size="icon-sm"
             className="size-8 rounded-full"
             aria-label="增加生成数量"
             onClick={() => update("batchCount", Math.min(3, input.batchCount + 1))}
@@ -606,14 +604,14 @@ function ProductStep({
         onClick={() => setSourceOpen(!sourceOpen)}
       >
         <FileSearch className="text-muted" />
-        <b className="font-medium">解析现有脚本</b>
+        <b className="">解析现有脚本</b>
         <ChevronDown className={cn("ml-auto transition-transform", sourceOpen && "rotate-180")} />
       </Button>
       {sourceOpen && (
         <div className="source-panel space-y-3 rounded-xl border border-line bg-surface-muted p-4">
           <textarea
             aria-label="现有口播脚本"
-            className="min-h-28 w-full resize-y rounded-md border border-line bg-white px-3 py-2 text-sm text-ink outline-none placeholder:text-muted focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+            className="min-h-28 w-full resize-y rounded-md border border-line bg-surface px-3 py-2 type-body text-ink outline-none placeholder:text-muted focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
             value={input.sourceScript ?? ""}
             onChange={(event) => update("sourceScript", event.target.value)}
             placeholder="粘贴现有口播脚本或竞品脚本原文…"
@@ -622,7 +620,7 @@ function ProductStep({
             <Button className="rounded-full" size="sm" disabled={busy === "parse"} onClick={onParse}>
               {busy === "parse" ? <LoaderCircle className="animate-spin" /> : <Sparkles />} AI 解析
             </Button>
-            <Label className="text-xs font-normal text-muted">
+            <Label className="type-label text-muted">
               <input
                 type="checkbox"
                 className="size-4 accent-primary"
@@ -636,8 +634,8 @@ function ProductStep({
       )}
       {extracted && (
         <div className="extract-review rounded-xl border border-line bg-surface-muted p-4">
-          <b className="font-medium">解析结果待确认</b>
-          <p className="mt-1 text-xs text-muted">
+          <b className="">解析结果待确认</b>
+          <p className="mt-1 type-helper text-muted">
             {extracted.productName || "未识别产品名"} · {extracted.sellingPoints?.join("、") || "未识别卖点"}
           </p>
           <div className="mt-3 flex justify-end gap-2">
@@ -653,16 +651,16 @@ function ProductStep({
       <div className="selected-scene flex items-center gap-3 rounded-xl border border-line bg-surface-muted p-3">
         <MapPin className="size-4 text-muted" />
         <div className="min-w-0 flex-1">
-          <b className="font-medium">{scenes[input.sceneCategory].find(([id]) => id === input.sceneId)?.[1]}</b>
-          <span className="mt-0.5 block truncate text-xs text-muted">
+          <b className="">{scenes[input.sceneCategory].find(([id]) => id === input.sceneId)?.[1]}</b>
+          <span className="mt-0.5 block truncate type-helper text-muted">
             {scenes[input.sceneCategory].find(([id]) => id === input.sceneId)?.[2]}
           </span>
         </div>
-        <span className="rounded-full bg-white px-2 py-1 text-xs text-muted">{input.targetLength}字</span>
+        <span className="rounded-full bg-surface px-2 py-1 type-helper text-muted">{input.targetLength}字</span>
       </div>
       <Label className="field block space-y-2">
         <span>
-          产品名称 <i className="text-danger not-italic">*</i>
+          产品名称 <i className="text-error not-italic">*</i>
         </span>
         <Input
           value={input.productName}
@@ -670,15 +668,15 @@ function ProductStep({
           onChange={(event) => update("productName", event.target.value)}
           placeholder="例如：玻尿酸精华液 / 小米 14 Pro"
         />
-        <small className="block text-right text-2xs font-normal text-muted">{input.productName.length} / 30</small>
+        <small className="block text-right type-helper text-muted">{input.productName.length} / 30</small>
       </Label>
       <Label className="field block space-y-2">
         <span className="flex items-center">
-          产品卖点 <i className="text-danger not-italic">*</i>
-          <em className="ml-auto text-xs font-normal not-italic text-muted">每行一个，最多 6 条</em>
+          产品卖点 <i className="text-error not-italic">*</i>
+          <em className="ml-auto type-helper not-italic text-muted">每行一个，最多 6 条</em>
         </span>
         <textarea
-          className="min-h-24 w-full resize-y rounded-md border border-line bg-transparent px-3 py-2 text-sm text-ink outline-none placeholder:text-muted focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+          className="min-h-24 w-full resize-y rounded-md border border-line bg-transparent px-3 py-2 type-body text-ink outline-none placeholder:text-muted focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
           value={input.sellingPoints.join("\n")}
           onChange={(event) =>
             update(
@@ -692,10 +690,10 @@ function ProductStep({
           }
           placeholder="输入卖点，每行一个…"
         />
-        <small className="block text-right text-2xs font-normal text-muted">{input.sellingPoints.length} / 6 条</small>
+        <small className="block text-right type-helper text-muted">{input.sellingPoints.length} / 6 条</small>
       </Label>
       <div className="field space-y-2">
-        <span className="text-sm font-medium">文案字数</span>
+        <span className="type-body-strong">文案字数</span>
         <div className="pill-group flex flex-wrap gap-2">
           {lengths.map((length) => (
             <Button
@@ -711,8 +709,8 @@ function ProductStep({
         </div>
       </div>
       <div className="field space-y-2">
-        <span className="text-sm font-medium">
-          营销目标 <i className="text-danger not-italic">*</i>
+        <span className="type-body-strong">
+          营销目标 <i className="text-error not-italic">*</i>
         </span>
         <div className="pill-group flex flex-wrap gap-2">
           {goals.map((goal) => (
@@ -730,7 +728,7 @@ function ProductStep({
       </div>
       <Label className="field block space-y-2">
         <span>
-          目标用户 <i className="text-danger not-italic">*</i>
+          目标用户 <i className="text-error not-italic">*</i>
         </span>
         <Input
           value={input.targetAudience}
@@ -740,10 +738,10 @@ function ProductStep({
       </Label>
       <Label className="field block space-y-2">
         <span className="flex items-center">
-          用户痛点 <em className="ml-auto text-xs font-normal not-italic text-muted">可选</em>
+          用户痛点 <em className="ml-auto type-helper not-italic text-muted">可选</em>
         </span>
         <textarea
-          className="min-h-20 w-full resize-y rounded-md border border-line bg-transparent px-3 py-2 text-sm text-ink outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+          className="min-h-20 w-full resize-y rounded-md border border-line bg-transparent px-3 py-2 type-body text-ink outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
           maxLength={150}
           value={input.painPoints ?? ""}
           onChange={(event) => update("painPoints", event.target.value)}
@@ -751,10 +749,10 @@ function ProductStep({
       </Label>
       <Label className="field block space-y-2">
         <span className="flex items-center">
-          产品利益点 <em className="ml-auto text-xs font-normal not-italic text-muted">可选</em>
+          产品利益点 <em className="ml-auto type-helper not-italic text-muted">可选</em>
         </span>
         <textarea
-          className="min-h-20 w-full resize-y rounded-md border border-line bg-transparent px-3 py-2 text-sm text-ink outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+          className="min-h-20 w-full resize-y rounded-md border border-line bg-transparent px-3 py-2 type-body text-ink outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
           maxLength={100}
           value={input.benefits ?? ""}
           onChange={(event) => update("benefits", event.target.value)}
@@ -773,9 +771,9 @@ function StyleStep({
 }) {
   return (
     <div className="ad-script-section form-section mx-auto max-w-4xl space-y-5">
-      <h2 className="text-lg font-medium">脚本风格</h2>
+      <h2 className="type-section-title">脚本风格</h2>
       <div className="field space-y-2">
-        <span className="text-sm font-medium">演讲角色</span>
+        <span className="type-body-strong">演讲角色</span>
         <div className="role-grid grid grid-cols-1 gap-2 sm:grid-cols-2">
           {roles.map(([role, description]) => (
             <Button
@@ -789,8 +787,8 @@ function StyleStep({
             >
               <Pencil className="text-muted" />
               <span className="min-w-0 flex-1">
-                <b className="block font-medium">{role}</b>
-                <small className="mt-0.5 block text-xs font-normal text-muted">{description}</small>
+                <b className="block">{role}</b>
+                <small className="mt-0.5 block type-helper text-muted">{description}</small>
               </span>
               {input.speakerRole === role && <Check className="text-primary" />}
             </Button>
@@ -800,7 +798,7 @@ function StyleStep({
       {input.speakerRole === "自定义角色" && (
         <Label className="field block space-y-2">
           <span>
-            角色背景 <i className="text-danger not-italic">*</i>
+            角色背景 <i className="text-error not-italic">*</i>
           </span>
           <Input
             value={input.customRole ?? ""}
@@ -810,7 +808,7 @@ function StyleStep({
         </Label>
       )}
       <div className="field space-y-2">
-        <span className="text-sm font-medium">脚本风格</span>
+        <span className="type-body-strong">脚本风格</span>
         <div className="pill-group flex flex-wrap gap-2">
           {styles.map((style) => (
             <Button
@@ -836,18 +834,18 @@ function StyleStep({
         </NativeSelect>
       </Label>
       <details className="advanced rounded-xl border border-line px-4">
-        <summary className="flex min-h-11 cursor-pointer items-center gap-2 font-medium">
+        <summary className="flex min-h-11 cursor-pointer items-center gap-2 type-body-strong">
           <Pencil /> 高级设置
         </summary>
-        <p className="pb-4 text-xs text-muted">采用四维等权评分，最多进行 5 轮调优；达到 85 分且合规后提前结束。</p>
+        <p className="pb-4 type-helper text-muted">采用四维等权评分，最多进行 5 轮调优；达到 85 分且合规后提前结束。</p>
       </details>
       <div className="cost-summary flex items-center gap-3 rounded-xl border border-line bg-surface-muted p-4">
         <Sparkles className="text-muted" />
         <div className="min-w-0 flex-1">
-          <b className="font-medium">将生成 {input.batchCount} 条差异化脚本</b>
-          <span className="mt-0.5 block text-xs text-muted">每条消耗 20 创作点</span>
+          <b className="">将生成 {input.batchCount} 条差异化脚本</b>
+          <span className="mt-0.5 block type-helper text-muted">每条消耗 20 创作点</span>
         </div>
-        <strong className="font-semibold">{input.batchCount * 20} 点</strong>
+        <strong className="">{input.batchCount * 20} 点</strong>
       </div>
     </div>
   );
@@ -884,9 +882,9 @@ function ProgressScreen({
       )
     : 4;
   return (
-    <section className="flex h-full min-h-0 flex-col overflow-hidden bg-white text-sm text-ink">
+    <section className="flex h-full min-h-0 flex-col overflow-hidden bg-surface type-body text-ink">
       <header className="flex h-14 shrink-0 items-center border-b border-line px-3 sm:px-6">
-        <h1 className="text-2xl font-medium">口播脚本</h1>
+        <h1 className="type-page-title">口播脚本</h1>
       </header>
       <div className="flex-1 overflow-y-auto p-3 sm:p-6">
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-4">
@@ -895,15 +893,15 @@ function ProgressScreen({
               <LoaderCircle className="animate-spin text-muted" />
             </span>
             <div>
-              <h2 className="text-xl font-medium">AI 智能调优中</h2>
-              <p className="text-xs text-muted">已耗时 {elapsedSeconds} 秒 · 目标 1 分钟内完成</p>
+              <h2 className="type-section-title">AI 智能调优中</h2>
+              <p className="type-helper text-muted">已耗时 {elapsedSeconds} 秒 · 目标 1 分钟内完成</p>
             </div>
           </div>
           <Card className="gap-0 py-0 shadow-none">
             <CardContent className="space-y-3 p-4 sm:p-6">
-              <div className="progress-meta flex items-center justify-between text-xs text-muted">
+              <div className="progress-meta flex items-center justify-between type-helper text-muted">
                 <span>{project?.project.status === "queued" ? "等待 Worker" : "生成与调优"}</span>
-                <b className="font-medium text-ink">{progress}%</b>
+                <b className="text-ink">{progress}%</b>
               </div>
               <div className="progress-track h-2 overflow-hidden rounded-full bg-surface-muted">
                 <i
@@ -916,16 +914,16 @@ function ProgressScreen({
                   <article className="flex min-h-16 items-center gap-3 py-3" key={variant.id}>
                     <span
                       className={cn(
-                        "status-dot grid size-8 place-items-center rounded-full bg-surface-muted text-xs",
-                        variant.status === "succeeded" && "bg-success text-white",
-                        variant.status === "failed" && "bg-danger/5 text-danger",
+                        "status-dot grid size-8 place-items-center rounded-full bg-surface-muted type-helper",
+                        variant.status === "succeeded" && "bg-success text-on-primary",
+                        variant.status === "failed" && "bg-error/5 text-error",
                       )}
                     >
                       {variant.status === "succeeded" ? <Check className="size-4" /> : variant.ordinal}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <b className="font-medium">变体 {variant.ordinal}</b>
-                      <p className="truncate text-xs text-muted">
+                      <b className="">变体 {variant.ordinal}</b>
+                      <p className="truncate type-helper text-muted">
                         {variant.status === "failed"
                           ? variant.error?.message
                           : variant.status === "succeeded"
@@ -933,7 +931,7 @@ function ProgressScreen({
                             : `正在执行第 ${Math.max(1, variant.iterationCount + 1)} 轮`}
                       </p>
                     </div>
-                    <span className="text-xs text-muted">
+                    <span className="type-helper text-muted">
                       {variant.status === "succeeded" ? "完成" : variant.status === "failed" ? "失败" : "处理中"}
                     </span>
                   </article>
@@ -941,8 +939,8 @@ function ProgressScreen({
                   <article className="flex min-h-16 items-center gap-3 py-3">
                     <LoaderCircle className="animate-spin text-muted" />
                     <div>
-                      <b className="font-medium">正在创建任务</b>
-                      <p className="text-xs text-muted">请稍候</p>
+                      <b className="">正在创建任务</b>
+                      <p className="type-helper text-muted">请稍候</p>
                     </div>
                   </article>
                 )}
@@ -955,7 +953,7 @@ function ProgressScreen({
               <ArrowLeft /> 返回配置
             </Button>
             {project && ["queued", "processing"].includes(project.project.status) && (
-              <Button variant="outline" className="rounded-full text-danger" disabled={cancelling} onClick={onCancel}>
+              <Button variant="outline" className="rounded-full text-error" disabled={cancelling} onClick={onCancel}>
                 {cancelling ? <LoaderCircle className="animate-spin" /> : null} 取消整批任务
               </Button>
             )}
@@ -1011,9 +1009,9 @@ function ResultScreen({
     ["行动召唤强度", version.score.scores.callToAction],
   ] as const;
   return (
-    <section className="flex h-full min-h-0 flex-col overflow-hidden bg-white text-sm text-ink">
+    <section className="flex h-full min-h-0 flex-col overflow-hidden bg-surface type-body text-ink">
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-line px-3 sm:px-6">
-        <h1 className="text-2xl font-medium">口播脚本</h1>
+        <h1 className="type-page-title">口播脚本</h1>
         <Button variant="ghost" size="sm" onClick={onReset}>
           <RefreshCcw /> 重新设置
         </Button>
@@ -1027,8 +1025,8 @@ function ResultScreen({
                   <MapPin className="size-4 text-muted" />
                 </span>
                 <div className="min-w-0">
-                  <b className="block truncate font-medium">{project.project.input.productName}</b>
-                  <span className="text-xs text-muted">
+                  <b className="block truncate">{project.project.input.productName}</b>
+                  <span className="type-helper text-muted">
                     {
                       scenes[project.project.input.sceneCategory].find(
                         ([id]) => id === project.project.input.sceneId,
@@ -1044,8 +1042,8 @@ function ResultScreen({
                 [version.compliance.passed ? "通过" : "复核", "合规状态"],
               ].map(([value, label]) => (
                 <span className="border-l border-line pl-4" key={label}>
-                  <strong className="block text-lg font-medium">{value}</strong>
-                  <small className="text-2xs text-muted">{label}</small>
+                  <strong className="block type-section-title">{value}</strong>
+                  <small className="type-helper text-muted">{label}</small>
                 </span>
               ))}
             </CardContent>
@@ -1068,18 +1066,18 @@ function ResultScreen({
           <div className="result-grid grid min-h-[560px] grid-cols-1 gap-4 lg:grid-cols-2">
             <Card className="script-editor min-h-0 gap-0 overflow-hidden py-0 shadow-none">
               <header className="flex h-14 shrink-0 items-center justify-between border-b border-line px-4">
-                <h2 className="text-base font-medium">脚本正文</h2>
+                <h2 className="type-section-title">脚本正文</h2>
                 <Button variant="ghost" size="sm" onClick={() => void navigator.clipboard.writeText(editor)}>
                   <Copy /> 复制脚本
                 </Button>
               </header>
               <textarea
                 aria-label="脚本正文"
-                className="min-h-96 flex-1 resize-none bg-white p-4 text-base leading-loose text-ink outline-none"
+                className="min-h-96 flex-1 resize-none bg-surface p-4 type-section-title leading-loose text-ink outline-none"
                 value={editor}
                 onChange={(event) => onEditor(event.target.value)}
               />
-              <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-line p-3 text-xs text-muted">
+              <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-line p-3 type-helper text-muted">
                 <span>编辑后保存为新的人工版本</span>
                 <Button
                   size="sm"
@@ -1093,7 +1091,7 @@ function ResultScreen({
             </Card>
             <Card className="analysis-panel min-h-0 gap-0 overflow-hidden py-0 shadow-none">
               <header className="flex min-h-14 flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2">
-                <h2 className="text-base font-medium">分析与合规</h2>
+                <h2 className="type-section-title">分析与合规</h2>
                 <NativeSelect value={version.id} onChange={(event) => onVersion(event.target.value)}>
                   {selectedVariant.versions.map((item) => (
                     <option value={item.id} key={item.id}>
@@ -1107,17 +1105,17 @@ function ResultScreen({
               <div className="analysis-scroll flex-1 space-y-5 overflow-y-auto p-4">
                 <section className="space-y-3">
                   <div className="flex items-end justify-between">
-                    <h3 className="font-medium">转化力评分</h3>
-                    <strong className="text-2xl font-medium">
+                    <h3 className="type-section-title">转化力评分</h3>
+                    <strong className="type-body-strong">
                       {version.score.total}
-                      <small className="text-xs font-normal text-muted">/100</small>
+                      <small className="type-helper text-muted">/100</small>
                     </strong>
                   </div>
                   {scoreRows.map(([label, value]) => (
                     <div className="score-row space-y-1" key={label}>
-                      <span className="flex justify-between text-xs text-muted">
+                      <span className="flex justify-between type-helper text-muted">
                         {label}
-                        <b className="font-medium text-ink">{value * 4}</b>
+                        <b className="text-ink">{value * 4}</b>
                       </span>
                       <span className="block h-1.5 overflow-hidden rounded-full bg-surface-muted">
                         <i className="block h-full rounded-full bg-primary" style={{ width: `${value * 4}%` }} />
@@ -1126,10 +1124,10 @@ function ResultScreen({
                   ))}
                 </section>
                 <section className="space-y-2">
-                  <h3 className="font-medium">优化建议</h3>
+                  <h3 className="type-section-title">优化建议</h3>
                   {version.score.suggestions.map((suggestion) => (
                     <p
-                      className="suggestion flex gap-2 rounded-lg bg-surface-muted p-3 text-xs leading-relaxed text-muted"
+                      className="suggestion flex gap-2 rounded-lg bg-surface-muted p-3 type-helper leading-relaxed text-muted"
                       key={suggestion}
                     >
                       <ArrowRight className="mt-0.5 size-3 shrink-0" /> {suggestion}
@@ -1137,21 +1135,21 @@ function ResultScreen({
                   ))}
                 </section>
                 <section className="space-y-2">
-                  <h3 className="flex items-center gap-2 font-medium">
+                  <h3 className="flex items-center gap-2 type-section-title">
                     <ShieldCheck /> 合规检测
                   </h3>
                   {version.compliance.findings.length ? (
                     version.compliance.findings.map((finding) => (
                       <p
                         className={cn(
-                          "finding rounded-lg border border-line bg-surface-muted p-3 text-xs leading-relaxed text-muted",
+                          "finding rounded-lg border border-line bg-surface-muted p-3 type-helper leading-relaxed text-muted",
                           finding.severity === "blocking" && "border-l-4 border-l-warning",
                         )}
                         key={`${finding.ruleId}:${finding.start ?? finding.excerpt}`}
                       >
-                        <b className="block font-medium text-ink">{finding.excerpt || finding.ruleId}</b>
+                        <b className="block text-ink">{finding.excerpt || finding.ruleId}</b>
                         {finding.message}
-                        <small className="mt-1 block text-2xs text-muted">{finding.suggestion}</small>
+                        <small className="mt-1 block type-helper text-muted">{finding.suggestion}</small>
                       </p>
                     ))
                   ) : (
@@ -1164,12 +1162,12 @@ function ResultScreen({
             </Card>
           </div>
           {actionJob && busy && (
-            <p className="action-progress flex items-center gap-2 text-xs text-muted">
+            <p className="action-progress flex items-center gap-2 type-helper text-muted">
               <LoaderCircle className="animate-spin" /> {actionJob.stage} · {actionJob.progress}%
             </p>
           )}
           {(error || notice) && <Feedback message={error || notice} error={Boolean(error)} />}
-          <footer className="result-actions sticky bottom-3 flex flex-wrap gap-2 rounded-xl border border-line bg-white/95 p-2 shadow-sm backdrop-blur">
+          <footer className="result-actions sticky bottom-3 flex flex-wrap gap-2 rounded-xl border border-line bg-surface/95 p-2 shadow-sm backdrop-blur">
             <Button
               variant="outline"
               size="sm"

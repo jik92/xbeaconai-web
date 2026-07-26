@@ -10,7 +10,7 @@ import {
 } from "@/api/api-client";
 import type { AssetFolder } from "@/entities/types";
 import { cn } from "@/lib/utils";
-import { Button } from "../ui/button";
+import { Button } from "@/components/ui/button";
 import { Input } from "../ui/input";
 import { NativeSelect } from "../ui/native-select";
 
@@ -133,7 +133,7 @@ export function SaveLocationPicker({
         <NativeSelect
           id={id}
           aria-label="保存位置"
-          className={cn("h-8", invalid && "border-red-500")}
+          className={cn("h-8", invalid && "border-error")}
           required={moduleId ? false : required}
           disabled={disabled || isLoading || (Boolean(moduleId) && defaultLoading)}
           value={value}
@@ -158,7 +158,7 @@ export function SaveLocationPicker({
         </NativeSelect>
         {!creating && (
           <Button
-            className="h-7 px-2 text-xs"
+            className="h-7 px-2 type-helper"
             size="sm"
             variant="ghost"
             disabled={disabled}
@@ -191,7 +191,7 @@ export function SaveLocationPicker({
             }}
           />
           <Button
-            className="h-7 px-2 text-xs"
+            className="h-7 px-2 type-helper"
             size="sm"
             disabled={!name.trim() || submitting}
             onClick={() => void createFolder()}
@@ -202,7 +202,7 @@ export function SaveLocationPicker({
           <Button
             aria-label="取消新建文件夹"
             className="size-7 p-0"
-            size="icon"
+            size="icon-sm"
             variant="ghost"
             disabled={submitting}
             onClick={cancelCreate}
@@ -212,7 +212,7 @@ export function SaveLocationPicker({
         </div>
       )}
       {error && (
-        <p className="text-xs text-red-600" role="alert">
+        <p className="type-helper text-error" role="alert">
           {error}
         </p>
       )}

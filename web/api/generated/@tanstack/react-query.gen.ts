@@ -1243,6 +1243,33 @@ export const listVideoCreateProjectsOptions = (options?: Options<ListVideoCreate
     queryKey: listVideoCreateProjectsQueryKey(options)
 });
 
+export const listVideoCreateProjectsInfiniteQueryKey = (options?: Options<ListVideoCreateProjectsData>): QueryKey<Options<ListVideoCreateProjectsData>> => createQueryKey('listVideoCreateProjects', options, true);
+
+export const listVideoCreateProjectsInfiniteOptions = (options?: Options<ListVideoCreateProjectsData>) => {
+    const opts = infiniteQueryOptions<ListVideoCreateProjectsResponse, DefaultError, InfiniteData<ListVideoCreateProjectsResponse>, QueryKey<Options<ListVideoCreateProjectsData>>, number | Pick<QueryKey<Options<ListVideoCreateProjectsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<ListVideoCreateProjectsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await listVideoCreateProjects({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: listVideoCreateProjectsInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
+
 export const createVideoCreateProjectMutation = (options?: Partial<Options<CreateVideoCreateProjectData>>): UseMutationOptions<CreateVideoCreateProjectResponse, CreateVideoCreateProjectError, Options<CreateVideoCreateProjectData>> => {
     const mutationOptions: UseMutationOptions<CreateVideoCreateProjectResponse, CreateVideoCreateProjectError, Options<CreateVideoCreateProjectData>> = {
         mutationFn: async (fnOptions) => {

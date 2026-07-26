@@ -127,7 +127,7 @@ export function VideoMashupPage() {
     jobColumn.accessor("title", {
       header: "任务名称",
       size: 300,
-      cell: (info) => <span className="truncate font-medium text-ink">{info.getValue()}</span>,
+      cell: (info) => <span className="truncate type-body-strong text-ink">{info.getValue()}</span>,
     }),
     jobColumn.accessor("status", {
       header: "状态",
@@ -142,7 +142,7 @@ export function VideoMashupPage() {
           <div className="h-1.5 w-24 overflow-hidden rounded-full bg-surface-muted">
             <span className="block h-full rounded-full bg-primary" style={{ width: `${info.getValue()}%` }} />
           </div>
-          <span className="text-2xs text-muted">{info.getValue()}%</span>
+          <span className="type-helper text-muted">{info.getValue()}%</span>
         </div>
       ),
     }),
@@ -163,7 +163,7 @@ export function VideoMashupPage() {
       size: 120,
       cell: (info) => (
         <Button
-          className="h-7 px-2 text-2xs text-primary"
+          className="h-7 px-2 type-helper text-primary"
           size="sm"
           variant="ghost"
           onClick={() => {
@@ -196,7 +196,7 @@ export function VideoMashupPage() {
         />
       </ToolTaskPage>
       <ToolCreatorModal open={creatorOpen} title={newTaskLabel} onClose={() => setCreatorOpen(false)}>
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 text-sm">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 type-body">
           {groups.map((group, groupIndex) => (
             <section className="border-b border-line pb-3" key={group.id}>
               <div className="flex items-center gap-2">
@@ -212,7 +212,7 @@ export function VideoMashupPage() {
                 {groups.length > 2 && (
                   <Button
                     className="size-8"
-                    size="icon"
+                    size="icon-sm"
                     variant="ghost"
                     aria-label={`删除${group.name}`}
                     onClick={() => setGroups((current) => current.filter((item) => item.id !== group.id))}
@@ -225,10 +225,10 @@ export function VideoMashupPage() {
                 {group.assets.map((asset) => (
                   <div className="flex h-8 max-w-40 items-center gap-1 rounded-md bg-surface-muted px-2" key={asset.id}>
                     <Film className="size-3.5 shrink-0" />
-                    <span className="truncate text-xs" title={asset.name}>
+                    <span className="truncate type-helper" title={asset.name}>
                       {asset.name}
                     </span>
-                    <button
+                    <Button
                       type="button"
                       className="shrink-0 text-muted"
                       aria-label={`移除${asset.name}`}
@@ -243,7 +243,7 @@ export function VideoMashupPage() {
                       }
                     >
                       <X className="size-3" />
-                    </button>
+                    </Button>
                   </div>
                 ))}
                 <AttachmentPicker
@@ -270,11 +270,11 @@ export function VideoMashupPage() {
             <Plus />
             添加视频组
           </Button>
-          <Label className="flex-col items-start text-xs text-muted">
+          <Label className="flex-col items-start type-label text-muted">
             任务名称
             <Input value={taskName} onChange={(event) => setTaskName(event.target.value)} />
           </Label>
-          <Label className="flex-col items-start text-xs text-muted">
+          <Label className="flex-col items-start type-label text-muted">
             组合模式
             <div className="flex gap-1">
               <Button
@@ -293,7 +293,7 @@ export function VideoMashupPage() {
               </Button>
             </div>
           </Label>
-          <Label className="flex-col items-start text-xs text-muted">
+          <Label className="flex-col items-start type-label text-muted">
             分辨率
             <div className="flex gap-1">
               {(["720P", "1080P"] as const).map((value) => (
@@ -308,7 +308,7 @@ export function VideoMashupPage() {
               ))}
             </div>
           </Label>
-          <Label className="flex-col items-start text-xs text-muted">
+          <Label className="flex-col items-start type-label text-muted">
             最多生成数量
             <Input
               className="w-24"
@@ -319,17 +319,17 @@ export function VideoMashupPage() {
               onChange={(event) => setCount(Number(event.target.value))}
             />
           </Label>
-          <Label className="flex-col items-start text-xs text-muted">
+          <Label className="flex-col items-start type-label text-muted">
             保存位置
             <SaveLocationPicker moduleId="video-mashup" value={outputFolderId} onChange={setOutputFolderId} />
           </Label>
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 type-helper text-muted">
             <span>视频组 {groups.length}</span>
             <span>可用素材 {groups.reduce((sum, group) => sum + group.assets.length, 0)}</span>
             <span>理论组合 {theoretical.toLocaleString()}</span>
             <span>预计生成 {expected}</span>
           </div>
-          {error && <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
+          {error && <p className="rounded-md bg-error/5 px-3 py-2 type-helper text-error">{error}</p>}
         </div>
         <footer className="flex h-13 flex-none items-center justify-end gap-2 border-t border-line px-4">
           <Button size="sm" variant="outline" onClick={() => setCreatorOpen(false)}>
@@ -344,14 +344,14 @@ export function VideoMashupPage() {
         <div className="grid min-h-0 flex-1 gap-3 overflow-y-auto p-4 sm:grid-cols-2">
           {result?.artifacts.map((artifact) => (
             <article className="min-w-0" key={artifact.id}>
-              <div className="grid h-32 place-items-center overflow-hidden rounded-md bg-black text-white">
+              <div className="grid h-32 place-items-center overflow-hidden rounded-md bg-surface-dark text-on-primary">
                 {artifact.url ? (
                   <AuthenticatedMedia url={artifact.url} mimeType={artifact.mimeType} alt={artifact.name} />
                 ) : (
                   <Film />
                 )}
               </div>
-              <p className="mt-1 truncate text-xs text-ink" title={artifact.name}>
+              <p className="mt-1 truncate type-helper text-ink" title={artifact.name}>
                 {artifact.name}
               </p>
               <div className="mt-1 flex gap-1">
@@ -372,7 +372,7 @@ export function VideoMashupPage() {
               </div>
             </article>
           ))}
-          {!result?.artifacts.length && <p className="text-xs text-muted">任务结果尚未生成</p>}
+          {!result?.artifacts.length && <p className="type-helper text-muted">任务结果尚未生成</p>}
         </div>
       </ToolCreatorModal>
     </>

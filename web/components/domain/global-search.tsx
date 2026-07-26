@@ -168,7 +168,7 @@ export function GlobalSearch({ pages }: GlobalSearchProps) {
       <Button
         variant="ghost"
         size="sm"
-        className="global-search-shortcut h-6 px-1.5 text-2xs text-muted"
+        className="global-search-shortcut h-6 px-1.5 type-helper text-muted"
         aria-label={`打开全局搜索，快捷键 ${shortcut}`}
         onMouseDown={(event) => event.preventDefault()}
         onClick={openSearch}
@@ -178,17 +178,17 @@ export function GlobalSearch({ pages }: GlobalSearchProps) {
       {open && (
         <div
           id="global-search-results"
-          className="absolute left-1/2 top-full z-50 mt-2 flex max-h-[min(520px,70vh)] w-[min(640px,calc(100vw-24px))] -translate-x-1/2 flex-col overflow-y-auto rounded-lg border border-line bg-white p-1 shadow-xl"
+          className="absolute left-1/2 top-full z-50 mt-2 flex max-h-[min(520px,70vh)] w-[min(640px,calc(100vw-24px))] -translate-x-1/2 flex-col overflow-y-auto rounded-lg border border-line bg-surface p-1 shadow-xl"
           role="listbox"
         >
           {groupedResults.map((group) => (
             <section key={group.section} className="border-b border-line/60 py-1 last:border-0">
-              <b className="block px-2 py-1 text-2xs font-medium text-muted">{group.section}</b>
+              <b className="block px-2 py-1 type-badge text-muted">{group.section}</b>
               {group.items.map((result) => {
                 const index = results.indexOf(result);
                 const Icon = resultIcons[result.kind];
                 return (
-                  <button
+                  <Button
                     type="button"
                     id={`global-search-${result.id}`}
                     key={result.id}
@@ -203,20 +203,20 @@ export function GlobalSearch({ pages }: GlobalSearchProps) {
                   >
                     <Icon className="size-4 shrink-0 text-muted" />
                     <span className="min-w-0 flex-1">
-                      <b className="block truncate text-xs font-medium text-ink">{result.label}</b>
-                      <small className="block truncate text-2xs text-muted">{result.meta}</small>
+                      <b className="block truncate type-label text-ink">{result.label}</b>
+                      <small className="block truncate type-helper text-muted">{result.meta}</small>
                     </span>
-                  </button>
+                  </Button>
                 );
               })}
             </section>
           ))}
           {!results.length && (
-            <div className="grid min-h-24 place-items-center px-3 text-xs text-muted">
+            <div className="grid min-h-24 place-items-center px-3 type-helper text-muted">
               {loading ? "正在搜索…" : "没有匹配结果"}
             </div>
           )}
-          {partialError && <small className="px-2 py-1 text-2xs text-warning">部分数据暂时无法搜索</small>}
+          {partialError && <small className="px-2 py-1 type-helper text-warning">部分数据暂时无法搜索</small>}
         </div>
       )}
     </div>

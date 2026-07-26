@@ -3166,7 +3166,12 @@ export type ExportAdScriptVersionResponse = ExportAdScriptVersionResponses[keyof
 export type ListVideoCreateProjectsData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        query?: string;
+        status?: 'draft' | 'analyzing' | 'script_generating' | 'script_review' | 'storyboard_generating' | 'storyboard_review' | 'composing' | 'completed' | 'failed';
+        page?: number;
+        pageSize?: number;
+    };
     url: '/api/video-create/projects';
 };
 
@@ -3176,6 +3181,9 @@ export type ListVideoCreateProjectsResponses = {
      */
     200: {
         projects: Array<VideoCreateProject>;
+        total: number;
+        page: number;
+        pageSize: number;
     };
 };
 
@@ -3239,7 +3247,8 @@ export type GetVideoCreateProjectResponse = GetVideoCreateProjectResponses[keyof
 export type UpdateVideoCreateProjectData = {
     body: {
         expectedVersion: number;
-        input: VideoCreateInput;
+        input?: VideoCreateInput;
+        title?: string;
     };
     path: {
         projectId: string;

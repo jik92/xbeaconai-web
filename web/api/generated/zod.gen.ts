@@ -2398,11 +2398,31 @@ export const zExportAdScriptVersionQuery = z.object({
  */
 export const zExportAdScriptVersionResponse = z.string();
 
+export const zListVideoCreateProjectsQuery = z.object({
+    query: z.string().max(100).optional(),
+    status: z.enum([
+        'draft',
+        'analyzing',
+        'script_generating',
+        'script_review',
+        'storyboard_generating',
+        'storyboard_review',
+        'composing',
+        'completed',
+        'failed'
+    ]).optional(),
+    page: z.int().gte(1).optional().default(1),
+    pageSize: z.int().gte(1).lte(50).optional().default(20)
+});
+
 /**
  * Video create projects
  */
 export const zListVideoCreateProjectsResponse = z.object({
-    projects: z.array(zVideoCreateProject)
+    projects: z.array(zVideoCreateProject),
+    total: z.int().gte(0),
+    page: z.int().gte(1),
+    pageSize: z.int().gte(1)
 });
 
 export const zCreateVideoCreateProjectBody = z.object({
@@ -2426,7 +2446,8 @@ export const zGetVideoCreateProjectResponse = zVideoCreateProject;
 
 export const zUpdateVideoCreateProjectBody = z.object({
     expectedVersion: z.int().gte(1),
-    input: zVideoCreateInput
+    input: zVideoCreateInput.optional(),
+    title: z.string().min(1).max(80).optional()
 });
 
 export const zUpdateVideoCreateProjectPath = z.object({

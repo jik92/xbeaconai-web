@@ -243,18 +243,18 @@ export function VideoCreateShotGenerationDialog({
     <Dialog open={open} onOpenChange={(next) => !next && !submitting && onClose()}>
       <DialogContent className="grid h-[calc(100vh-32px)] max-h-[900px] max-w-[min(1280px,calc(100vw-32px))] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0">
         <DialogHeader className="border-b border-line px-6 py-4">
-          <DialogTitle className="text-xl">AI生成视频素材</DialogTitle>
+          <DialogTitle className="type-section-title">AI生成视频素材</DialogTitle>
         </DialogHeader>
         {loading || !draft ? (
-          <div className="grid place-items-center text-sm text-muted">
+          <div className="grid place-items-center type-body text-muted">
             <span className="flex items-center gap-2">
               <LoaderCircle className="animate-spin" /> 正在构建最终生成参数
             </span>
           </div>
         ) : (
           <div className="flex min-h-0 flex-col gap-4 overflow-y-auto px-6 py-4">
-            <div className="flex items-start gap-3 rounded-xl border border-warning/40 bg-warning/5 px-4 py-3 text-sm text-body">
-              <span className="shrink-0 rounded-md bg-warning/15 px-2 py-1 font-medium text-ink">口播</span>
+            <div className="flex items-start gap-3 rounded-xl border border-warning/40 bg-warning/5 px-4 py-3 type-body text-body">
+              <span className="shrink-0 rounded-md bg-warning/15 px-2 py-1 type-badge text-ink">口播</span>
               <span className="leading-relaxed">{draft.narration}</span>
             </div>
             <div className="grid min-h-[420px] flex-1 grid-cols-[112px_minmax(0,1fr)] overflow-hidden rounded-2xl border border-line bg-surface">
@@ -267,13 +267,13 @@ export function VideoCreateShotGenerationDialog({
                     <div className="aspect-square w-full overflow-hidden rounded-xl border border-line bg-surface [&_img]:size-full [&_img]:object-cover [&_video]:size-full [&_video]:object-cover">
                       <AttachmentPreview attachment={attachment} />
                     </div>
-                    <span className="mt-1 block truncate text-center text-xs text-muted">
+                    <span className="mt-1 block truncate text-center type-helper text-muted">
                       @{attachment.label}
                       {attachment.category ? `（${attachment.category}）` : ""}
                     </span>
                     {referenceKind(attachment.mimeType) === "image" && (
                       <NativeSelect
-                        className="mt-1 h-7 w-full px-1 text-xs"
+                        className="mt-1 h-7 w-full px-1 type-helper"
                         value={attachment.category ?? "商品"}
                         aria-label={`${attachment.label} 图片分类`}
                         disabled={attachment.source === "portrait"}
@@ -288,7 +288,7 @@ export function VideoCreateShotGenerationDialog({
                     <Button
                       className="absolute right-1 top-1 size-7 opacity-0 group-hover:opacity-100"
                       variant="outline"
-                      size="icon"
+                      size="icon-sm"
                       aria-label={`移除 ${attachment.label}`}
                       onClick={() => removeAttachment(attachment)}
                     >
@@ -301,7 +301,7 @@ export function VideoCreateShotGenerationDialog({
                   accept="image/*,video/*,audio/*"
                   onSelect={addAttachments}
                   trigger={(openPicker) => (
-                    <Button className="size-10 rounded-full" variant="outline" size="icon" onClick={openPicker}>
+                    <Button className="size-10 rounded-full" variant="outline" size="icon-sm" onClick={openPicker}>
                       <Plus />
                       <span className="sr-only">添加参考附件</span>
                     </Button>
@@ -309,14 +309,14 @@ export function VideoCreateShotGenerationDialog({
                 />
               </aside>
               <textarea
-                className="min-h-[420px] w-full resize-none bg-transparent p-5 text-sm leading-7 text-ink outline-none"
+                className="min-h-[420px] w-full resize-none bg-transparent p-5 type-body leading-relaxed text-ink outline-none"
                 value={prompt}
                 maxLength={10_000}
                 aria-label="最终视频生成提示词"
                 onChange={(event) => setPrompt(event.target.value)}
               />
             </div>
-            <div className="grid gap-2 rounded-xl border border-line bg-canvas-soft p-3 text-xs text-muted sm:grid-cols-2">
+            <div className="grid gap-2 rounded-xl border border-line bg-canvas-soft p-3 type-helper text-muted sm:grid-cols-2">
               <span>执行模式：{draft.executionMode === "mock" ? "FFmpeg Mock" : "真实 Seedance API"}</span>
               <span>
                 {generateAudio
@@ -324,11 +324,11 @@ export function VideoCreateShotGenerationDialog({
                   : `后续配音：${draft.postProcessAudio.model} / ${draft.postProcessAudio.voice}`}
               </span>
             </div>
-            <details className="rounded-xl border border-line bg-canvas-soft text-xs text-muted">
-              <summary className="cursor-pointer px-3 py-2 font-medium text-ink">
+            <details className="rounded-xl border border-line bg-canvas-soft type-helper text-muted">
+              <summary className="cursor-pointer px-3 py-2 type-body-strong text-ink">
                 查看 API 提交参数与附件绑定（{attachments.length} 个）
               </summary>
-              <pre className="max-h-56 overflow-auto border-t border-line p-3 leading-5">
+              <pre className="max-h-56 overflow-auto border-t border-line p-3 leading-relaxed">
                 {JSON.stringify(submitOptions, null, 2)}
               </pre>
             </details>
@@ -367,7 +367,7 @@ export function VideoCreateShotGenerationDialog({
               <option value="480p">480P</option>
               <option value="720p">720P</option>
             </NativeSelect>
-            <label className="flex h-9 items-center gap-2 rounded-md border border-line px-3 text-sm text-ink">
+            <label className="flex h-9 items-center gap-2 rounded-md border border-line px-3 type-body text-ink">
               <input
                 className="w-10 bg-transparent outline-none"
                 type="number"
@@ -383,16 +383,16 @@ export function VideoCreateShotGenerationDialog({
               />
               秒
             </label>
-            <div className="flex h-9 items-center gap-2 rounded-md border border-line px-3 text-sm text-ink">
+            <div className="flex h-9 items-center gap-2 rounded-md border border-line px-3 type-body text-ink">
               {generateAudio ? "有声" : "无声"}
               <Switch checked={generateAudio} disabled={!draft} onCheckedChange={setGenerateAudio} />
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {error && <span className="max-w-sm text-right text-xs text-error">{error}</span>}
+            {error && <span className="max-w-sm text-right type-helper text-error">{error}</span>}
             <Button
               className="size-11 rounded-full"
-              size="icon"
+              size="icon-sm"
               disabled={!draft || submitting}
               onClick={() => void submit()}
             >

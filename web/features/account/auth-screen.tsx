@@ -106,14 +106,14 @@ export function AuthScreen() {
 
   const verificationView = view === "register" || view === "forgot";
   return (
-    <main className="grid min-h-screen place-items-center bg-white px-4 py-8 font-sans text-ink">
+    <main className="grid min-h-screen place-items-center bg-surface px-4 py-8 font-sans text-ink">
       <Card className="h-[480px] w-full max-w-sm gap-0 overflow-hidden py-0">
         <header className="flex h-16 shrink-0 items-center justify-between border-b border-line px-6">
-          <span className="flex items-center gap-2 text-sm font-semibold tracking-wide">
+          <span className="flex items-center gap-2 type-body-strong tracking-wide">
             <BrandLogo className="w-9 rounded-md" />
             {APP_CONFIG.projectName}
           </span>
-          <h1 className="text-sm font-medium">{viewTitles[view]}</h1>
+          <h1 className="type-page-title">{viewTitles[view]}</h1>
         </header>
 
         <CardContent className="flex-1 px-6 py-5">
@@ -122,7 +122,7 @@ export function AuthScreen() {
               <Button
                 variant="ghost"
                 size="sm"
-                className={view === "login" ? "bg-white shadow-sm hover:bg-white" : "text-muted"}
+                className={view === "login" ? "bg-surface shadow-sm hover:bg-surface" : "text-muted"}
                 onClick={() => changeView("login")}
               >
                 登录
@@ -130,7 +130,7 @@ export function AuthScreen() {
               <Button
                 variant="ghost"
                 size="sm"
-                className={view === "register" ? "bg-white shadow-sm hover:bg-white" : "text-muted"}
+                className={view === "register" ? "bg-surface shadow-sm hover:bg-surface" : "text-muted"}
                 onClick={() => changeView("register")}
               >
                 注册
@@ -143,14 +143,14 @@ export function AuthScreen() {
               <Button variant="ghost" size="sm" className="-ml-2 px-2 text-muted" onClick={() => changeView("login")}>
                 <ArrowLeft /> 返回登录
               </Button>
-              {view === "setup" && <span className="text-xs text-muted">{phone}</span>}
+              {view === "setup" && <span className="type-helper text-muted">{phone}</span>}
             </div>
           )}
 
           <form className="space-y-4" onSubmit={submit}>
             {view !== "setup" && (
               <div className="space-y-2">
-                <Label className="text-xs" htmlFor="auth-phone">
+                <Label className="type-label" htmlFor="auth-phone">
                   手机号
                 </Label>
                 <Input
@@ -170,7 +170,7 @@ export function AuthScreen() {
 
             {verificationView && (
               <div className="space-y-2">
-                <Label className="text-xs" htmlFor="auth-code">
+                <Label className="type-label" htmlFor="auth-code">
                   短信验证码
                 </Label>
                 <div className="grid grid-cols-[minmax(0,1fr)_104px] gap-2">
@@ -188,7 +188,7 @@ export function AuthScreen() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-9 px-2 text-xs"
+                    className="h-9 px-2 type-helper"
                     disabled={!validPhone || sendingCode || countdown > 0}
                     onClick={() => void requestCode()}
                   >
@@ -200,7 +200,7 @@ export function AuthScreen() {
 
             {(view === "login" || view === "setup") && (
               <div className="space-y-2">
-                <Label className="text-xs" htmlFor="auth-password">
+                <Label className="type-label" htmlFor="auth-password">
                   {view === "setup" ? "新密码" : "密码"}
                 </Label>
                 <div className="relative">
@@ -219,7 +219,7 @@ export function AuthScreen() {
                   <Button
                     type="button"
                     variant="ghost"
-                    size="icon"
+                    size="icon-sm"
                     className="absolute right-1 top-1 size-7 text-muted"
                     aria-label={show ? "隐藏密码" : "显示密码"}
                     onClick={() => setShow((value) => !value)}
@@ -232,7 +232,7 @@ export function AuthScreen() {
 
             {view === "setup" && (
               <div className="space-y-2">
-                <Label className="text-xs" htmlFor="auth-confirm-password">
+                <Label className="type-label" htmlFor="auth-confirm-password">
                   确认密码
                 </Label>
                 <Input
@@ -255,7 +255,7 @@ export function AuthScreen() {
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="ml-auto flex h-7 px-1 text-xs text-muted"
+                className="ml-auto flex h-7 px-1 type-helper text-muted"
                 onClick={() => changeView("forgot")}
               >
                 忘记密码？
@@ -263,16 +263,16 @@ export function AuthScreen() {
             )}
 
             {error && (
-              <p className="rounded-md bg-danger/10 px-3 py-2 text-xs text-danger" role="alert">
+              <p className="rounded-md bg-error/10 px-3 py-2 type-helper text-error" role="alert">
                 {error}
               </p>
             )}
             {notice && (
-              <p className="flex items-center justify-between gap-2 rounded-md bg-success/10 px-3 py-2 text-xs text-success">
+              <p className="flex items-center justify-between gap-2 rounded-md bg-success/10 px-3 py-2 type-helper text-success">
                 <span>{notice}</span>
                 {displayedVerificationCode && (
                   <span className="shrink-0" role="status">
-                    当前验证码：<strong className="font-semibold tracking-widest">{displayedVerificationCode}</strong>
+                    当前验证码：<strong className="tracking-widest">{displayedVerificationCode}</strong>
                   </span>
                 )}
               </p>

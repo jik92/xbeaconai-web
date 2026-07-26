@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { downloadAuthenticated, fetchCreationCapabilities, fetchJobs, submitJob } from "@/api/api-client";
 import type { Job, SeedanceModelId } from "@/api/generated/types.gen";
 import { AttachmentPicker } from "@/components/domain/attachment-picker";
+import { Button } from "@/components/ui/button";
 import { randomUuid } from "@/lib/random-id";
 import "./ai-creation-composer.css";
 
@@ -89,20 +90,20 @@ function Trigger({
   invalid?: boolean;
 }) {
   return (
-    <button
+    <Button
       type="button"
       className={`composer-trigger ${active ? "active" : ""} ${invalid ? "invalid" : ""}`}
       onClick={onClick}
     >
       {children}
       <ChevronDown size={14} />
-    </button>
+    </Button>
   );
 }
 function Panel({ title, children, wide = false }: { title: string; children: React.ReactNode; wide?: boolean }) {
   return (
     <div className={`composer-popover ${wide ? "wide" : ""}`} role="dialog" aria-label={title}>
-      <h3>{title}</h3>
+      <h3 className="type-section-title">{title}</h3>
       {children}
     </div>
   );
@@ -119,7 +120,7 @@ function ModelList({
   return (
     <div className="composer-model-list">
       {models.map((model) => (
-        <button
+        <Button
           type="button"
           key={model.id}
           disabled={!model.enabled}
@@ -132,11 +133,11 @@ function ModelList({
               <em key={item}>{item}</em>
             ))}
             {model.executionMode === "mock" && <em className="mock">Mock</em>}
-            <small>{model.description}</small>
-            {!model.enabled && <small className="disabled-reason">{model.disabledReason}</small>}
+            <small className="type-helper">{model.description}</small>
+            {!model.enabled && <small className="type-helper disabled-reason">{model.disabledReason}</small>}
           </span>
           {value === model.id && <Check size={17} />}
-        </button>
+        </Button>
       ))}
     </div>
   );
@@ -157,7 +158,7 @@ function Segments({
       {items.map((item) => {
         const reason = isDisabled?.(String(item));
         return (
-          <button
+          <Button
             type="button"
             key={item}
             className={String(value) === String(item) ? "selected" : ""}
@@ -167,7 +168,7 @@ function Segments({
           >
             {item === "adaptive" ? "自动" : item}
             {reason && <span>{reason}</span>}
-          </button>
+          </Button>
         );
       })}
     </div>
@@ -407,7 +408,7 @@ export function AiCreationComposer() {
     >
       <header className="creation-heading">
         <span>AI 工具箱</span>
-        <h1>AI 创作</h1>
+        <h1 className="type-page-title">AI 创作</h1>
         <p>输入一个想法，用图片或视频模型把它变成作品。</p>
       </header>
       <section
@@ -421,25 +422,25 @@ export function AiCreationComposer() {
       >
         <div className="composer-input-area">
           <div className="reference-wrap">
-            <button
+            <Button
               type="button"
               className={`reference-card ${panel === "reference" ? "active" : ""}`}
               onClick={() => open("reference")}
               aria-label={kind === "image" ? "添加参考" : "添加参考素材"}
             >
               <span>+</span>
-              {kind === "video" && <small>参考</small>}
-            </button>
+              {kind === "video" && <small className="type-helper">参考</small>}
+            </Button>
             {panel === "reference" && (
               <Panel title="添加参考">
                 <div className="reference-menu">
                   <AttachmentPicker
                     multiple
                     trigger={(openPicker) => (
-                      <button type="button" onClick={openPicker}>
+                      <Button type="button" onClick={openPicker}>
                         <Library />
-                        附件素材<small>从素材库选择或从本地上传</small>
-                      </button>
+                        附件素材<small className="type-helper">从素材库选择或从本地上传</small>
+                      </Button>
                     )}
                     onSelect={(assets) => {
                       const references = [...draft.references];
@@ -470,10 +471,13 @@ export function AiCreationComposer() {
                       setPanel(null);
                     }}
                   />
-                  <button type="button" onClick={() => addDemo("portrait")}>
+                  <Button type="button" onClick={() => addDemo("portrait")}>
                     <UserRound />
-                    人像库<small>{kind === "video" ? "演示人像不可用于真实提交" : "选择人物参考"}</small>
-                  </button>
+                    人像库
+                    <small className="type-helper">
+                      {kind === "video" ? "演示人像不可用于真实提交" : "选择人物参考"}
+                    </small>
+                  </Button>
                 </div>
               </Panel>
             )}
@@ -489,13 +493,13 @@ export function AiCreationComposer() {
             }
           />
           <div className="composer-tools">
-            <button type="button" disabled title="产品稿未定义该按钮行为">
+            <Button type="button" disabled title="产品稿未定义该按钮行为">
               <Maximize2 />
-            </button>
+            </Button>
             {kind === "image" && (
-              <button type="button" disabled title="提示词优化能力尚未接入">
+              <Button type="button" disabled title="提示词优化能力尚未接入">
                 <WandSparkles />
-              </button>
+              </Button>
             )}
           </div>
           {draft.references.length > 0 && (
@@ -507,8 +511,8 @@ export function AiCreationComposer() {
                 >
                   <Image />
                   <b>@{asset.label}</b>
-                  <small>{asset.name}</small>
-                  <button
+                  <small className="type-helper">{asset.name}</small>
+                  <Button
                     type="button"
                     aria-label={`删除 ${asset.label}`}
                     onClick={() =>
@@ -516,7 +520,7 @@ export function AiCreationComposer() {
                     }
                   >
                     <X />
-                  </button>
+                  </Button>
                 </span>
               ))}
             </div>
@@ -532,14 +536,14 @@ export function AiCreationComposer() {
               {panel === "type" && (
                 <Panel title="创作类型">
                   <div className="simple-menu">
-                    <button className={kind === "image" ? "selected" : ""} onClick={() => switchKind("image")}>
+                    <Button className={kind === "image" ? "selected" : ""} onClick={() => switchKind("image")}>
                       <Image />
                       图片生成{kind === "image" && <Check />}
-                    </button>
-                    <button className={kind === "video" ? "selected" : ""} onClick={() => switchKind("video")}>
+                    </Button>
+                    <Button className={kind === "video" ? "selected" : ""} onClick={() => switchKind("video")}>
                       <Video />
                       视频生成{kind === "video" && <Check />}
-                    </button>
+                    </Button>
                   </div>
                 </Panel>
               )}
@@ -576,7 +580,7 @@ export function AiCreationComposer() {
                       {referenceModes.map((item) => {
                         const disabled = !model?.referenceModes.includes(item.id);
                         return (
-                          <button
+                          <Button
                             key={item.id}
                             disabled={disabled}
                             className={draft.referenceMode === item.id ? "selected" : ""}
@@ -588,8 +592,12 @@ export function AiCreationComposer() {
                           >
                             {item.label}
                             {item.badge && <em>{item.badge}</em>}
-                            {disabled ? <small>暂未验证</small> : draft.referenceMode === item.id && <Check />}
-                          </button>
+                            {disabled ? (
+                              <small className="type-helper">暂未验证</small>
+                            ) : (
+                              draft.referenceMode === item.id && <Check />
+                            )}
+                          </Button>
                         );
                       })}
                     </div>
@@ -671,14 +679,14 @@ export function AiCreationComposer() {
                       placeholder={model?.supportsSeed ? "不填则随机" : "当前模型不支持"}
                       onChange={(event) => update({ seed: event.target.value.replace(/\D/g, "").slice(0, 10) })}
                     />
-                    <button
+                    <Button
                       type="button"
                       disabled={!model?.supportsSeed}
                       aria-label="随机种子"
                       onClick={() => update({ seed: seedValue() })}
                     >
                       <RefreshCw />
-                    </button>
+                    </Button>
                   </div>
                 </Panel>
               )}
@@ -687,16 +695,18 @@ export function AiCreationComposer() {
           <div className="composer-submit">
             <span className={kind === "image" ? "credits" : ""}>
               {quote}星点
-              <small>{model?.executionMode === "mock" ? "模拟能力，不调用真实图片模型" : "服务端提交时重新报价"}</small>
+              <small className="type-helper">
+                {model?.executionMode === "mock" ? "模拟能力，不调用真实图片模型" : "服务端提交时重新报价"}
+              </small>
             </span>
-            <button
+            <Button
               type="button"
               aria-label="提交创作"
               disabled={submitting || !model?.enabled}
               onClick={() => void doSubmit()}
             >
               {submitting ? <LoaderCircle className="spin" /> : <ArrowUp />}
-            </button>
+            </Button>
           </div>
         </footer>
         {error && <div className="composer-error">{error}</div>}
@@ -715,9 +725,9 @@ export function AiCreationComposer() {
         <header>
           <div>
             <span>任务中心</span>
-            <h2>最近创作</h2>
+            <h2 className="type-section-title">最近创作</h2>
           </div>
-          <small>{tasks.length} 个任务</small>
+          <small className="type-helper">{tasks.length} 个任务</small>
         </header>
         {tasks.length ? (
           <div className="creation-task-table">
@@ -744,7 +754,7 @@ export function AiCreationComposer() {
                     </td>
                     <td>
                       <b>{task.title}</b>
-                      <small>
+                      <small className="type-helper">
                         {task.stage} · {task.progress}%
                       </small>
                     </td>
@@ -761,9 +771,9 @@ export function AiCreationComposer() {
                     </td>
                     <td>
                       {task.status === "succeeded" || task.status === "partially_succeeded" ? (
-                        <button type="button" onClick={() => setSelectedTask(task)}>
+                        <Button type="button" onClick={() => setSelectedTask(task)}>
                           查看结果
-                        </button>
+                        </Button>
                       ) : (
                         <span className="task-waiting">{task.status === "failed" ? "可重试" : "处理中"}</span>
                       )}
@@ -786,7 +796,7 @@ export function AiCreationComposer() {
           <Sparkles size={17} />
           <span>
             <b>{actionNotice}</b>
-            <small>操作已完成</small>
+            <small className="type-helper">操作已完成</small>
           </span>
         </div>
       )}
@@ -794,10 +804,10 @@ export function AiCreationComposer() {
         <div className="composer-review-backdrop" onMouseDown={() => setShowReview(false)}>
           <section onMouseDown={(event) => event.stopPropagation()}>
             <header>
-              <h2 className="text-ink">确认视频生成参数</h2>
-              <button aria-label="关闭确认" onClick={() => setShowReview(false)}>
+              <h2 className="type-section-title text-ink">确认视频生成参数</h2>
+              <Button variant="ghost" size="icon-sm" aria-label="关闭确认" onClick={() => setShowReview(false)}>
                 <X />
-              </button>
+              </Button>
             </header>
             <dl>
               <div>
@@ -820,9 +830,9 @@ export function AiCreationComposer() {
               </div>
             </dl>
             <p>确认后将创建真实 Seedance 异步任务。任务可能耗时数分钟，并产生模型费用。</p>
-            <button className="confirm-paid" disabled={submitting} onClick={() => void doSubmit()}>
+            <Button className="confirm-paid" disabled={submitting} onClick={() => void doSubmit()}>
               {submitting ? <LoaderCircle className="spin" /> : null}确认并提交
-            </button>
+            </Button>
           </section>
         </div>
       )}
@@ -830,10 +840,10 @@ export function AiCreationComposer() {
         <div className="result-backdrop" onMouseDown={() => setSelectedTask(null)}>
           <section className="result-drawer" onMouseDown={(event) => event.stopPropagation()}>
             <header>
-              <h2 className="text-ink">对话作品</h2>
-              <button aria-label="关闭" onClick={() => setSelectedTask(null)}>
+              <h2 className="type-section-title text-ink">对话作品</h2>
+              <Button variant="ghost" size="icon-sm" aria-label="关闭" onClick={() => setSelectedTask(null)}>
                 <X />
-              </button>
+              </Button>
             </header>
             <div className="creation-result-preview">
               <Sparkles />
@@ -842,9 +852,9 @@ export function AiCreationComposer() {
             </div>
             <div className="tool-result-actions">
               {["继续追问", "创建变体", "收藏作品", "下载"].map((action, index) => (
-                <button key={action} className={index === 0 ? "primary" : ""} onClick={() => void resultAction(action)}>
+                <Button key={action} className={index === 0 ? "primary" : ""} onClick={() => void resultAction(action)}>
                   {action}
-                </button>
+                </Button>
               ))}
             </div>
           </section>

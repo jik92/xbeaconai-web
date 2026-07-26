@@ -15,8 +15,8 @@ import {
   Images,
   LockKeyhole,
   LogOut,
-  Megaphone,
   type LucideIcon,
+  Megaphone,
   Package,
   PanelLeftClose,
   PanelLeftOpen,
@@ -24,8 +24,8 @@ import {
   ReceiptText,
   RotateCcw,
   Settings2,
-  UserRound,
   Store,
+  UserRound,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { fetchLibraryAssets, fetchProducts } from "@/api/api-client";
@@ -214,8 +214,8 @@ export function AppShell() {
   }, [menuPreferences]);
   if (status === "loading")
     return (
-      <main className="grid min-h-screen place-items-center bg-white font-sans">
-        <div className="flex items-center gap-2 text-xs text-muted">
+      <main className="grid min-h-screen place-items-center bg-surface font-sans">
+        <div className="flex items-center gap-2 type-helper text-muted">
           <BrandLogo className="w-9 rounded-md" />
           正在打开{APP_CONFIG.projectName}工作台…
         </div>
@@ -241,7 +241,7 @@ export function AppShell() {
           </Button>
           <Button
             variant="ghost"
-            size="icon"
+            size="icon-sm"
             className="size-[34px]"
             aria-label="帮助"
             onClick={() => setPanel("help")}
@@ -250,7 +250,7 @@ export function AppShell() {
           </Button>
           <Button
             variant="ghost"
-            size="icon"
+            size="icon-sm"
             aria-label="通知"
             className={`size-[34px]${unread ? " has-dot" : ""}`}
             onClick={() => setPanel("notifications")}
@@ -266,15 +266,15 @@ export function AppShell() {
             </PopoverTrigger>
             <PopoverContent align="end" sideOffset={8} className="w-60 p-2" role="menu" aria-label="用户菜单">
               <div className="border-b border-line px-2 py-2">
-                <b className="block truncate text-sm font-medium">{user.displayName || user.phone}</b>
-                <span className="block truncate text-xs text-muted">{user.phone}</span>
-                <small className="mt-1 block text-xs text-muted">{user.credits.toLocaleString()} 创作点</small>
+                <b className="block truncate type-body-strong">{user.displayName || user.phone}</b>
+                <span className="block truncate type-helper text-muted">{user.phone}</span>
+                <small className="mt-1 block type-helper text-muted">{user.credits.toLocaleString()} 创作点</small>
               </div>
               <div className="grid gap-1 py-2">
-                <button
+                <Button
                   type="button"
                   role="menuitem"
-                  className="flex h-9 items-center gap-2 rounded-md px-2 text-left text-sm text-ink hover:bg-surface-muted"
+                  className="flex h-9 items-center gap-2 rounded-md px-2 text-left type-body text-ink hover:bg-surface-muted"
                   onClick={() => {
                     setAccountMenuOpen(false);
                     setPanel("profile");
@@ -282,11 +282,11 @@ export function AppShell() {
                 >
                   <UserRound className="size-4" />
                   个人资料
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
                   role="menuitem"
-                  className="flex h-9 items-center gap-2 rounded-md px-2 text-left text-sm text-ink hover:bg-surface-muted"
+                  className="flex h-9 items-center gap-2 rounded-md px-2 text-left type-body text-ink hover:bg-surface-muted"
                   onClick={() => {
                     setAccountMenuOpen(false);
                     setPanel("security");
@@ -294,11 +294,11 @@ export function AppShell() {
                 >
                   <LockKeyhole className="size-4" />
                   账号与密码
-                </button>
+                </Button>
                 <Link
                   to="/billing/ai"
                   role="menuitem"
-                  className="flex h-9 items-center gap-2 rounded-md px-2 text-sm text-ink hover:bg-surface-muted"
+                  className="flex h-9 items-center gap-2 rounded-md px-2 type-body text-ink hover:bg-surface-muted"
                   onClick={() => setAccountMenuOpen(false)}
                 >
                   <ReceiptText className="size-4" />
@@ -308,7 +308,7 @@ export function AppShell() {
                   <Link
                     to="/admin"
                     role="menuitem"
-                    className="flex h-9 items-center gap-2 rounded-md px-2 text-sm text-ink hover:bg-surface-muted"
+                    className="flex h-9 items-center gap-2 rounded-md px-2 type-body text-ink hover:bg-surface-muted"
                     onClick={() => setAccountMenuOpen(false)}
                   >
                     <Settings2 className="size-4" />
@@ -316,10 +316,10 @@ export function AppShell() {
                   </Link>
                 )}
               </div>
-              <button
+              <Button
                 type="button"
                 role="menuitem"
-                className="flex h-9 w-full items-center gap-2 border-t border-line px-2 pt-2 text-left text-sm text-danger"
+                className="flex h-9 w-full items-center gap-2 border-t border-line px-2 pt-2 text-left type-body text-error"
                 onClick={() => {
                   setAccountMenuOpen(false);
                   void logout();
@@ -327,7 +327,7 @@ export function AppShell() {
               >
                 <LogOut className="size-4" />
                 退出登录
-              </button>
+              </Button>
             </PopoverContent>
           </Popover>
         </div>
@@ -344,7 +344,7 @@ export function AppShell() {
               .filter((item): item is SidebarMenuItem => Boolean(item));
             return (
               <nav key={group} aria-label={group}>
-                <h3>{group}</h3>
+                <h3 className="type-section-title">{group}</h3>
                 {groupItems.map((item, index) => {
                   const hidden = isSidebarMenuItemHidden(menuPreferences, item.id, item.available);
                   const providerAvailability = runtimeAvailability(item);
@@ -378,7 +378,7 @@ export function AppShell() {
                         <item.icon />
                         <span>{item.label}</span>
                         <div className="menu-item-actions">
-                          <button
+                          <Button
                             type="button"
                             aria-label={`上移${item.label}`}
                             title="上移"
@@ -388,8 +388,8 @@ export function AppShell() {
                             }
                           >
                             <ChevronUp />
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             type="button"
                             aria-label={`下移${item.label}`}
                             title="下移"
@@ -399,8 +399,8 @@ export function AppShell() {
                             }
                           >
                             <ChevronDown />
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             type="button"
                             aria-label={`${hidden ? "显示" : "隐藏"}${item.label}`}
                             title={hidden ? "显示菜单" : "隐藏菜单"}
@@ -409,7 +409,7 @@ export function AppShell() {
                             }
                           >
                             {hidden ? <EyeOff /> : <Eye />}
-                          </button>
+                          </Button>
                         </div>
                       </fieldset>
                     );
@@ -427,7 +427,7 @@ export function AppShell() {
                       {assetCount !== undefined && <i>{assetCount}</i>}
                     </Link>
                   ) : item.available ? (
-                    <button
+                    <Button
                       type="button"
                       key={item.id}
                       className="sidebar-coming-soon"
@@ -438,9 +438,9 @@ export function AppShell() {
                       <item.icon />
                       <span>{item.label}</span>
                       <i>不可用</i>
-                    </button>
+                    </Button>
                   ) : (
-                    <button
+                    <Button
                       type="button"
                       key={item.id}
                       className="sidebar-coming-soon"
@@ -451,7 +451,7 @@ export function AppShell() {
                       <item.icon />
                       <span>{item.label}</span>
                       <i>Coming Soon</i>
-                    </button>
+                    </Button>
                   );
                 })}
               </nav>
@@ -462,17 +462,17 @@ export function AppShell() {
           {menuEditing && (
             <div className="menu-edit-hint">
               <span>拖拽或使用箭头调整分组内顺序</span>
-              <button
+              <Button
                 type="button"
                 onClick={() => setMenuPreferences(createDefaultSidebarMenuPreferences(defaultSidebarMenuOrder))}
               >
                 <RotateCcw size={13} />
                 恢复默认
-              </button>
+              </Button>
             </div>
           )}
           <div className="sidebar-footer-actions">
-            <button
+            <Button
               type="button"
               className={`menu-edit-toggle${menuEditing ? " active" : ""}`}
               aria-label={menuEditing ? "完成菜单编辑" : "编辑菜单"}
@@ -489,8 +489,8 @@ export function AppShell() {
             >
               {menuEditing ? <Check size={16} /> : <Settings2 size={16} />}
               <span>{menuEditing ? "完成" : "编辑菜单"}</span>
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               className="drawer-toggle"
               aria-label={sidebarCollapsed ? "展开导航，显示图标和标题" : "收起导航，仅显示图标"}
@@ -502,7 +502,7 @@ export function AppShell() {
               }}
             >
               {sidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-            </button>
+            </Button>
           </div>
         </footer>
       </aside>

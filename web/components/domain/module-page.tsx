@@ -61,10 +61,10 @@ const statusMap: Record<Job["status"], string> = {
 const emptyJobs: Job[] = [];
 const statusClassMap: Record<Job["status"], string> = {
   queued: "bg-surface-muted text-muted",
-  processing: "bg-blue-50 text-blue-600",
-  succeeded: "bg-emerald-50 text-emerald-700",
-  partially_succeeded: "bg-amber-50 text-amber-700",
-  failed: "bg-red-50 text-red-600",
+  processing: "bg-surface-strong text-primary",
+  succeeded: "bg-surface-strong text-success",
+  partially_succeeded: "bg-surface-strong text-warning",
+  failed: "bg-error/5 text-error",
   cancelled: "bg-surface-muted text-muted",
 };
 function UploadField({
@@ -82,14 +82,16 @@ function UploadField({
     <AttachmentPicker
       accept={`${field.kind}/*`}
       trigger={(open) => (
-        <button id={field.id} type="button" className="upload-zone" onClick={open}>
+        <Button id={field.id} type="button" className="upload-zone" onClick={open}>
           <span className="upload-icon">{value ? <Icon size={22} /> : <UploadCloud size={22} />}</span>
           <span>
             <b>{displayValue || field.label}</b>
-            <small>{value ? "已选择，点击可重新选择" : field.hint || "从素材库选择或从本地上传"}</small>
+            <small className="type-helper">
+              {value ? "已选择，点击可重新选择" : field.hint || "从素材库选择或从本地上传"}
+            </small>
           </span>
-          {value && <Check className="ml-auto text-emerald-600" size={20} />}
-        </button>
+          {value && <Check className="ml-auto text-success" size={20} />}
+        </Button>
       )}
       onSelect={([asset]) => asset && onChange(`asset:${asset.id}:${asset.name}`)}
     />
@@ -116,7 +118,7 @@ function AssetGroupField({
     <AttachmentPicker
       multiple
       trigger={(open) => (
-        <button id={field.id} type="button" className="asset-uploader" onClick={open}>
+        <Button id={field.id} type="button" className="asset-uploader" onClick={open}>
           <span className="asset-stack">
             <i />
             <i />
@@ -124,10 +126,10 @@ function AssetGroupField({
           </span>
           <span>
             <b>{names.length ? `已选择 ${names.length} 个素材` : "选择任务素材"}</b>
-            <small>{field.hint || "支持从素材库选择或本地批量上传"}</small>
+            <small className="type-helper">{field.hint || "支持从素材库选择或本地批量上传"}</small>
           </span>
           <em>{names.length ? "重新选择" : "添加素材"}</em>
-        </button>
+        </Button>
       )}
       onSelect={(assets) =>
         onChange(
@@ -157,9 +159,9 @@ function BusinessField({
       </label>
       {control}
       {field.hint && field.kind !== "video" && field.kind !== "audio" && (
-        <small className="field-hint">{field.hint}</small>
+        <small className="type-helper field-hint">{field.hint}</small>
       )}
-      {invalid && <small className="field-error">请完成此项后再提交</small>}
+      {invalid && <small className="type-helper field-error">请完成此项后再提交</small>}
     </div>
   );
   if (["video", "audio", "image"].includes(field.kind))
@@ -169,14 +171,14 @@ function BusinessField({
     return wrap(
       <div id={field.id} className="segmented">
         {field.options?.map((option) => (
-          <button
+          <Button
             type="button"
             key={option}
             className={value === option ? "active" : ""}
             onClick={() => onChange(option)}
           >
             {option}
-          </button>
+          </Button>
         ))}
       </div>,
     );
@@ -203,12 +205,12 @@ function BusinessField({
   if (field.kind === "number")
     return wrap(
       <div className="number-input">
-        <button
+        <Button
           type="button"
           onClick={() => onChange(String(Math.max(field.min ?? 0, Number(value || field.min || 0) - 1)))}
         >
           −
-        </button>
+        </Button>
         <input
           id={field.id}
           type="number"
@@ -218,17 +220,17 @@ function BusinessField({
           onChange={(e) => onChange(e.target.value)}
         />
         <span>{field.unit}</span>
-        <button
+        <Button
           type="button"
           onClick={() => onChange(String(Math.min(field.max ?? 99, Number(value || field.min || 0) + 1)))}
         >
           ＋
-        </button>
+        </Button>
       </div>,
     );
   if (field.kind === "checkbox")
     return wrap(
-      <button
+      <Button
         id={field.id}
         type="button"
         role="checkbox"
@@ -238,14 +240,14 @@ function BusinessField({
       >
         <i>{value === "true" && <Check size={13} />}</i>
         <span>{field.label}</span>
-      </button>,
+      </Button>,
     );
   if (field.kind === "region")
     return wrap(
-      <button id={field.id} type="button" className="region-picker" onClick={() => onChange("底部 24% 区域")}>
+      <Button id={field.id} type="button" className="region-picker" onClick={() => onChange("底部 24% 区域")}>
         <span className={value ? "selected" : ""} />
         <b>{value || "点击画面框选字幕区域"}</b>
-      </button>,
+      </Button>,
     );
   return wrap(
     <input
@@ -288,10 +290,10 @@ function ToolboxUploadTile({
       accept={accept}
       multiple={multiple}
       trigger={(open) => (
-        <button
+        <Button
           type="button"
           className={cn(
-            "tool-upload-tile !size-24 !rounded-md !border-line bg-white transition-colors hover:!bg-surface-muted",
+            "tool-upload-tile !size-24 !rounded-md !border-line bg-surface transition-colors hover:!bg-surface-muted",
             value && "has-file",
           )}
           onClick={open}
@@ -315,9 +317,9 @@ function ToolboxUploadTile({
             <Plus />
           )}
           {names.length > 0 && !preview?.url && (
-            <small>{names.length > 1 ? `已选择 ${names.length} 个素材` : names[0]}</small>
+            <small className="type-helper">{names.length > 1 ? `已选择 ${names.length} 个素材` : names[0]}</small>
           )}
-        </button>
+        </Button>
       )}
       onSelect={(assets) => {
         if (multiple)
@@ -335,7 +337,7 @@ function ToolboxUploadTile({
 
 function ToolboxSwitch({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   return (
-    <button
+    <Button
       type="button"
       role="switch"
       aria-checked={value === "true"}
@@ -347,11 +349,11 @@ function ToolboxSwitch({ value, onChange }: { value: string; onChange: (value: s
     >
       <span
         className={cn(
-          "absolute top-0.5 left-0.5 size-4 rounded-full bg-white shadow-sm transition-transform",
+          "absolute top-0.5 left-0.5 size-4 rounded-full bg-surface shadow-sm transition-transform",
           value === "true" && "translate-x-4",
         )}
       />
-    </button>
+    </Button>
   );
 }
 
@@ -378,8 +380,8 @@ export function ToolboxCreatorForm({
 }) {
   const field = (id: string) => config.fields.find((item) => item.id === id) as FieldSpec;
   const requiredLabel = (text: string, required = false) => (
-    <Label className="tool-form-label text-xs text-muted sm:justify-end">
-      {required && <span className="text-red-500">*</span>}
+    <Label className="tool-form-label type-label text-muted sm:justify-end">
+      {required && <span className="text-error">*</span>}
       {text}
     </Label>
   );
@@ -424,8 +426,8 @@ export function ToolboxCreatorForm({
   const invalid = (id: string) =>
     submitted && (config.id === "voice-clone" ? voiceFieldRequired(id) : field(id).required) && !values[id];
   const compactLabel = (text: string, required = false) => (
-    <Label className="text-xs text-muted sm:justify-end">
-      {required && <span className="text-red-500">*</span>}
+    <Label className="type-label text-muted sm:justify-end">
+      {required && <span className="text-error">*</span>}
       {text}
     </Label>
   );
@@ -437,7 +439,7 @@ export function ToolboxCreatorForm({
         <div className="grid items-center gap-2 sm:grid-cols-[96px_minmax(0,1fr)]">
           {compactLabel("分割策略", true)}
           <NativeSelect
-            className={cn("h-8", invalid("method") && "border-red-500")}
+            className={cn("h-8", invalid("method") && "border-error")}
             value={values.method ?? ""}
             onChange={(event) => setValue("method", event.target.value)}
           >
@@ -458,7 +460,7 @@ export function ToolboxCreatorForm({
         <div
           className={cn(
             "grid items-start gap-2 sm:grid-cols-[96px_minmax(0,1fr)] [&_.tool-upload-tile]:!size-24",
-            invalid("source") && "[&_.tool-upload-tile]:!border-red-500",
+            invalid("source") && "[&_.tool-upload-tile]:!border-error",
           )}
         >
           {compactLabel("选择视频", true)}
@@ -520,7 +522,7 @@ export function ToolboxCreatorForm({
           {requiredLabel("配音音色")}
           <span>
             <b>系统预设音色</b>
-            <small>无需配置音色参数</small>
+            <small className="type-helper">无需配置音色参数</small>
           </span>
         </div>
         <div className={`tool-form-row textarea-row ${invalid("synthesisText") ? "invalid" : ""}`}>
@@ -532,7 +534,7 @@ export function ToolboxCreatorForm({
               placeholder="输入要生成语音的文本"
               onChange={(event) => setValue("synthesisText", event.target.value)}
             />
-            <small>{(values.synthesisText ?? "").length} / 1000</small>
+            <small className="type-helper">{(values.synthesisText ?? "").length} / 1000</small>
           </div>
         </div>
         <div className="tool-form-row">
@@ -554,7 +556,7 @@ export function ToolboxCreatorForm({
               value={[Number(values.speechRate ?? 0)]}
               onValueChange={([value]) => setValue("speechRate", String(value ?? 0))}
             />
-            <output className="w-20 shrink-0 text-right text-sm text-muted">
+            <output className="w-20 shrink-0 text-right type-body text-muted">
               {Number(values.speechRate ?? 0) === 0 ? "正常" : `${values.speechRate}%`}
             </output>
           </div>
@@ -581,7 +583,7 @@ export function ToolboxCreatorForm({
           {requiredLabel("处理方式")}
           <span>
             <b>精细化自动擦除</b>
-            <small>自动识别字幕并逐帧补全背景</small>
+            <small className="type-helper">自动识别字幕并逐帧补全背景</small>
           </span>
         </div>
         <div className={`tool-form-row upload-row ${invalid("source") ? "invalid" : ""}`}>
@@ -597,7 +599,7 @@ export function ToolboxCreatorForm({
           {requiredLabel("处理方式")}
           <span>
             <b>极速画质增强</b>
-            <small>自动改善清晰度、噪点和画面质感</small>
+            <small className="type-helper">自动改善清晰度、噪点和画面质感</small>
           </span>
         </div>
         <div className={`tool-form-row upload-row ${invalid("source") ? "invalid" : ""}`}>
@@ -645,7 +647,7 @@ export function ToolboxCreatorForm({
 
   return (
     <>
-      <div className="min-h-0 flex-1 overflow-y-auto p-4 text-sm max-sm:[&_.tool-form-label]:!justify-start max-sm:[&_.tool-form-row]:!grid-cols-1 [&_.mashup-form]:!grid-cols-1 [&_.mashup-left]:!border-0 [&_.mashup-left]:!p-0 [&_.mashup-right]:!p-0 [&_.tool-form-label]:!justify-end [&_.tool-form-label]:!text-xs [&_.tool-form-label]:!text-muted [&_.tool-form-row]:!min-h-10 [&_.tool-form-row]:!grid-cols-[96px_minmax(0,1fr)] [&_.tool-form-row]:!gap-3 [&_.tool-simple-form]:!mx-auto [&_.tool-simple-form]:!w-full [&_.tool-simple-form]:!max-w-2xl [&_.tool-simple-form]:!p-0 [&_input:not([type=range])]:!h-8 [&_input:not([type=range])]:!rounded-md [&_input:not([type=range])]:!border-line [&_input:not([type=range])]:!px-3 [&_select]:!h-8 [&_textarea]:!rounded-md [&_textarea]:!border-line [&_textarea]:!p-3">
+      <div className="min-h-0 flex-1 overflow-y-auto p-4 type-body max-sm:[&_.tool-form-label]:!justify-start max-sm:[&_.tool-form-row]:!grid-cols-1 [&_.mashup-form]:!grid-cols-1 [&_.mashup-left]:!border-0 [&_.mashup-left]:!p-0 [&_.mashup-right]:!p-0 [&_.tool-form-label]:!justify-end [&_.tool-form-label]:!type-label [&_.tool-form-label]:!text-muted [&_.tool-form-row]:!min-h-10 [&_.tool-form-row]:!grid-cols-[96px_minmax(0,1fr)] [&_.tool-form-row]:!gap-3 [&_.tool-simple-form]:!mx-auto [&_.tool-simple-form]:!w-full [&_.tool-simple-form]:!max-w-2xl [&_.tool-simple-form]:!p-0 [&_input:not([type=range])]:!h-8 [&_input:not([type=range])]:!rounded-md [&_input:not([type=range])]:!border-line [&_input:not([type=range])]:!px-3 [&_select]:!h-8 [&_textarea]:!rounded-md [&_textarea]:!border-line [&_textarea]:!p-3">
         {content}
         <div className="mx-auto mt-3 grid w-full max-w-2xl items-start gap-3 sm:grid-cols-[96px_minmax(0,1fr)]">
           {compactLabel("保存位置")}
@@ -656,7 +658,7 @@ export function ToolboxCreatorForm({
           />
         </div>
       </div>
-      {error && <div className="border-t border-red-100 bg-red-50 px-4 py-2 text-xs text-red-600">{error}</div>}
+      {error && <div className="border-t border-error/20 bg-error/5 px-4 py-2 type-helper text-error">{error}</div>}
       <footer className="flex h-13 flex-none items-center justify-end gap-2 border-t border-line px-4">
         <Button size="sm" variant="outline" onClick={onCancel}>
           取消
@@ -697,8 +699,8 @@ function TaskTable({
         size: 260,
         cell: (i) => (
           <div>
-            <b className="text-xs font-medium text-ink">{i.getValue()}</b>
-            <small className="mt-0.5 block text-2xs text-muted">
+            <b className="type-label text-ink">{i.getValue()}</b>
+            <small className="mt-0.5 block type-helper text-muted">
               {new Date(i.row.original.createdAt).toLocaleString()} ·{" "}
               {i.row.original.overallExecutionMode === "mock"
                 ? "模拟"
@@ -717,7 +719,7 @@ function TaskTable({
         cell: (i) => (
           <span
             className={cn(
-              "inline-flex items-center gap-1 rounded-full px-2 py-1 text-2xs",
+              "inline-flex items-center gap-1 rounded-full px-2 py-1 type-helper",
               statusClassMap[i.getValue()],
             )}
           >
@@ -734,7 +736,7 @@ function TaskTable({
             <div className="h-1.5 w-24 overflow-hidden rounded-full bg-surface-muted">
               <span className="block h-full rounded-full bg-primary" style={{ width: `${i.getValue()}%` }} />
             </div>
-            <span className="text-2xs text-muted">{i.getValue()}%</span>
+            <span className="type-helper text-muted">{i.getValue()}%</span>
           </div>
         ),
       }),
@@ -771,7 +773,7 @@ function TaskTable({
             {i.row.original.status === "succeeded" || i.row.original.status === "partially_succeeded" ? (
               <>
                 <Button
-                  className="h-7 px-2 text-2xs text-primary"
+                  className="h-7 px-2 type-helper text-primary"
                   size="sm"
                   variant="ghost"
                   onClick={() => preview(i.row.original)}
@@ -781,7 +783,7 @@ function TaskTable({
                 </Button>
                 {i.row.original.status === "partially_succeeded" ? (
                   <Button
-                    className="h-7 px-2 text-2xs text-primary"
+                    className="h-7 px-2 type-helper text-primary"
                     size="sm"
                     variant="ghost"
                     onClick={() => retry(i.row.original)}
@@ -791,7 +793,7 @@ function TaskTable({
                   </Button>
                 ) : (
                   <Button
-                    className="h-7 px-2 text-2xs text-primary"
+                    className="h-7 px-2 type-helper text-primary"
                     size="sm"
                     variant="ghost"
                     onClick={() => preview(i.row.original)}
@@ -803,7 +805,7 @@ function TaskTable({
               </>
             ) : i.row.original.status === "failed" || i.row.original.status === "cancelled" ? (
               <Button
-                className="h-7 px-2 text-2xs text-primary"
+                className="h-7 px-2 type-helper text-primary"
                 size="sm"
                 variant="ghost"
                 onClick={() => retry(i.row.original)}
@@ -813,7 +815,7 @@ function TaskTable({
               </Button>
             ) : (
               <Button
-                className="h-7 px-2 text-2xs text-primary"
+                className="h-7 px-2 type-helper text-primary"
                 size="sm"
                 variant="ghost"
                 onClick={() => cancel(i.row.original)}
@@ -870,7 +872,7 @@ function ResultPreview({
               className={`result-clip-card ${selectedArtifactIds.includes(artifact.id) ? "selected" : ""}`}
               key={artifact.id}
             >
-              <button
+              <Button
                 type="button"
                 className="result-clip-selector"
                 aria-label={`${selectedArtifactIds.includes(artifact.id) ? "取消选择" : "选择"}${artifact.name}`}
@@ -878,7 +880,7 @@ function ResultPreview({
                 onClick={() => onToggleArtifact(artifact.id)}
               >
                 {selectedArtifactIds.includes(artifact.id) && <Check />}
-              </button>
+              </Button>
               <div className={`result-clip-media${artifact.mimeType.startsWith("video/") ? " result-clip-video" : ""}`}>
                 {artifact.url ? (
                   <AuthenticatedMedia url={artifact.url} mimeType={artifact.mimeType} alt={artifact.name} />
@@ -886,7 +888,7 @@ function ResultPreview({
                   <config.icon size={32} />
                 )}
               </div>
-              <small title={artifact.name}>
+              <small className="type-helper" title={artifact.name}>
                 <b>{String(index + 1).padStart(2, "0")}</b>
                 {artifact.name}
               </small>
@@ -929,7 +931,7 @@ function AssetStrip({ onSelect }: { onSelect: (asset: { id: number; name: string
     <div ref={parent} className="asset-strip">
       <div style={{ width: virtual.getTotalSize(), height: 92, position: "relative" }}>
         {virtual.getVirtualItems().map((v) => (
-          <button
+          <Button
             type="button"
             className="asset-card"
             key={v.key}
@@ -938,7 +940,7 @@ function AssetStrip({ onSelect }: { onSelect: (asset: { id: number; name: string
           >
             <ImagePlus size={20} />
             <span>{assets[v.index].name}</span>
-          </button>
+          </Button>
         ))}
       </div>
     </div>
@@ -1235,7 +1237,7 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
     setActionNotice(`${action}已打开，可继续查看结果细节`);
   };
   return (
-    <div className="!m-0 !max-w-none !bg-white !p-0">
+    <div className="!m-0 !max-w-none !bg-surface !p-0">
       <ToolCreatorModal
         open={config.id !== "voice-clone" && creatorOpen}
         title={newTaskLabel}
@@ -1259,7 +1261,7 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
                 <section className="work-card">
                   <div className="steps">
                     {config.steps.map((step, index) => (
-                      <button
+                      <Button
                         type="button"
                         className={index === currentStep ? "active" : index < currentStep ? "done" : ""}
                         key={step}
@@ -1268,7 +1270,7 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
                         <i>{index < currentStep ? <Check size={12} /> : index + 1}</i>
                         {step}
                         {index < config.steps.length - 1 && <ChevronRight />}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                   {currentStep < 2 ? (
@@ -1295,20 +1297,20 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
                           <span>视频生成引擎</span>
                           <div className="model-cards">
                             {selectableModels.map((model) => (
-                              <button
+                              <Button
                                 type="button"
                                 key={model.id}
                                 className={videoModel === model.id ? "active" : ""}
                                 onClick={() => setVideoModel(model.id as SeedanceModelId)}
                               >
                                 <b>{model.name}</b>
-                                <small>{model.description}</small>
+                                <small className="type-helper">{model.description}</small>
                                 <em>{model.tags.join(" · ")}</em>
-                              </button>
+                              </Button>
                             ))}
                           </div>
                           {!selectableModels.length && (
-                            <small className="field-error">
+                            <small className="type-helper field-error">
                               三款 Seedance 尚未全部通过真实基线测试，当前不可提交真实视频生成。
                             </small>
                           )}
@@ -1318,7 +1320,9 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
                         <div className="engine-panel local-engine">
                           <span>生成引擎</span>
                           <b>本地处理，不使用视频生成模型</b>
-                          <small>该工具使用 FFmpeg 或本地滤镜，不会发起 Seedance 付费请求。</small>
+                          <small className="type-helper">
+                            该工具使用 FFmpeg 或本地滤镜，不会发起 Seedance 付费请求。
+                          </small>
                         </div>
                       )}
                     </div>
@@ -1329,7 +1333,7 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
                           <Check size={18} />
                         </span>
                         <div>
-                          <h3>确认创作配置</h3>
+                          <h3 className="type-section-title">确认创作配置</h3>
                           <p>检查以下信息，确认后任务将进入异步生成队列。</p>
                         </div>
                       </div>
@@ -1347,17 +1351,17 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
                           </div>
                         )}
                       </dl>
-                      <button type="button" className="edit-config" onClick={() => setCurrentStep(0)}>
+                      <Button type="button" className="edit-config" onClick={() => setCurrentStep(0)}>
                         返回修改内容
-                      </button>
+                      </Button>
                     </div>
                   )}
                   {currentStep === 1 && (
                     <>
-                      <button className="advanced" onClick={() => setAdvanced((v) => !v)}>
+                      <Button className="advanced" onClick={() => setAdvanced((v) => !v)}>
                         <span>高级设置</span>
-                        <small>{advanced ? "收起" : "展开更多生成参数"}</small>
-                      </button>
+                        <small className="type-helper">{advanced ? "收起" : "展开更多生成参数"}</small>
+                      </Button>
                       {advanced && (
                         <div className="advanced-panel">
                           <label>
@@ -1386,30 +1390,30 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
                       <b>
                         {currentStep === 2 ? `预计消耗 ${config.cost} 创作点` : `第 ${currentStep + 1} 步，共 3 步`}
                       </b>
-                      <small>
+                      <small className="type-helper">
                         {hydrated ? "已自动保存草稿" : "正在恢复草稿…"} · {config.duration}
                       </small>
                     </div>
                     <div className="wizard-actions">
                       {currentStep > 0 && (
-                        <button type="button" className="secondary" onClick={back}>
+                        <Button type="button" className="secondary" onClick={back}>
                           <ArrowLeft />
                           上一步
-                        </button>
+                        </Button>
                       )}
                       {currentStep < 2 ? (
-                        <button type="button" disabled={!hydrated} onClick={next}>
+                        <Button type="button" disabled={!hydrated} onClick={next}>
                           下一步
                           <ArrowRight />
-                        </button>
+                        </Button>
                       ) : (
-                        <button
+                        <Button
                           disabled={running || !hydrated || (usesSeedance && !selectableModels.length)}
                           onClick={submit}
                         >
                           {running ? <LoaderCircle className="animate-spin" /> : <WandSparkles />}
                           {running ? "正在提交…" : config.action}
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </div>
@@ -1420,7 +1424,7 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
                     <span />
                     <span />
                   </div>
-                  <h3>获得更好的结果</h3>
+                  <h3 className="type-section-title">获得更好的结果</h3>
                   <ol>
                     {config.tips.map((tip) => (
                       <li key={tip}>{tip}</li>
@@ -1430,7 +1434,7 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
                     <Clock3 size={17} />
                     <span>
                       <b>异步生成</b>
-                      <small>{config.duration}</small>
+                      <small className="type-helper">{config.duration}</small>
                     </span>
                   </div>
                 </aside>
@@ -1440,11 +1444,11 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
                   <div className="section-title">
                     <div>
                       <span>灵感素材</span>
-                      <h2>从已有素材开始</h2>
+                      <h2 className="type-section-title">从已有素材开始</h2>
                     </div>
-                    <button type="button" onClick={() => setActionNotice("素材库已展开，可点击下方素材引用")}>
+                    <Button type="button" onClick={() => setActionNotice("素材库已展开，可点击下方素材引用")}>
                       查看素材库
-                    </button>
+                    </Button>
                   </div>
                   <AssetStrip
                     onSelect={(asset) => {
@@ -1462,7 +1466,7 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
                   <Sparkles size={17} />
                   <span>
                     <b>{actionNotice}</b>
-                    <small>操作已完成</small>
+                    <small className="type-helper">操作已完成</small>
                   </span>
                 </div>
               )}
@@ -1508,14 +1512,14 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
         <div className="result-backdrop" onMouseDown={() => setSelectedTask(null)}>
           <section className="result-drawer" onMouseDown={(e) => e.stopPropagation()}>
             <header>
-              <h2 className="text-ink">
+              <h2 className="type-section-title text-ink">
                 {(selectedTask.result as ApiJobResult | undefined)?.kind === "video-merge"
                   ? "合并视频"
                   : config.result.label}
               </h2>
-              <button onClick={() => setSelectedTask(null)} aria-label="关闭">
+              <Button variant="ghost" size="icon-sm" onClick={() => setSelectedTask(null)} aria-label="关闭">
                 <X />
-              </button>
+              </Button>
             </header>
             <ResultPreview
               task={selectedTask}
@@ -1539,7 +1543,7 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
                   ? ["下载音频", "再次生成"]
                   : config.result.actions
               ).map((action, index) => (
-                <button
+                <Button
                   key={action}
                   className={index === 0 ? "primary" : ""}
                   disabled={resultActionRunning}
@@ -1553,7 +1557,7 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
                     <Play />
                   )}
                   {action}
-                </button>
+                </Button>
               ))}
             </div>
             <div className="tool-result-meta">

@@ -655,6 +655,12 @@ function providerGuard(moduleId: ModuleId): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
     if (["GET", "HEAD", "OPTIONS"].includes(c.req.method)) return next();
     if (moduleId === "video-remix" && c.req.path.startsWith("/api/video-remix/projects/")) return next();
+    if (
+      moduleId === "video-create" &&
+      c.req.method === "PATCH" &&
+      /^\/api\/video-create\/projects\/[^/]+$/u.test(c.req.path)
+    )
+      return next();
     const availability = moduleFeatureAvailability(moduleId);
     if (availability.enabled) return next();
     return c.json(
@@ -5110,14 +5116,34 @@ const listVideoCreateProjectsRoute = createRoute({
   method: "get",
   path: "/api/video-create/projects",
   operationId: "listVideoCreateProjects",
+  request: {
+    query: z.object({
+      query: z.string().trim().max(100).optional(),
+      status: VideoCreateProjectStatusSchema.optional(),
+      page: z.coerce.number().int().min(1).default(1),
+      pageSize: z.coerce.number().int().min(1).max(50).default(20),
+    }),
+  },
   responses: {
     200: {
       description: "Video create projects",
-      content: { "application/json": { schema: z.object({ projects: z.array(VideoCreateProjectSchema) }) } },
+      content: {
+        "application/json": {
+          schema: z.object({
+            projects: z.array(VideoCreateProjectSchema),
+            total: z.number().int().nonnegative(),
+            page: z.number().int().min(1),
+            pageSize: z.number().int().min(1),
+          }),
+        },
+      },
     },
   },
 });
-app.openapi(listVideoCreateProjectsRoute, (c) => c.json({ projects: videoCreates.listOwned(c.get("userId")) }, 200));
+app.openapi(listVideoCreateProjectsRoute, (c) => {
+  const query = c.req.valid("query");
+  return c.json(videoCreates.listOwnedPage({ ownerUserId: c.get("userId"), ...query }), 200);
+});
 
 const getVideoCreateProjectRoute = createRoute({
   method: "get",
@@ -5151,7 +5177,15 @@ const updateVideoCreateProjectRoute = createRoute({
       required: true,
       content: {
         "application/json": {
-          schema: z.object({ expectedVersion: z.number().int().min(1), input: VideoCreateInputSchema }),
+          schema: z
+            .object({
+              expectedVersion: z.number().int().min(1),
+              input: VideoCreateInputSchema.optional(),
+              title: z.string().trim().min(1).max(80).optional(),
+            })
+            .refine((body) => (body.input === undefined) !== (body.title === undefined), {
+              message: "input 和 title 必须且只能提供一个",
+            }),
         },
       },
     },
@@ -5167,7 +5201,7 @@ app.openapi(updateVideoCreateProjectRoute, (c) => {
   const { projectId } = c.req.valid("param");
   const body = c.req.valid("json");
   const ownerUserId = c.get("userId");
-  if (!videoCreateAssetsAvailable(ownerUserId, body.input))
+  if (body.input && !videoCreateAssetsAvailable(ownerUserId, body.input))
     return c.json(
       {
         error: {
@@ -5180,7 +5214,9 @@ app.openapi(updateVideoCreateProjectRoute, (c) => {
       422,
     );
   try {
-    const project = videoCreates.updateInput(projectId, ownerUserId, body.expectedVersion, body.input);
+    const project = body.input
+      ? videoCreates.updateInput(projectId, ownerUserId, body.expectedVersion, body.input)
+      : videoCreates.updateTitle(projectId, ownerUserId, body.expectedVersion, body.title ?? "");
     return project
       ? c.json(project, 200)
       : c.json(

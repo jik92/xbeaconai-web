@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Download, Merge, Plus, Scissors, Trash2, X }
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { authenticatedBlobUrl, submitJob, uploadMediaFile } from "@/api/api-client";
 import { SaveLocationPicker } from "@/components/domain/save-location-picker";
+import { Button } from "@/components/ui/button";
 import { randomUuid } from "@/lib/random-id";
 import {
   clipDuration,
@@ -231,36 +232,36 @@ export function VideoEditorPage() {
             multiple
             onChange={(event) => void addFiles(event.target.files)}
           />
-          <button type="button" onClick={() => fileInput.current?.click()}>
+          <Button type="button" variant="outline" size="sm" onClick={() => fileInput.current?.click()}>
             <Plus size={16} />
             添加
-          </button>
-          <button
-            className="primary-action"
+          </Button>
+          <Button
             type="button"
+            size="sm"
             onClick={() => setExportOpen(true)}
             disabled={Boolean(busy) || !timeline.clips.length}
           >
             <Download size={16} />
             导出
-          </button>
+          </Button>
         </div>
       </header>
       <section className="video-editor-workspace">
         <aside className="video-editor-sources">
-          <h2>视频素材</h2>
+          <h2 className="type-section-title">视频素材</h2>
           {timeline.sources.map((source) => (
             <div className="video-editor-source-item" key={source.id}>
               {previewUrls[source.id] ? <video src={previewUrls[source.id]} muted /> : <span>载入中</span>}
               <span>{source.name}</span>
-              <button
+              <Button
                 type="button"
                 aria-label={`移除素材 ${source.name}`}
                 title="从当前剪辑中移除"
                 onClick={() => removeSource(source.id, source.name)}
               >
                 <X size={14} />
-              </button>
+              </Button>
             </div>
           ))}
           {!timeline.sources.length && <p>点击“添加”上传视频</p>}
@@ -290,7 +291,7 @@ export function VideoEditorPage() {
         <aside className="video-editor-inspector">
           {selectedClip ? (
             <>
-              <h2>片段属性</h2>
+              <h2 className="type-section-title">片段属性</h2>
               <label>
                 名称
                 <input
@@ -364,7 +365,7 @@ export function VideoEditorPage() {
       </section>
       <section className="video-editor-timeline">
         <div className="video-editor-toolbar">
-          <button
+          <Button
             type="button"
             aria-label="撤销"
             disabled={!history.length}
@@ -378,8 +379,8 @@ export function VideoEditorPage() {
             }}
           >
             <ChevronLeft />
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             aria-label="重做"
             disabled={!future.length}
@@ -393,19 +394,19 @@ export function VideoEditorPage() {
             }}
           >
             <ChevronRight />
-          </button>
-          <button className="tool-primary" type="button" onClick={cut}>
+          </Button>
+          <Button className="tool-primary" type="button" onClick={cut}>
             <Scissors />
             切分
-          </button>
-          <button type="button" onClick={merge} disabled={selected.length < 2}>
+          </Button>
+          <Button type="button" onClick={merge} disabled={selected.length < 2}>
             <Merge />
             合并
-          </button>
-          <button type="button" onClick={remove} disabled={!selected.length}>
+          </Button>
+          <Button type="button" onClick={remove} disabled={!selected.length}>
             <Trash2 />
             删除
-          </button>
+          </Button>
           <span>{busy || message}</span>
           <label>
             缩放
@@ -431,7 +432,7 @@ export function VideoEditorPage() {
             {timeline.clips.map((clip) => {
               const source = timeline.sources.find((item) => item.id === clip.sourceId);
               return (
-                <button
+                <Button
                   type="button"
                   key={clip.id}
                   className={selected.includes(clip.id) ? "selected" : ""}
@@ -448,7 +449,7 @@ export function VideoEditorPage() {
                 >
                   {source && previewUrls[source.id] && <video src={previewUrls[source.id]} muted />}
                   <span>{clip.name}</span>
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -464,10 +465,16 @@ export function VideoEditorPage() {
             }}
           >
             <header>
-              <h2 className="text-ink">导出视频</h2>
-              <button type="button" aria-label="关闭" onClick={() => setExportOpen(false)}>
+              <h2 className="type-section-title text-ink">导出视频</h2>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="关闭"
+                onClick={() => setExportOpen(false)}
+              >
                 <X />
-              </button>
+              </Button>
             </header>
             <label>
               文件名
@@ -483,12 +490,12 @@ export function VideoEditorPage() {
               />
             </label>
             <footer>
-              <button type="button" onClick={() => setExportOpen(false)}>
+              <Button type="button" onClick={() => setExportOpen(false)}>
                 取消
-              </button>
-              <button className="primary-action" type="submit" disabled={Boolean(busy)}>
+              </Button>
+              <Button className="primary-action" type="submit" disabled={Boolean(busy)}>
                 {busy || "开始导出"}
-              </button>
+              </Button>
             </footer>
           </form>
         </div>

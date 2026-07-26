@@ -48,14 +48,14 @@ export function DataTable<TData>({
       style={{ height }}
       aria-busy={loading || undefined}
     >
-      <table className="w-full table-fixed border-collapse text-xs">
+      <table className="w-full table-fixed border-collapse type-body">
         <thead className="[&_tr]:border-b [&_tr]:border-line">
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
               {headerGroup.headers.map((header) => (
                 <th
                   key={header.id}
-                  className="sticky top-0 z-10 h-10 overflow-hidden text-ellipsis whitespace-nowrap px-2 text-left align-middle font-medium text-muted"
+                  className="sticky top-0 z-10 h-10 overflow-hidden text-ellipsis whitespace-nowrap px-2 text-left align-middle type-label text-muted"
                   style={{ width: `${(header.getSize() / table.getTotalSize()) * 100}%` }}
                   colSpan={header.colSpan}
                 >
@@ -87,7 +87,7 @@ export function DataTable<TData>({
                   className={cn(
                     "flex flex-col items-center justify-center text-muted [&>b]:mt-3 [&>svg]:size-10 [&_button]:mt-3",
                     "min-h-48",
-                    Boolean(error) && "text-red-600",
+                    Boolean(error) && "text-error",
                   )}
                 >
                   <b>{stateMessage}</b>

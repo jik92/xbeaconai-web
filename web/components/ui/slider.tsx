@@ -18,7 +18,7 @@ export function Slider({ className, "aria-label": ariaLabel, ...props }: Compone
       <SliderPrimitive.Thumb
         data-slot="slider-thumb"
         aria-label={ariaLabel}
-        className="block size-4 shrink-0 rounded-full border border-primary bg-white shadow-sm transition-shadow hover:ring-4 hover:ring-primary/10 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 disabled:pointer-events-none disabled:opacity-50"
+        className="block size-4 shrink-0 rounded-full border border-primary bg-surface shadow-sm transition-shadow hover:ring-4 hover:ring-primary/10 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 disabled:pointer-events-none disabled:opacity-50"
       />
     </SliderPrimitive.Root>
   );

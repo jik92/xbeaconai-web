@@ -1,6 +1,5 @@
-// biome-ignore-all lint/a11y/useButtonType: This full-screen workbench contains no forms.
 // biome-ignore-all lint/a11y/noStaticElementInteractions: Modal backdrops dismiss their dialogs.
-import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Check,
   ChevronLeft,
@@ -24,7 +23,6 @@ import {
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   composeRemixVideos,
-  downloadAuthenticated,
   fetchCreationCapabilities,
   fetchJob,
   fetchLibraryAssets,
@@ -42,7 +40,9 @@ import type { Job, SeedanceModelId } from "@/api/generated/types.gen";
 import { AttachmentPicker, type AttachmentSelection } from "@/components/domain/attachment-picker";
 import { AuthenticatedMedia } from "@/components/domain/authenticated-media";
 import { ImagePreview } from "@/components/domain/media-preview";
+import { ProjectRecordDrawer, type ProjectRecordStatusTone } from "@/components/domain/project-record-drawer";
 import { PromptWorkbench } from "@/components/domain/prompt-workbench";
+import { Button } from "@/components/ui/button";
 import type { ApiJobResult, LibraryAsset, LibraryProduct } from "@/entities/types";
 import type { CreationModelCapability } from "@/features/ai-creation/ai-creation-composer";
 import { fetchPortraits, type Portrait, portraitDisplayUrl } from "@/features/portrait-library/portrait-data";
@@ -153,45 +153,35 @@ function PublicPreviewImage({ url, alt }: { url: string; alt: string }) {
   return <ImagePreview src={url} alt={alt} onImageError={() => setFailed(true)} />;
 }
 
-function WorkflowHeader({
-  stage,
-  onStage,
-  onHistory,
-  onReset,
-}: {
-  stage: number;
-  onStage: (stage: number) => void;
-  onHistory: () => void;
-  onReset: () => void;
-}) {
+function WorkflowHeader({ stage, onHistory, onReset }: { stage: number; onHistory: () => void; onReset: () => void }) {
   return (
     <header className="remix-header">
       <div className="remix-brand">
         <Video />
         爆款二创
       </div>
-      <nav className="remix-steps" aria-label="创作进度">
+      <ol className="remix-steps" aria-label="创作进度">
         {stages.map((label, index) => (
-          <button
+          <li
             key={label}
             className={index === stage ? "active" : index < stage ? "done" : ""}
-            onClick={() => index <= stage && onStage(index)}
+            aria-current={index === stage ? "step" : undefined}
           >
             <i>{index < stage ? <Check /> : index + 1}</i>
             <span>{label}</span>
             {index < stages.length - 1 && <ChevronRight className="step-arrow" />}
-          </button>
+          </li>
         ))}
-      </nav>
+      </ol>
       <div className="remix-header-actions">
-        <button onClick={onHistory}>
+        <Button className="remix-header-action shrink-0" variant="outline" size="sm" onClick={onHistory}>
           <History />
-          项目记录
-        </button>
-        <button onClick={onReset}>
+          生成记录
+        </Button>
+        <Button className="remix-header-action shrink-0" variant="ghost" size="sm" onClick={onReset}>
           <Plus />
           新建
-        </button>
+        </Button>
       </div>
     </header>
   );
@@ -233,12 +223,12 @@ function ConfigSidebar({
   return (
     <aside className="remix-config">
       <div className="remix-mode-tabs">
-        <button className={mode === "product" ? "active" : ""} onClick={() => setMode("product")}>
+        <Button className={mode === "product" ? "active" : ""} onClick={() => setMode("product")}>
           含商品模式
-        </button>
-        <button className={mode === "talking" ? "active" : ""} onClick={() => setMode("talking")}>
+        </Button>
+        <Button className={mode === "talking" ? "active" : ""} onClick={() => setMode("talking")}>
           纯口播模式
-        </button>
+        </Button>
       </div>
       <input
         className="remix-project-name"
@@ -252,9 +242,9 @@ function ConfigSidebar({
         <b>
           商品 <em>*</em>
         </b>
-        <button onClick={() => onPick("product")}>⚙ 商品库</button>
+        <Button onClick={() => onPick("product")}>⚙ 商品库</Button>
       </div>
-      <button className="config-product" onClick={() => onPick("product")}>
+      <Button className="config-product" onClick={() => onPick("product")}>
         {selectedProduct ? (
           <span className="product-thumb product-asset-thumb">
             <AuthenticatedMedia
@@ -268,10 +258,10 @@ function ConfigSidebar({
           <span className="product-thumb" />
         )}
         <span>{selectedProduct?.name || "未选择商品"}</span>
-      </button>
+      </Button>
       <div className="config-field-title">
         <b>人像</b>
-        <button onClick={() => onPick("portrait")}>{selectedPortraits.length ? "更换" : "+ 添加"}</button>
+        <Button onClick={() => onPick("portrait")}>{selectedPortraits.length ? "更换" : "+ 添加"}</Button>
       </div>
       {selectedPortraits.length ? (
         <div className="portrait-cards-row">
@@ -288,14 +278,14 @@ function ConfigSidebar({
               ) : (
                 <ImagePreview className="config-portrait" src={portrait.display_url} alt={portrait.name} />
               )}
-              <button
+              <Button
                 type="button"
                 className="portrait-card-remove"
                 aria-label={`移除人像 ${portrait.name}`}
                 onClick={() => onRemovePortrait(portrait.key)}
               >
                 <X />
-              </button>
+              </Button>
             </div>
           ))}
         </div>
@@ -304,15 +294,15 @@ function ConfigSidebar({
       )}
       <div className="config-field-title">
         <b>口播音色</b>
-        <button onClick={() => onPick("voice")}>{selectedVoice ? "更换" : "+ 选择"}</button>
+        <Button onClick={() => onPick("voice")}>{selectedVoice ? "更换" : "+ 选择"}</Button>
       </div>
-      <button className="config-voice" onClick={() => onPick("voice")}>
+      <Button className="config-voice" onClick={() => onPick("voice")}>
         <Mic2 />
         <span>
           <b>{selectedVoice?.name || "未选择音色"}</b>
-          <small>{selectedVoice?.description || "使用视频原声或从音色库选择"}</small>
+          <small className="type-helper">{selectedVoice?.description || "使用视频原声或从音色库选择"}</small>
         </span>
-      </button>
+      </Button>
       <label className="config-description">
         需求描述
         <textarea
@@ -325,7 +315,7 @@ function ConfigSidebar({
         <b>
           分镜视频 <em>*</em>
         </b>
-        <small>（同一成片的连续片段）</small>
+        <small className="type-helper">（同一成片的连续片段）</small>
       </div>
       <AttachmentPicker
         accept="video/*"
@@ -348,18 +338,18 @@ function ConfigSidebar({
                     <b title={source.name}>
                       {index + 1}. {source.name}
                     </b>
-                    <button
+                    <Button
                       type="button"
                       aria-label={`删除 ${source.name}`}
                       disabled={sourcesLocked}
                       onClick={() => onRemoveSource(source.id)}
                     >
                       <X />
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ))}
-              <button
+              <Button
                 type="button"
                 className="append-video-button"
                 onClick={open}
@@ -371,19 +361,19 @@ function ConfigSidebar({
                   : sources.length >= remixMaxSources
                     ? `最多 ${remixMaxSources} 条`
                     : "继续添加分镜视频"}
-              </button>
-              <small className="video-selection-count">
+              </Button>
+              <small className="type-helper video-selection-count">
                 已选 {sources.length}/{remixMaxSources} 条
               </small>
             </div>
           ) : (
-            <button type="button" className="config-attachment-picker" disabled={sourcesLocked} onClick={open}>
+            <Button type="button" className="config-attachment-picker" disabled={sourcesLocked} onClick={open}>
               <Upload />
               <span>
                 <b>选择分镜视频</b>
-                <small>支持从素材库或本地多选，最多 {remixMaxSources} 条</small>
+                <small className="type-helper">支持从素材库或本地多选，最多 {remixMaxSources} 条</small>
               </span>
-            </button>
+            </Button>
           )
         }
         onSelect={onSelectAttachments}
@@ -414,14 +404,14 @@ function AssetPickerModal({
     <div className="remix-picker-layer" role="presentation" onMouseDown={onClose}>
       <aside className="remix-picker" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
         <header>
-          <h2 className="text-ink">{title}</h2>
-          <button aria-label="关闭" onClick={onClose}>
+          <h2 className="type-section-title text-ink">{title}</h2>
+          <Button variant="ghost" size="icon-sm" aria-label="关闭" onClick={onClose}>
             <X />
-          </button>
+          </Button>
         </header>
         <div className="remix-picker-grid">
           {data.map((asset) => (
-            <button key={asset.id} onClick={() => onSelect(asset)}>
+            <Button key={asset.id} onClick={() => onSelect(asset)}>
               <span className={kind}>
                 {kind === "product" ? (
                   <AuthenticatedMedia url={asset.url} mimeType={asset.mimeType} alt={asset.name} previewable={false} />
@@ -430,8 +420,8 @@ function AssetPickerModal({
                 )}
               </span>
               <b>{asset.name}</b>
-              <small>{asset.description || asset.originalName}</small>
-            </button>
+              <small className="type-helper">{asset.description || asset.originalName}</small>
+            </Button>
           ))}
           {isLoading && <p>正在加载资产…</p>}
           {error && <p>{error instanceof Error ? error.message : "资产加载失败"}</p>}
@@ -440,10 +430,10 @@ function AssetPickerModal({
           )}
         </div>
         <footer>
-          <button onClick={() => window.location.assign(kind === "product" ? "/assets/products" : "/assets/voices")}>
+          <Button onClick={() => window.location.assign(kind === "product" ? "/assets/products" : "/assets/voices")}>
             <Upload />
             管理并上传{kind === "product" ? "商品" : "音色"}
-          </button>
+          </Button>
         </footer>
       </aside>
     </div>
@@ -524,10 +514,10 @@ function ProductPickerModal({
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header>
-          <h2 className="text-ink">选择商品</h2>
-          <button aria-label="关闭" onClick={onClose}>
+          <h2 className="type-section-title text-ink">选择商品</h2>
+          <Button variant="ghost" size="icon-sm" aria-label="关闭" onClick={onClose}>
             <X />
-          </button>
+          </Button>
         </header>
         <div className="portrait-picker-controls product-picker-controls">
           <label>
@@ -542,18 +532,18 @@ function ProductPickerModal({
               placeholder="搜索商品名称或描述…"
             />
           </label>
-          <button className="product-search-button" onClick={doSearch}>
+          <Button className="product-search-button" onClick={doSearch}>
             查询
-          </button>
-          <button className="product-reset-button" onClick={doReset}>
+          </Button>
+          <Button className="product-reset-button" onClick={doReset}>
             重置
-          </button>
+          </Button>
         </div>
         <div className="remix-picker-grid product-picker-grid">
           {paged.map((product) => {
             const isSelected = product.id === pendingId;
             return (
-              <button
+              <Button
                 key={product.id}
                 className={isSelected ? "selected" : ""}
                 aria-pressed={isSelected}
@@ -572,10 +562,10 @@ function ProductPickerModal({
                   )}
                 </span>
                 <b>{product.name}</b>
-                <small>
+                <small className="type-helper">
                   {product.images.length} 张商品图 · {product.description || "暂无形态描述"}
                 </small>
-              </button>
+              </Button>
             );
           })}
           {isLoading && <p>正在加载商品…</p>}
@@ -605,43 +595,43 @@ function ProductPickerModal({
             </span>
           </div>
           <div className="product-pagination">
-            <button aria-label="上一页" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+            <Button aria-label="上一页" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
               <ChevronLeft />
-            </button>
+            </Button>
             {pageButtons[0] > 1 && (
               <>
-                <button onClick={() => setPage(1)}>1</button>
+                <Button onClick={() => setPage(1)}>1</Button>
                 {pageButtons[0] > 2 && <span className="page-ellipsis">…</span>}
               </>
             )}
             {pageButtons.map((p) => (
-              <button key={p} className={p === page ? "active" : ""} onClick={() => setPage(p)}>
+              <Button key={p} className={p === page ? "active" : ""} onClick={() => setPage(p)}>
                 {p}
-              </button>
+              </Button>
             ))}
             {pageButtons[pageButtons.length - 1] < totalPages && (
               <>
                 {pageButtons[pageButtons.length - 1] < totalPages - 1 && <span className="page-ellipsis">…</span>}
-                <button onClick={() => setPage(totalPages)}>{totalPages}</button>
+                <Button onClick={() => setPage(totalPages)}>{totalPages}</Button>
               </>
             )}
-            <button
+            <Button
               aria-label="下一页"
               disabled={page >= totalPages}
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             >
               <ChevronRight />
-            </button>
+            </Button>
           </div>
           <div className="product-footer-actions">
-            <button className="product-manage" onClick={() => window.location.assign("/assets/products")}>
+            <Button className="product-manage" onClick={() => window.location.assign("/assets/products")}>
               <Upload />
               管理商品
-            </button>
-            <button className="product-cancel" onClick={onClose}>
+            </Button>
+            <Button className="product-cancel" onClick={onClose}>
               取消
-            </button>
-            <button
+            </Button>
+            <Button
               className="product-confirm"
               disabled={!pending}
               onClick={() => {
@@ -649,7 +639,7 @@ function ProductPickerModal({
               }}
             >
               确定
-            </button>
+            </Button>
           </div>
         </footer>
       </aside>
@@ -735,10 +725,10 @@ function PortraitPickerModal({
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header>
-          <h2 className="text-ink">选择人像（最多 {maxSelect} 个）</h2>
-          <button aria-label="关闭" onClick={onClose}>
+          <h2 className="type-section-title text-ink">选择人像（最多 {maxSelect} 个）</h2>
+          <Button variant="ghost" size="icon-sm" aria-label="关闭" onClick={onClose}>
             <X />
-          </button>
+          </Button>
         </header>
         <div className="portrait-picker-controls">
           <label>
@@ -752,9 +742,9 @@ function PortraitPickerModal({
           </label>
           <div aria-label="按性别筛选">
             {["全部", "女", "男"].map((item) => (
-              <button key={item} className={gender === item ? "active" : ""} onClick={() => setGender(item)}>
+              <Button key={item} className={gender === item ? "active" : ""} onClick={() => setGender(item)}>
                 {item}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -765,7 +755,7 @@ function PortraitPickerModal({
           {filtered.slice(0, visibleCount).map((portrait) => {
             const active = isSelected(portrait.key);
             return (
-              <button
+              <Button
                 key={portrait.key}
                 className={active ? "selected" : ""}
                 aria-label={`${active ? "已选择，" : ""}${portrait.name}`}
@@ -793,13 +783,13 @@ function PortraitPickerModal({
                   )}
                 </span>
                 <b>{portrait.profession}</b>
-                <small>
+                <small className="type-helper">
                   {portrait.age ? `${portrait.age} 岁 · ` : ""}
                   {portrait.type === "general"
                     ? `${portrait.gender}性 · NO. ${String(portrait.index).padStart(4, "0")}`
                     : "自建虚拟人像"}
                 </small>
-              </button>
+              </Button>
             );
           })}
           {isLoading && <p>正在加载人像库…</p>}
@@ -814,14 +804,14 @@ function PortraitPickerModal({
           </span>
           <div>
             {filtered.length > visibleCount && (
-              <button onClick={() => setVisibleCount((count) => count + 48)}>加载更多</button>
+              <Button onClick={() => setVisibleCount((count) => count + 48)}>加载更多</Button>
             )}
-            <button className="product-cancel" onClick={onClose}>
+            <Button className="product-cancel" onClick={onClose}>
               取消
-            </button>
-            <button className="product-confirm" disabled={!pending.length} onClick={() => onConfirm(pending)}>
+            </Button>
+            <Button className="product-confirm" disabled={!pending.length} onClick={() => onConfirm(pending)}>
               确定
-            </button>
+            </Button>
           </div>
         </footer>
       </aside>
@@ -839,6 +829,13 @@ const remixProjectStageLabels: Record<RemixProjectSummary["currentStage"], strin
   failed: "失败",
 };
 
+function remixProjectStatusTone(stage: RemixProjectSummary["currentStage"]): ProjectRecordStatusTone {
+  if (stage === "failed") return "error";
+  if (stage === "completed") return "success";
+  if (stage === "upload") return "neutral";
+  return "progress";
+}
+
 function ProjectHistoryDrawer({
   open,
   currentProjectId,
@@ -852,208 +849,45 @@ function ProjectHistoryDrawer({
   onContinue: (project: RemixProjectDetail) => void | Promise<void>;
   onRenamed: (projectId: string, title: string) => void;
 }) {
-  const queryClient = useQueryClient();
-  const [query, setQuery] = useState("");
-  const [appliedQuery, setAppliedQuery] = useState("");
-  const [stageFilter, setStageFilter] = useState<"" | RemixProjectSummary["currentStage"]>("");
-  const [appliedStage, setAppliedStage] = useState<"" | RemixProjectSummary["currentStage"]>("");
-  const [editingId, setEditingId] = useState("");
-  const [editingTitle, setEditingTitle] = useState("");
-  const [busyId, setBusyId] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
-  const historyTableRef = useRef<HTMLDivElement>(null);
-  const loadMoreRef = useRef<HTMLDivElement>(null);
-  const history = useInfiniteQuery({
-    queryKey: ["video-remix-projects", appliedQuery, appliedStage],
-    initialPageParam: 1,
-    queryFn: ({ pageParam }) =>
-      fetchRemixProjects({
-        query: appliedQuery || undefined,
-        stage: appliedStage || undefined,
-        page: pageParam,
-        pageSize: 20,
-      }),
-    getNextPageParam: (lastPage) =>
-      lastPage.page * lastPage.pageSize < lastPage.total ? lastPage.page + 1 : undefined,
-    enabled: open,
-  });
-  const projects = history.data?.pages.flatMap((pageData) => pageData.projects) ?? [];
-  const total = history.data?.pages[0]?.total ?? 0;
-  useEffect(() => {
-    const target = loadMoreRef.current;
-    const root = historyTableRef.current;
-    if (!open || !target || !root || !history.hasNextPage || history.isFetchingNextPage) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) void history.fetchNextPage();
-      },
-      { root, rootMargin: "160px" },
-    );
-    observer.observe(target);
-    return () => observer.disconnect();
-  }, [history.fetchNextPage, history.hasNextPage, history.isFetchingNextPage, open]);
-  const renameProject = async (project: RemixProjectSummary) => {
-    const title = editingTitle.trim();
-    if (!title || title === project.title) {
-      setEditingId("");
-      return;
-    }
-    setBusyId(project.id);
-    setErrorMessage("");
-    try {
-      await saveRemixProject(project.id, { title });
-      onRenamed(project.id, title);
-      setEditingId("");
-      await queryClient.invalidateQueries({ queryKey: ["video-remix-projects"] });
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "项目重命名失败");
-    } finally {
-      setBusyId("");
-    }
-  };
-  const continueProject = async (projectId: string) => {
-    setBusyId(projectId);
-    setErrorMessage("");
-    try {
-      await onContinue(await fetchRemixProject(projectId));
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "项目恢复失败");
-    } finally {
-      setBusyId("");
-    }
-  };
-  if (!open) return null;
   return (
-    <div className="history-layer" role="presentation" onMouseDown={onClose}>
-      <aside
-        className="history-drawer"
-        role="dialog"
-        aria-modal="true"
-        aria-label="项目记录"
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <header>
-          <button aria-label="关闭" onClick={onClose}>
-            <X />
-          </button>
-          <h2>项目记录</h2>
-        </header>
-        <div className="history-filters">
-          <label>
-            <input value={query} placeholder="搜索项目名称" onChange={(event) => setQuery(event.target.value)} />
-            <Search />
-          </label>
-          <select
-            aria-label="项目进度"
-            value={stageFilter}
-            onChange={(event) => setStageFilter(event.target.value as typeof stageFilter)}
-          >
-            <option value="">全部进度</option>
-            {Object.entries(remixProjectStageLabels).map(([value, label]) => (
-              <option value={value} key={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-          <button
-            className="history-search"
-            onClick={() => {
-              setAppliedQuery(query.trim());
-              setAppliedStage(stageFilter);
-            }}
-          >
-            查询
-          </button>
-        </div>
-        {(errorMessage || history.error) && (
-          <button className="history-error" onClick={() => void history.refetch()}>
-            {errorMessage || (history.error instanceof Error ? history.error.message : "项目记录加载失败")}，点击重试
-          </button>
-        )}
-        <div className="history-table" ref={historyTableRef}>
-          <div className="history-head">
-            <span>项目名称</span>
-            <span>项目进度</span>
-            <span>创建人</span>
-            <span>更新时间</span>
-            <span>操作</span>
-          </div>
-          {projects.map((project) => (
-            <div className={`history-row ${project.id === currentProjectId ? "current" : ""}`} key={project.id}>
-              <span>
-                {editingId === project.id ? (
-                  <input
-                    className="history-title-input"
-                    value={editingTitle}
-                    maxLength={80}
-                    disabled={busyId === project.id}
-                    onChange={(event) => setEditingTitle(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") void renameProject(project);
-                      if (event.key === "Escape") setEditingId("");
-                    }}
-                  />
-                ) : (
-                  <b>
-                    {project.title}
-                    <button
-                      aria-label={`重命名 ${project.title}`}
-                      onClick={() => {
-                        setEditingId(project.id);
-                        setEditingTitle(project.title);
-                      }}
-                    >
-                      <Pencil />
-                    </button>
-                  </b>
-                )}
-                <small>产品：{project.productName}</small>
-              </span>
-              <span>
-                <i className={project.currentStage}>
-                  {remixProjectStageLabels[project.currentStage]}
-                  {project.currentStage === "storyboard" && ` ${project.generatedCount} / ${project.sourceCount}`}
-                </i>
-              </span>
-              <span>{project.createdBy}</span>
-              <span className="history-time">{new Date(project.updatedAt).toLocaleString()}</span>
-              <span>
-                {editingId === project.id ? (
-                  <button disabled={busyId === project.id} onClick={() => void renameProject(project)}>
-                    保存
-                  </button>
-                ) : (
-                  <button disabled={busyId === project.id} onClick={() => void continueProject(project.id)}>
-                    {busyId === project.id ? "加载中" : "继续创作"}
-                  </button>
-                )}
-              </span>
-            </div>
-          ))}
-          {history.isLoading && <div className="history-empty">正在加载项目记录…</div>}
-          {!history.isLoading && !projects.length && <div className="history-empty">暂无项目记录</div>}
-          <div className="history-load-more" ref={loadMoreRef}>
-            {history.isFetchingNextPage
-              ? "正在加载更多记录…"
-              : history.hasNextPage
-                ? "下滑自动加载更多"
-                : projects.length
-                  ? "已加载全部记录"
-                  : ""}
-          </div>
-        </div>
-        <footer>
-          <span>
-            已加载 {projects.length}/{total} 条
-          </span>
-          {history.hasNextPage && (
-            <button disabled={history.isFetchingNextPage} onClick={() => void history.fetchNextPage()}>
-              {history.isFetchingNextPage ? "加载中…" : "加载更多"}
-            </button>
-          )}
-        </footer>
-      </aside>
-    </div>
+    <ProjectRecordDrawer
+      open={open}
+      queryKey="video-remix-project-records"
+      currentProjectId={currentProjectId}
+      statusOptions={Object.entries(remixProjectStageLabels).map(([value, label]) => ({ value, label }))}
+      onClose={onClose}
+      fetchPage={async ({ query, status, page, pageSize }) => {
+        const data = await fetchRemixProjects({
+          query,
+          stage: status as RemixProjectSummary["currentStage"] | undefined,
+          page,
+          pageSize,
+        });
+        return {
+          items: data.projects.map((project) => ({
+            id: project.id,
+            title: project.title,
+            status: project.currentStage,
+            statusLabel: remixProjectStageLabels[project.currentStage],
+            statusTone: remixProjectStatusTone(project.currentStage),
+            summary:
+              project.currentStage === "storyboard"
+                ? `${project.productName} · 分镜 ${project.generatedCount}/${project.sourceCount}`
+                : project.productName,
+            createdBy: project.createdBy,
+            updatedAt: project.updatedAt,
+          })),
+          total: data.total,
+          page: data.page,
+          pageSize: data.pageSize,
+        };
+      }}
+      onRename={async (item, title) => {
+        await saveRemixProject(item.id, { title });
+      }}
+      onRenamed={onRenamed}
+      onContinue={async (item) => onContinue(await fetchRemixProject(item.id))}
+    />
   );
 }
 
@@ -1197,7 +1031,7 @@ export function RemixProject() {
         .then((updated) => {
           lastSavedWorkspace.current = serialized;
           setJob((current) => (current?.id === updated.id ? updated : current));
-          void queryClient.invalidateQueries({ queryKey: ["video-remix-projects"] });
+          void queryClient.invalidateQueries({ queryKey: ["video-remix-project-records"] });
         })
         .catch((error) => setNotice(error instanceof Error ? error.message : "项目进度保存失败"));
     }, 600);
@@ -1566,7 +1400,7 @@ export function RemixProject() {
     [promptVersions],
   );
   const promptVersionButton = (version: PromptVersion & { sequence: number }) => (
-    <button
+    <Button
       key={version.id}
       className={version.id === activePromptVersionId ? "active" : ""}
       onClick={() => {
@@ -1576,9 +1410,9 @@ export function RemixProject() {
       }}
     >
       <b>v{version.sequence}</b>
-      <small>{version.label}</small>
+      <small className="type-helper">{version.label}</small>
       {version.id === activePromptVersionId && <Check />}
-    </button>
+    </Button>
   );
   const activeSource = sources.find((source) => source.id === activeSourceId) ?? sources[0];
   const sourceAssetId = activeSource?.id || "";
@@ -1817,12 +1651,7 @@ export function RemixProject() {
 
   return (
     <div className="remix-project">
-      <WorkflowHeader
-        stage={stage}
-        onStage={setStage}
-        onHistory={() => setHistoryOpen(true)}
-        onReset={() => void startNewProject()}
-      />
+      <WorkflowHeader stage={stage} onHistory={() => setHistoryOpen(true)} onReset={() => void startNewProject()} />
       <div className="remix-body">
         <ConfigSidebar
           mode={mode}
@@ -1869,11 +1698,11 @@ export function RemixProject() {
         />
         <section className="remix-workspace">
           {notice && (
-            <button className="remix-toast" onClick={() => setNotice("")}>
+            <Button className="remix-toast" onClick={() => setNotice("")}>
               <Sparkles />
               {notice}
               <X />
-            </button>
+            </Button>
           )}
           {stage === 0 && (
             <div className="stage-empty">
@@ -1889,7 +1718,7 @@ export function RemixProject() {
           {stage === 1 && (
             <div className="analysis-stage">
               <div className="analysis-orbit">{parsing ? <LoaderCircle className="animate-spin" /> : <Sparkles />}</div>
-              <h2>{parsing ? "AI 正在解析分镜视频" : "等待开始 AI 解析"}</h2>
+              <h2 className="type-section-title">{parsing ? "AI 正在解析分镜视频" : "等待开始 AI 解析"}</h2>
               <p>正在识别人物、商品、场景、镜头边界和口播文案</p>
               <div className="analysis-progress">
                 <span style={{ width: `${job?.progress ?? (parsing ? 16 : 0)}%` }} />
@@ -1903,7 +1732,7 @@ export function RemixProject() {
                 const entry = analysisEntries.find((item) => item.assetId === source.id);
                 const latestShot = shotJobs.find((shotJob) => shotJob.values.sourceAssetId === source.id);
                 return (
-                  <button
+                  <Button
                     key={source.id}
                     className={source.id === activeSourceId ? "active" : ""}
                     onClick={() => {
@@ -1934,7 +1763,7 @@ export function RemixProject() {
                               ? "生成失败"
                               : `v${index + 1}`}
                     </i>
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -1944,21 +1773,21 @@ export function RemixProject() {
               <div className="prompt-toolbar">
                 <label>
                   对比版本{" "}
-                  <button className={`toggle ${compare ? "active" : ""}`} onClick={() => setCompare(!compare)} />
+                  <Button className={`toggle ${compare ? "active" : ""}`} onClick={() => setCompare(!compare)} />
                 </label>
                 <div>
-                  <button disabled={!prompt} onClick={() => setPromptTool("check")}>
+                  <Button disabled={!prompt} onClick={() => setPromptTool("check")}>
                     <CircleCheck />
                     智能检查
-                  </button>
-                  <button className="purple" disabled={!prompt} onClick={() => setPromptTool("modify")}>
+                  </Button>
+                  <Button className="purple" disabled={!prompt} onClick={() => setPromptTool("modify")}>
                     <Pencil />
                     智能修改
-                  </button>
-                  <button className="orange" disabled={!prompt} onClick={() => setPromptTool("voice")}>
+                  </Button>
+                  <Button className="orange" disabled={!prompt} onClick={() => setPromptTool("voice")}>
                     <Mic2 />
                     换口播
-                  </button>
+                  </Button>
                 </div>
               </div>
               <div className="prompt-content">
@@ -1988,20 +1817,20 @@ export function RemixProject() {
               </div>
               <footer className="stage-actions">
                 <div>
-                  <button onClick={() => setEditing(!editing)}>
+                  <Button onClick={() => setEditing(!editing)}>
                     <FileText />
                     {editing ? "保存文本" : "编辑文本"}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={() => void navigator.clipboard.writeText(prompt).then(() => setNotice("脚本已复制"))}
                   >
                     <Copy />
                     复制脚本
-                  </button>
+                  </Button>
                 </div>
-                <button className="primary" onClick={next}>
+                <Button className="primary" onClick={next}>
                   下一步
-                </button>
+                </Button>
               </footer>
             </div>
           )}
@@ -2014,7 +1843,7 @@ export function RemixProject() {
                       <Video />
                       结果预览
                     </span>
-                    <small>{activeShotRunning?.stage || "正在生成当前分镜"}</small>
+                    <small className="type-helper">{activeShotRunning?.stage || "正在生成当前分镜"}</small>
                   </header>
                   <div className="shot-execution-content">
                     <div className="shot-execution-preview" role="status" aria-live="polite">
@@ -2043,7 +1872,7 @@ export function RemixProject() {
                                   errorText="图片加载失败"
                                 />
                               )}
-                              <small>@{reference.label}</small>
+                              <small className="type-helper">@{reference.label}</small>
                             </span>
                           ))}
                           {!visibleExecutionSnapshot.references.length && <i>本次未引用素材</i>}
@@ -2094,7 +1923,7 @@ export function RemixProject() {
                       accept="image/*"
                       multiple
                       trigger={(open) => (
-                        <button
+                        <Button
                           type="button"
                           className="storyboard-add-reference"
                           aria-label="添加参考素材"
@@ -2102,7 +1931,7 @@ export function RemixProject() {
                           onClick={open}
                         >
                           <Plus />
-                        </button>
+                        </Button>
                       )}
                       onSelect={appendShotReferences}
                     />
@@ -2235,7 +2064,7 @@ export function RemixProject() {
                           setDraggingSourceId("");
                         }}
                       >
-                        <button
+                        <Button
                           type="button"
                           className="timeline-preview-button"
                           aria-label={`预览第 ${index + 1} 个片段：${source.name}`}
@@ -2254,14 +2083,16 @@ export function RemixProject() {
                           ) : (
                             <span className="timeline-missing-state">
                               <TriangleAlert />
-                              <small>未生成</small>
+                              <small className="type-helper">未生成</small>
                             </span>
                           )}
                           <b>{index + 1}</b>
-                        </button>
+                        </Button>
                         <footer>
                           <span title={source.name}>{source.name}</span>
-                          <small className={isReady ? "ready" : "missing"}>{isReady ? "就绪" : "缺失"}</small>
+                          <small className={isReady ? "type-helper ready" : "type-helper missing"}>
+                            {isReady ? "就绪" : "缺失"}
+                          </small>
                         </footer>
                       </article>
                     );
@@ -2298,8 +2129,8 @@ export function RemixProject() {
                       : "全部片段已生成，可以开始合并"}
                   </span>
                   <div>
-                    <button onClick={() => setStage(3)}>返回分镜</button>
-                    <button
+                    <Button onClick={() => setStage(3)}>返回分镜</Button>
+                    <Button
                       className="primary"
                       disabled={composeOrder.length < 2 || Boolean(activeComposeJobId)}
                       onClick={() => void startCompose()}
@@ -2310,7 +2141,7 @@ export function RemixProject() {
                         : resultVideo?.url
                           ? "重新合并"
                           : "开始合并"}
-                    </button>
+                    </Button>
                   </div>
                 </footer>
               </article>
@@ -2319,14 +2150,14 @@ export function RemixProject() {
         </section>
       </div>
       {stage === 0 && (
-        <button
+        <Button
           className="parse-button"
           disabled={!sources.length || !selectedProduct || parsing || Boolean(job)}
           onClick={() => void parse()}
         >
           <Sparkles />
           {parsing ? "解析中" : job ? "已提交解析" : "视频解析"}
-        </button>
+        </Button>
       )}
       {pendingShotSubmission && (
         <div
@@ -2343,17 +2174,19 @@ export function RemixProject() {
           >
             <header>
               <Video />
-              <h2 id="shot-submit-confirm-title">确认提交视频生成任务</h2>
+              <h2 className="type-section-title" id="shot-submit-confirm-title">
+                确认提交视频生成任务
+              </h2>
             </header>
             <p>任务提交后不可取消、不可停止。</p>
-            <small>请确认提示词、引用素材和生成参数无误后再继续。</small>
+            <small className="type-helper">请确认提示词、引用素材和生成参数无误后再继续。</small>
             <footer>
-              <button type="button" onClick={() => setPendingShotSubmission(null)}>
+              <Button type="button" onClick={() => setPendingShotSubmission(null)}>
                 返回修改
-              </button>
-              <button type="button" className="primary" onClick={() => void submitShotGeneration()}>
+              </Button>
+              <Button type="button" className="primary" onClick={() => void submitShotGeneration()}>
                 确认提交
-              </button>
+              </Button>
             </footer>
           </section>
         </div>

@@ -1,8 +1,7 @@
 .panel-form > label {
   display: block;
-  @apply text-xs;
-  @apply font-semibold;
-  color: #445066;
+  @apply type-label;
+  @apply text-primary;
   margin: 13px 0;
 }
 .panel-form input,
@@ -12,19 +11,19 @@
   height: 42px;
   margin-top: 7px;
   padding: 0 11px;
-  border: 1px solid #dce2ea;
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: white;
-  color: #263248;
+  background: var(--surface);
+  @apply text-primary;
 }
 .panel-primary {
   width: 100%;
   height: 42px;
   border: 0;
   border-radius: 8px;
-  background: #246bfd;
-  color: white;
-  @apply font-semibold;
+  background: var(--primary);
+  @apply text-on-primary;
+  @apply type-body-strong;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -37,7 +36,7 @@
   position: fixed;
   inset: 0;
   z-index: 80;
-  background: #0f172a66;
+  background: var(--overlay);
   display: flex;
   justify-content: flex-end;
   backdrop-filter: blur(2px);
@@ -45,8 +44,8 @@
 .workspace-drawer {
   width: min(520px, 94vw);
   height: 100%;
-  background: white;
-  box-shadow: -20px 0 55px #0f172a30;
+  background: var(--surface);
+  box-shadow: -20px 0 55px var(--shadow-elevated);
   animation: drawer-in 0.22s ease-out;
   overflow: auto;
 }
@@ -57,7 +56,7 @@
   height: 60px;
   padding: 0 22px;
   border-bottom: 1px solid var(--border);
-  background: #fffc;
+  background: var(--surface);
   backdrop-filter: blur(12px);
   display: flex;
   align-items: center;
@@ -65,30 +64,16 @@
 }
 .workspace-drawer header h2 {
   margin: 0;
-  color: var(--ink);
-  @apply text-base;
-  @apply font-medium;
-}
-.workspace-drawer header > button {
-  width: 34px;
-  height: 34px;
-  border: 0;
-  border-radius: 8px;
-  background: #f2f4f7;
-  color: #687386;
-  display: grid;
-  place-items: center;
-}
-.workspace-drawer header svg {
-  width: 17px;
+  @apply text-ink;
+  @apply type-section-title;
 }
 .workspace-body {
   padding: 22px;
 }
 .panel-muted {
   text-align: center;
-  color: #919baa;
-  @apply text-xs;
+  @apply text-primary;
+  @apply type-helper;
   padding: 36px 0;
 }
 .help-list {
@@ -99,22 +84,22 @@
   display: flex;
   gap: 12px;
   padding: 15px;
-  border: 1px solid #e2e7ef;
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: #fafbfd;
+  background: var(--surface);
 }
 .help-list article > svg {
   flex: none;
   width: 20px;
-  color: #246bfd;
+  @apply text-primary;
 }
 .help-list b {
-  @apply text-xs;
+  @apply type-helper;
 }
 .help-list p {
-  @apply text-2xs;
+  @apply type-helper;
   @apply leading-relaxed;
-  color: #717c8d;
+  @apply text-primary;
   margin: 5px 0 0;
 }
 .panel-form select {
@@ -125,7 +110,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px;
-  border: 1px solid #e3e7ed;
+  border: 1px solid var(--border);
   border-radius: 9px;
 }
 .switch-row span b,
@@ -134,8 +119,8 @@
 }
 .switch-row span small {
   margin-top: 4px;
-  color: #929aa7;
-  @apply font-normal;
+  @apply text-primary;
+  @apply type-helper;
 }
 .switch-row input {
   width: 18px !important;
@@ -149,18 +134,18 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  color: #818b9c;
-  @apply text-2xs;
+  @apply text-primary;
+  @apply type-helper;
   margin-bottom: 10px;
 }
 .panel-toolbar button {
   border: 0;
   background: transparent;
-  color: #246bfd;
-  @apply text-2xs;
+  @apply text-primary;
+  @apply type-badge;
 }
 .panel-toolbar button:disabled {
-  color: #b4bbc5;
+  @apply text-muted;
 }
 .notification-list > button {
   width: 100%;
@@ -169,8 +154,8 @@
   text-align: left;
   padding: 13px 7px;
   border: 0;
-  border-bottom: 1px solid #edf0f4;
-  background: white;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
 }
 .notification-list > button.read {
   opacity: 0.62;
@@ -181,8 +166,8 @@
   display: grid;
   place-items: center;
   border-radius: 8px;
-  background: #eaf1ff;
-  color: #246bfd;
+  background: var(--surface-strong);
+  @apply text-primary;
 }
 .notification-list > button i svg {
   width: 15px;
@@ -191,25 +176,25 @@
   flex: 1;
 }
 .notification-list b {
-  @apply text-xs;
+  @apply type-helper;
 }
 .notification-list p {
   margin: 4px 0;
-  color: #6e798b;
-  @apply text-2xs;
+  @apply text-primary;
+  @apply type-helper;
   @apply leading-normal;
 }
 .notification-list small {
-  color: #a0a8b5;
-  @apply text-2xs;
+  @apply text-primary;
+  @apply type-helper;
 }
 .mock-warning,
 .security-note {
   padding: 11px;
   border-radius: 8px;
-  background: #fff8e7;
-  color: #8f661b;
-  @apply text-2xs;
+  background: var(--surface);
+  @apply text-error;
+  @apply type-helper;
 }
 .package-grid {
   display: grid;
@@ -219,13 +204,13 @@
 }
 .package-grid article {
   padding: 13px;
-  border: 1px solid #e0e5ed;
+  border: 1px solid var(--border);
   border-radius: 10px;
 }
 .package-grid article > span {
-  @apply text-2xs;
-  color: #246bfd;
-  background: #edf3ff;
+  @apply type-helper;
+  @apply text-primary;
+  background: var(--canvas-soft);
   border-radius: 99px;
   padding: 3px 5px;
 }
@@ -234,61 +219,61 @@
   display: block;
 }
 .package-grid article > b {
-  @apply text-2xs;
+  @apply type-helper;
   margin-top: 13px;
 }
 .package-grid strong {
-  @apply text-lg;
+  @apply type-section-title;
   margin-top: 5px;
 }
 .package-grid strong small {
-  @apply text-2xs;
-  color: #8b95a5;
+  @apply type-helper;
+  @apply text-primary;
 }
 .package-grid p {
-  @apply text-2xs;
-  color: #6d7788;
+  @apply type-helper;
+  @apply text-primary;
 }
 .package-grid button {
   width: 100%;
   height: 30px;
   border: 0;
   border-radius: 6px;
-  background: #246bfd;
-  color: white;
-  @apply text-2xs;
+  background: var(--primary);
+  @apply text-on-primary;
+  @apply type-badge;
 }
 .panel-subtitle {
-  @apply text-xs;
+  @apply type-helper;
   margin: 24px 0 8px;
 }
 .order-list > div {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #edf0f4;
+  border-bottom: 1px solid var(--border);
   padding: 11px 0;
 }
 .order-list b,
 .order-list small {
   display: block;
-  @apply text-2xs;
+  @apply type-helper;
 }
 .order-list small {
-  color: #9aa3b1;
-  @apply text-2xs;
+  @apply text-primary;
+  @apply type-helper;
   margin-top: 3px;
 }
 .order-list em {
-  font-style: normal;
-  color: #18a464;
-  @apply text-2xs;
+  @apply not-italic;
+  @apply text-success;
+  @apply type-helper;
 }
 .account-hero {
   display: flex;
   padding: 16px;
   border-radius: 11px;
-  background: linear-gradient(145deg, #eaf1ff, #f6f2ff);
+  background: var(--canvas-soft);
   margin-bottom: 12px;
 }
 .account-hero b,
@@ -297,30 +282,30 @@
   display: block;
 }
 .account-hero b {
-  @apply text-sm;
+  @apply type-body;
   margin-top: 2px;
 }
 .account-hero span {
-  @apply text-2xs;
-  color: #748096;
+  @apply type-helper;
+  @apply text-primary;
   margin-top: 4px;
 }
 .account-hero small {
-  @apply text-2xs;
-  color: #246bfd;
+  @apply type-helper;
+  @apply text-primary;
   margin-top: 4px;
 }
 .account-summary > button {
   width: 100%;
   min-height: 58px;
   border: 0;
-  border-bottom: 1px solid #edf0f4;
-  background: white;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
   display: flex;
   align-items: center;
   gap: 11px;
   text-align: left;
-  color: #60708a;
+  @apply text-primary;
 }
 .account-summary > button > svg {
   width: 18px;
@@ -333,17 +318,17 @@
   display: block;
 }
 .account-summary > button b {
-  @apply text-xs;
-  color: #344158;
+  @apply type-helper;
+  @apply text-primary;
 }
 .account-summary > button small {
-  @apply text-2xs;
-  color: #99a1af;
+  @apply type-helper;
+  @apply text-primary;
   margin-top: 4px;
 }
 .account-summary .logout-button {
   justify-content: center;
-  color: #d34458;
+  @apply text-error;
   border-bottom: 0;
   margin-top: 18px;
 }
@@ -351,15 +336,15 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #edf3ff;
-  color: #536f9e;
+  background: var(--canvas-soft);
+  @apply text-primary;
 }
 .security-note svg {
   width: 17px;
 }
 .merge-preview > span {
-  @apply text-2xs;
-  color: #dce5f5;
+  @apply type-helper;
+  @apply text-muted-soft;
 }
 @media (max-width: 700px) {
   .workspace-body {

@@ -62,21 +62,21 @@ export function VideoCreateVoiceSettingsDialog(props: {
                     selected && "border-ink bg-canvas-soft",
                   )}
                 >
-                  <button
+                  <Button
                     type="button"
                     className="flex min-w-0 flex-1 items-center gap-3 text-left"
                     onClick={() => setDraft((current) => ({ ...current, presetVoiceId: voice.id }))}
                   >
-                    <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-ink text-base font-semibold text-white">
+                    <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-ink type-section-title text-on-primary">
                       {voice.name.slice(0, 1)}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-2 font-medium text-ink">
+                      <span className="flex items-center gap-2 type-body-strong text-ink">
                         {voice.name} {selected && <Check className="size-4" />}
                       </span>
-                      <span className="mt-1 block text-xs text-muted">{voice.description}</span>
+                      <span className="mt-1 block type-helper text-muted">{voice.description}</span>
                     </span>
-                  </button>
+                  </Button>
                   <Button
                     type="button"
                     size="sm"
@@ -107,12 +107,12 @@ export function VideoCreateVoiceSettingsDialog(props: {
             onChange={(style) => setDraft((current) => ({ ...current, style }))}
           />
           {!props.providerEnabled && (
-            <p className="text-sm text-warning">{props.disabledReason ?? "火山语音当前不可用"}</p>
+            <p className="type-body text-warning">{props.disabledReason ?? "火山语音当前不可用"}</p>
           )}
-          {error && <p className="text-sm text-error">{error}</p>}
+          {error && <p className="type-body text-error">{error}</p>}
         </div>
         <DialogFooter className="border-t border-line px-6 py-4">
-          <span className="mr-auto text-xs text-muted">
+          <span className="mr-auto type-helper text-muted">
             当前：{voicePresetCatalog.find((voice) => voice.id === draft.presetVoiceId)?.name}
           </span>
           <Button variant="outline" onClick={() => props.onOpenChange(false)}>
@@ -139,14 +139,17 @@ function SettingChoice<T extends string>(props: {
 }) {
   return (
     <section className="space-y-2">
-      <h3 className="text-sm font-medium text-ink">{props.label}</h3>
+      <h3 className="type-section-title text-ink">{props.label}</h3>
       <div className="flex flex-wrap gap-2">
         {props.options.map((option) => (
           <Button
             type="button"
             key={option.id}
             variant="outline"
-            className={cn("rounded-full", props.value === option.id && "border-ink bg-ink text-white hover:bg-ink/90")}
+            className={cn(
+              "rounded-full",
+              props.value === option.id && "border-ink bg-ink text-on-primary hover:bg-ink/90",
+            )}
             onClick={() => props.onChange(option.id)}
           >
             {option.label}
@@ -176,7 +179,7 @@ export function VideoCreateSubtitleSettingsDialog(props: {
         </DialogHeader>
         <div className="grid max-h-[68vh] gap-3 overflow-y-auto p-6 sm:grid-cols-2 lg:grid-cols-3">
           {videoCreateSubtitlePresets.map((preset) => (
-            <button
+            <Button
               type="button"
               key={preset.id}
               className={cn(
@@ -185,20 +188,20 @@ export function VideoCreateSubtitleSettingsDialog(props: {
               )}
               onClick={() => setDraft(preset.id)}
             >
-              <span className="flex h-24 items-end justify-center bg-gradient-to-br from-slate-700 via-slate-900 to-black p-4">
-                <span className={cn("[text-shadow:0_2px_2px_rgb(0_0_0/0.9)]", preset.previewClassName)}>示例字幕</span>
+              <span className="flex h-24 items-end justify-center bg-surface-dark p-4">
+                <span className={preset.previewClassName}>示例字幕</span>
               </span>
               <span className="block p-3">
-                <span className="flex items-center gap-2 text-sm font-medium text-ink">
+                <span className="flex items-center gap-2 type-body-strong text-ink">
                   {preset.name} {draft === preset.id && <Check className="size-4" />}
                 </span>
-                <span className="mt-1 block text-xs text-muted">{preset.description}</span>
+                <span className="mt-1 block type-helper text-muted">{preset.description}</span>
               </span>
-            </button>
+            </Button>
           ))}
         </div>
         <DialogFooter className="border-t border-line px-6 py-4">
-          <span className="mr-auto text-xs text-muted">
+          <span className="mr-auto type-helper text-muted">
             当前：{videoCreateSubtitlePresets.find((preset) => preset.id === draft)?.name}
           </span>
           <Button variant="outline" onClick={() => props.onOpenChange(false)}>

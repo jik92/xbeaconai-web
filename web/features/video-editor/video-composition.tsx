@@ -5,7 +5,7 @@ import { clipDuration, type VideoEditorTimeline } from "../../../shared/video-ed
 export function VideoComposition({ timeline }: { timeline: VideoEditorTimeline }) {
   let from = 0;
   return (
-    <AbsoluteFill style={{ backgroundColor: "#000" }}>
+    <AbsoluteFill className="bg-surface-dark">
       {timeline.clips.map((clip) => {
         const source = timeline.sources.find((item) => item.id === clip.sourceId);
         if (!source) return null;

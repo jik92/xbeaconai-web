@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, max } from "drizzle-orm";
+import { and, asc, count, desc, eq, like, max } from "drizzle-orm";
 import type { VideoCreateSubtitleStyleId, VideoCreateVoiceSettings } from "../../shared/video-create/media-settings";
 import { videoCreateVoiceSettingsKey } from "../../shared/video-create/media-settings";
 import { type AppDatabase, openDatabase } from "../db/database";
@@ -191,6 +191,30 @@ export class VideoCreateStore {
       .map((project) => this.aggregate(project));
   }
 
+  listOwnedPage(input: {
+    ownerUserId: string;
+    query?: string;
+    status?: VideoCreateProjectStatus;
+    page: number;
+    pageSize: number;
+  }) {
+    const filters = [eq(videoCreateProjects.ownerUserId, input.ownerUserId)];
+    if (input.query) filters.push(like(videoCreateProjects.title, `%${input.query}%`));
+    if (input.status) filters.push(eq(videoCreateProjects.status, input.status));
+    const where = and(...filters);
+    const total = this.db.select({ value: count() }).from(videoCreateProjects).where(where).get()?.value ?? 0;
+    const projects = this.db
+      .select()
+      .from(videoCreateProjects)
+      .where(where)
+      .orderBy(desc(videoCreateProjects.updatedAt))
+      .limit(input.pageSize)
+      .offset((input.page - 1) * input.pageSize)
+      .all()
+      .map((project) => this.aggregate(project));
+    return { projects, total, page: input.page, pageSize: input.pageSize };
+  }
+
   listAutoGenerateProjects() {
     return this.db
       .select()
@@ -211,6 +235,25 @@ export class VideoCreateStore {
       .update(videoCreateProjects)
       .set({ input, version: project.version + 1, updatedAt: new Date().toISOString() })
       .where(and(eq(videoCreateProjects.id, projectId), eq(videoCreateProjects.version, expectedVersion)))
+      .run();
+    return this.getOwned(projectId, ownerUserId);
+  }
+
+  updateTitle(projectId: string, ownerUserId: string, expectedVersion: number, title: string) {
+    const project = this.getOwned(projectId, ownerUserId)?.project;
+    if (!project) return undefined;
+    if (project.version !== expectedVersion)
+      throw new VideoCreateVersionConflictError("项目已被其他页面修改，请刷新后重试");
+    this.db
+      .update(videoCreateProjects)
+      .set({ title, version: project.version + 1, updatedAt: new Date().toISOString() })
+      .where(
+        and(
+          eq(videoCreateProjects.id, projectId),
+          eq(videoCreateProjects.ownerUserId, ownerUserId),
+          eq(videoCreateProjects.version, expectedVersion),
+        ),
+      )
       .run();
     return this.getOwned(projectId, ownerUserId);
   }

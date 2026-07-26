@@ -278,10 +278,16 @@ export async function fetchModels() {
   return data?.models ?? [];
 }
 
-export async function fetchVideoCreateProjects() {
+export async function fetchVideoCreateProjects(input: {
+  query?: string;
+  status?: VideoCreateProject["project"]["status"];
+  page: number;
+  pageSize: number;
+}) {
   configure();
-  const { data } = await listVideoCreateProjects({ headers: authHeaders(), throwOnError: true });
-  return data?.projects ?? [];
+  const { data } = await listVideoCreateProjects({ query: input, headers: authHeaders(), throwOnError: true });
+  if (!data) throw new Error("一键成片生成记录加载失败");
+  return data;
 }
 
 export async function fetchVideoCreateProject(projectId: string): Promise<VideoCreateProject> {
@@ -311,6 +317,18 @@ export async function updateVideoCreate(input: VideoCreateProject, values: Video
     throwOnError: true,
   });
   if (!data) throw new Error("一键成片参数保存失败");
+  return data;
+}
+
+export async function renameVideoCreateProject(projectId: string, expectedVersion: number, title: string) {
+  configure();
+  const { data } = await updateVideoCreateProject({
+    path: { projectId },
+    body: { expectedVersion, title },
+    headers: authHeaders(),
+    throwOnError: true,
+  });
+  if (!data) throw new Error("一键成片项目重命名失败");
   return data;
 }
 

@@ -31,6 +31,7 @@ colors:
   gradient-rose: "#e8b8c4"
   semantic-error: "#dc2626"
   semantic-success: "#16a34a"
+  semantic-warning: "#777169"
 
 typography:
   font-sans: "'Inter', 'PingFang SC', 'Microsoft YaHei', ui-sans-serif, system-ui, sans-serif"
@@ -38,15 +39,7 @@ typography:
   text-2xs: 10px / 14px
   text-xs: 12px / 16px
   text-sm: 14px / 20px
-  text-base: 16px / 24px
-  text-lg: 18px / 26px
-  text-xl: 20px / 28px
-  text-2xl: 24px / 32px
-  text-3xl: 30px / 36px
-  text-4xl: 36px / 42px
-  text-5xl: 48px / 52px
-  text-6xl: 64px / 68px
-  weights: [300, 400, 500, 600]
+  weights: [400, 500, 600]
   tracking: [tight, normal, wide, wider, widest]
 
 rounded:
@@ -241,6 +234,7 @@ These appear ONLY as soft radial-gradient atmospheric orbs inside `{component.gr
 ### Semantic
 - **Success** (`{colors.semantic-success}` — #16a34a): Confirmation.
 - **Error** (`{colors.semantic-error}` — #dc2626): Validation errors.
+- **Warning** (`{colors.semantic-warning}` — #777169): Restrained operational warnings that must remain distinct from errors without introducing another saturated accent.
 
 ## Typography
 
@@ -248,28 +242,29 @@ These appear ONLY as soft radial-gradient atmospheric orbs inside `{component.gr
 
 `web/styles/tailwind.css` is the only runtime source for font families and the type scale. `font-sans` uses `Inter`, `PingFang SC`, `Microsoft YaHei`, `ui-sans-serif`, `system-ui`, then `sans-serif`. The repository does not currently ship Inter or Waldenburg font files, so installed system fonts provide the actual rendering. `font-display` intentionally aliases `font-sans` until an approved, bundled display font is available.
 
-TSX uses Tailwind classes directly. Legacy selector-based CSS uses `@apply` after referencing the shared Tailwind theme. Raw `font-family`, `font-size`, `font-weight`, `line-height`, `letter-spacing`, inline typography styles, and arbitrary typography utilities are prohibited. The only base-layer exception is `font: inherit` on native form controls.
+TSX and legacy selector-based CSS use the semantic `type-*` utilities defined in `web/styles/tailwind.css`. Raw visual `text-*` and `font-*` combinations, raw `font-family`, `font-size`, `font-weight`, `line-height`, `letter-spacing`, inline typography styles, and arbitrary typography utilities are prohibited outside that source-of-truth file. The only base-layer exception is `font: inherit` on native form controls.
 
 ### Hierarchy
 
-| Tailwind Token | Size / Line Height | Use |
-|---|---|---|
-| `text-2xs` | 10px / 14px | Dense metadata and compact status only |
-| `text-xs` | 12px / 16px | Helper copy, labels, badges, timestamps |
-| `text-sm` | 14px / 20px | Default product body, buttons, forms, tables, navigation |
-| `text-base` | 16px / 24px | Emphasized body and relaxed reading content |
-| `text-lg` | 18px / 26px | Small section and dialog titles |
-| `text-xl` | 20px / 28px | Component and standard dialog titles |
-| `text-2xl` | 24px / 32px | Product page titles |
-| `text-3xl` | 30px / 36px | Large product page titles |
-| `text-4xl` | 36px / 42px | Compact marketing display titles |
-| `text-5xl` | 48px / 52px | Marketing hero titles |
-| `text-6xl` | 64px / 68px | Homepage hero only; forbidden in product workspaces |
+| Semantic Token | Size / Line Height | Weight | Use |
+|---|---|---|---|
+| `type-page-title` | 14px / 20px | 600 | The single primary title of a product page |
+| `type-section-title` | 14px / 20px | 500 | Section, dialog, and panel titles |
+| `type-card-title` | 14px / 20px | 500 | Card and list-item titles |
+| `type-body` | 14px / 20px | 400 | Default copy, inputs, navigation, and table cells |
+| `type-body-strong` | 14px / 20px | 500 | Emphasized body and primary actions |
+| `type-label` | 12px / 16px | 500 | Field labels and table headings |
+| `type-helper` | 12px / 16px | 400 | Descriptions, hints, timestamps, and counts |
+| `type-badge` | 12px / 16px | 500 | Status labels, tags, and compact actions |
+| `type-micro` | 10px / 14px | 400 | Media overlays, timecodes, and canvas scales only |
+| `type-micro-strong` | 10px / 14px | 500 | Emphasized media overlays only |
 
 ### Principles
-- **Compact product default.** Product pages inherit `font-sans text-sm`; use larger body text only when reading comfort materially benefits.
-- **Limited weights.** Use only `font-light`, `font-normal`, `font-medium`, and `font-semibold`. `font-light` is display-only; normal text never drops below 400.
-- **Controlled rhythm.** Prefer the line height bundled with each `text-*` Token. Overrides are limited to Tailwind `leading-none`, `leading-tight`, `leading-snug`, `leading-normal`, `leading-relaxed`, and `leading-loose`.
+- **Compact product default.** Every product-interface role resolves to 10px, 12px, or 14px. No product text exceeds 14px.
+- **Semantic roles only.** Choose a `type-*` role from the table based on content meaning instead of selecting a visual size or weight directly.
+- **Limited weights.** Use only 400, 500, and 600 through the semantic roles. Only page titles use 600.
+- **Restricted micro text.** The 10px roles are limited to constrained media overlays, timecodes, and canvas scales; forms, tables, buttons, descriptions, and ordinary metadata never use them.
+- **Controlled rhythm.** Prefer the line height bundled with each semantic type role. Overrides are limited to Tailwind `leading-none`, `leading-tight`, `leading-snug`, `leading-normal`, `leading-relaxed`, and `leading-loose`.
 - **Controlled tracking.** Use only `tracking-tight`, `tracking-normal`, `tracking-wide`, `tracking-wider`, and `tracking-widest`. Running body copy normally uses default tracking.
 - **No arbitrary values.** Do not use `text-[…]`, `font-[…]`, `leading-[…]`, `tracking-[…]`, or inline typography styles.
 - **No fake fonts.** Do not reference a font family unless its files are bundled or it exists in the approved fallback stack.
@@ -333,6 +328,10 @@ The system uses **hairline + soft drop**. Cards float above the off-white canvas
 
 ### Buttons
 
+**`button-compact`** — All product-interface button semantics, including icon actions, tabs, clickable cards, media selectors, upload triggers, and timeline controls, use the shared shadcn `Button`; business components must not render native `<button>` markup. The component defaults to `sm` at 32px high with `type-badge`, while `icon-sm` is 32px square. Use `default`/`icon` at 36px or `cta` at 40px only when the hierarchy explicitly requires more emphasis. Specialized controls may override geometry and internal layout, but focus, disabled state, semantic type, and base interaction remain owned by the shared component.
+
+**`button-header-actions`** — Product page Headers use one 8px-spaced compact action group. Primary actions use `default + sm`; save, record, refresh, and other secondary actions use `outline + sm`; new, reset, and low-emphasis actions use `ghost + sm`. Modal, drawer, and preview Header close actions use `ghost + icon-sm` with an explicit accessible label. Header CSS owns layout only and must not override Button height, padding, border, radius, color, typography, shadow, hover, focus, or disabled states.
+
 **`button-primary`** — Near-black ink pill. Background `{colors.primary}`, text `{colors.on-primary}`, type `font-sans text-sm font-medium` (14px / 500), padding 10px × 20px, height 40px, rounded `{rounded.pill}`.
 
 **`button-primary-active`** — Press state. Background `{colors.primary-active}`.
@@ -362,6 +361,8 @@ The system uses **hairline + soft drop**. Cards float above the off-white canvas
 **`data-table`** — One shared shadcn-style table appearance across the system. Use a 40px sticky header, 56px rows, compact cell padding, and subtle horizontal row dividers. The component has no outer card border, radius, shadow, owned background, page-specific visual variant, or horizontal scrollbar. Columns share the available width proportionally; long content stays on one line and truncates. Pages control layout and background only; compose filters and actions with shadcn `h-8` controls and Tailwind spacing utilities.
 
 **`asset-page`** — Shared compact shell for materials, portraits, products, and voices. Use a full-content-height white `p-3` page, one compact search/action toolbar, an independently scrolling content region, and a small result count. The four asset sidebar entries show their real cached total counts, including `0`; a failed or still-loading count stays hidden without blocking navigation. Materials retain a two-column folder-and-table layout separated by one `border-line` vertical hairline; portraits and products retain preview grids; voices use horizontal `voice-row` items. Do not add page cards, subtitles, descriptions, or per-page toolbar styling.
+
+**`project-record-drawer`** — Shared compact generation-history drawer used by video remix and one-click video creation. Use one `max-w-lg` right-side shell with a 52px title bar, one compact search/status row, independently scrolling row cards, and a 52px loaded-count footer. Every record keeps the same semantic order: 14px project title, 12px status and business summary, then 12px creator/time and actions. Search, status filtering, inline rename, continue, pagination, loading, empty, error, retry, and current-project states must stay in the shared component; business pages only adapt their API data and restore behavior. Do not rebuild the drawer as a wide table or add module-specific drawer CSS.
 
 **`admin-page`** — Full-height white management workspace using a compact tab row, `h-8` shadcn controls, hairline separators, and the shared `DataTable`. Credential management uses one row per key with fixed Provider, credential, status, new value, Doctor result, and action columns; save and delete operate per row while one global Doctor action stays in the toolbar. Doctor results persist between sessions; changing or deleting a Provider key clears that Provider's result until it is tested again. User management uses the same table for account identity, credits, status, timestamps, recharge, disable, restore, and current-page selection actions; only disabled non-admin accounts may be selected for physical release. Custom credit grants use the shared title-only compact modal, while account release uses a danger Dialog that lists the selected accounts and requires the exact phrase `释放账号` before submission. Queue controls keep refresh and destructive bulk stop in the same toolbar. Provider audit logs use compact user/Provider/module/status/date filters above the shared table; the read-only, title-only detail Dialog shows the original redacted JSON, timing and identifiers, Provider response or error, and generated results through the shared media preview. Do not wrap the page in decorative cards.
 

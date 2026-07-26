@@ -34,7 +34,7 @@ const statusStyles: Record<AdminProviderAudit["status"], string> = {
   submitting: "bg-surface-muted text-muted",
   processing: "bg-surface-strong text-ink",
   succeeded: "bg-success/10 text-success",
-  failed: "bg-danger/10 text-danger",
+  failed: "bg-error/10 text-error",
   cancelled: "bg-surface-muted text-muted",
 };
 
@@ -78,7 +78,7 @@ export function buildProviderAuditQuery(filters: ProviderAuditFilterState): Audi
 
 function JsonBlock({ value, empty = "—" }: { value: unknown; empty?: string }) {
   return (
-    <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-surface-muted p-3 font-mono text-2xs leading-relaxed text-ink">
+    <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-surface-muted p-3 font-sans type-helper leading-relaxed text-ink">
       {value === undefined ? empty : JSON.stringify(value, null, 2)}
     </pre>
   );
@@ -86,11 +86,11 @@ function JsonBlock({ value, empty = "—" }: { value: unknown; empty?: string })
 
 export function AuditDetail({ detail, loading }: { detail?: AdminProviderAuditDetail; loading: boolean }) {
   if (loading)
-    return <div className="flex min-h-48 items-center justify-center text-xs text-muted">正在加载审计详情…</div>;
+    return <div className="flex min-h-48 items-center justify-center type-helper text-muted">正在加载审计详情…</div>;
   if (!detail)
-    return <div className="flex min-h-48 items-center justify-center text-xs text-danger">审计详情加载失败</div>;
+    return <div className="flex min-h-48 items-center justify-center type-helper text-error">审计详情加载失败</div>;
   return (
-    <div className="min-h-0 space-y-4 overflow-y-auto pr-1 text-xs">
+    <div className="min-h-0 space-y-4 overflow-y-auto pr-1 type-helper">
       <dl className="grid grid-cols-2 gap-x-6 gap-y-3 border-b border-line pb-4 max-md:grid-cols-1">
         {[
           ["用户", `${detail.userDisplayName ?? "—"} · ${detail.userPhone ?? "—"}`],
@@ -111,32 +111,32 @@ export function AuditDetail({ detail, loading }: { detail?: AdminProviderAuditDe
         ))}
       </dl>
       <section className="space-y-2">
-        <h3 className="font-medium text-ink">原始提交参数</h3>
+        <h3 className="type-section-title text-ink">原始提交参数</h3>
         <JsonBlock value={detail.requestPayload} />
       </section>
       <section className="space-y-2">
-        <h3 className="font-medium text-ink">第三方响应</h3>
+        <h3 className="type-section-title text-ink">第三方响应</h3>
         <JsonBlock value={detail.responsePayload} />
       </section>
       {detail.errorPayload !== undefined && (
         <section className="space-y-2">
-          <h3 className="font-medium text-danger">错误信息</h3>
+          <h3 className="type-section-title text-error">错误信息</h3>
           <JsonBlock value={detail.errorPayload} />
         </section>
       )}
       <section className="space-y-2">
-        <h3 className="font-medium text-ink">生成素材</h3>
+        <h3 className="type-section-title text-ink">生成素材</h3>
         {detail.assets.length ? (
           <div className="grid grid-cols-2 gap-3 max-md:grid-cols-1">
             {detail.assets.map((asset) => (
               <div className="min-w-0 rounded-xl border border-line p-2" key={asset.id}>
-                <div className="mb-2 truncate text-xs text-ink">{asset.name}</div>
+                <div className="mb-2 truncate type-helper text-ink">{asset.name}</div>
                 {asset.available && asset.url && asset.mimeType ? (
                   <MediaPreview
                     url={asset.url}
                     mimeType={asset.mimeType}
                     alt={asset.name}
-                    className="max-h-64 w-full rounded-lg bg-black object-contain"
+                    className="max-h-64 w-full rounded-lg bg-surface-dark object-contain"
                   />
                 ) : (
                   <div className="flex h-16 items-center justify-center rounded-lg bg-surface-muted text-muted">
@@ -188,7 +188,7 @@ function auditColumns(onView: (auditId: string) => void): ColumnDef<AdminProvide
       header: "状态",
       size: 75,
       cell: ({ row }) => (
-        <span className={`inline-flex rounded-full px-2 py-0.5 text-2xs ${statusStyles[row.original.status]}`}>
+        <span className={`inline-flex rounded-full px-2 py-0.5 type-helper ${statusStyles[row.original.status]}`}>
           {statusLabels[row.original.status]}
         </span>
       ),
@@ -275,14 +275,14 @@ export function ProviderAuditPanel({
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex min-h-11 flex-wrap items-center gap-2 border-b border-line px-1 py-1">
         <Input
-          className="h-8 w-52 text-xs"
+          className="h-8 w-52 type-helper"
           placeholder="用户、任务或第三方任务"
           value={search}
           onChange={(event) => update(setSearch, event.target.value)}
         />
         <NativeSelect
           aria-label="Provider"
-          className="h-8 text-xs"
+          className="h-8 type-helper"
           value={provider}
           onChange={(event) => update(setProvider, event.target.value)}
         >
@@ -294,7 +294,7 @@ export function ProviderAuditPanel({
         </NativeSelect>
         <NativeSelect
           aria-label="模块"
-          className="h-8 text-xs"
+          className="h-8 type-helper"
           value={moduleId}
           onChange={(event) => update(setModuleId, event.target.value)}
         >
@@ -309,7 +309,7 @@ export function ProviderAuditPanel({
         </NativeSelect>
         <NativeSelect
           aria-label="状态"
-          className="h-8 text-xs"
+          className="h-8 type-helper"
           value={status}
           onChange={(event) => update(setStatus, event.target.value)}
         >
@@ -322,14 +322,14 @@ export function ProviderAuditPanel({
         </NativeSelect>
         <Input
           aria-label="开始日期"
-          className="h-8 w-32 text-xs"
+          className="h-8 w-32 type-helper"
           type="date"
           value={startedFrom}
           onChange={(event) => update(setStartedFrom, event.target.value)}
         />
         <Input
           aria-label="结束日期"
-          className="h-8 w-32 text-xs"
+          className="h-8 w-32 type-helper"
           type="date"
           value={startedTo}
           onChange={(event) => update(setStartedTo, event.target.value)}
@@ -337,7 +337,7 @@ export function ProviderAuditPanel({
         <Button variant="outline" size="sm" onClick={() => void query.refetch()}>
           <RefreshCw className={query.isFetching ? "animate-spin" : ""} /> 刷新
         </Button>
-        <span className="ml-auto text-xs text-muted">共 {query.data?.total ?? 0} 条日志</span>
+        <span className="ml-auto type-helper text-muted">共 {query.data?.total ?? 0} 条日志</span>
       </div>
       <ProviderAuditTable
         audits={query.data?.audits ?? []}
@@ -345,7 +345,7 @@ export function ProviderAuditPanel({
         error={query.error}
         onView={setSelectedId}
       />
-      <footer className="flex h-11 items-center justify-end gap-2 border-t border-line text-xs text-muted">
+      <footer className="flex h-11 items-center justify-end gap-2 border-t border-line type-helper text-muted">
         <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>
           上一页
         </Button>

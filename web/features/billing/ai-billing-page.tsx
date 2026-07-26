@@ -136,11 +136,11 @@ export function AiBillingPage() {
   const records = (query.data?.records ?? []) as Array<AiRechargeRecord | AiConsumptionRecord>;
 
   return (
-    <div className="flex h-[calc(100vh-56px)] min-h-0 flex-col bg-white p-3 text-ink">
+    <div className="flex h-[calc(100vh-56px)] min-h-0 flex-col bg-surface p-3 text-ink">
       <header className="flex h-11 shrink-0 items-center gap-2 border-b border-line px-1">
-        <h1 className="text-xl font-medium">AI账单</h1>
-        <div className="ml-auto flex items-center gap-2 text-xs" role="group" aria-label="账单记录类型">
-          <span className={type === "recharges" ? "font-medium text-ink" : "text-muted"}>充值记录</span>
+        <h1 className="type-page-title">AI账单</h1>
+        <div className="ml-auto flex items-center gap-2 type-helper" role="group" aria-label="账单记录类型">
+          <span className={type === "recharges" ? "type-body-strong text-ink" : "type-body text-muted"}>充值记录</span>
           <Switch
             checked={type === "consumption"}
             aria-label="切换充值记录和消费记录"
@@ -149,12 +149,14 @@ export function AiBillingPage() {
               setPage(1);
             }}
           />
-          <span className={type === "consumption" ? "font-medium text-ink" : "text-muted"}>消费记录</span>
+          <span className={type === "consumption" ? "type-body-strong text-ink" : "type-body text-muted"}>
+            消费记录
+          </span>
         </div>
         <Button variant="outline" size="sm" onClick={() => void query.refetch()}>
           <RefreshCw className={query.isFetching ? "animate-spin" : ""} /> 刷新
         </Button>
-        <span className="text-xs text-muted">共 {query.data?.total ?? 0} 条</span>
+        <span className="type-helper text-muted">共 {query.data?.total ?? 0} 条</span>
       </header>
       <DataTable
         columns={columns}
@@ -165,7 +167,7 @@ export function AiBillingPage() {
         emptyMessage={`暂无${recordTitle}`}
         className="min-h-0 flex-1"
       />
-      <footer className="flex h-11 shrink-0 items-center justify-end gap-2 border-t border-line text-xs text-muted">
+      <footer className="flex h-11 shrink-0 items-center justify-end gap-2 border-t border-line type-helper text-muted">
         <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>
           上一页
         </Button>

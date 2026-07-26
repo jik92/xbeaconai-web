@@ -36,8 +36,8 @@ function formatElapsed(seconds?: number | null) {
 function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <span className="text-xs text-muted">{label}</span>
-      <p className="truncate text-sm text-ink" title={value}>
+      <span className="type-helper text-muted">{label}</span>
+      <p className="truncate type-body text-ink" title={value}>
         {value}
       </p>
     </div>
@@ -57,7 +57,7 @@ export function VideoCreateMaterialHistoryDialog(props: {
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <DialogContent className="grid max-h-[80vh] max-w-5xl grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
         <DialogHeader>
-          <DialogTitle className="text-xl">生成历史</DialogTitle>
+          <DialogTitle className="type-section-title">生成历史</DialogTitle>
         </DialogHeader>
         <div className="min-h-0 overflow-y-auto pr-1">
           {props.loading ? (
@@ -71,7 +71,7 @@ export function VideoCreateMaterialHistoryDialog(props: {
                 const available = version.available && Boolean(versionUrl(version));
                 return (
                   <Card className="gap-0 overflow-hidden py-0 lg:flex-row" key={version.id}>
-                    <div className="flex aspect-video w-full shrink-0 items-center justify-center bg-surface-muted text-xs text-muted lg:w-52">
+                    <div className="flex aspect-video w-full shrink-0 items-center justify-center bg-surface-muted type-helper text-muted lg:w-52">
                       {available ? (
                         <AuthenticatedMedia
                           url={versionUrl(version)}
@@ -87,8 +87,8 @@ export function VideoCreateMaterialHistoryDialog(props: {
                     <CardContent className="grid min-w-0 flex-1 gap-4 p-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_12rem_auto] lg:items-center">
                       <div className="min-w-0 space-y-3">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-ink">{sourceLabels[version.source]}</span>
-                          <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs text-muted">
+                          <span className="type-body-strong text-ink">{sourceLabels[version.source]}</span>
+                          <span className="rounded-full bg-surface-muted px-2 py-0.5 type-helper text-muted">
                             {version.status === "pending"
                               ? "生成中"
                               : version.status === "failed"
@@ -132,7 +132,7 @@ export function VideoCreateMaterialHistoryDialog(props: {
                       </div>
                       <div className="flex flex-col items-stretch gap-2 sm:col-span-2 lg:col-span-1 lg:items-end">
                         {version.error?.message && (
-                          <p className="max-w-48 text-xs text-error">{version.error.message}</p>
+                          <p className="max-w-48 type-helper text-error">{version.error.message}</p>
                         )}
                         <Button
                           size="sm"
@@ -164,7 +164,7 @@ export function VideoCreateMaterialHistoryDialog(props: {
               })}
             </div>
           ) : (
-            <p className="py-16 text-center text-sm text-muted">暂无生成历史</p>
+            <p className="py-16 text-center type-body text-muted">暂无生成历史</p>
           )}
         </div>
       </DialogContent>

@@ -5,6 +5,7 @@ import { fetchJobs, submitJob } from "@/api/api-client";
 import type { Job } from "@/api/generated/types.gen";
 import type { AttachmentSelection } from "@/components/domain/attachment-picker";
 import { type PromptReference, PromptWorkbench } from "@/components/domain/prompt-workbench";
+import { Button } from "@/components/ui/button";
 import type { ApiJobResult } from "@/entities/types";
 import { randomUuid } from "@/lib/random-id";
 import "./media-understand-page.css";
@@ -113,23 +114,23 @@ export function MediaUnderstandPage() {
           submitting={submitting}
           controls={
             <>
-              <button onClick={() => setPanel(panel === "model" ? undefined : "model")}>
+              <Button onClick={() => setPanel(panel === "model" ? undefined : "model")}>
                 <Box />
                 {models.find((item) => item.id === model)?.name}
                 <ChevronDown />
-              </button>
-              <button onClick={() => setPanel(panel === "reasoning" ? undefined : "reasoning")}>
+              </Button>
+              <Button onClick={() => setPanel(panel === "reasoning" ? undefined : "reasoning")}>
                 思考深度: {reasoningOptions.find((item) => item.id === reasoning)?.label}
                 <ChevronDown />
-              </button>
+              </Button>
             </>
           }
         >
           {panel === "model" && (
             <div className="ag-popover mu-model-panel">
-              <h3>理解模型</h3>
+              <h3 className="type-section-title">理解模型</h3>
               {models.map((item) => (
-                <button
+                <Button
                   key={item.id}
                   onClick={() => {
                     setModel(item.id);
@@ -138,18 +139,18 @@ export function MediaUnderstandPage() {
                 >
                   <span>
                     <b>{item.name}</b>
-                    <small>{item.description}</small>
+                    <small className="type-helper">{item.description}</small>
                   </span>
                   {model === item.id && <Check />}
-                </button>
+                </Button>
               ))}
             </div>
           )}
           {panel === "reasoning" && (
             <div className="ag-popover mu-reasoning-panel">
-              <h3>思考深度</h3>
+              <h3 className="type-section-title">思考深度</h3>
               {reasoningOptions.map((item) => (
-                <button
+                <Button
                   key={item.id}
                   onClick={() => {
                     setReasoning(item.id);
@@ -158,7 +159,7 @@ export function MediaUnderstandPage() {
                 >
                   {item.label}
                   {reasoning === item.id && <Check />}
-                </button>
+                </Button>
               ))}
             </div>
           )}
@@ -170,10 +171,10 @@ export function MediaUnderstandPage() {
           </div>
         )}
         {notice && (
-          <button className="mu-notice" onClick={() => setNotice("")}>
+          <Button className="mu-notice" onClick={() => setNotice("")}>
             {notice}
             <X />
-          </button>
+          </Button>
         )}
       </div>
 
@@ -182,24 +183,24 @@ export function MediaUnderstandPage() {
           <header>
             <div>
               <span>MATERIAL INSIGHTS</span>
-              <h2>最近理解</h2>
+              <h2 className="type-section-title">最近理解</h2>
             </div>
-            <small>{tasks.length} 个任务</small>
+            <small className="type-helper">{tasks.length} 个任务</small>
           </header>
           <div>
             {tasks.slice(0, 6).map((task) => (
-              <button key={task.id} onClick={() => setSelectedTask(task)}>
+              <Button key={task.id} onClick={() => setSelectedTask(task)}>
                 <ScanSearch />
                 <span>
                   <b>{task.title}</b>
-                  <small>
+                  <small className="type-helper">
                     {task.stage} · {task.progress}%
                   </small>
                 </span>
                 <i className={task.status}>
                   {task.status === "succeeded" ? "已完成" : task.status === "failed" ? "失败" : "处理中"}
                 </i>
-              </button>
+              </Button>
             ))}
           </div>
         </section>
@@ -209,10 +210,10 @@ export function MediaUnderstandPage() {
         <div className="mu-result-mask" onMouseDown={() => setSelectedTask(null)}>
           <section onMouseDown={(event) => event.stopPropagation()}>
             <header>
-              <h2>素材理解结果</h2>
-              <button onClick={() => setSelectedTask(null)}>
+              <h2 className="type-section-title">素材理解结果</h2>
+              <Button variant="ghost" size="icon-sm" aria-label="关闭" onClick={() => setSelectedTask(null)}>
                 <X />
-              </button>
+              </Button>
             </header>
             <pre>{resultText(selectedTask)}</pre>
           </section>

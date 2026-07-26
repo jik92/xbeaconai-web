@@ -3,37 +3,140 @@
 @theme inline {
   --font-sans: "Inter", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-sans);
+  --font-weight-*: initial;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --text-*: initial;
   --text-2xs: 0.625rem;
   --text-2xs--line-height: 0.875rem;
   --text-xs: 0.75rem;
   --text-xs--line-height: 1rem;
   --text-sm: 0.875rem;
   --text-sm--line-height: 1.25rem;
-  --text-base: 1rem;
-  --text-base--line-height: 1.5rem;
-  --text-lg: 1.125rem;
-  --text-lg--line-height: 1.625rem;
-  --text-xl: 1.25rem;
-  --text-xl--line-height: 1.75rem;
-  --text-2xl: 1.5rem;
-  --text-2xl--line-height: 2rem;
-  --text-3xl: 1.875rem;
-  --text-3xl--line-height: 2.25rem;
-  --text-4xl: 2.25rem;
-  --text-4xl--line-height: 2.625rem;
-  --text-5xl: 3rem;
-  --text-5xl--line-height: 3.25rem;
-  --text-6xl: 4rem;
-  --text-6xl--line-height: 4.25rem;
   --color-canvas: var(--canvas);
+  --color-canvas-soft: var(--canvas-soft);
+  --color-canvas-deep: var(--canvas-deep);
   --color-surface: var(--surface);
   --color-surface-muted: var(--surface-muted);
+  --color-surface-strong: var(--surface-strong);
+  --color-surface-dark: var(--surface-dark);
+  --color-surface-dark-elevated: var(--surface-dark-elevated);
   --color-line: var(--border);
+  --color-line-soft: var(--border-soft);
+  --color-line-strong: var(--border-strong);
   --color-ink: var(--ink);
+  --color-body: var(--body);
+  --color-body-strong: var(--body-strong);
   --color-muted: var(--muted);
+  --color-muted-soft: var(--muted-soft);
   --color-primary: var(--primary);
+  --color-primary-active: var(--primary-active);
+  --color-on-primary: var(--on-primary);
+  --color-on-dark: var(--on-dark);
+  --color-on-dark-soft: var(--on-dark-soft);
   --color-success: var(--success);
   --color-warning: var(--warning);
+  --color-error: var(--error);
   --color-danger: var(--danger);
-  --color-surface-strong: #f0efed;
+  --color-gradient-mint: var(--gradient-mint);
+  --color-gradient-peach: var(--gradient-peach);
+  --color-gradient-lavender: var(--gradient-lavender);
+  --color-gradient-sky: var(--gradient-sky);
+  --color-gradient-rose: var(--gradient-rose);
+}
+
+@utility type-page-title {
+  @apply text-sm font-semibold;
+}
+
+@utility type-section-title {
+  @apply text-sm font-medium;
+}
+
+@utility type-card-title {
+  @apply text-sm font-medium;
+}
+
+@utility type-body {
+  @apply text-sm font-normal;
+}
+
+@utility type-body-strong {
+  @apply text-sm font-medium;
+}
+
+@utility type-label {
+  @apply text-xs font-medium;
+}
+
+@utility type-helper {
+  @apply text-xs font-normal;
+}
+
+@utility type-badge {
+  @apply text-xs font-medium;
+}
+
+@utility type-micro {
+  @apply text-2xs font-normal;
+}
+
+@utility type-micro-strong {
+  @apply text-2xs font-medium;
+}
+
+@layer base {
+  :root {
+    font-synthesis: none;
+    --canvas: #f5f5f5;
+    --canvas-soft: #fafafa;
+    --canvas-deep: #0c0a09;
+    --surface: #ffffff;
+    --surface-muted: #fafafa;
+    --surface-strong: #f0efed;
+    --surface-dark: #0c0a09;
+    --surface-dark-elevated: #1c1917;
+    --border: #e7e5e4;
+    --border-soft: #f0efed;
+    --border-strong: #d6d3d1;
+    --ink: #0c0a09;
+    --body: #4e4e4e;
+    --body-strong: #292524;
+    --muted: #777169;
+    --muted-soft: #a8a29e;
+    --primary: #292524;
+    --primary-active: #0c0a09;
+    --on-primary: #ffffff;
+    --on-dark: #ffffff;
+    --on-dark-soft: #a8a29e;
+    --success: #16a34a;
+    --warning: #777169;
+    --error: #dc2626;
+    --danger: var(--error);
+    --gradient-mint: #a7e5d3;
+    --gradient-peach: #f4c5a8;
+    --gradient-lavender: #c8b8e0;
+    --gradient-sky: #a8c8e8;
+    --gradient-rose: #e8b8c4;
+    --overlay: color-mix(in srgb, var(--ink) 42%, transparent);
+    --shadow-soft: color-mix(in srgb, var(--ink) 4%, transparent);
+    --shadow-elevated: color-mix(in srgb, var(--ink) 14%, transparent);
+  }
+
+  b,
+  strong {
+    @apply font-medium;
+  }
+
+  small {
+    font-size: inherit;
+    font-weight: inherit;
+    line-height: inherit;
+  }
+
+  em,
+  i {
+    @apply not-italic;
+  }
 }

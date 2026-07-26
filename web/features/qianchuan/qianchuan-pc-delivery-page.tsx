@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type ColumnDef } from "@tanstack/react-table";
+import type { ColumnDef } from "@tanstack/react-table";
 import { LoaderCircle, Pause, Play, RefreshCw, Upload } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { fetchLibraryAssets } from "@/api/api-client";
 import { Button } from "@/components/ui/button";
@@ -198,10 +198,10 @@ export function QianchuanPcDeliveryPage() {
     form.endTime;
 
   return (
-    <main className="flex h-[calc(100vh-56px)] min-h-0 flex-col gap-3 overflow-y-auto bg-white p-4 text-ink">
+    <main className="flex h-[calc(100vh-56px)] min-h-0 flex-col gap-3 overflow-y-auto bg-surface p-4 text-ink">
       <header className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">千川PC投放</h1>
-        <Button variant="outline" onClick={refresh}>
+        <h1 className="type-page-title">千川PC投放</h1>
+        <Button variant="outline" size="sm" onClick={refresh}>
           <RefreshCw />
           刷新
         </Button>
@@ -394,7 +394,7 @@ export function QianchuanPcDeliveryPage() {
 
       <Card className="min-h-72 gap-2 overflow-hidden py-4">
         <CardContent className="px-4">
-          <h2 className="font-medium">投放记录</h2>
+          <h2 className="type-section-title">投放记录</h2>
         </CardContent>
         <DataTable
           className="px-2"
@@ -409,17 +409,17 @@ export function QianchuanPcDeliveryPage() {
 
       <Card className="gap-3 py-4">
         <CardContent className="px-4">
-          <h2 className="font-medium">今日报表</h2>
+          <h2 className="type-section-title">今日报表</h2>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
             {reports.data?.reports.map((report) => (
-              <div key={report.id} className="rounded-lg border border-line p-3 text-xs">
+              <div key={report.id} className="rounded-lg border border-line p-3 type-helper">
                 <b>{report.level}</b>
                 <pre className="mt-2 overflow-auto whitespace-pre-wrap text-muted">
                   {JSON.stringify(report.metrics, null, 2)}
                 </pre>
               </div>
             ))}
-            {!reports.data?.reports.length && <span className="text-sm text-muted">同步投放后显示报表</span>}
+            {!reports.data?.reports.length && <span className="type-body text-muted">同步投放后显示报表</span>}
           </div>
         </CardContent>
       </Card>
@@ -429,7 +429,7 @@ export function QianchuanPcDeliveryPage() {
           <DialogHeader>
             <DialogTitle>确认提交千川投放</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-2 rounded-lg bg-surface-muted p-3 text-sm">
+          <div className="grid gap-2 rounded-lg bg-surface-muted p-3 type-body">
             <span>计划：{form.name}</span>
             <span>账户：{advertiserId}</span>
             <span>日预算：¥{form.budget}</span>

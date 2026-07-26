@@ -15,6 +15,20 @@ type OpenApiOperation = {
 };
 
 describe("video create shot generation API contract", () => {
+  test("publishes searchable paginated records and title-only rename", async () => {
+    const spec = (await Bun.file(resolve(import.meta.dir, "../../openapi/openapi.json")).json()) as {
+      paths: Record<string, Record<string, OpenApiOperation & { parameters?: unknown }>>;
+    };
+    const list = spec.paths["/api/video-create/projects"]?.get;
+    const update = spec.paths["/api/video-create/projects/{projectId}"]?.patch;
+    expect(JSON.stringify(list?.parameters)).toContain('"query"');
+    expect(JSON.stringify(list?.parameters)).toContain('"status"');
+    expect(JSON.stringify(list?.parameters)).toContain('"pageSize"');
+    expect(JSON.stringify(list?.responses?.["200"])).toContain('"total"');
+    expect(JSON.stringify(update?.requestBody)).toContain('"title"');
+    expect(JSON.stringify(update?.requestBody)).toContain('"expectedVersion"');
+  });
+
   test("publishes the persistent full-generation action and workflow state", async () => {
     const spec = (await Bun.file(resolve(import.meta.dir, "../../openapi/openapi.json")).json()) as {
       paths: Record<string, Record<string, OpenApiOperation>>;

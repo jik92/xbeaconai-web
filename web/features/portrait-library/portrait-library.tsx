@@ -197,7 +197,7 @@ export function PortraitLibrary() {
                 }}
               >
                 {filtered.slice(row.index * columns, row.index * columns + columns).map((item) => (
-                  <button type="button" className="portrait-card" key={item.key} onClick={() => setSelected(item)}>
+                  <Button type="button" className="portrait-card" key={item.key} onClick={() => setSelected(item)}>
                     <div className="portrait-image">
                       <MediaPreview
                         url={item.display_url}
@@ -211,7 +211,7 @@ export function PortraitLibrary() {
                       <i>{item.status === "active" ? "选择人像" : "处理中"}</i>
                     </div>
                     <div className="portrait-copy">
-                      <h3>{item.profession}</h3>
+                      <h3 className="type-card-title">{item.profession}</h3>
                       <p>
                         {item.type === "general"
                           ? `${item.age} 岁 · ${item.gender}性 · 第 ${item.page} 页`
@@ -222,7 +222,7 @@ export function PortraitLibrary() {
                               : "Ark 处理中"}
                       </p>
                     </div>
-                  </button>
+                  </Button>
                 ))}
               </div>
             ))}
@@ -276,7 +276,7 @@ export function PortraitLibrary() {
                 </Button>
                 {selected.type === "general" && (
                   <a
-                    className="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-line bg-white px-3 text-xs font-medium text-ink hover:bg-surface-muted"
+                    className="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-line bg-surface px-3 type-label text-ink hover:bg-surface-muted"
                     href={selected.source_url}
                     download
                     target="_blank"
@@ -313,7 +313,7 @@ export function PortraitLibrary() {
               .finally(() => setCreating(false));
           }}
         >
-          <label className="grid gap-1 text-xs text-muted" htmlFor="custom-portrait-file">
+          <label className="grid gap-1 type-label text-muted" htmlFor="custom-portrait-file">
             人像图片
             <Input
               id="custom-portrait-file"
@@ -323,7 +323,7 @@ export function PortraitLibrary() {
               onChange={(event) => setPortraitFile(event.target.files?.[0] ?? null)}
             />
           </label>
-          <label className="grid gap-1 text-xs text-muted" htmlFor="custom-portrait-name">
+          <label className="grid gap-1 type-label text-muted" htmlFor="custom-portrait-name">
             人像名称
             <Input
               id="custom-portrait-name"
@@ -333,7 +333,7 @@ export function PortraitLibrary() {
               onChange={(event) => setPortraitName(event.target.value)}
             />
           </label>
-          <label className="grid gap-1 text-xs text-muted" htmlFor="custom-portrait-gender">
+          <label className="grid gap-1 type-label text-muted" htmlFor="custom-portrait-gender">
             性别
             <NativeSelect
               id="custom-portrait-gender"
@@ -349,18 +349,18 @@ export function PortraitLibrary() {
               <option value="女">女</option>
             </NativeSelect>
           </label>
-          <label className="grid gap-1 text-xs text-muted" htmlFor="custom-portrait-description">
+          <label className="grid gap-1 type-label text-muted" htmlFor="custom-portrait-description">
             基础描述
             <textarea
               id="custom-portrait-description"
-              className="min-h-24 resize-y rounded-md border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-ink"
+              className="min-h-24 resize-y rounded-md border border-line bg-surface px-3 py-2 type-body text-ink outline-none focus:border-ink"
               value={portraitDescription}
               maxLength={300}
               disabled={creating}
               onChange={(event) => setPortraitDescription(event.target.value)}
             />
           </label>
-          {createError && <p className="text-xs text-danger">{createError}</p>}
+          {createError && <p className="type-helper text-error">{createError}</p>}
           <div className="mt-auto flex justify-end gap-2 border-t border-line pt-3">
             <Button type="button" size="sm" variant="outline" disabled={creating} onClick={() => setCreateOpen(false)}>
               取消

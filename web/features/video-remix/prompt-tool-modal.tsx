@@ -65,7 +65,7 @@ function Choice({
   onChange: () => void;
 }) {
   return (
-    <label className="flex cursor-pointer items-center gap-2 text-sm text-ink">
+    <label className="flex cursor-pointer items-center gap-2 type-body text-ink">
       <input className="size-4 accent-primary" type={type} checked={checked} onChange={onChange} />
       {label}
     </label>
@@ -74,19 +74,19 @@ function Choice({
 
 function VideoSelection({ fileName }: { fileName: string }) {
   return (
-    <div className="rounded-xl border border-line bg-white">
+    <div className="rounded-xl border border-line bg-surface">
       <div className="flex h-12 items-center justify-between border-b border-line px-3">
-        <b className="font-medium">视频列表</b>
-        <span className="flex items-center gap-2 text-sm text-muted">
-          <Check className="size-4 rounded bg-primary p-0.5 text-white" /> 全选　已选 1 条
+        <b className="">视频列表</b>
+        <span className="flex items-center gap-2 type-body text-muted">
+          <Check className="size-4 rounded bg-primary p-0.5 text-on-primary" /> 全选　已选 1 条
         </span>
       </div>
       <div className="m-3 flex items-center gap-3 rounded-lg border border-primary bg-surface-muted p-3">
-        <Check className="size-5 rounded bg-primary p-0.5 text-white" />
+        <Check className="size-5 rounded bg-primary p-0.5 text-on-primary" />
         <FileVideo2 className="size-5 text-muted" />
         <span className="min-w-0">
-          <b className="block truncate font-medium">{fileName}</b>
-          <small className="text-muted">v1 · AI解析</small>
+          <b className="block truncate">{fileName}</b>
+          <small className="type-helper text-muted">v1 · AI解析</small>
         </span>
       </div>
     </div>
@@ -103,7 +103,7 @@ function RadioRows({
   return (
     <>
       <fieldset className="space-y-2">
-        <legend className="mb-2 text-sm text-muted">修改范围</legend>
+        <legend className="mb-2 type-body text-muted">修改范围</legend>
         <div className="flex gap-5">
           <Choice
             type="radio"
@@ -120,7 +120,7 @@ function RadioRows({
         </div>
       </fieldset>
       <fieldset className="space-y-2">
-        <legend className="mb-2 text-sm text-muted">参考模式</legend>
+        <legend className="mb-2 type-body text-muted">参考模式</legend>
         <div className="flex gap-5">
           <Choice
             type="radio"
@@ -165,7 +165,7 @@ function CheckControls({
     <>
       <RadioRows config={config} setConfig={setConfig} />
       <fieldset>
-        <legend className="mb-2 text-sm text-muted">检查类型</legend>
+        <legend className="mb-2 type-body text-muted">检查类型</legend>
         <div className="grid grid-cols-3 gap-2">
           {(Object.keys(checkTypeLabels) as RemixCheckType[]).map((item) => (
             <Choice
@@ -178,7 +178,7 @@ function CheckControls({
         </div>
       </fieldset>
       <fieldset>
-        <legend className="mb-2 text-sm text-muted">修复规则</legend>
+        <legend className="mb-2 type-body text-muted">修复规则</legend>
         <div className="grid grid-cols-3 gap-2">
           {(Object.keys(repairRuleLabels) as RemixRepairRule[]).map((item) => (
             <Choice
@@ -191,7 +191,7 @@ function CheckControls({
         </div>
       </fieldset>
       <textarea
-        className="min-h-20 w-full resize-y rounded-lg border border-line bg-white p-3 text-sm outline-none focus:border-primary"
+        className="min-h-20 w-full resize-y rounded-lg border border-line bg-surface p-3 type-body outline-none focus:border-primary"
         value={config.customInstruction}
         onChange={(event) => setConfig({ ...config, customInstruction: event.target.value })}
         placeholder="自定义检查要求…"
@@ -213,19 +213,19 @@ function ModifyControls({
   return (
     <>
       <label className="space-y-2">
-        <span className="block text-sm text-muted">预设场景</span>
-        <button
+        <span className="block type-body text-muted">预设场景</span>
+        <Button
           type="button"
-          className="flex h-10 w-full items-center justify-between rounded-lg border border-line bg-white px-3 text-left text-sm outline-none focus:border-primary"
+          className="flex h-10 w-full items-center justify-between rounded-lg border border-line bg-surface px-3 text-left type-body outline-none focus:border-primary"
           onClick={() => setPresetOpen((value) => !value)}
         >
           <span className={preset ? "text-ink" : "text-muted"}>{preset?.title ?? "单选，与自定义指令叠加生效"}</span>
           <ChevronDown className="size-4 text-muted" />
-        </button>
+        </Button>
         {presetOpen && (
-          <div className="max-h-72 overflow-auto rounded-xl border border-line bg-white p-1 shadow-lg">
+          <div className="max-h-72 overflow-auto rounded-xl border border-line bg-surface p-1 shadow-lg">
             {remixModifyPresets.map((item) => (
-              <button
+              <Button
                 type="button"
                 key={item.id}
                 className={`block w-full rounded-lg p-3 text-left hover:bg-surface-muted ${config.preset === item.id ? "bg-surface-muted" : ""}`}
@@ -234,17 +234,17 @@ function ModifyControls({
                   setPresetOpen(false);
                 }}
               >
-                <b className="block font-medium text-ink">{item.title}</b>
-                <small className="mt-1 block text-sm leading-5 text-muted">{item.description}</small>
-              </button>
+                <b className="block text-ink">{item.title}</b>
+                <small className="mt-1 block type-body leading-relaxed text-muted">{item.description}</small>
+              </Button>
             ))}
           </div>
         )}
       </label>
       <label className="space-y-2">
-        <span className="block text-sm text-muted">自定义</span>
+        <span className="block type-body text-muted">自定义</span>
         <textarea
-          className="min-h-24 w-full resize-y rounded-lg border border-line bg-white p-3 text-sm outline-none focus:border-primary"
+          className="min-h-24 w-full resize-y rounded-lg border border-line bg-surface p-3 type-body outline-none focus:border-primary"
           value={config.customInstruction}
           onChange={(event) => setConfig({ ...config, customInstruction: event.target.value })}
           placeholder="例：把产品名称改为“星辰”，色调改为暖金，模特改为短发女性"
@@ -266,29 +266,29 @@ function VoiceControls({
   return (
     <>
       <div className="flex border-b border-line">
-        <button
+        <Button
           type="button"
-          className={`h-10 border-b-2 px-3 text-sm ${config.voiceMode === "correct" ? "border-primary text-primary" : "border-transparent text-ink"}`}
+          className={`h-10 border-b-2 px-3 type-body ${config.voiceMode === "correct" ? "border-primary text-primary" : "border-transparent text-ink"}`}
           onClick={() => setConfig({ ...config, voiceMode: "correct" })}
         >
           修正口播
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
-          className={`h-10 border-b-2 px-3 text-sm ${config.voiceMode === "replace" ? "border-primary text-primary" : "border-transparent text-ink"}`}
+          className={`h-10 border-b-2 px-3 type-body ${config.voiceMode === "replace" ? "border-primary text-primary" : "border-transparent text-ink"}`}
           onClick={() => setConfig({ ...config, voiceMode: "replace" })}
         >
           换口播
-        </button>
+        </Button>
       </div>
-      <p className="text-sm leading-6 text-muted">
+      <p className="type-body leading-relaxed text-muted">
         {config.voiceMode === "correct"
           ? "针对字幕缺失、有误或画面口播文案解析偏差的问题，自动识别分镜口播内容，结合分镜时长，精准修正并替换提示词内错误口播文案。"
           : "保持商品事实、镜头顺序和分镜时长不变，按新的表达要求重写每个分镜的口播文案，并同步调整说话神态与音色语气设定。"}
       </p>
       {config.voiceMode === "replace" && (
         <textarea
-          className="min-h-28 w-full resize-y rounded-lg border border-line bg-white p-3 text-sm outline-none focus:border-primary"
+          className="min-h-28 w-full resize-y rounded-lg border border-line bg-surface p-3 type-body outline-none focus:border-primary"
           value={config.customInstruction}
           onChange={(event) => setConfig({ ...config, customInstruction: event.target.value })}
           placeholder="输入新口播的表达方向、目标人群、语气或必须保留的卖点…"
@@ -492,7 +492,7 @@ export function PromptToolModal({
     <Dialog open={Boolean(tool)} onOpenChange={(open) => !open && close()}>
       <DialogContent className="h-[calc(100vh-24px)] max-w-[calc(100vw-24px)] grid-rows-[56px_minmax(0,1fr)] gap-0 overflow-hidden rounded-xl p-0">
         <header className="flex h-14 flex-none items-center border-b border-line px-4">
-          <DialogTitle className="text-lg">{tool ? toolTitles[tool] : "提示词工具"}</DialogTitle>
+          <DialogTitle className="type-section-title">{tool ? toolTitles[tool] : "提示词工具"}</DialogTitle>
         </header>
         <div className="grid min-h-0 flex-1 grid-cols-[340px_minmax(0,1fr)]">
           <aside className="flex min-h-0 flex-col border-r border-line bg-surface-muted/40">
@@ -500,27 +500,27 @@ export function PromptToolModal({
               <VideoSelection fileName={fileName} />
               <div className="flex items-center gap-2 border-y border-line py-3 text-primary">
                 {tool === "check" ? <CircleCheck /> : tool === "modify" ? <Pencil /> : <Mic2 />}
-                <b className="font-medium">{tool ? remixPromptToolLabels[tool] : "提示词工具"}</b>
+                <b className="">{tool ? remixPromptToolLabels[tool] : "提示词工具"}</b>
               </div>
               {tool === "check" && <CheckControls config={config} setConfig={setConfig} />}
               {tool === "modify" && <ModifyControls config={config} setConfig={setConfig} />}
               {tool === "voice" && <VoiceControls config={config} setConfig={setConfig} />}
               {(job || error) && (
-                <div className="space-y-2 rounded-lg border border-line bg-white p-3 text-sm">
+                <div className="space-y-2 rounded-lg border border-line bg-surface p-3 type-body">
                   {job && (
                     <div className="flex items-center justify-between gap-3">
                       <span className="flex items-center gap-2">
                         {activeJobId && <LoaderCircle className="size-4 animate-spin" />}
                         {job.stage}
                       </span>
-                      <b className="font-medium">{job.progress}%</b>
+                      <b className="">{job.progress}%</b>
                     </div>
                   )}
-                  {error && <p className="text-danger">{error}</p>}
+                  {error && <p className="text-error">{error}</p>}
                 </div>
               )}
             </div>
-            <footer className="flex flex-none gap-2 border-t border-line bg-white p-4">
+            <footer className="flex flex-none gap-2 border-t border-line bg-surface p-4">
               <Button variant="outline" onClick={reset} disabled={Boolean(activeJobId)}>
                 重置
               </Button>
@@ -530,7 +530,7 @@ export function PromptToolModal({
               </Button>
             </footer>
           </aside>
-          <section className="h-full min-h-0 overflow-hidden bg-white p-4">
+          <section className="h-full min-h-0 overflow-hidden bg-surface p-4">
             {showVoiceDiff ? (
               <div className="voice-diff-review">
                 <section className="voice-diff" aria-label="口播修正前后对比">
@@ -561,7 +561,7 @@ export function PromptToolModal({
                   )}
                 </section>
                 <div className="voice-diff-actions">
-                  <button
+                  <Button
                     type="button"
                     onClick={() => {
                       if (editingVoiceRewrite) {
@@ -574,14 +574,14 @@ export function PromptToolModal({
                     }}
                   >
                     {editingVoiceRewrite ? "取消" : "修改"}
-                  </button>
-                  <button type="button" className="primary" disabled={!canApplyVoiceRewrite} onClick={saveVoiceRewrite}>
+                  </Button>
+                  <Button type="button" className="primary" disabled={!canApplyVoiceRewrite} onClick={saveVoiceRewrite}>
                     {canApplyVoiceRewrite ? "应用并保存为新版本" : "已应用，修改后可再次保存"}
-                  </button>
+                  </Button>
                 </div>
               </div>
             ) : (
-              <pre className="h-full overflow-auto whitespace-pre-wrap rounded-xl border border-line bg-surface-muted/20 p-4 font-sans text-sm leading-6 text-ink">
+              <pre className="h-full overflow-auto whitespace-pre-wrap rounded-xl border border-line bg-surface-muted/20 p-4 font-sans type-body leading-relaxed text-ink">
                 {preview}
               </pre>
             )}

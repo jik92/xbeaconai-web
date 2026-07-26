@@ -62,7 +62,7 @@ const jobStatusStyles: Record<AdminJob["status"], string> = {
   processing: "bg-surface-strong text-ink",
   succeeded: "bg-success/10 text-success",
   partially_succeeded: "bg-warning/10 text-warning",
-  failed: "bg-danger/10 text-danger",
+  failed: "bg-error/10 text-error",
   cancelled: "bg-surface-muted text-muted",
 };
 
@@ -76,7 +76,7 @@ const doctorLabels: Record<AdminCredentialDoctorResult["status"], string> = {
 const doctorStyles: Record<AdminCredentialDoctorResult["status"], string> = {
   available: "text-success",
   missing: "text-warning",
-  invalid: "text-danger",
+  invalid: "text-error",
   timeout: "text-warning",
 };
 
@@ -123,12 +123,12 @@ function SelectionCheckbox({
 }
 
 function DoctorStatus({ result }: { result?: AdminCredentialDoctorResult }) {
-  if (!result) return <span className="text-xs text-muted">未检测</span>;
+  if (!result) return <span className="type-helper text-muted">未检测</span>;
   const Icon = result.status === "available" ? CheckCircle2 : result.status === "timeout" ? Clock3 : CircleAlert;
   return (
-    <span className={`inline-flex min-w-0 items-center gap-1 text-xs ${doctorStyles[result.status]}`}>
+    <span className={`inline-flex min-w-0 items-center gap-1 type-helper ${doctorStyles[result.status]}`}>
       <Icon className="size-3.5 shrink-0" />
-      <b className="font-medium">{doctorLabels[result.status]}</b>
+      <b className="">{doctorLabels[result.status]}</b>
       <span className="truncate text-muted">{result.message}</span>
       <span className="shrink-0 text-muted">{result.latencyMs}ms</span>
     </span>
@@ -247,7 +247,7 @@ function CredentialsPanel() {
       size: 100,
       cell: ({ row }) => (
         <a
-          className="inline-flex min-w-0 items-center gap-1 font-medium text-ink hover:underline"
+          className="inline-flex min-w-0 items-center gap-1 type-body-strong text-ink hover:underline"
           href={row.original.docsUrl}
           target="_blank"
           rel="noopener noreferrer"
@@ -264,8 +264,8 @@ function CredentialsPanel() {
       size: 220,
       cell: ({ row }) => (
         <div className="min-w-0">
-          <span className="block truncate font-medium text-ink">{row.original.label}</span>
-          <code className="block truncate text-2xs text-muted">{row.original.name}</code>
+          <span className="block truncate type-body-strong text-ink">{row.original.label}</span>
+          <code className="block truncate type-helper text-muted">{row.original.name}</code>
         </div>
       ),
     },
@@ -274,7 +274,7 @@ function CredentialsPanel() {
       header: "当前状态",
       size: 120,
       cell: ({ row }) => (
-        <span className={`text-xs ${row.original.configured ? "text-success" : "text-warning"}`}>
+        <span className={`type-helper ${row.original.configured ? "text-success" : "text-warning"}`}>
           {row.original.configured ? row.original.maskedValue : "未配置"}
         </span>
       ),
@@ -287,7 +287,7 @@ function CredentialsPanel() {
         <Input
           type={row.original.secret ? "password" : "text"}
           autoComplete="new-password"
-          className="h-8 text-xs"
+          className="h-8 type-helper"
           value={drafts[row.original.name] ?? ""}
           placeholder={row.original.configured ? "输入新值以覆盖" : "输入 Key"}
           onChange={(event) => setDrafts((current) => ({ ...current, [row.original.name]: event.target.value }))}
@@ -318,8 +318,8 @@ function CredentialsPanel() {
           </Button>
           <Button
             variant="ghost"
-            size="icon"
-            className="size-8 text-danger hover:bg-danger/10 hover:text-danger"
+            size="icon-sm"
+            className="size-8 text-error hover:bg-error/10 hover:text-error"
             aria-label={`删除 ${row.original.label}`}
             disabled={!row.original.configured || Boolean(saving) || Boolean(deleting)}
             onClick={() => void remove(row.original)}
@@ -333,14 +333,14 @@ function CredentialsPanel() {
 
   if (isLoading)
     return (
-      <div className="grid min-h-48 place-items-center text-xs text-muted">
+      <div className="grid min-h-48 place-items-center type-helper text-muted">
         <span className="inline-flex items-center gap-2">
           <LoaderCircle className="size-4 animate-spin" /> 正在读取密钥
         </span>
       </div>
     );
   if (error)
-    return <div className="grid min-h-48 place-items-center text-xs text-danger">{apiErrorMessage(error)}</div>;
+    return <div className="grid min-h-48 place-items-center type-helper text-error">{apiErrorMessage(error)}</div>;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -522,9 +522,9 @@ function UsersPanel() {
       header: "用户名",
       size: 180,
       cell: ({ row }) => (
-        <span className="inline-flex min-w-0 items-center gap-2 font-medium text-ink">
+        <span className="inline-flex min-w-0 items-center gap-2 type-body-strong text-ink">
           <span className="truncate">{row.original.displayName}</span>
-          {row.original.isAdmin && <span className="text-2xs text-muted">管理员</span>}
+          {row.original.isAdmin && <span className="type-helper text-muted">管理员</span>}
         </span>
       ),
     },
@@ -540,7 +540,7 @@ function UsersPanel() {
       header: "状态",
       size: 90,
       cell: ({ row }) => (
-        <span className={`inline-flex rounded-full px-2 py-0.5 text-2xs ${userStatusStyles[row.original.status]}`}>
+        <span className={`inline-flex rounded-full px-2 py-0.5 type-helper ${userStatusStyles[row.original.status]}`}>
           {userStatusLabels[row.original.status]}
         </span>
       ),
@@ -581,7 +581,7 @@ function UsersPanel() {
             <Button
               variant="ghost"
               size="sm"
-              className="text-danger hover:bg-danger/10 hover:text-danger"
+              className="text-error hover:bg-error/10 hover:text-error"
               disabled={Boolean(busyUserId) || releasing}
               onClick={() => void changeStatus(row.original, "disabled")}
             >
@@ -598,7 +598,7 @@ function UsersPanel() {
               {busyUserId === row.original.id && <LoaderCircle className="animate-spin" />} 恢复
             </Button>
           )}
-          {row.original.status === "pending_password" && <span className="text-xs text-muted">—</span>}
+          {row.original.status === "pending_password" && <span className="type-helper text-muted">—</span>}
         </div>
       ),
     },
@@ -608,7 +608,7 @@ function UsersPanel() {
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line px-1">
         <Input
-          className="h-8 w-56 text-xs"
+          className="h-8 w-56 type-helper"
           placeholder="搜索用户名或手机号"
           value={search}
           onChange={(event) => {
@@ -618,7 +618,7 @@ function UsersPanel() {
           }}
         />
         <NativeSelect
-          className="h-8 text-xs"
+          className="h-8 type-helper"
           value={status}
           onChange={(event) => {
             clearReleaseSelection();
@@ -639,7 +639,7 @@ function UsersPanel() {
         <Button
           variant="outline"
           size="sm"
-          className="border-danger/30 text-danger hover:bg-danger/10 hover:text-danger"
+          className="border-error/30 text-error hover:bg-error/10 hover:text-error"
           disabled={!selectedUsers.length || releasing || Boolean(busyUserId)}
           onClick={() => {
             setReleaseFailures([]);
@@ -649,7 +649,7 @@ function UsersPanel() {
         >
           <Trash2 /> 释放账号{selectedUsers.length ? `（${selectedUsers.length}）` : ""}
         </Button>
-        <span className="ml-auto text-xs text-muted">共 {query.data?.total ?? 0} 个用户</span>
+        <span className="ml-auto type-helper text-muted">共 {query.data?.total ?? 0} 个用户</span>
       </div>
       <DataTable
         columns={columns}
@@ -660,7 +660,7 @@ function UsersPanel() {
         emptyMessage="暂无符合条件的用户"
         className="min-h-0 flex-1"
       />
-      <footer className="flex h-11 shrink-0 items-center justify-end gap-2 border-t border-line text-xs text-muted">
+      <footer className="flex h-11 shrink-0 items-center justify-end gap-2 border-t border-line type-helper text-muted">
         <Button
           variant="outline"
           size="sm"
@@ -704,7 +704,7 @@ function UsersPanel() {
           }}
         >
           <div className="space-y-4 p-4">
-            <div className="grid grid-cols-[72px_1fr] items-center gap-3 text-sm">
+            <div className="grid grid-cols-[72px_1fr] items-center gap-3 type-body">
               <Label>用户</Label>
               <span className="truncate text-ink">
                 {rechargeUser?.displayName} · {rechargeUser?.phone}
@@ -770,7 +770,7 @@ function UsersPanel() {
               void releaseAccounts();
             }}
           >
-            <div className="rounded-md border border-danger/20 bg-danger/5 p-3 text-xs text-ink">
+            <div className="rounded-md border border-error/20 bg-error/5 p-3 type-helper text-ink">
               此操作不可恢复，将物理删除账号、任务、项目、素材、TOS 对象和自建虚拟人像。
             </div>
             <div className="max-h-36 overflow-y-auto rounded-md border border-line">
@@ -779,13 +779,13 @@ function UsersPanel() {
                   className="flex items-center justify-between gap-3 border-b border-line/60 px-3 py-2 last:border-0"
                   key={member.id}
                 >
-                  <span className="truncate text-sm text-ink">{member.displayName}</span>
-                  <span className="shrink-0 text-xs text-muted">{member.phone}</span>
+                  <span className="truncate type-body text-ink">{member.displayName}</span>
+                  <span className="shrink-0 type-helper text-muted">{member.phone}</span>
                 </div>
               ))}
             </div>
             {releaseFailures.length > 0 && (
-              <div className="grid gap-1 text-xs text-danger" role="alert">
+              <div className="grid gap-1 type-helper text-error" role="alert">
                 {releaseFailures.map((failure) => {
                   const member = selectedUsers.find((item) => item.id === failure.userId);
                   return (
@@ -814,7 +814,7 @@ function UsersPanel() {
               </Button>
               <Button
                 type="submit"
-                className="bg-danger text-white hover:bg-danger/90"
+                className="bg-error text-on-primary hover:bg-error/90"
                 disabled={releasing || releaseConfirmation !== "释放账号" || !selectedUsers.length}
               >
                 {releasing && <LoaderCircle className="animate-spin" />} 释放账号
@@ -853,7 +853,7 @@ function JobsPanel() {
         header: "任务 ID",
         size: 110,
         cell: ({ row }) => (
-          <Button variant="ghost" size="sm" className="h-7 px-1 font-mono" onClick={() => setSelected(row.original)}>
+          <Button variant="ghost" size="sm" className="h-7 px-1 font-sans" onClick={() => setSelected(row.original)}>
             {row.original.id.slice(0, 8)}…
           </Button>
         ),
@@ -866,7 +866,7 @@ function JobsPanel() {
         header: "状态",
         size: 90,
         cell: ({ row }) => (
-          <span className={`inline-flex rounded-full px-2 py-0.5 text-2xs ${jobStatusStyles[row.original.status]}`}>
+          <span className={`inline-flex rounded-full px-2 py-0.5 type-helper ${jobStatusStyles[row.original.status]}`}>
             {statusLabels[row.original.status]}
           </span>
         ),
@@ -916,7 +916,7 @@ function JobsPanel() {
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex min-h-11 items-center gap-2 border-b border-line px-1">
         <Input
-          className="h-8 w-52 text-xs"
+          className="h-8 w-52 type-helper"
           placeholder="搜索用户手机号"
           value={phone}
           onChange={(event) => {
@@ -925,7 +925,7 @@ function JobsPanel() {
           }}
         />
         <NativeSelect
-          className="h-8 text-xs"
+          className="h-8 type-helper"
           value={moduleId}
           onChange={(event) => {
             setPage(1);
@@ -942,7 +942,7 @@ function JobsPanel() {
           <option value="video-enhancement">视频增强</option>
         </NativeSelect>
         <NativeSelect
-          className="h-8 text-xs"
+          className="h-8 type-helper"
           value={status}
           onChange={(event) => {
             setPage(1);
@@ -962,13 +962,13 @@ function JobsPanel() {
         <Button
           variant="outline"
           size="sm"
-          className="text-danger hover:bg-danger/10 hover:text-danger"
+          className="text-error hover:bg-error/10 hover:text-error"
           disabled={stopping}
           onClick={() => void stopAll()}
         >
           {stopping && <LoaderCircle className="animate-spin" />} 停止所有任务
         </Button>
-        <span className="ml-auto text-xs text-muted">共 {query.data?.total ?? 0} 个任务</span>
+        <span className="ml-auto type-helper text-muted">共 {query.data?.total ?? 0} 个任务</span>
       </div>
       <DataTable
         columns={columns}
@@ -979,7 +979,7 @@ function JobsPanel() {
         emptyMessage="暂无符合条件的任务"
         height="calc(100% - 88px)"
       />
-      <footer className="flex h-11 items-center justify-end gap-2 border-t border-line text-xs text-muted">
+      <footer className="flex h-11 items-center justify-end gap-2 border-t border-line type-helper text-muted">
         <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>
           上一页
         </Button>
@@ -992,22 +992,22 @@ function JobsPanel() {
       </footer>
       {selected && (
         <div
-          className="fixed inset-0 z-80 flex justify-end bg-black/35"
+          className="fixed inset-0 z-80 flex justify-end bg-surface-dark/35"
           role="presentation"
           onMouseDown={() => setSelected(undefined)}
         >
           <aside
-            className="h-full w-[min(480px,92vw)] overflow-auto bg-white p-4 shadow-xl"
+            className="h-full w-[min(480px,92vw)] overflow-auto bg-surface p-4 shadow-xl"
             role="dialog"
             aria-modal="true"
             aria-label="任务详情"
             onMouseDown={(event) => event.stopPropagation()}
           >
             <header className="flex h-10 items-center justify-between border-b border-line">
-              <h2 className="text-base font-medium text-ink">任务详情</h2>
+              <h2 className="type-section-title text-ink">任务详情</h2>
               <Button
                 variant="ghost"
-                size="icon"
+                size="icon-sm"
                 className="size-8"
                 aria-label="关闭"
                 onClick={() => setSelected(undefined)}
@@ -1015,7 +1015,7 @@ function JobsPanel() {
                 <X />
               </Button>
             </header>
-            <dl className="divide-y divide-line text-xs">
+            <dl className="divide-y divide-line type-helper">
               {[
                 ["任务 ID", selected.id],
                 ["用户", selected.ownerPhone],
@@ -1031,7 +1031,7 @@ function JobsPanel() {
               <div className="grid grid-cols-[120px_1fr] gap-3 py-3">
                 <dt className="text-muted">错误</dt>
                 <dd>
-                  <pre className="whitespace-pre-wrap break-all text-2xs text-ink">
+                  <pre className="whitespace-pre-wrap break-all type-helper text-ink">
                     {selected.error ? JSON.stringify(selected.error, null, 2) : "—"}
                   </pre>
                 </dd>
@@ -1049,7 +1049,7 @@ export function AdminPage() {
   const [tab, setTab] = useState<"credentials" | "users" | "jobs" | "audits">("credentials");
   if (!user?.isAdmin) return <Navigate to="/" />;
   return (
-    <div className="flex h-[calc(100vh-56px)] min-h-0 flex-col bg-white p-3 text-ink">
+    <div className="flex h-[calc(100vh-56px)] min-h-0 flex-col bg-surface p-3 text-ink">
       <header className="flex h-10 shrink-0 items-center border-b border-line">
         <nav className="flex items-center gap-1" aria-label="管理后台">
           <Button

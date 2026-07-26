@@ -14,6 +14,7 @@ import {
   updateProfile,
 } from "@/api/generated/sdk.gen";
 import type { NotificationItem, Preferences, RechargeOrder } from "@/api/generated/types.gen";
+import { Button } from "@/components/ui/button";
 import { randomUuid } from "@/lib/random-id";
 import { apiErrorMessage, useAuth } from "./auth-context";
 
@@ -29,10 +30,10 @@ function Drawer({ title, children, onClose }: { title: string; children: ReactNo
     >
       <section className="workspace-drawer" role="dialog" aria-modal="true" aria-label={title}>
         <header>
-          <h2 className="text-ink">{title}</h2>
-          <button aria-label="关闭" onClick={onClose}>
+          <h2 className="type-section-title text-ink">{title}</h2>
+          <Button variant="ghost" size="icon-sm" aria-label="关闭" onClick={onClose}>
             <X />
-          </button>
+          </Button>
         </header>
         <div className="workspace-body">{children}</div>
       </section>
@@ -132,7 +133,7 @@ function PreferencesPanel() {
       <label className="switch-row">
         <span>
           <b>任务完成通知</b>
-          <small>任务结束时写入通知中心</small>
+          <small className="type-helper">任务结束时写入通知中心</small>
         </span>
         <input
           type="checkbox"
@@ -143,7 +144,7 @@ function PreferencesPanel() {
       <label className="switch-row">
         <span>
           <b>自动播放结果</b>
-          <small>打开结果时自动播放音视频</small>
+          <small className="type-helper">打开结果时自动播放音视频</small>
         </span>
         <input
           type="checkbox"
@@ -151,9 +152,9 @@ function PreferencesPanel() {
           onChange={(event) => setValue({ ...value, autoplayResults: event.target.checked })}
         />
       </label>
-      <button className="panel-primary" disabled={saving}>
+      <Button className="panel-primary" disabled={saving}>
         {saving ? "保存中…" : "保存设置"}
-      </button>
+      </Button>
     </form>
   );
 }
@@ -175,16 +176,16 @@ function NotificationsPanel({ onUnread }: { onUnread: (count: number) => void })
     <div className="notification-list">
       <div className="panel-toolbar">
         <span>{unread} 条未读</span>
-        <button
+        <Button
           disabled={!unread}
           onClick={() => void markAllNotificationsRead({ throwOnError: true }).then(() => load())}
         >
           全部已读
-        </button>
+        </Button>
       </div>
       {!items.length && <p className="panel-muted">暂时没有通知</p>}
       {items.map((item) => (
-        <button
+        <Button
           key={item.id}
           className={item.readAt ? "read" : ""}
           onClick={() =>
@@ -195,9 +196,9 @@ function NotificationsPanel({ onUnread }: { onUnread: (count: number) => void })
           <span>
             <b>{item.title}</b>
             <p>{item.body}</p>
-            <small>{new Date(item.createdAt).toLocaleString()}</small>
+            <small className="type-helper">{new Date(item.createdAt).toLocaleString()}</small>
           </span>
-        </button>
+        </Button>
       ))}
     </div>
   );
@@ -249,23 +250,23 @@ function RechargePanel() {
             <span>{item.badge}</span>
             <b>{item.name}</b>
             <strong>
-              {item.credits.toLocaleString()} <small>创作点</small>
+              {item.credits.toLocaleString()} <small className="type-helper">创作点</small>
             </strong>
             <p>¥ {item.amountCny}.00</p>
-            <button disabled={Boolean(busy)} onClick={() => void buy(item.id)}>
+            <Button disabled={Boolean(busy)} onClick={() => void buy(item.id)}>
               {busy === item.id ? "处理中…" : "模拟支付"}
-            </button>
+            </Button>
           </article>
         ))}
       </div>
-      <h3 className="panel-subtitle">最近订单</h3>
+      <h3 className="type-section-title panel-subtitle">最近订单</h3>
       <div className="order-list">
         {!orders.length && <p className="panel-muted">暂无充值订单</p>}
         {orders.map((order) => (
           <div key={order.id}>
             <span>
               <b>+{order.credits.toLocaleString()} 创作点</b>
-              <small>{new Date(order.createdAt).toLocaleString()}</small>
+              <small className="type-helper">{new Date(order.createdAt).toLocaleString()}</small>
             </span>
             <em>¥{order.amountCny} · 已到账</em>
           </div>
@@ -283,28 +284,28 @@ function AccountPanel({ open }: { open: (panel: WorkspacePanel) => void }) {
         <div>
           <b>{user?.displayName || user?.phone}</b>
           <span>{user?.phone}</span>
-          <small>{user?.credits.toLocaleString()} 创作点</small>
+          <small className="type-helper">{user?.credits.toLocaleString()} 创作点</small>
         </div>
       </div>
-      <button onClick={() => open("profile")}>
+      <Button onClick={() => open("profile")}>
         <UserRound />
         <span>
           <b>个人资料</b>
         </span>
         <ChevronRight />
-      </button>
-      <button onClick={() => open("security")}>
+      </Button>
+      <Button onClick={() => open("security")}>
         <LockKeyhole />
         <span>
           <b>账号与密码</b>
-          <small>修改登录密码并退出其他会话</small>
+          <small className="type-helper">修改登录密码并退出其他会话</small>
         </span>
         <ChevronRight />
-      </button>
-      <button className="logout-button" onClick={() => void logout()}>
+      </Button>
+      <Button className="logout-button" onClick={() => void logout()}>
         <LogOut />
         退出登录
-      </button>
+      </Button>
     </div>
   );
 }
@@ -340,9 +341,9 @@ function ProfilePanel() {
           required
         />
       </label>
-      <button className="panel-primary" disabled={busy}>
+      <Button className="panel-primary" disabled={busy}>
         {busy ? "保存中…" : "保存个人资料"}
-      </button>
+      </Button>
     </form>
   );
 }
@@ -397,10 +398,10 @@ function SecurityPanel() {
         确认新密码
         <input type="password" value={confirm} onChange={(event) => setConfirm(event.target.value)} required />
       </label>
-      {error && <p className="rounded-md bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>}
-      <button className="panel-primary" disabled={busy}>
+      {error && <p className="rounded-md bg-error/10 px-3 py-2 type-helper text-error">{error}</p>}
+      <Button className="panel-primary" disabled={busy}>
         {busy ? "修改中…" : "修改密码"}
-      </button>
+      </Button>
     </form>
   );
 }

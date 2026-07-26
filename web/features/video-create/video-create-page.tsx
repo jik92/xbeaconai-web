@@ -39,6 +39,7 @@ import {
   generateVideoCreateShotVideo,
   processVideoCreateShotVideo,
   regenerateVideoCreateScriptSection,
+  renameVideoCreateProject,
   replaceVideoCreateShotVideo,
   runVideoCreateProjectAction,
   saveVideoCreateMediaSettings,
@@ -54,6 +55,7 @@ import type { VideoCreateInput, VideoCreateProject } from "@/api/generated/types
 import { AttachmentPicker, type AttachmentSelection } from "@/components/domain/attachment-picker";
 import { AuthenticatedMedia } from "@/components/domain/authenticated-media";
 import { ImagePreview } from "@/components/domain/media-preview";
+import { ProjectRecordDrawer, type ProjectRecordStatusTone } from "@/components/domain/project-record-drawer";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -134,7 +136,7 @@ const videoModelOptions: Array<{
     tag: "速度更快",
   },
 ];
-const statusLabels: Record<string, string> = {
+const statusLabels: Record<VideoCreateProject["project"]["status"], string> = {
   draft: "草稿",
   analyzing: "AI 分析中",
   script_generating: "脚本生成中",
@@ -145,6 +147,13 @@ const statusLabels: Record<string, string> = {
   completed: "已完成",
   failed: "生成失败",
 };
+
+function videoCreateStatusTone(status: VideoCreateProject["project"]["status"]): ProjectRecordStatusTone {
+  if (status === "failed") return "error";
+  if (status === "completed") return "success";
+  if (["analyzing", "script_generating", "storyboard_generating", "composing"].includes(status)) return "progress";
+  return "neutral";
+}
 type MultiSelectKey =
   | "marketingGoals"
   | "targetAudiences"
@@ -223,8 +232,8 @@ function ChoiceGroup({
         {options.map((option) => (
           <Button
             className={cn(
-              "h-8 rounded-full px-3 font-normal",
-              selected.includes(option) && "border-primary bg-primary text-white hover:bg-primary/90",
+              "h-8 rounded-full px-3 type-badge",
+              selected.includes(option) && "border-primary bg-primary text-on-primary hover:bg-primary/90",
             )}
             variant="outline"
             size="sm"
@@ -264,8 +273,10 @@ function ParameterPanel({
       >
         <span className="flex items-center gap-2">
           <span>{title}</span>
-          {count > 0 && <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-white">{count}</span>}
-          <span className="text-xs font-normal text-muted">{count ? "已选" : "可选"}</span>
+          {count > 0 && (
+            <span className="rounded-full bg-primary px-2 py-0.5 type-helper text-on-primary">{count}</span>
+          )}
+          <span className="type-helper text-muted">{count ? "已选" : "可选"}</span>
         </span>
         <ChevronDown className={cn("transition-transform", open && "rotate-180")} />
       </Button>
@@ -297,8 +308,8 @@ function ProductImages({
         >
           <AuthenticatedMedia url={`/api/assets/${asset.id}/content`} mimeType={asset.mimeType} alt={asset.name} />
           <Button
-            className="absolute right-1 top-1 size-6 rounded-full bg-ink/75 p-0 text-white hover:bg-ink"
-            size="icon"
+            className="absolute right-1 top-1 size-6 rounded-full bg-ink/75 p-0 text-on-primary hover:bg-ink"
+            size="icon-sm"
             aria-label="移除商品图片"
             onClick={() => onRemove(asset.id)}
           >
@@ -323,63 +334,6 @@ function ProductImages({
           )}
         />
       )}
-    </div>
-  );
-}
-
-function HistoryDrawer({
-  open,
-  projects,
-  onClose,
-  onSelect,
-}: {
-  open: boolean;
-  projects: VideoCreateProject[];
-  onClose: () => void;
-  onSelect: (project: VideoCreateProject) => void;
-}) {
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 bg-ink/20" role="presentation" onMouseDown={onClose}>
-      <aside
-        className="absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-line bg-surface shadow-sm"
-        role="dialog"
-        aria-modal="true"
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <header className="flex h-[52px] shrink-0 items-center justify-between border-b border-line px-4">
-          <h2 className="text-base font-medium text-ink">生成记录</h2>
-          <Button variant="ghost" size="icon" aria-label="关闭生成记录" onClick={onClose}>
-            <X />
-          </Button>
-        </header>
-        <div className="flex-1 space-y-2 overflow-y-auto p-3">
-          {projects.map((item) => (
-            <Button
-              className="h-auto w-full justify-start rounded-lg p-3 text-left"
-              variant="outline"
-              key={item.project.id}
-              onClick={() => onSelect(item)}
-            >
-              <span className="min-w-0 flex-1 space-y-1">
-                <span className="flex items-center gap-2">
-                  <span className="rounded-full bg-surface-strong px-2 py-0.5 text-xs text-body">
-                    {statusLabels[item.project.status]}
-                  </span>
-                  <span className="truncate font-medium text-ink">{item.project.title}</span>
-                </span>
-                <span className="block truncate text-xs font-normal text-muted">
-                  {item.project.input.productName || "尚未填写产品名称"}
-                </span>
-              </span>
-              <time className="text-xs font-normal text-muted">
-                {new Date(item.project.updatedAt).toLocaleString()}
-              </time>
-            </Button>
-          ))}
-          {!projects.length && <p className="py-10 text-center text-sm text-muted">暂无生成记录</p>}
-        </div>
-      </aside>
     </div>
   );
 }
@@ -429,11 +383,6 @@ export function VideoCreatePage() {
   const polling =
     Boolean(active && ["analyzing", "script_generating", "storyboard_generating", "composing"].includes(active)) ||
     hasRunningShot;
-  const { data: history = [] } = useQuery({
-    queryKey: ["video-create-projects"],
-    queryFn: fetchVideoCreateProjects,
-    refetchInterval: polling ? 3_000 : false,
-  });
   const { data: portraits = [], isLoading: portraitsLoading } = useQuery({
     queryKey: ["portrait-library"],
     queryFn: fetchPortraits,
@@ -496,7 +445,7 @@ export function VideoCreatePage() {
     (input.templates?.length ?? 0);
   const invalidate = (next?: VideoCreateProject) => {
     if (next) setProject(next);
-    void queryClient.invalidateQueries({ queryKey: ["video-create-projects"] });
+    void queryClient.invalidateQueries({ queryKey: ["video-create-project-records"] });
     if (next) void queryClient.invalidateQueries({ queryKey: ["video-create-project", next.project.id] });
   };
   const execute = async (key: string, task: () => Promise<void>) => {
@@ -623,11 +572,11 @@ export function VideoCreatePage() {
 
   return (
     <div
-      className="flex h-[calc(100vh-56px)] min-h-0 flex-col overflow-hidden bg-surface text-sm text-body max-[760px]:h-auto max-[760px]:overflow-auto"
+      className="flex h-[calc(100vh-56px)] min-h-0 flex-col overflow-hidden bg-surface type-body text-body max-[760px]:h-auto max-[760px]:overflow-auto"
       data-testid="video-create-page"
     >
       <header className="flex h-[52px] shrink-0 items-center justify-between gap-3 border-b border-line px-3">
-        <h1 className="shrink-0 text-lg font-medium text-ink">新建项目</h1>
+        <h1 className="shrink-0 type-page-title text-ink">新建项目</h1>
         <div className="flex min-w-0 items-center gap-2 overflow-x-auto">
           <Button
             className="shrink-0"
@@ -676,7 +625,7 @@ export function VideoCreatePage() {
             <section className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label>产品图片</Label>
-                <span className="text-xs text-muted">最多 6 张</span>
+                <span className="type-helper text-muted">最多 6 张</span>
               </div>
               <ProductImages
                 assets={productAssets}
@@ -717,7 +666,7 @@ export function VideoCreatePage() {
             <section className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label>人像图片</Label>
-                <span className="text-xs text-muted">可选</span>
+                <span className="type-helper text-muted">可选</span>
               </div>
               {selectedPortrait ? (
                 <div className="flex items-center gap-2 rounded-lg border border-line p-2 [&_img]:h-12 [&_img]:w-9 [&_img]:rounded-md [&_img]:object-cover">
@@ -731,7 +680,7 @@ export function VideoCreatePage() {
                   ) : (
                     <ImagePreview src={selectedPortrait.display_url} alt={selectedPortrait.name} />
                   )}
-                  <span className="min-w-0 flex-1 truncate text-xs text-muted">{selectedPortrait.name}</span>
+                  <span className="min-w-0 flex-1 truncate type-helper text-muted">{selectedPortrait.name}</span>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -760,8 +709,8 @@ export function VideoCreatePage() {
                 {scenes.map((scene) => (
                   <Button
                     className={cn(
-                      "h-8 rounded-full px-3 font-normal",
-                      input.scene === scene && "border-primary bg-primary text-white hover:bg-primary/90",
+                      "h-8 rounded-full px-3 type-badge",
+                      input.scene === scene && "border-primary bg-primary text-on-primary hover:bg-primary/90",
                     )}
                     variant="outline"
                     size="sm"
@@ -790,19 +739,19 @@ export function VideoCreatePage() {
             <section className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label>核心卖点</Label>
-                <span className="text-xs text-muted">最多 8 条</span>
+                <span className="type-helper text-muted">最多 8 条</span>
               </div>
               <div className="flex flex-wrap gap-2">
                 {sellingPoints.map((point, index) => (
                   <span
-                    className="inline-flex h-8 items-center gap-1 rounded-full bg-surface-strong px-3 text-xs text-ink"
+                    className="inline-flex h-8 items-center gap-1 rounded-full bg-surface-strong px-3 type-helper text-ink"
                     key={point}
                   >
                     {point}
                     <Button
                       className="size-5 rounded-full p-0"
                       variant="ghost"
-                      size="icon"
+                      size="icon-sm"
                       aria-label="删除卖点"
                       onClick={() =>
                         mutateInput(
@@ -835,7 +784,7 @@ export function VideoCreatePage() {
                 {durationOptions.map((seconds) => (
                   <Button
                     className={cn(
-                      input.durationSec === seconds && "border-primary bg-primary text-white hover:bg-primary/90",
+                      input.durationSec === seconds && "border-primary bg-primary text-on-primary hover:bg-primary/90",
                     )}
                     variant="outline"
                     size="sm"
@@ -853,20 +802,20 @@ export function VideoCreatePage() {
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
-                  size="icon"
+                  size="icon-sm"
                   onClick={() => mutateInput("segmentCount", Math.max(1, input.segmentCount - 1))}
                 >
                   −
                 </Button>
-                <span className="w-8 text-center font-medium text-ink">{input.segmentCount}</span>
+                <span className="w-8 text-center type-body-strong text-ink">{input.segmentCount}</span>
                 <Button
                   variant="outline"
-                  size="icon"
+                  size="icon-sm"
                   onClick={() => mutateInput("segmentCount", Math.min(12, input.segmentCount + 1))}
                 >
                   ＋
                 </Button>
-                <span className="text-xs text-muted">段，单段不超过 15 秒</span>
+                <span className="type-helper text-muted">段，单段不超过 15 秒</span>
               </div>
             </section>
 
@@ -877,16 +826,14 @@ export function VideoCreatePage() {
                   <Button
                     className={cn(
                       "h-auto flex-col gap-0.5 py-2",
-                      input.speechRate === speed && "border-primary bg-primary text-white hover:bg-primary/90",
+                      input.speechRate === speed && "border-primary bg-primary text-on-primary hover:bg-primary/90",
                     )}
                     variant="outline"
                     key={speed}
                     onClick={() => mutateInput("speechRate", speed)}
                   >
                     <span>{speed === "slow" ? "慢" : speed === "medium" ? "中" : "快"}</span>
-                    <span
-                      className={cn("text-xs font-normal text-muted", input.speechRate === speed && "text-white/75")}
-                    >
+                    <span className={cn("type-helper text-muted", input.speechRate === speed && "text-on-primary/75")}>
                       {speed === "slow" ? "3字/s" : speed === "medium" ? "4字/s" : "5字/s"}
                     </span>
                   </Button>
@@ -916,7 +863,7 @@ export function VideoCreatePage() {
                 <Label htmlFor="video-create-pain-points">用户痛点</Label>
                 <textarea
                   id="video-create-pain-points"
-                  className="min-h-20 w-full resize-y rounded-md border border-line bg-transparent px-3 py-2 text-sm text-ink outline-none placeholder:text-muted focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                  className="min-h-20 w-full resize-y rounded-md border border-line bg-transparent px-3 py-2 type-body text-ink outline-none placeholder:text-muted focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
                   value={input.audiencePainPoints}
                   onChange={(event) => mutateInput("audiencePainPoints", event.target.value)}
                   placeholder="例：夏天防晒产品总是厚重泛白"
@@ -926,7 +873,7 @@ export function VideoCreatePage() {
                 <Label htmlFor="video-create-benefits">产品利益点</Label>
                 <textarea
                   id="video-create-benefits"
-                  className="min-h-20 w-full resize-y rounded-md border border-line bg-transparent px-3 py-2 text-sm text-ink outline-none placeholder:text-muted focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                  className="min-h-20 w-full resize-y rounded-md border border-line bg-transparent px-3 py-2 type-body text-ink outline-none placeholder:text-muted focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
                   value={input.productBenefits}
                   onChange={(event) => mutateInput("productBenefits", event.target.value)}
                   placeholder="例：零感轻薄，一抹即化"
@@ -1015,7 +962,7 @@ export function VideoCreatePage() {
                 <Label htmlFor="video-create-custom-requirements">自定义要求</Label>
                 <textarea
                   id="video-create-custom-requirements"
-                  className="min-h-20 w-full resize-y rounded-md border border-line bg-transparent px-3 py-2 text-sm text-ink outline-none placeholder:text-muted focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                  className="min-h-20 w-full resize-y rounded-md border border-line bg-transparent px-3 py-2 type-body text-ink outline-none placeholder:text-muted focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
                   value={input.customRequirements}
                   onChange={(event) => mutateInput("customRequirements", event.target.value)}
                   placeholder="补充品牌语气、禁用表达或其他要求"
@@ -1088,20 +1035,24 @@ export function VideoCreatePage() {
           <header className="flex h-[52px] shrink-0 items-center border-b border-line px-3">
             <nav className="flex h-full items-center gap-1">
               <Button
-                className={cn("h-8 rounded-full", tab === "script" && "bg-primary text-white hover:bg-primary/90")}
+                className={cn("h-8 rounded-full", tab === "script" && "bg-primary text-on-primary hover:bg-primary/90")}
                 variant="ghost"
                 size="sm"
                 onClick={() => setTab("script")}
               >
-                脚本 <span className="rounded-full bg-current/10 px-1.5 text-xs">{project?.sections.length ?? 0}</span>
+                脚本{" "}
+                <span className="rounded-full bg-current/10 px-1.5 type-helper">{project?.sections.length ?? 0}</span>
               </Button>
               <Button
-                className={cn("h-8 rounded-full", tab === "storyboard" && "bg-primary text-white hover:bg-primary/90")}
+                className={cn(
+                  "h-8 rounded-full",
+                  tab === "storyboard" && "bg-primary text-on-primary hover:bg-primary/90",
+                )}
                 variant="ghost"
                 size="sm"
                 onClick={() => setTab("storyboard")}
               >
-                分镜 <span className="rounded-full bg-current/10 px-1.5 text-xs">{project?.shots.length ?? 0}</span>
+                分镜 <span className="rounded-full bg-current/10 px-1.5 type-helper">{project?.shots.length ?? 0}</span>
               </Button>
             </nav>
           </header>
@@ -1122,7 +1073,7 @@ export function VideoCreatePage() {
               <span className="grid size-12 place-items-center rounded-full bg-surface-muted">
                 <Film className="size-5" />
               </span>
-              <b className="font-medium text-body-strong">产出物将在这里呈现</b>
+              <b className="text-body-strong">产出物将在这里呈现</b>
             </div>
           )}
           {["script_generating", "analyzing", "storyboard_generating", "composing"].includes(active ?? "") && (
@@ -1130,15 +1081,15 @@ export function VideoCreatePage() {
               <span className="grid size-12 place-items-center rounded-full bg-surface-muted text-ink">
                 <LoaderCircle className="animate-spin" />
               </span>
-              <h2 className="text-base font-medium text-ink">{statusLabels[active ?? ""]}</h2>
-              <p className="text-xs">任务在 Worker 中执行，关闭页面后也会继续。</p>
+              <h2 className="type-section-title text-ink">{active ? statusLabels[active] : ""}</h2>
+              <p className="type-helper">任务在 Worker 中执行，关闭页面后也会继续。</p>
             </div>
           )}
 
           {tab === "script" && project?.sections.length ? (
             <section className="flex min-h-0 flex-1 flex-col">
               <div className="flex h-12 shrink-0 items-center justify-between border-b border-line bg-canvas-soft px-3">
-                <span className="text-xs text-muted">
+                <span className="type-helper text-muted">
                   共 <b>{totalCharacters}</b> 字 · 约 <b>{totalDuration}s</b>
                 </span>
                 <div className="flex gap-2">
@@ -1176,11 +1127,11 @@ export function VideoCreatePage() {
                   return (
                     <article className="overflow-hidden rounded-xl border border-line bg-surface" key={section.id}>
                       <header className="flex min-h-10 items-center justify-between border-b border-line bg-canvas-soft px-3 py-2">
-                        <span className="rounded-full bg-surface-strong px-2.5 py-1 text-xs font-medium text-ink">
+                        <span className="rounded-full bg-surface-strong px-2.5 py-1 type-label text-ink">
                           {section.label}
                         </span>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted">
+                          <span className="type-helper text-muted">
                             {estimateDuration(value, input.speechRate)}s · {[...value].length}字
                           </span>
                           <Button
@@ -1208,7 +1159,7 @@ export function VideoCreatePage() {
                         </div>
                       </header>
                       <textarea
-                        className="min-h-24 w-full resize-y bg-transparent p-3 text-sm leading-relaxed text-body outline-none disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-muted"
+                        className="min-h-24 w-full resize-y bg-transparent p-3 type-body leading-relaxed text-body outline-none disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-muted"
                         value={value}
                         disabled={actionAvailability.scriptLocked}
                         onChange={(event) => setDrafts((current) => ({ ...current, [section.id]: event.target.value }))}
@@ -1269,8 +1220,8 @@ export function VideoCreatePage() {
             <section className="flex min-h-0 flex-1 flex-col">
               <div className="flex h-12 shrink-0 items-center border-b border-line bg-canvas-soft px-3">
                 <div className="flex items-center gap-2">
-                  <b className="font-medium text-ink">分镜编辑</b>
-                  <span className="rounded-full bg-surface-strong px-2 py-0.5 text-xs text-muted">
+                  <b className="text-ink">分镜编辑</b>
+                  <span className="rounded-full bg-surface-strong px-2 py-0.5 type-helper text-muted">
                     {project.shots.length} 个段落
                   </span>
                 </div>
@@ -1283,7 +1234,7 @@ export function VideoCreatePage() {
                     alt="最终成片"
                   />
                   <div className="flex min-w-0 flex-col items-start justify-center gap-2">
-                    <h2 className="text-base font-medium text-ink">完整成片已生成</h2>
+                    <h2 className="type-section-title text-ink">完整成片已生成</h2>
                     <Button
                       size="sm"
                       onClick={() =>
@@ -1299,7 +1250,7 @@ export function VideoCreatePage() {
                 </div>
               )}
               <div className="min-h-0 flex-1 overflow-auto pb-16">
-                <div className="grid h-10 min-w-[1120px] grid-cols-[40px_minmax(240px,1fr)_minmax(240px,1fr)_minmax(280px,1fr)_minmax(280px,1fr)] items-center border-b border-line bg-canvas-soft text-xs font-medium text-muted">
+                <div className="grid h-10 min-w-[1120px] grid-cols-[40px_minmax(240px,1fr)_minmax(240px,1fr)_minmax(280px,1fr)_minmax(280px,1fr)] items-center border-b border-line bg-canvas-soft type-label text-muted">
                   <span>#</span>
                   <span>分镜段落</span>
                   <span className="flex items-center justify-between gap-2 pr-3">
@@ -1321,7 +1272,7 @@ export function VideoCreatePage() {
                       <Button
                         className="size-7 p-0"
                         variant="ghost"
-                        size="icon"
+                        size="icon-sm"
                         aria-label="配音设置"
                         onClick={() => setVoiceSettingsOpen(true)}
                       >
@@ -1349,7 +1300,7 @@ export function VideoCreatePage() {
                       <Button
                         className="size-7 p-0"
                         variant="ghost"
-                        size="icon"
+                        size="icon-sm"
                         aria-label="字幕样式设置"
                         onClick={() => setSubtitleSettingsOpen(true)}
                       >
@@ -1379,15 +1330,15 @@ export function VideoCreatePage() {
                       className="grid min-h-64 min-w-[1120px] grid-cols-[40px_minmax(240px,1fr)_minmax(240px,1fr)_minmax(280px,1fr)_minmax(280px,1fr)] border-b border-line"
                       key={shot.id}
                     >
-                      <span className="border-r border-line p-3 text-xs text-muted">
+                      <span className="border-r border-line p-3 type-helper text-muted">
                         {String(shot.ordinal).padStart(2, "0")}
                       </span>
                       <div className="space-y-2 border-r border-line p-3">
-                        <span className="inline-flex rounded-full bg-surface-strong px-2 py-1 text-xs text-muted">
+                        <span className="inline-flex rounded-full bg-surface-strong px-2 py-1 type-helper text-muted">
                           {shot.durationSec}s
                         </span>
                         <p className="leading-relaxed text-body">{shot.narration}</p>
-                        <small className="text-xs text-muted">0–{shot.durationSec}s · 1 镜</small>
+                        <small className="type-helper text-muted">0–{shot.durationSec}s · 1 镜</small>
                       </div>
                       <div className="border-r border-line p-3">
                         {shot.videoAssetId ? (
@@ -1405,7 +1356,7 @@ export function VideoCreatePage() {
                         ) : (
                           <div
                             className={cn(
-                              "flex h-36 w-24 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-line bg-surface-muted text-xs text-muted",
+                              "flex h-36 w-24 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-line bg-surface-muted type-helper text-muted",
                               shot.status === "failed" && "border-error/40 bg-error/5 text-error",
                             )}
                           >
@@ -1486,7 +1437,9 @@ export function VideoCreatePage() {
                             <History /> 生成历史
                           </Button>
                         </div>
-                        {shot.error && <small className="mt-2 block text-xs text-error">{shot.error.message}</small>}
+                        {shot.error && (
+                          <small className="mt-2 block type-helper text-error">{shot.error.message}</small>
+                        )}
                       </div>
                       <div className={cn("border-r border-line p-3", !shot.audioEnabled && "opacity-50")}>
                         <div className="mb-3 flex items-start justify-between gap-3">
@@ -1514,11 +1467,11 @@ export function VideoCreatePage() {
                               alt={`分镜 ${shot.ordinal} 配音`}
                             />
                             {shot.audioStale && (
-                              <span className="block text-xs text-warning">配音配置已更新，待重新生成</span>
+                              <span className="block type-helper text-warning">配音配置已更新，待重新生成</span>
                             )}
                           </div>
                         ) : (
-                          <span className="text-xs text-muted">生成分镜视频后可试听配音</span>
+                          <span className="type-helper text-muted">生成分镜视频后可试听配音</span>
                         )}
                         <Button
                           className="mt-3"
@@ -1540,7 +1493,7 @@ export function VideoCreatePage() {
                       </div>
                       <div className={cn("p-3", !shot.subtitleEnabled && "opacity-50")}>
                         <div className="mb-3 flex items-center justify-between gap-3">
-                          <span className="text-xs text-muted">{shot.subtitleCues.length} 条字幕</span>
+                          <span className="type-helper text-muted">{shot.subtitleCues.length} 条字幕</span>
                           <Switch
                             checked={shot.subtitleEnabled}
                             aria-label={`分镜 ${shot.ordinal} 字幕`}
@@ -1560,7 +1513,7 @@ export function VideoCreatePage() {
                           <div className="space-y-2">
                             {shot.subtitleCues.map((cue) => (
                               <div key={`${cue.startSec}-${cue.endSec}-${cue.text}`}>
-                                <div className="text-xs text-muted">
+                                <div className="type-helper text-muted">
                                   {cue.startSec.toFixed(1)}s ～ {cue.endSec.toFixed(1)}s
                                 </div>
                                 <p className="mt-0.5 leading-relaxed text-body">{cue.text}</p>
@@ -1568,7 +1521,7 @@ export function VideoCreatePage() {
                             ))}
                           </div>
                         ) : (
-                          <span className="text-xs text-muted">生成配音后自动生成字幕时间轴</span>
+                          <span className="type-helper text-muted">生成配音后自动生成字幕时间轴</span>
                         )}
                         <Button
                           className="mt-3"
@@ -1600,7 +1553,7 @@ export function VideoCreatePage() {
                 })}
               </div>
               <footer className="absolute inset-x-0 bottom-0 flex h-14 items-center justify-end gap-3 border-t border-line bg-surface px-3">
-                <span className="text-xs text-muted">
+                <span className="type-helper text-muted">
                   {project.canCompose
                     ? "全部分镜已就绪"
                     : `还有 ${
@@ -1637,7 +1590,7 @@ export function VideoCreatePage() {
               {videoModelOptions.map((model) => {
                 const selected = batchSettings.videoModel === model.id;
                 return (
-                  <button
+                  <Button
                     type="button"
                     className={cn(
                       "flex w-full items-center justify-between gap-3 border-b border-line px-4 py-3 text-left last:border-b-0",
@@ -1647,21 +1600,21 @@ export function VideoCreatePage() {
                     onClick={() => setBatchSettings((current) => ({ ...current, videoModel: model.id }))}
                   >
                     <span className="min-w-0">
-                      <span className="flex items-center gap-2 font-medium">
+                      <span className="flex items-center gap-2 type-body-strong">
                         {model.name}
-                        <span className="rounded-full bg-surface-strong px-2 py-0.5 text-xs text-muted">
+                        <span className="rounded-full bg-surface-strong px-2 py-0.5 type-helper text-muted">
                           {model.tag}
                         </span>
                       </span>
-                      <span className="mt-1 block text-xs text-muted">{model.description}</span>
+                      <span className="mt-1 block type-helper text-muted">{model.description}</span>
                     </span>
                     {selected && <Check className="size-5 shrink-0" />}
-                  </button>
+                  </Button>
                 );
               })}
             </div>
             <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-canvas-soft px-4 py-3">
-              <span className="font-medium text-ink">生成声音</span>
+              <span className="type-body-strong text-ink">生成声音</span>
               <Switch
                 checked={batchSettings.generateAudio}
                 aria-label="生成声音"
@@ -1674,7 +1627,7 @@ export function VideoCreatePage() {
                 <div className="flex flex-wrap gap-2">
                   {(["9:16", "16:9", "1:1"] as const).map((ratio) => (
                     <Button
-                      className={cn(batchSettings.ratio === ratio && "bg-primary text-white")}
+                      className={cn(batchSettings.ratio === ratio && "bg-primary text-on-primary")}
                       variant="outline"
                       size="sm"
                       key={ratio}
@@ -1690,7 +1643,7 @@ export function VideoCreatePage() {
                 <div className="flex gap-2">
                   {(["480p", "720p"] as const).map((resolution) => (
                     <Button
-                      className={cn(batchSettings.resolution === resolution && "bg-primary text-white")}
+                      className={cn(batchSettings.resolution === resolution && "bg-primary text-on-primary")}
                       variant="outline"
                       size="sm"
                       key={resolution}
@@ -1703,7 +1656,7 @@ export function VideoCreatePage() {
               </div>
               <div className="space-y-2">
                 <Label>时长（秒）</Label>
-                <div className="rounded-md border border-line bg-surface px-3 py-2 text-xs text-muted">
+                <div className="rounded-md border border-line bg-surface px-3 py-2 type-helper text-muted">
                   时长自动取每个分镜的实际时长，4～15 秒内取整
                 </div>
               </div>
@@ -1753,7 +1706,7 @@ export function VideoCreatePage() {
           <DialogHeader>
             <DialogTitle>清除脚本</DialogTitle>
           </DialogHeader>
-          <div className="space-y-2 text-sm leading-relaxed text-body">
+          <div className="space-y-2 type-body leading-relaxed text-body">
             <p>清除后，当前脚本和依赖的分镜记录将无法恢复。</p>
             <p className="text-muted">已经生成的视频、音频和素材库文件会继续保留。</p>
           </div>
@@ -1766,7 +1719,7 @@ export function VideoCreatePage() {
               取消
             </Button>
             <Button
-              className="bg-error text-white hover:bg-error/90"
+              className="bg-error text-on-primary hover:bg-error/90"
               disabled={!project || Boolean(busy) || polling}
               onClick={() =>
                 project &&
@@ -1917,11 +1870,45 @@ export function VideoCreatePage() {
           setPortraitPickerOpen(false);
         }}
       />
-      <HistoryDrawer
+      <ProjectRecordDrawer
         open={historyOpen}
-        projects={history}
+        queryKey="video-create-project-records"
+        currentProjectId={projectId}
+        statusOptions={Object.entries(statusLabels).map(([value, label]) => ({ value, label }))}
         onClose={() => setHistoryOpen(false)}
-        onSelect={(selected) => {
+        fetchPage={async ({ query, status, page, pageSize }) => {
+          const data = await fetchVideoCreateProjects({
+            query,
+            status: status as VideoCreateProject["project"]["status"] | undefined,
+            page,
+            pageSize,
+          });
+          return {
+            items: data.projects.map((item) => ({
+              id: item.project.id,
+              title: item.project.title,
+              status: item.project.status,
+              statusLabel: statusLabels[item.project.status],
+              statusTone: videoCreateStatusTone(item.project.status),
+              summary: item.project.input.productName || "尚未填写产品名称",
+              updatedAt: item.project.updatedAt,
+              revision: item.project.version,
+            })),
+            total: data.total,
+            page: data.page,
+            pageSize: data.pageSize,
+          };
+        }}
+        onRename={async (item, title) => {
+          if (item.revision === undefined) throw new Error("项目版本缺失，请刷新后重试");
+          const updated = await renameVideoCreateProject(item.id, item.revision, title);
+          if (projectId === item.id) {
+            setProject(updated);
+            setInput(updated.project.input);
+          }
+        }}
+        onContinue={async (item) => {
+          const selected = await fetchVideoCreateProject(item.id);
           setProject(selected);
           setInput(selected.project.input);
           setHistoryOpen(false);

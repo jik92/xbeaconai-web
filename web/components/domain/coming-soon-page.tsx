@@ -12,9 +12,9 @@ export function ComingSoonPage({ config }: { config: ComingSoonFeature }) {
         <Clock3 />
       </div>
       <span>COMING SOON</span>
-      <h1>{config.label}</h1>
+      <h1 className="type-page-title">{config.label}</h1>
       <p>该工作流正在逐项验收，验收通过后会在这里开放。</p>
-      <small>当前不会创建任务、扣除创作点或调用任何模型。</small>
+      <small className="type-helper">当前不会创建任务、扣除创作点或调用任何模型。</small>
     </section>
   );
 }
@@ -26,9 +26,9 @@ export function ProjectComingSoonPage() {
         <Clock3 />
       </div>
       <span>COMING SOON</span>
-      <h1>{APP_CONFIG.projectName}</h1>
+      <h1 className="type-page-title">{APP_CONFIG.projectName}</h1>
       <p>功能正在逐项验收，开放后会在这里显示。</p>
-      <small>当前不会创建任务、扣除创作点或调用任何模型。</small>
+      <small className="type-helper">当前不会创建任务、扣除创作点或调用任何模型。</small>
     </section>
   );
 }

@@ -434,6 +434,20 @@ describe("video create domain", () => {
       }).project.id,
     ).toBe(projectId);
 
+    expect(
+      store.listOwnedPage({ ownerUserId: owner.user.id, query: "通勤", status: "draft", page: 1, pageSize: 1 }),
+    ).toEqual(expect.objectContaining({ total: 1, page: 1, pageSize: 1 }));
+    expect(store.listOwnedPage({ ownerUserId: other.user.id, query: "通勤", page: 1, pageSize: 20 }).projects).toEqual(
+      [],
+    );
+    const renamed = store.updateTitle(projectId, owner.user.id, created.project.version, "通勤衬衫生成记录");
+    expect(renamed?.project.title).toBe("通勤衬衫生成记录");
+    expect(renamed?.project.version).toBe(created.project.version + 1);
+    expect(() => store.updateTitle(projectId, owner.user.id, created.project.version, "冲突标题")).toThrow(
+      VideoCreateVersionConflictError,
+    );
+    expect(store.updateTitle(projectId, other.user.id, renamed?.project.version ?? 0, "越权标题")).toBeUndefined();
+
     const scripted = store.replaceScripts(projectId, {
       sections: [
         { label: "开场共鸣", text: "职场穿搭总怕闷热又没精神？", durationSec: 4 },

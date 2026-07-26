@@ -2,6 +2,7 @@ import { AudioLines, Maximize2, X } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import ReactPlayer from "react-player";
 import { authenticatedBlobUrl } from "@/api/api-client";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export interface MediaMetadata {
@@ -68,7 +69,7 @@ export function VideoPreview({
   return (
     <ReactPlayer
       ref={ref}
-      className={cn(className, "object-contain")}
+      className={cn(className, "bg-surface-dark object-contain")}
       src={src}
       playing={autoPlay}
       controls={controls}
@@ -78,7 +79,7 @@ export function VideoPreview({
       preload="metadata"
       width="100%"
       height="100%"
-      style={{ objectFit: "contain", backgroundColor: "#000" }}
+      style={{ objectFit: "contain" }}
       onReady={() => {
         if (ref.current && initialTime > 0) ref.current.currentTime = initialTime;
       }}
@@ -242,7 +243,7 @@ function MediaLightbox({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-4 sm:p-8"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-surface-dark/85 p-4 sm:p-8"
       role="dialog"
       aria-modal="true"
       aria-label={`${alt}全屏预览`}
@@ -250,14 +251,14 @@ function MediaLightbox({
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <button
+      <Button
         type="button"
-        className="absolute right-4 top-4 inline-flex size-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        className="absolute right-4 top-4 inline-flex size-10 items-center justify-center rounded-full bg-on-dark/10 text-on-primary transition-colors hover:bg-on-dark/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-dark"
         aria-label="关闭全屏预览"
         onClick={onClose}
       >
         <X className="size-5" aria-hidden="true" />
-      </button>
+      </Button>
       {renderNativeMedia({
         kind,
         src: source,
@@ -266,7 +267,7 @@ function MediaLightbox({
         controls: true,
         className:
           kind === "audio"
-            ? "w-full max-w-xl rounded-xl bg-white p-3"
+            ? "w-full max-w-xl rounded-xl bg-surface p-3"
             : "max-h-[calc(100vh-4rem)] max-w-full object-contain",
         initialTime: currentTime,
         onTimeChange,
@@ -319,7 +320,7 @@ function InteractiveVideoPreview({
               onMetadata?.(metadata);
             }}
           />
-          <button
+          <Button
             type="button"
             className="absolute inset-0 z-[1] cursor-default bg-transparent"
             aria-label={`${alt}视频预览`}
@@ -340,7 +341,7 @@ function InteractiveVideoPreview({
         </>
       )}
       <span
-        className="pointer-events-none absolute right-2 top-2 z-[2] rounded-md bg-black px-2 py-1 text-2xs text-yellow-300"
+        className="pointer-events-none absolute right-2 top-2 z-[2] rounded-md bg-surface-dark px-2 py-1 type-micro text-on-dark-soft"
         role="timer"
         aria-label="播放时间"
       >
@@ -405,7 +406,7 @@ function InteractiveAudioPreview({
               onMetadata?.(metadata);
             }}
           />
-          <button
+          <Button
             type="button"
             className="absolute inset-0 z-[1] cursor-default bg-transparent"
             aria-label={`${alt}音频预览`}
@@ -428,9 +429,9 @@ function InteractiveAudioPreview({
       <span className="grid size-6 shrink-0 place-items-center rounded-full bg-surface-strong text-ink">
         <AudioLines className="size-3.5" aria-hidden="true" />
       </span>
-      <span className="min-w-0 flex-1 truncate text-2xs text-ink">{alt}</span>
+      <span className="min-w-0 flex-1 truncate type-helper text-ink">{alt}</span>
       <span
-        className="pointer-events-none relative z-[2] shrink-0 rounded bg-ink/75 px-1.5 py-0.5 text-2xs text-white"
+        className="pointer-events-none relative z-[2] shrink-0 rounded bg-ink/75 px-1.5 py-0.5 type-micro text-on-primary"
         role="timer"
         aria-label="播放时间"
       >
@@ -499,21 +500,21 @@ export function MediaPreview({
   content = (
     <div className={cn("group/media-preview relative inline-flex max-h-full max-w-full", kind === "audio" && "w-full")}>
       {content}
-      <button
+      <Button
         type="button"
         className={cn(
-          "absolute inline-flex text-white opacity-0 transition-opacity focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white group-hover/media-preview:opacity-100",
+          "absolute inline-flex text-on-primary opacity-0 transition-opacity focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-dark group-hover/media-preview:opacity-100",
           kind === "image"
             ? "inset-0 items-start justify-end rounded-[inherit] p-2"
-            : "right-2 top-2 size-8 items-center justify-center rounded-full bg-black/55 hover:bg-black/70",
+            : "right-2 top-2 size-8 items-center justify-center rounded-full bg-surface-dark/55 hover:bg-surface-dark/70",
         )}
         aria-label={`全屏预览${alt}`}
         onClick={() => setLightboxOpen(true)}
       >
-        <span className="inline-flex size-8 items-center justify-center rounded-full bg-black/55 hover:bg-black/70">
+        <span className="inline-flex size-8 items-center justify-center rounded-full bg-surface-dark/55 hover:bg-surface-dark/70">
           <Maximize2 className="size-4" aria-hidden="true" />
         </span>
-      </button>
+      </Button>
       {lightboxOpen && <MediaLightbox kind={kind} source={source} alt={alt} onClose={() => setLightboxOpen(false)} />}
     </div>
   );
