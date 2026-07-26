@@ -208,6 +208,14 @@ export class ArkAssetsClient {
     return this.request<ArkAsset>("GetAsset", { Id: id, ProjectName: projectName }, true);
   }
 
+  deleteAsset(id: string, projectName = "default") {
+    return this.request<Record<string, never>>("DeleteAsset", { Id: id, ProjectName: projectName });
+  }
+
+  deleteAssetGroup(id: string, projectName = "default") {
+    return this.request<Record<string, never>>("DeleteAssetGroup", { Id: id, ProjectName: projectName });
+  }
+
   async waitForAsset(id: string, projectName = "default", timeoutMs = 30 * 60_000, pollIntervalMs = 10_000) {
     const started = Date.now();
     while (Date.now() - started < timeoutMs) {

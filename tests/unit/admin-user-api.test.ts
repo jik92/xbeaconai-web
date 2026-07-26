@@ -11,5 +11,7 @@ describe("admin user API contract", () => {
     expect(spec.paths["/api/admin/users/{userId}/credits"]?.post?.operationId).toBe("grantAdminUserCredits");
     expect(spec.paths["/api/admin/users/{userId}/credits"]?.post?.responses).toHaveProperty("409");
     expect(spec.paths["/api/admin/users/{userId}/status"]?.patch?.operationId).toBe("updateAdminUserStatus");
+    expect(spec.paths["/api/admin/users/release"]?.post?.operationId).toBe("releaseAdminUsers");
+    expect(spec.paths["/api/admin/users/release"]?.post?.responses).toHaveProperty("403");
   });
 });

@@ -97,4 +97,23 @@ describe("Ark Assets OpenAPI", () => {
       { action: "GetAsset", body: { Id: "asset-1", ProjectName: "default" } },
     ]);
   });
+
+  test("uses the Ark deletion actions once for custom portraits and their group", async () => {
+    const requests: Array<{ action: string; body: Record<string, unknown> }> = [];
+    const client = new ArkAssetsClient(config, async (url, init) => {
+      requests.push({
+        action: new URL(String(url)).searchParams.get("Action") ?? "",
+        body: JSON.parse(String(init?.body)) as Record<string, unknown>,
+      });
+      return Response.json({ Result: {} });
+    });
+
+    await client.deleteAsset("asset-1", "project-1");
+    await client.deleteAssetGroup("group-1", "project-1");
+
+    expect(requests).toEqual([
+      { action: "DeleteAsset", body: { Id: "asset-1", ProjectName: "project-1" } },
+      { action: "DeleteAssetGroup", body: { Id: "group-1", ProjectName: "project-1" } },
+    ]);
+  });
 });

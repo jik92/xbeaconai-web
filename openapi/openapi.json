@@ -7378,6 +7378,167 @@
         }
       }
     },
+    "/api/admin/users/release": {
+      "post": {
+        "operationId": "releaseAdminUsers",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "minItems": 1,
+                    "maxItems": 100
+                  }
+                },
+                "required": [
+                  "userIds"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Per-user physical account release results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "userId": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "released": {
+                                "type": "boolean",
+                                "enum": [
+                                  true
+                                ]
+                              },
+                              "summary": {
+                                "type": "object",
+                                "properties": {
+                                  "userId": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "displayName": {
+                                    "type": "string"
+                                  },
+                                  "phone": {
+                                    "type": "string"
+                                  },
+                                  "deletedArkAssets": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  },
+                                  "deletedArkGroups": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  },
+                                  "deletedTosObjects": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  }
+                                },
+                                "required": [
+                                  "userId",
+                                  "displayName",
+                                  "phone",
+                                  "deletedArkAssets",
+                                  "deletedArkGroups",
+                                  "deletedTosObjects"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "userId",
+                              "released",
+                              "summary"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "userId": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "released": {
+                                "type": "boolean",
+                                "enum": [
+                                  false
+                                ]
+                              },
+                              "error": {
+                                "type": "object",
+                                "properties": {
+                                  "code": {
+                                    "type": "string"
+                                  },
+                                  "message": {
+                                    "type": "string"
+                                  },
+                                  "retryable": {
+                                    "type": "boolean"
+                                  },
+                                  "requestId": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "code",
+                                  "message",
+                                  "retryable",
+                                  "requestId"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "userId",
+                              "released",
+                              "error"
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "results"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/jobs": {
       "get": {
         "operationId": "listAdminJobs",

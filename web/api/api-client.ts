@@ -53,6 +53,7 @@ import {
   processVideoCreateShotMaterial,
   regenerateVideoCreateSection,
   registerCustomPortrait,
+  releaseAdminUsers,
   replaceVideoCreateShot,
   retryJob,
   runAdminCredentialDoctor as runAdminCredentialDoctorRequest,
@@ -88,6 +89,7 @@ import type {
   ListVideoRemixProjectsResponse,
   ModuleId,
   ProviderCredentialName,
+  ReleaseAdminUsersResponse,
   RunAdminCredentialDoctorResponse,
   SeedanceModelId,
   StopAllAdminJobsResponse,
@@ -100,6 +102,7 @@ export type AdminJob = ListAdminJobsResponse["jobs"][number];
 export type AdminProviderAudit = ListAdminProviderAuditsResponse["audits"][number];
 export type AdminProviderAuditDetail = GetAdminProviderAuditResponse;
 export type AdminUser = ListAdminUsersResponse["users"][number];
+export type AdminAccountReleaseResult = ReleaseAdminUsersResponse["results"][number];
 export type AdminCredentialDoctorResult = RunAdminCredentialDoctorResponse["results"][number];
 export type ProviderFeatures = GetProviderFeaturesResponse;
 export type AdminStopAllJobsResult = StopAllAdminJobsResponse;
@@ -257,6 +260,16 @@ export async function setAdminUserStatus(userId: string, status: "active" | "dis
     throwOnError: true,
   });
   if (!data) throw new Error("用户状态更新失败");
+  return data;
+}
+export async function releaseSelectedAdminUsers(userIds: string[]) {
+  configure();
+  const { data } = await releaseAdminUsers({
+    body: { userIds },
+    headers: authHeaders(),
+    throwOnError: true,
+  });
+  if (!data) throw new Error("账号释放失败");
   return data;
 }
 export async function fetchModels() {

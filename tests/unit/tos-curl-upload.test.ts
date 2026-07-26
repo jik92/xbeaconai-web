@@ -1,7 +1,15 @@
 import { describe, expect, test } from "bun:test";
-import { parseCurlProgress, parseCurlUploadResponse } from "../../server/storage/ossutils";
+import { parseCurlProgress, parseCurlUploadResponse, tosPaginationMarkers } from "../../server/storage/ossutils";
 
 describe("TOS curl upload parsing", () => {
+  test("omits undefined pagination markers because the TOS SDK signs them incorrectly", () => {
+    expect(tosPaginationMarkers({ keyMarker: undefined, uploadIdMarker: undefined })).toEqual({});
+    expect(tosPaginationMarkers({ keyMarker: "next-key", versionIdMarker: "next-version" })).toEqual({
+      keyMarker: "next-key",
+      versionIdMarker: "next-version",
+    });
+  });
+
   test("reads the final progress value from curl's progress bar", () => {
     expect(parseCurlProgress("#### 9.4%\r######## 49.2%\r########## 100.0%\n")).toBe(100);
     expect(parseCurlProgress("no progress yet")).toBeUndefined();

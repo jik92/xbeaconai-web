@@ -15,7 +15,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   type AdminCredential,
@@ -28,6 +28,7 @@ import {
   fetchAdminJobs,
   fetchAdminUsers,
   grantCreditsToAdminUser,
+  releaseSelectedAdminUsers,
   removeAdminCredential,
   runAdminCredentialDoctor,
   saveAdminCredential,
@@ -39,6 +40,7 @@ import type { ModuleId, ProviderCredentialName } from "@/api/generated/types.gen
 import { ToolCreatorModal } from "@/components/domain/tool-creator-modal";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -89,6 +91,36 @@ const userStatusStyles: Record<AdminUser["status"], string> = {
   active: "bg-success/10 text-success",
   disabled: "bg-surface-muted text-muted",
 };
+
+function SelectionCheckbox({
+  checked,
+  indeterminate = false,
+  disabled = false,
+  label,
+  onChange,
+}: {
+  checked: boolean;
+  indeterminate?: boolean;
+  disabled?: boolean;
+  label: string;
+  onChange: (checked: boolean) => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      className="size-4 rounded border-line accent-primary"
+      checked={checked}
+      disabled={disabled}
+      aria-label={label}
+      onChange={(event) => onChange(event.target.checked)}
+    />
+  );
+}
 
 function DoctorStatus({ result }: { result?: AdminCredentialDoctorResult }) {
   if (!result) return <span className="text-xs text-muted">未检测</span>;
@@ -351,6 +383,11 @@ function UsersPanel() {
   const [credits, setCredits] = useState("");
   const [rechargeKey, setRechargeKey] = useState("");
   const [busyUserId, setBusyUserId] = useState("");
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(() => new Set());
+  const [releaseDialogOpen, setReleaseDialogOpen] = useState(false);
+  const [releaseConfirmation, setReleaseConfirmation] = useState("");
+  const [releaseFailures, setReleaseFailures] = useState<Array<{ userId: string; message: string }>>([]);
+  const [releasing, setReleasing] = useState(false);
   const query = useQuery({
     queryKey: ["admin-users", page, search, status],
     queryFn: () =>
@@ -362,6 +399,19 @@ function UsersPanel() {
       }),
   });
   const totalPages = Math.max(1, Math.ceil((query.data?.total ?? 0) / 25));
+  const pageUsers = query.data?.users ?? [];
+  const releasableUsers = pageUsers.filter((member) => member.status === "disabled" && !member.isAdmin);
+  const selectedUsers = pageUsers.filter((member) => selectedUserIds.has(member.id));
+  const allReleasableSelected =
+    releasableUsers.length > 0 && releasableUsers.every((member) => selectedUserIds.has(member.id));
+  const someReleasableSelected = releasableUsers.some((member) => selectedUserIds.has(member.id));
+
+  const clearReleaseSelection = () => {
+    setSelectedUserIds(new Set());
+    setReleaseDialogOpen(false);
+    setReleaseConfirmation("");
+    setReleaseFailures([]);
+  };
 
   const changeStatus = async (member: AdminUser, nextStatus: "active" | "disabled") => {
     const action = nextStatus === "disabled" ? "注销" : "恢复";
@@ -404,7 +454,69 @@ function UsersPanel() {
     }
   };
 
+  const releaseAccounts = async () => {
+    if (!selectedUsers.length || releaseConfirmation !== "释放账号") return;
+    setReleasing(true);
+    setReleaseFailures([]);
+    try {
+      const response = await releaseSelectedAdminUsers(selectedUsers.map((member) => member.id));
+      const succeeded = new Set(response.results.filter((result) => result.released).map((result) => result.userId));
+      const failures = response.results.flatMap((result) =>
+        result.released ? [] : [{ userId: result.userId, message: result.error.message }],
+      );
+      setSelectedUserIds(new Set(failures.map((failure) => failure.userId)));
+      await query.refetch();
+      if (!failures.length) {
+        setReleaseDialogOpen(false);
+        setReleaseConfirmation("");
+        toast.success(`已释放 ${succeeded.size} 个账号`);
+      } else {
+        setReleaseFailures(failures);
+        setReleaseConfirmation("");
+        if (succeeded.size) toast.success(`已释放 ${succeeded.size} 个账号，${failures.length} 个失败`);
+        else toast.error(`${failures.length} 个账号释放失败`);
+      }
+    } catch (reason) {
+      toast.error(apiErrorMessage(reason, "账号释放失败"));
+    } finally {
+      setReleasing(false);
+    }
+  };
+
   const columns: ColumnDef<AdminUser, unknown>[] = [
+    {
+      id: "selection",
+      size: 44,
+      header: () => (
+        <SelectionCheckbox
+          checked={allReleasableSelected}
+          indeterminate={!allReleasableSelected && someReleasableSelected}
+          disabled={!releasableUsers.length || releasing}
+          label="选择当前页可释放账号"
+          onChange={(checked) =>
+            setSelectedUserIds(checked ? new Set(releasableUsers.map((member) => member.id)) : new Set())
+          }
+        />
+      ),
+      cell: ({ row }) => {
+        const releasable = row.original.status === "disabled" && !row.original.isAdmin;
+        return (
+          <SelectionCheckbox
+            checked={selectedUserIds.has(row.original.id)}
+            disabled={!releasable || releasing}
+            label={`选择释放 ${row.original.displayName}`}
+            onChange={(checked) =>
+              setSelectedUserIds((current) => {
+                const next = new Set(current);
+                if (checked) next.add(row.original.id);
+                else next.delete(row.original.id);
+                return next;
+              })
+            }
+          />
+        );
+      },
+    },
     {
       id: "displayName",
       header: "用户名",
@@ -455,7 +567,7 @@ function UsersPanel() {
             <Button
               variant="outline"
               size="sm"
-              disabled={Boolean(busyUserId)}
+              disabled={Boolean(busyUserId) || releasing}
               onClick={() => {
                 setRechargeUser(row.original);
                 setCredits("");
@@ -470,7 +582,7 @@ function UsersPanel() {
               variant="ghost"
               size="sm"
               className="text-danger hover:bg-danger/10 hover:text-danger"
-              disabled={Boolean(busyUserId)}
+              disabled={Boolean(busyUserId) || releasing}
               onClick={() => void changeStatus(row.original, "disabled")}
             >
               {busyUserId === row.original.id && <LoaderCircle className="animate-spin" />} 注销
@@ -480,7 +592,7 @@ function UsersPanel() {
             <Button
               variant="outline"
               size="sm"
-              disabled={Boolean(busyUserId)}
+              disabled={Boolean(busyUserId) || releasing}
               onClick={() => void changeStatus(row.original, "active")}
             >
               {busyUserId === row.original.id && <LoaderCircle className="animate-spin" />} 恢复
@@ -500,6 +612,7 @@ function UsersPanel() {
           placeholder="搜索用户名或手机号"
           value={search}
           onChange={(event) => {
+            clearReleaseSelection();
             setPage(1);
             setSearch(event.target.value.slice(0, 80));
           }}
@@ -508,6 +621,7 @@ function UsersPanel() {
           className="h-8 text-xs"
           value={status}
           onChange={(event) => {
+            clearReleaseSelection();
             setPage(1);
             setStatus(event.target.value);
           }}
@@ -522,6 +636,19 @@ function UsersPanel() {
         <Button variant="outline" size="sm" onClick={() => void query.refetch()}>
           <RefreshCw className={query.isFetching ? "animate-spin" : ""} /> 刷新
         </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="border-danger/30 text-danger hover:bg-danger/10 hover:text-danger"
+          disabled={!selectedUsers.length || releasing || Boolean(busyUserId)}
+          onClick={() => {
+            setReleaseFailures([]);
+            setReleaseConfirmation("");
+            setReleaseDialogOpen(true);
+          }}
+        >
+          <Trash2 /> 释放账号{selectedUsers.length ? `（${selectedUsers.length}）` : ""}
+        </Button>
         <span className="ml-auto text-xs text-muted">共 {query.data?.total ?? 0} 个用户</span>
       </div>
       <DataTable
@@ -534,13 +661,29 @@ function UsersPanel() {
         className="min-h-0 flex-1"
       />
       <footer className="flex h-11 shrink-0 items-center justify-end gap-2 border-t border-line text-xs text-muted">
-        <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={page <= 1}
+          onClick={() => {
+            clearReleaseSelection();
+            setPage((value) => value - 1);
+          }}
+        >
           上一页
         </Button>
         <span>
           第 {page} / {totalPages} 页
         </span>
-        <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((value) => value + 1)}>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={page >= totalPages}
+          onClick={() => {
+            clearReleaseSelection();
+            setPage((value) => value + 1);
+          }}
+        >
           下一页
         </Button>
       </footer>
@@ -602,6 +745,84 @@ function UsersPanel() {
           </footer>
         </form>
       </ToolCreatorModal>
+      <Dialog
+        open={releaseDialogOpen}
+        onOpenChange={(open) => {
+          if (releasing) return;
+          setReleaseDialogOpen(open);
+          if (!open) {
+            setReleaseConfirmation("");
+            setReleaseFailures([]);
+          }
+        }}
+      >
+        <DialogContent
+          onEscapeKeyDown={(event) => releasing && event.preventDefault()}
+          onPointerDownOutside={(event) => releasing && event.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>释放账号</DialogTitle>
+          </DialogHeader>
+          <form
+            className="grid gap-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void releaseAccounts();
+            }}
+          >
+            <div className="rounded-md border border-danger/20 bg-danger/5 p-3 text-xs text-ink">
+              此操作不可恢复，将物理删除账号、任务、项目、素材、TOS 对象和自建虚拟人像。
+            </div>
+            <div className="max-h-36 overflow-y-auto rounded-md border border-line">
+              {selectedUsers.map((member) => (
+                <div
+                  className="flex items-center justify-between gap-3 border-b border-line/60 px-3 py-2 last:border-0"
+                  key={member.id}
+                >
+                  <span className="truncate text-sm text-ink">{member.displayName}</span>
+                  <span className="shrink-0 text-xs text-muted">{member.phone}</span>
+                </div>
+              ))}
+            </div>
+            {releaseFailures.length > 0 && (
+              <div className="grid gap-1 text-xs text-danger" role="alert">
+                {releaseFailures.map((failure) => {
+                  const member = selectedUsers.find((item) => item.id === failure.userId);
+                  return (
+                    <p key={failure.userId}>
+                      {member?.displayName ?? failure.userId}：{failure.message}
+                    </p>
+                  );
+                })}
+              </div>
+            )}
+            <div className="grid gap-2">
+              <Label htmlFor="admin-release-confirmation">输入“释放账号”确认</Label>
+              <Input
+                id="admin-release-confirmation"
+                autoFocus
+                value={releaseConfirmation}
+                disabled={releasing}
+                placeholder="释放账号"
+                autoComplete="off"
+                onChange={(event) => setReleaseConfirmation(event.target.value.slice(0, 20))}
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" disabled={releasing} onClick={() => setReleaseDialogOpen(false)}>
+                取消
+              </Button>
+              <Button
+                type="submit"
+                className="bg-danger text-white hover:bg-danger/90"
+                disabled={releasing || releaseConfirmation !== "释放账号" || !selectedUsers.length}
+              >
+                {releasing && <LoaderCircle className="animate-spin" />} 释放账号
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -30,8 +30,8 @@ import {
   remixRepairRules,
   remixVoiceModes,
 } from "../shared/video-remix/prompt-tools";
-import { parseRemixAnalysisEntries, parseRemixSources, remixMaxSources } from "../shared/video-remix/workflow";
 import { validateRemixShotReferenceBindings } from "../shared/video-remix/shot-reference";
+import { parseRemixAnalysisEntries, parseRemixSources, remixMaxSources } from "../shared/video-remix/workflow";
 import { APP_CONFIG, isModuleOpen } from "../web/app/config";
 import type { ModuleId } from "../web/entities/types";
 import {
@@ -56,6 +56,7 @@ import {
   AdScriptVariantStatusSchema,
   AdScriptVersionSourceSchema,
 } from "./ad-script/types";
+import { AccountReleaseError, AdminAccountReleaseService } from "./admin/account-release-service";
 import { ProviderGenerationAuditStore } from "./audit/provider-generation-audit-store";
 import { credentialDoctor } from "./byok/credential-doctor";
 import {
@@ -101,6 +102,7 @@ import {
   maxDirectUploadBytes,
   verifyDirectUploadTicket,
 } from "./uploads/direct-upload";
+import { advanceVideoCreateAutoWorkflow } from "./video-create/auto-workflow";
 import {
   buildVideoCreateShotGenerationPrompt,
   createFallbackVideoCreateShotPlan,
@@ -109,14 +111,13 @@ import {
   validateVideoCreateShotGenerationReferences,
   videoCreateReferenceRole,
 } from "./video-create/shot-generation";
-import { advanceVideoCreateAutoWorkflow } from "./video-create/auto-workflow";
 import {
+  PortraitReferenceSchema,
   VIDEO_CREATE_ANALYSIS_MODEL,
   VideoCreateInputSchema,
   VideoCreateMaterialStorageKindSchema,
   VideoCreateMaterialVersionSourceSchema,
   VideoCreateMaterialVersionStatusSchema,
-  PortraitReferenceSchema,
   VideoCreateProjectStatusSchema,
   VideoCreateRecommendationSchema,
   VideoCreateShotGenerationPlanSchema,
@@ -436,6 +437,7 @@ export const adScripts = new AdScriptStore();
 export const videoCreates = new VideoCreateStore();
 export const providerAudits = new ProviderGenerationAuditStore();
 export const customPortraits = new CustomPortraitStore();
+export const accountRelease = new AdminAccountReleaseService(accounts);
 export const queue = new BullJobQueue((jobId) => store.get(jobId));
 function adminUser(userId: string) {
   const user = accounts.getUser(userId);
@@ -3505,6 +3507,80 @@ app.openapi(updateAdminUserStatusRoute, (c) => {
       return c.json({ error: { code: error.code, message: error.message, retryable: false, requestId } }, 409);
     throw error;
   }
+});
+
+const AdminAccountReleaseSummarySchema = z.object({
+  userId: z.string().uuid(),
+  displayName: z.string(),
+  phone: z.string(),
+  deletedArkAssets: z.number().int().nonnegative(),
+  deletedArkGroups: z.number().int().nonnegative(),
+  deletedTosObjects: z.number().int().nonnegative(),
+});
+const AdminAccountReleaseResultSchema = z.discriminatedUnion("released", [
+  z.object({
+    userId: z.string().uuid(),
+    released: z.literal(true),
+    summary: AdminAccountReleaseSummarySchema,
+  }),
+  z.object({
+    userId: z.string().uuid(),
+    released: z.literal(false),
+    error: ApiErrorSchema,
+  }),
+]);
+const releaseAdminUsersRoute = createRoute({
+  method: "post",
+  path: "/api/admin/users/release",
+  operationId: "releaseAdminUsers",
+  request: {
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: z.object({ userIds: z.array(z.string().uuid()).min(1).max(100) }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: "Per-user physical account release results",
+      content: { "application/json": { schema: z.object({ results: z.array(AdminAccountReleaseResultSchema) }) } },
+    },
+    403: { description: "Admin required", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(releaseAdminUsersRoute, async (c) => {
+  const adminUserId = c.get("userId");
+  if (!adminUser(adminUserId))
+    return c.json(
+      {
+        error: { code: "ADMIN_REQUIRED", message: "仅管理员可访问", retryable: false, requestId: crypto.randomUUID() },
+      },
+      403,
+    );
+  const userIds = [...new Set(c.req.valid("json").userIds)];
+  const results = [];
+  for (const userId of userIds) {
+    try {
+      const summary = await accountRelease.releaseUser(userId, adminUserId);
+      results.push({ userId, released: true as const, summary });
+    } catch (error) {
+      const known = error instanceof AccountReleaseError;
+      results.push({
+        userId,
+        released: false as const,
+        error: {
+          code: known ? error.code : "ACCOUNT_RELEASE_FAILED",
+          message: error instanceof Error ? error.message : "账号释放失败",
+          retryable: known ? error.retryable : true,
+          requestId: crypto.randomUUID(),
+        },
+      });
+    }
+  }
+  return c.json({ results }, 200);
 });
 
 const listAdminJobsRoute = createRoute({

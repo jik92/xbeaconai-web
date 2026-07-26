@@ -2419,6 +2419,55 @@ export type UpdateAdminUserStatusResponses = {
 
 export type UpdateAdminUserStatusResponse = UpdateAdminUserStatusResponses[keyof UpdateAdminUserStatusResponses];
 
+export type ReleaseAdminUsersData = {
+    body: {
+        userIds: Array<string>;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/admin/users/release';
+};
+
+export type ReleaseAdminUsersErrors = {
+    /**
+     * Admin required
+     */
+    403: ApiErrorResponse;
+};
+
+export type ReleaseAdminUsersError = ReleaseAdminUsersErrors[keyof ReleaseAdminUsersErrors];
+
+export type ReleaseAdminUsersResponses = {
+    /**
+     * Per-user physical account release results
+     */
+    200: {
+        results: Array<{
+            userId: string;
+            released: true;
+            summary: {
+                userId: string;
+                displayName: string;
+                phone: string;
+                deletedArkAssets: number;
+                deletedArkGroups: number;
+                deletedTosObjects: number;
+            };
+        } | {
+            userId: string;
+            released: false;
+            error: {
+                code: string;
+                message: string;
+                retryable: boolean;
+                requestId: string;
+            };
+        }>;
+    };
+};
+
+export type ReleaseAdminUsersResponse = ReleaseAdminUsersResponses[keyof ReleaseAdminUsersResponses];
+
 export type ListAdminJobsData = {
     body?: never;
     path?: never;

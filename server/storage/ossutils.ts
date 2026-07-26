@@ -16,6 +16,11 @@ export interface PutStagedFileInput {
   signal?: AbortSignal;
 }
 
+export interface TosObjectRef {
+  key: string;
+  versionId?: string;
+}
+
 const MAX_ACTIVE_UPLOAD_BYTES = 500 * 1024 * 1024;
 const MAX_ACTIVE_UPLOADS = 2;
 const CURL_UPLOAD_PART_SIZE = 16 * 1024 * 1024;
@@ -32,6 +37,14 @@ export function parseCurlProgress(output: string) {
   return lastPercent === undefined ? undefined : Math.max(0, Math.min(100, Number(lastPercent)));
 }
 
+export function tosPaginationMarkers(input: { keyMarker?: string; versionIdMarker?: string; uploadIdMarker?: string }) {
+  return {
+    ...(input.keyMarker ? { keyMarker: input.keyMarker } : {}),
+    ...(input.versionIdMarker ? { versionIdMarker: input.versionIdMarker } : {}),
+    ...(input.uploadIdMarker ? { uploadIdMarker: input.uploadIdMarker } : {}),
+  };
+}
+
 class WeightedUploadGate {
   private activeBytes = 0;
   private activeCount = 0;
@@ -46,7 +59,9 @@ class WeightedUploadGate {
     return () => {
       this.activeCount -= 1;
       this.activeBytes -= bytes;
-      this.waiting.splice(0).forEach((resolve) => resolve());
+      this.waiting.splice(0).forEach((resolve) => {
+        resolve();
+      });
     };
   }
 }
@@ -89,14 +104,56 @@ export class OssUtils {
   }
 
   private async abortDanglingUploads(key: string) {
-    const response = await this.ready().listMultipartUploads({ bucket: env.tos.bucket, prefix: key });
-    await Promise.allSettled(
-      (response.data.Uploads ?? [])
-        .filter((upload) => upload.Key === key && upload.UploadId)
-        .map((upload) =>
-          this.ready().abortMultipartUpload({ bucket: env.tos.bucket, key, uploadId: upload.UploadId! }),
-        ),
-    );
+    let keyMarker: string | undefined;
+    let uploadIdMarker: string | undefined;
+    while (true) {
+      const response = await this.ready().listMultipartUploads({
+        bucket: env.tos.bucket,
+        prefix: key,
+        maxUploads: 1000,
+        ...tosPaginationMarkers({ keyMarker, uploadIdMarker }),
+      });
+      const tasks: Promise<unknown>[] = [];
+      for (const upload of response.data.Uploads ?? []) {
+        if (upload.Key !== key || !upload.UploadId) continue;
+        tasks.push(this.ready().abortMultipartUpload({ bucket: env.tos.bucket, key, uploadId: upload.UploadId }));
+      }
+      const results = await Promise.allSettled(tasks);
+      const failure = results.find((result) => result.status === "rejected");
+      if (failure?.status === "rejected") throw failure.reason;
+      if (!response.data.IsTruncated) return;
+      keyMarker = response.data.NextKeyMarker;
+      uploadIdMarker = response.data.NextUploadIdMarker;
+      if (!keyMarker && !uploadIdMarker) throw new Error(`TOS_MULTIPART_PAGINATION_INVALID:${key}`);
+    }
+  }
+
+  private async abortMultipartUploadsByPrefix(prefix: string) {
+    let keyMarker: string | undefined;
+    let uploadIdMarker: string | undefined;
+    let aborted = 0;
+    while (true) {
+      const response = await this.ready().listMultipartUploads({
+        bucket: env.tos.bucket,
+        prefix,
+        maxUploads: 1000,
+        ...tosPaginationMarkers({ keyMarker, uploadIdMarker }),
+      });
+      const uploads = response.data.Uploads ?? [];
+      for (const upload of uploads) {
+        if (!upload.Key || !upload.UploadId) continue;
+        await this.ready().abortMultipartUpload({
+          bucket: env.tos.bucket,
+          key: upload.Key,
+          uploadId: upload.UploadId,
+        });
+        aborted += 1;
+      }
+      if (!response.data.IsTruncated) return aborted;
+      keyMarker = response.data.NextKeyMarker;
+      uploadIdMarker = response.data.NextUploadIdMarker;
+      if (!keyMarker && !uploadIdMarker) throw new Error(`TOS_MULTIPART_PAGINATION_INVALID:${prefix}`);
+    }
   }
 
   async ensureDirectory(prefix: string) {
@@ -371,6 +428,102 @@ export class OssUtils {
   }
   async deleteMany(keys: string[]) {
     await Promise.allSettled(keys.map((key) => this.deleteObject(key)));
+  }
+  private async listVersionedObjectRefs(prefix: string) {
+    const refs: TosObjectRef[] = [];
+    let keyMarker: string | undefined;
+    let versionIdMarker: string | undefined;
+    while (true) {
+      const response = await this.ready().listObjectVersions({
+        bucket: env.tos.bucket,
+        prefix,
+        maxKeys: 1000,
+        ...tosPaginationMarkers({ keyMarker, versionIdMarker }),
+      });
+      refs.push(
+        ...(response.data.Versions ?? []).map((item) => ({ key: item.Key, versionId: item.VersionId })),
+        ...(response.data.DeleteMarkers ?? []).map((item) => ({ key: item.Key, versionId: item.VersionId })),
+      );
+      if (!response.data.IsTruncated) return refs;
+      keyMarker = response.data.NextKeyMarker;
+      versionIdMarker = response.data.NextVersionIdMarker;
+      if (!keyMarker && !versionIdMarker) throw new Error(`TOS_VERSION_PAGINATION_INVALID:${prefix}`);
+    }
+  }
+  private async deleteObjectRefs(refs: TosObjectRef[]) {
+    let deleted = 0;
+    for (let offset = 0; offset < refs.length; offset += 1000) {
+      const batch = refs.slice(offset, offset + 1000);
+      const response = await this.ready().deleteMultiObjects({
+        bucket: env.tos.bucket,
+        objects: batch,
+      });
+      const failures = response.data.Error ?? [];
+      if (failures.length)
+        throw new Error(`TOS_DELETE_FAILED:${failures.map((item) => `${item.Key}:${item.Code}`).join(",")}`);
+      deleted += batch.length;
+    }
+    return deleted;
+  }
+  async deleteKeysPermanently(keys: string[]) {
+    const uniqueKeys = [...new Set(keys.filter(Boolean))];
+    let deleted = 0;
+    for (const key of uniqueKeys) {
+      await this.abortDanglingUploads(key);
+      while (true) {
+        const versioned = (await this.listVersionedObjectRefs(key)).filter((item) => item.key === key);
+        if (versioned.length) {
+          deleted += await this.deleteObjectRefs(versioned);
+          continue;
+        }
+        const current = await this.ready().listObjectsType2({
+          bucket: env.tos.bucket,
+          prefix: key,
+          maxKeys: 1,
+          listOnlyOnce: true,
+        });
+        if (!(current.data.Contents ?? []).some((item) => item.Key === key)) break;
+        await this.deleteObject(key);
+        deleted += 1;
+      }
+      const remainingUploads = await this.ready().listMultipartUploads({
+        bucket: env.tos.bucket,
+        prefix: key,
+        maxUploads: 1,
+      });
+      if ((remainingUploads.data.Uploads ?? []).some((upload) => upload.Key === key))
+        throw new Error(`TOS_KEY_MULTIPART_NOT_EMPTY:${key}`);
+    }
+    return deleted;
+  }
+  async deletePrefixPermanently(prefix: string) {
+    let deleted = await this.abortMultipartUploadsByPrefix(prefix);
+    while (true) {
+      const refs = await this.listVersionedObjectRefs(prefix);
+      if (!refs.length) break;
+      deleted += await this.deleteObjectRefs(refs);
+    }
+    while (true) {
+      const remaining = await this.ready().listObjectsType2({
+        bucket: env.tos.bucket,
+        prefix,
+        maxKeys: 1000,
+        listOnlyOnce: true,
+      });
+      const keys = (remaining.data.Contents ?? []).map((item) => item.Key);
+      if (!keys.length) break;
+      deleted += await this.deleteKeysPermanently(keys);
+    }
+    const verification = await this.ready().listObjectsType2({
+      bucket: env.tos.bucket,
+      prefix,
+      maxKeys: 1,
+      listOnlyOnce: true,
+    });
+    if ((verification.data.Contents ?? []).length) throw new Error(`TOS_PREFIX_NOT_EMPTY:${prefix}`);
+    const remainingUploads = await this.countDanglingUploads(prefix);
+    if (remainingUploads) throw new Error(`TOS_PREFIX_MULTIPART_NOT_EMPTY:${prefix}`);
+    return deleted;
   }
   async countDanglingUploads(prefix = "seedance-staging/") {
     const response = await this.ready().listMultipartUploads({ bucket: env.tos.bucket, prefix });

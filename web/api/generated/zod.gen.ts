@@ -1864,6 +1864,37 @@ export const zUpdateAdminUserStatusResponse = zUserSummary.and(z.object({
     updatedAt: z.string()
 }));
 
+export const zReleaseAdminUsersBody = z.object({
+    userIds: z.array(z.uuid()).min(1).max(100)
+});
+
+/**
+ * Per-user physical account release results
+ */
+export const zReleaseAdminUsersResponse = z.object({
+    results: z.array(z.union([z.object({
+            userId: z.uuid(),
+            released: z.literal(true),
+            summary: z.object({
+                userId: z.uuid(),
+                displayName: z.string(),
+                phone: z.string(),
+                deletedArkAssets: z.int().gte(0),
+                deletedArkGroups: z.int().gte(0),
+                deletedTosObjects: z.int().gte(0)
+            })
+        }), z.object({
+            userId: z.uuid(),
+            released: z.literal(false),
+            error: z.object({
+                code: z.string(),
+                message: z.string(),
+                retryable: z.boolean(),
+                requestId: z.string()
+            })
+        })]))
+});
+
 export const zListAdminJobsQuery = z.object({
     page: z.int().gte(1).optional().default(1),
     pageSize: z.int().gte(10).lte(100).optional().default(25),

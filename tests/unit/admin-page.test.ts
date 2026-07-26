@@ -15,6 +15,12 @@ describe("compact admin page", () => {
     expect(source).toContain("充值创作点");
     expect(source).toContain("setAdminUserStatus");
     expect(source).toContain("grantCreditsToAdminUser");
+    expect(source).toContain("releaseSelectedAdminUsers");
+    expect(source).toContain("释放账号");
+    expect(source).toContain('releaseConfirmation !== "释放账号"');
+    expect(source).toContain("SelectionCheckbox");
+    expect(source).toContain('member.status === "disabled" && !member.isAdmin');
+    expect(source).toContain("此操作不可恢复");
     expect(source).toContain("停止所有任务");
     expect(source).toContain("saveCredential(row.original)");
     expect(source).toContain("getRowId={(credential) => credential.name}");
