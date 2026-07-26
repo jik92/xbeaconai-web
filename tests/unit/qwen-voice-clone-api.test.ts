@@ -13,7 +13,6 @@ describe("Qwen voice clone API routing", () => {
     expect(source).toContain("validateQwenVoiceCloneValues(jobValues)");
     expect(source).toContain(`jobValues.auditReference = \`authenticated-submission:\${ownerUserId}:\${`);
     expect(source).toContain("jobValues.submittedByUserId = ownerUserId");
-    expect(source).not.toContain('providerFeatureAvailability(["volc-speech"])');
     expect(source).not.toContain('jobValues.presetVoiceId = "zh_female_vv_uranus_bigtts"');
   });
 });

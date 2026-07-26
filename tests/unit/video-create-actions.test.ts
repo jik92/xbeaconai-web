@@ -143,11 +143,14 @@ describe("video create action boundaries", () => {
     );
 
     expect(app).toContain("audioEnabled: !input.shotOptions.generateAudio");
+    expect(app).toContain('input.operation === "audio-generate" ? { audioEnabled: true } : {}');
     expect(app).toContain("subtitleEnabled: String(shot.subtitleEnabled)");
-    expect(worker).toContain("subtitleEnabled ? subtitleCues : undefined");
+    expect(worker).toContain("if (subtitleEnabled)");
+    expect(worker).toContain('nameSuffix = ""');
     expect(worker).toContain("!currentMaterialVersion?.subtitlesComposed");
     expect(worker).toContain('"SUBTITLES_ALREADY_COMPOSED"');
-    expect(page).toContain('shot.subtitlesComposed ? "字幕已合成" : "字幕合成"');
+    expect(page).toContain("shot.subtitleStyleStale");
+    expect(page).toContain('"按新样式合成"');
   });
 
   test("keeps row-level audio, subtitle, and immutable material history actions", () => {
@@ -175,6 +178,27 @@ describe("video create action boundaries", () => {
     expect(history).toContain("grid-rows-[auto_minmax(0,1fr)]");
     expect(history).toContain('className="min-h-0 overflow-y-auto pr-1"');
     expect(history).not.toContain("grid grid-cols-1 gap-3 sm:grid-cols-2");
+  });
+
+  test("exposes project-level voice and subtitle settings with stale output states", () => {
+    const page = readFileSync(
+      resolve(import.meta.dir, "../../web/features/video-create/video-create-page.tsx"),
+      "utf8",
+    );
+    const dialogs = readFileSync(
+      resolve(import.meta.dir, "../../web/features/video-create/video-create-media-settings-dialogs.tsx"),
+      "utf8",
+    );
+    expect(page).toContain('aria-label="配音设置"');
+    expect(page).toContain('aria-label="字幕样式设置"');
+    expect(page).toContain("batchGenerateVideoCreateVoices");
+    expect(page).toContain("shot.audioStale");
+    expect(page).toContain("shot.subtitleStyleStale");
+    expect(dialogs).toContain("配音设置");
+    expect(dialogs).toContain("字幕样式设置");
+    expect(dialogs).toContain("批量生成配音");
+    expect(page).toContain('{ ...shot, status: "queued" as const, audioEnabled: true, error: undefined }');
+    expect(dialogs).toContain("previewVideoCreatePresetVoice");
   });
 
   test("clears the script beside copy only after confirming dependent storyboard removal", () => {

@@ -39,12 +39,12 @@ const providers: CredentialDoctorProvider[] = [
 ];
 
 describe("credential doctor", () => {
-  test("checks Qwen and TOS but omits Volc Speech from the active Provider list", () => {
+  test("checks Qwen, TOS, and Volc Speech in the active Provider list", () => {
     const providerIds = activeCredentialDoctorProviders.map((provider) => provider.providerId);
     expect(providerIds).toContain("qwen-audio");
     expect(providerIds).toContain("ark");
     expect(providerIds).toContain("tos");
-    expect(providerIds).not.toContain("volc-speech");
+    expect(providerIds).toContain("volc-speech");
   });
 
   test("reports available, missing, invalid and timeout without exposing provider errors", async () => {

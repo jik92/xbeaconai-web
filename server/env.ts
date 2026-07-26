@@ -4,6 +4,22 @@ import { APP_CONFIG } from "../web/app/config";
 
 const dataDir = resolve(process.env.YAOZUO_DATA_DIR ?? ".data");
 const apiPort = Number(process.env.API_PORT ?? 8787);
+const positiveInteger = (value: string | undefined, fallback: number) => {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+};
+export function resolveWorkerConcurrencies(input: { network?: string; ffmpeg?: string; legacy?: string }) {
+  const legacy = input.legacy === undefined ? undefined : positiveInteger(input.legacy, 2);
+  return {
+    network: positiveInteger(input.network, legacy ?? 40),
+    ffmpeg: positiveInteger(input.ffmpeg, legacy ?? 2),
+  };
+}
+const workerConcurrencies = resolveWorkerConcurrencies({
+  network: process.env.NETWORK_WORKER_CONCURRENCY,
+  ffmpeg: process.env.FFMPEG_WORKER_CONCURRENCY,
+  legacy: process.env.WORKER_CONCURRENCY,
+});
 const configuredAllowedOrigins = (process.env.ALLOWED_ORIGINS ?? "")
   .split(",")
   .map((origin) => origin.trim())
@@ -35,7 +51,8 @@ export const env = {
   byokEncryptionKey: process.env.BYOK_ENCRYPTION_KEY ?? "",
   redisUrl: process.env.REDIS_URL ?? "redis://127.0.0.1:6379",
   redisQueueName: process.env.REDIS_QUEUE_NAME ?? "yaozuo-jobs",
-  workerConcurrency: Math.max(1, Number(process.env.WORKER_CONCURRENCY ?? 2)),
+  networkWorkerConcurrency: workerConcurrencies.network,
+  ffmpegWorkerConcurrency: workerConcurrencies.ffmpeg,
   // Local debugging only: set DOUYIN_BROWSER_HEADLESS=false to observe the
   // browser, and optionally pause before the downloader proceeds.
   douyinBrowserHeadless: process.env.DOUYIN_BROWSER_HEADLESS !== "false",

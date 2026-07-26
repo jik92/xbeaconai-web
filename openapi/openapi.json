@@ -231,6 +231,120 @@
           "createdAt"
         ]
       },
+      "AiRechargeRecord": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "mock_recharge",
+              "admin_grant"
+            ]
+          },
+          "credits": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "amountCny": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "balanceAfter": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "succeeded"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "credits",
+          "balanceAfter",
+          "status",
+          "createdAt"
+        ]
+      },
+      "AiConsumptionRecord": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "jobId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "moduleId": {
+            "$ref": "#/components/schemas/JobModuleId"
+          },
+          "jobTitle": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "charge",
+              "refund"
+            ]
+          },
+          "creditChange": {
+            "type": "integer"
+          },
+          "balanceAfter": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "note": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "jobId",
+          "type",
+          "creditChange",
+          "balanceAfter",
+          "createdAt"
+        ]
+      },
+      "JobModuleId": {
+        "type": "string",
+        "enum": [
+          "video-remix",
+          "video-create",
+          "ad-script",
+          "ai-generate",
+          "video-cut",
+          "media-understand",
+          "video-mashup",
+          "voice-clone",
+          "video-renewal",
+          "subtitle-erase",
+          "video-enhancement",
+          "video-extract",
+          "video-editor",
+          "kickart",
+          "douyin-video-import",
+          "share-content-import",
+          "portrait-asset-register"
+        ]
+      },
       "ProviderId": {
         "type": "string",
         "enum": [
@@ -611,28 +725,6 @@
           "jobSchemaVersion",
           "createdAt",
           "updatedAt"
-        ]
-      },
-      "JobModuleId": {
-        "type": "string",
-        "enum": [
-          "video-remix",
-          "video-create",
-          "ad-script",
-          "ai-generate",
-          "video-cut",
-          "media-understand",
-          "video-mashup",
-          "voice-clone",
-          "video-renewal",
-          "subtitle-erase",
-          "video-enhancement",
-          "video-extract",
-          "video-editor",
-          "kickart",
-          "douyin-video-import",
-          "share-content-import",
-          "portrait-asset-register"
         ]
       },
       "SeedanceModelId": {
@@ -1632,6 +1724,16 @@
                   "nullable": true,
                   "format": "uuid"
                 },
+                "audioSettingsKey": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "audioStale": {
+                  "type": "boolean"
+                },
+                "subtitleStyleStale": {
+                  "type": "boolean"
+                },
                 "subtitleCues": {
                   "type": "array",
                   "items": {
@@ -1713,6 +1815,9 @@
                 "materialProcessing",
                 "subtitlesComposed",
                 "audioArtifactId",
+                "audioSettingsKey",
+                "audioStale",
+                "subtitleStyleStale",
                 "subtitleCues",
                 "audioEnabled",
                 "subtitleEnabled",
@@ -2056,6 +2161,58 @@
           "subtitles": {
             "type": "boolean",
             "default": true
+          },
+          "voiceSettings": {
+            "type": "object",
+            "properties": {
+              "presetVoiceId": {
+                "type": "string",
+                "enum": [
+                  "zh_female_vv_uranus_bigtts",
+                  "zh_male_liufei_uranus_bigtts",
+                  "zh_male_m191_uranus_bigtts",
+                  "zh_male_xuanyijieshuo_uranus_bigtts"
+                ]
+              },
+              "speed": {
+                "type": "string",
+                "enum": [
+                  "slow",
+                  "normal",
+                  "fast"
+                ]
+              },
+              "style": {
+                "type": "string",
+                "enum": [
+                  "marketing",
+                  "news",
+                  "entertainment"
+                ]
+              }
+            },
+            "default": {
+              "presetVoiceId": "zh_female_vv_uranus_bigtts",
+              "speed": "normal",
+              "style": "marketing"
+            },
+            "required": [
+              "presetVoiceId",
+              "speed",
+              "style"
+            ]
+          },
+          "subtitleStyleId": {
+            "type": "string",
+            "enum": [
+              "source-white",
+              "source-yellow",
+              "title-white",
+              "title-yellow",
+              "happy-white",
+              "happy-orange"
+            ],
+            "default": "source-yellow"
           }
         },
         "required": [
@@ -3309,6 +3466,138 @@
         }
       }
     },
+    "/api/billing/ai/recharges": {
+      "get": {
+        "operationId": "listAiRechargeRecords",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 100,
+              "default": 25
+            },
+            "required": false,
+            "name": "pageSize",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Owned AI recharge records",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "records": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AiRechargeRecord"
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "page": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "pageSize": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  },
+                  "required": [
+                    "records",
+                    "total",
+                    "page",
+                    "pageSize"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/billing/ai/consumption": {
+      "get": {
+        "operationId": "listAiConsumptionRecords",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 100,
+              "default": 25
+            },
+            "required": false,
+            "name": "pageSize",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Owned AI consumption and refund records",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "records": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AiConsumptionRecord"
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "page": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "pageSize": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  },
+                  "required": [
+                    "records",
+                    "total",
+                    "page",
+                    "pageSize"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/capabilities": {
       "get": {
         "operationId": "getCapabilities",
@@ -3830,11 +4119,69 @@
                             "requiredProviders",
                             "unavailableProviders"
                           ]
+                        },
+                        "portraitCreation": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "requiredProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "unavailableProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "disabledReason": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "requiredProviders",
+                            "unavailableProviders"
+                          ]
+                        },
+                        "voiceSynthesis": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "requiredProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "unavailableProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "disabledReason": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "requiredProviders",
+                            "unavailableProviders"
+                          ]
                         }
                       },
                       "required": [
                         "assetUpload",
-                        "shareImport"
+                        "shareImport",
+                        "portraitCreation",
+                        "voiceSynthesis"
                       ]
                     }
                   },
@@ -4876,6 +5223,13 @@
                           "description": {
                             "type": "string"
                           },
+                          "gender": {
+                            "type": "string",
+                            "enum": [
+                              "男",
+                              "女"
+                            ]
+                          },
                           "imageUrl": {
                             "type": "string"
                           },
@@ -4934,10 +5288,18 @@
                   "assetId": {
                     "type": "string",
                     "format": "uuid"
+                  },
+                  "gender": {
+                    "type": "string",
+                    "enum": [
+                      "男",
+                      "女"
+                    ]
                   }
                 },
                 "required": [
-                  "assetId"
+                  "assetId",
+                  "gender"
                 ]
               }
             }
@@ -4973,6 +5335,13 @@
                         },
                         "description": {
                           "type": "string"
+                        },
+                        "gender": {
+                          "type": "string",
+                          "enum": [
+                            "男",
+                            "女"
+                          ]
                         },
                         "imageUrl": {
                           "type": "string"
@@ -5046,6 +5415,13 @@
                         },
                         "description": {
                           "type": "string"
+                        },
+                        "gender": {
+                          "type": "string",
+                          "enum": [
+                            "男",
+                            "女"
+                          ]
                         },
                         "imageUrl": {
                           "type": "string"
@@ -10368,6 +10744,19 @@
                           "subtitlesComposed": {
                             "type": "boolean"
                           },
+                          "subtitleStyleId": {
+                            "type": "string",
+                            "nullable": true,
+                            "enum": [
+                              "source-white",
+                              "source-yellow",
+                              "title-white",
+                              "title-yellow",
+                              "happy-white",
+                              "happy-orange",
+                              null
+                            ]
+                          },
                           "generation": {
                             "type": "object",
                             "nullable": true,
@@ -10470,6 +10859,7 @@
                           "inputVersionId",
                           "jobId",
                           "subtitlesComposed",
+                          "subtitleStyleId",
                           "generation",
                           "execution",
                           "available",
@@ -10630,6 +11020,16 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Provider unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -10748,6 +11148,287 @@
           },
           "404": {
             "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/video-create/projects/{projectId}/media-settings": {
+      "patch": {
+        "operationId": "updateVideoCreateMediaSettings",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "voiceSettings": {
+                    "type": "object",
+                    "properties": {
+                      "presetVoiceId": {
+                        "type": "string",
+                        "enum": [
+                          "zh_female_vv_uranus_bigtts",
+                          "zh_male_liufei_uranus_bigtts",
+                          "zh_male_m191_uranus_bigtts",
+                          "zh_male_xuanyijieshuo_uranus_bigtts"
+                        ]
+                      },
+                      "speed": {
+                        "type": "string",
+                        "enum": [
+                          "slow",
+                          "normal",
+                          "fast"
+                        ]
+                      },
+                      "style": {
+                        "type": "string",
+                        "enum": [
+                          "marketing",
+                          "news",
+                          "entertainment"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "presetVoiceId",
+                      "speed",
+                      "style"
+                    ]
+                  },
+                  "subtitleStyleId": {
+                    "type": "string",
+                    "enum": [
+                      "source-white",
+                      "source-yellow",
+                      "title-white",
+                      "title-yellow",
+                      "happy-white",
+                      "happy-orange"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoCreateProject"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Action in progress",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/video-create/voice-preview": {
+      "post": {
+        "operationId": "previewVideoCreateVoice",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "voiceSettings": {
+                    "type": "object",
+                    "properties": {
+                      "presetVoiceId": {
+                        "type": "string",
+                        "enum": [
+                          "zh_female_vv_uranus_bigtts",
+                          "zh_male_liufei_uranus_bigtts",
+                          "zh_male_m191_uranus_bigtts",
+                          "zh_male_xuanyijieshuo_uranus_bigtts"
+                        ]
+                      },
+                      "speed": {
+                        "type": "string",
+                        "enum": [
+                          "slow",
+                          "normal",
+                          "fast"
+                        ]
+                      },
+                      "style": {
+                        "type": "string",
+                        "enum": [
+                          "marketing",
+                          "news",
+                          "entertainment"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "presetVoiceId",
+                      "speed",
+                      "style"
+                    ]
+                  },
+                  "text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  }
+                },
+                "required": [
+                  "voiceSettings",
+                  "text"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Voice preview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "audioBase64": {
+                      "type": "string"
+                    },
+                    "mimeType": {
+                      "type": "string",
+                      "enum": [
+                        "audio/mpeg"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "audioBase64",
+                    "mimeType"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Provider unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/video-create/projects/{projectId}/shots/batch-audio": {
+      "post": {
+        "operationId": "batchGenerateVideoCreateAudio",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jobs": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Job"
+                      }
+                    },
+                    "submittedShotIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "format": "uuid"
+                      }
+                    }
+                  },
+                  "required": [
+                    "jobs",
+                    "submittedShotIds"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Nothing to generate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Provider unavailable",
             "content": {
               "application/json": {
                 "schema": {

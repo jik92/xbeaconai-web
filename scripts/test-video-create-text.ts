@@ -8,6 +8,10 @@ import {
   regenerateVideoCreateSection,
 } from "../server/video-create/model";
 import type { VideoCreateAggregate } from "../server/video-create/video-create-store";
+import {
+  defaultVideoCreateSubtitleStyleId,
+  defaultVideoCreateVoiceSettings,
+} from "../shared/video-create/media-settings";
 
 const timestamp = new Date().toISOString();
 const projectId = crypto.randomUUID();
@@ -45,6 +49,8 @@ const aggregate: VideoCreateAggregate = {
       videoModel: "doubao-seedance-2-0-fast-260128",
       ratio: "9:16",
       subtitles: true,
+      voiceSettings: defaultVideoCreateVoiceSettings,
+      subtitleStyleId: defaultVideoCreateSubtitleStyleId,
     },
     recommendation: null,
     currentJobId: null,

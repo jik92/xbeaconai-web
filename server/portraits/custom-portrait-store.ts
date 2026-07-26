@@ -1,4 +1,5 @@
 import { and, desc, eq } from "drizzle-orm";
+import type { PortraitGender } from "../../shared/portraits/portrait-tags";
 import { type AppDatabase, openDatabase } from "../db/database";
 import { arkPortraitGroups, customPortraits } from "../db/schema";
 import { env } from "../env";
@@ -11,6 +12,7 @@ export interface CustomPortraitRecord {
   ownerUserId: string;
   groupId?: string;
   arkAssetId?: string;
+  gender?: PortraitGender;
   status: CustomPortraitStatus;
   errorCode?: string;
   errorMessage?: string;
@@ -27,6 +29,7 @@ const portraitRecord = (row: CustomPortraitRow): CustomPortraitRecord => ({
   ownerUserId: row.ownerUserId,
   groupId: row.groupId ?? undefined,
   arkAssetId: row.arkAssetId ?? undefined,
+  gender: row.gender ?? undefined,
   status: row.status,
   errorCode: row.errorCode ?? undefined,
   errorMessage: row.errorMessage ?? undefined,
@@ -48,7 +51,7 @@ export class CustomPortraitStore {
     this.client.close();
   }
 
-  create(input: { assetId: string; jobId: string; ownerUserId: string; createdAt?: string }) {
+  create(input: { assetId: string; jobId: string; ownerUserId: string; gender?: PortraitGender; createdAt?: string }) {
     const createdAt = input.createdAt ?? new Date().toISOString();
     this.db
       .insert(customPortraits)

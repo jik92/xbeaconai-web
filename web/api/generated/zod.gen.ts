@@ -64,14 +64,15 @@ export const zRechargeOrder = z.object({
     createdAt: z.string()
 });
 
-export const zProviderId = z.enum([
-    'aihubmix',
-    'ark',
-    'volc-speech',
-    'tos',
-    'mediakit',
-    'qwen-audio'
-]);
+export const zAiRechargeRecord = z.object({
+    id: z.uuid(),
+    source: z.enum(['mock_recharge', 'admin_grant']),
+    credits: z.int().gte(1),
+    amountCny: z.int().gte(0).optional(),
+    balanceAfter: z.int().gte(0),
+    status: z.enum(['succeeded']),
+    createdAt: z.string()
+});
 
 export const zJobModuleId = z.enum([
     'video-remix',
@@ -91,6 +92,27 @@ export const zJobModuleId = z.enum([
     'douyin-video-import',
     'share-content-import',
     'portrait-asset-register'
+]);
+
+export const zAiConsumptionRecord = z.object({
+    id: z.uuid(),
+    jobId: z.uuid(),
+    moduleId: zJobModuleId.optional(),
+    jobTitle: z.string().optional(),
+    type: z.enum(['charge', 'refund']),
+    creditChange: z.int(),
+    balanceAfter: z.int().gte(0),
+    note: z.string().optional(),
+    createdAt: z.string()
+});
+
+export const zProviderId = z.enum([
+    'aihubmix',
+    'ark',
+    'volc-speech',
+    'tos',
+    'mediakit',
+    'qwen-audio'
 ]);
 
 export const zSeedanceModelId = z.enum([
@@ -521,7 +543,37 @@ export const zVideoCreateInput = z.object({
         '16:9',
         '1:1'
     ]).optional().default('9:16'),
-    subtitles: z.boolean().optional().default(true)
+    subtitles: z.boolean().optional().default(true),
+    voiceSettings: z.object({
+        presetVoiceId: z.enum([
+            'zh_female_vv_uranus_bigtts',
+            'zh_male_liufei_uranus_bigtts',
+            'zh_male_m191_uranus_bigtts',
+            'zh_male_xuanyijieshuo_uranus_bigtts'
+        ]),
+        speed: z.enum([
+            'slow',
+            'normal',
+            'fast'
+        ]),
+        style: z.enum([
+            'marketing',
+            'news',
+            'entertainment'
+        ])
+    }).optional().default({
+        presetVoiceId: 'zh_female_vv_uranus_bigtts',
+        speed: 'normal',
+        style: 'marketing'
+    }),
+    subtitleStyleId: z.enum([
+        'source-white',
+        'source-yellow',
+        'title-white',
+        'title-yellow',
+        'happy-white',
+        'happy-orange'
+    ]).optional().default('source-yellow')
 });
 
 export const zVideoCreateRecommendation = z.object({
@@ -738,6 +790,9 @@ export const zVideoCreateProject = z.object({
         materialProcessing: z.boolean(),
         subtitlesComposed: z.boolean(),
         audioArtifactId: z.uuid(),
+        audioSettingsKey: z.string(),
+        audioStale: z.boolean(),
+        subtitleStyleStale: z.boolean(),
         subtitleCues: z.array(z.object({
             startSec: z.number().gte(0),
             endSec: z.number().gte(0),
@@ -949,6 +1004,36 @@ export const zCreateRechargeOrderResponse = z.object({
     user: zUserSummary
 });
 
+export const zListAiRechargeRecordsQuery = z.object({
+    page: z.int().gte(1).optional().default(1),
+    pageSize: z.int().gte(10).lte(100).optional().default(25)
+});
+
+/**
+ * Owned AI recharge records
+ */
+export const zListAiRechargeRecordsResponse = z.object({
+    records: z.array(zAiRechargeRecord),
+    total: z.int().gte(0),
+    page: z.int().gte(1),
+    pageSize: z.int().gte(1)
+});
+
+export const zListAiConsumptionRecordsQuery = z.object({
+    page: z.int().gte(1).optional().default(1),
+    pageSize: z.int().gte(10).lte(100).optional().default(25)
+});
+
+/**
+ * Owned AI consumption and refund records
+ */
+export const zListAiConsumptionRecordsResponse = z.object({
+    records: z.array(zAiConsumptionRecord),
+    total: z.int().gte(0),
+    page: z.int().gte(1),
+    pageSize: z.int().gte(1)
+});
+
 /**
  * Executable capabilities
  */
@@ -1064,6 +1149,18 @@ export const zGetProviderFeaturesResponse = z.object({
             disabledReason: z.string().optional()
         }),
         shareImport: z.object({
+            enabled: z.boolean(),
+            requiredProviders: z.array(zProviderId),
+            unavailableProviders: z.array(zProviderId),
+            disabledReason: z.string().optional()
+        }),
+        portraitCreation: z.object({
+            enabled: z.boolean(),
+            requiredProviders: z.array(zProviderId),
+            unavailableProviders: z.array(zProviderId),
+            disabledReason: z.string().optional()
+        }),
+        voiceSynthesis: z.object({
             enabled: z.boolean(),
             requiredProviders: z.array(zProviderId),
             unavailableProviders: z.array(zProviderId),
@@ -1281,6 +1378,7 @@ export const zListCustomPortraitsResponse = z.object({
         jobId: z.uuid().optional(),
         name: z.string(),
         description: z.string().optional(),
+        gender: z.enum(['男', '女']).optional(),
         imageUrl: z.string(),
         status: z.enum([
             'queued',
@@ -1296,7 +1394,8 @@ export const zListCustomPortraitsResponse = z.object({
 });
 
 export const zRegisterCustomPortraitBody = z.object({
-    assetId: z.uuid()
+    assetId: z.uuid(),
+    gender: z.enum(['男', '女'])
 });
 
 export const zRegisterCustomPortraitResponse = z.union([
@@ -1307,6 +1406,7 @@ export const zRegisterCustomPortraitResponse = z.union([
             jobId: z.uuid().optional(),
             name: z.string(),
             description: z.string().optional(),
+            gender: z.enum(['男', '女']).optional(),
             imageUrl: z.string(),
             status: z.enum([
                 'queued',
@@ -1327,6 +1427,7 @@ export const zRegisterCustomPortraitResponse = z.union([
             jobId: z.uuid().optional(),
             name: z.string(),
             description: z.string().optional(),
+            gender: z.enum(['男', '女']).optional(),
             imageUrl: z.string(),
             status: z.enum([
                 'queued',
@@ -2516,6 +2617,14 @@ export const zListVideoCreateShotMaterialVersionsResponse = z.object({
         inputVersionId: z.uuid(),
         jobId: z.uuid(),
         subtitlesComposed: z.boolean(),
+        subtitleStyleId: z.enum([
+            'source-white',
+            'source-yellow',
+            'title-white',
+            'title-yellow',
+            'happy-white',
+            'happy-orange'
+        ]),
         generation: z.object({
             model: z.string(),
             durationSec: z.number().gte(0),
@@ -2590,6 +2699,86 @@ export const zUpdateAllVideoCreateShotSettingsPath = z.object({
  * Updated
  */
 export const zUpdateAllVideoCreateShotSettingsResponse = zVideoCreateProject;
+
+export const zUpdateVideoCreateMediaSettingsBody = z.object({
+    voiceSettings: z.object({
+        presetVoiceId: z.enum([
+            'zh_female_vv_uranus_bigtts',
+            'zh_male_liufei_uranus_bigtts',
+            'zh_male_m191_uranus_bigtts',
+            'zh_male_xuanyijieshuo_uranus_bigtts'
+        ]),
+        speed: z.enum([
+            'slow',
+            'normal',
+            'fast'
+        ]),
+        style: z.enum([
+            'marketing',
+            'news',
+            'entertainment'
+        ])
+    }).optional(),
+    subtitleStyleId: z.enum([
+        'source-white',
+        'source-yellow',
+        'title-white',
+        'title-yellow',
+        'happy-white',
+        'happy-orange'
+    ]).optional()
+});
+
+export const zUpdateVideoCreateMediaSettingsPath = z.object({
+    projectId: z.uuid()
+});
+
+/**
+ * Updated
+ */
+export const zUpdateVideoCreateMediaSettingsResponse = zVideoCreateProject;
+
+export const zPreviewVideoCreateVoiceBody = z.object({
+    voiceSettings: z.object({
+        presetVoiceId: z.enum([
+            'zh_female_vv_uranus_bigtts',
+            'zh_male_liufei_uranus_bigtts',
+            'zh_male_m191_uranus_bigtts',
+            'zh_male_xuanyijieshuo_uranus_bigtts'
+        ]),
+        speed: z.enum([
+            'slow',
+            'normal',
+            'fast'
+        ]),
+        style: z.enum([
+            'marketing',
+            'news',
+            'entertainment'
+        ])
+    }),
+    text: z.string().min(1).max(80)
+});
+
+/**
+ * Voice preview
+ */
+export const zPreviewVideoCreateVoiceResponse = z.object({
+    audioBase64: z.string(),
+    mimeType: z.enum(['audio/mpeg'])
+});
+
+export const zBatchGenerateVideoCreateAudioPath = z.object({
+    projectId: z.uuid()
+});
+
+/**
+ * Accepted
+ */
+export const zBatchGenerateVideoCreateAudioResponse = z.object({
+    jobs: z.array(zJob),
+    submittedShotIds: z.array(z.uuid())
+});
 
 export const zPreflightQwenVoiceSampleBody = z.object({
     assetId: z.uuid()

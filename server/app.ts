@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { mkdirSync, readFileSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { dirname, extname, isAbsolute, relative, resolve } from "node:path";
@@ -11,6 +12,11 @@ import {
   type PortraitReference,
   serializePortraitReference,
 } from "../shared/portraits/portrait-reference";
+import {
+  videoCreateVoiceContextText,
+  videoCreateVoiceSettingsKey,
+  videoCreateVoiceSpeechRate,
+} from "../shared/video-create/media-settings";
 import { parseVideoMashupConfig, type VideoMashupConfig } from "../shared/video-mashup/config";
 import { parseRemixWorkspace, remixProjectStages } from "../shared/video-remix/project-records";
 import {
@@ -67,7 +73,6 @@ import { AiGenerateRequestSchema, normalizeAiGenerateValues } from "./creation/a
 import { creationCapabilities, quoteCreation, validateCreationValues } from "./creation/capabilities";
 import { env } from "./env";
 import { emitLog } from "./imports/import-logger";
-import type { ShareCandidate } from "./imports/share-content";
 import { platformAdapters, ShareContentParser } from "./imports/share-content";
 
 const shareParser = new ShareContentParser(platformAdapters);
@@ -79,6 +84,7 @@ import { isSeedanceModelId, seedanceModelIds, videoModels } from "./models/video
 import { getPortraitById } from "./portraits/catalog";
 import { type CustomPortraitRecord, CustomPortraitStore } from "./portraits/custom-portrait-store";
 import { resolvePortraitReference } from "./portraits/portrait-resolver";
+import { volcSpeech } from "./providers/volc-speech";
 import { auditSdkRegistry } from "./sdk-registry";
 import { ossutils } from "./storage/ossutils";
 import { rollbackUploadedObjects, uploadFilesStrictly } from "./storage/strict-library-upload";
@@ -108,6 +114,8 @@ import {
   VideoCreateRecommendationSchema,
   VideoCreateShotGenerationPlanSchema,
   VideoCreateShotStatusSchema,
+  VideoCreateSubtitleStyleIdSchema,
+  VideoCreateVoiceSettingsSchema,
 } from "./video-create/types";
 import {
   nextVideoCreateStatus,
@@ -115,6 +123,7 @@ import {
   VideoCreateStateError,
   VideoCreateStore,
   VideoCreateVersionConflictError,
+  videoCreateBatchEligibleAudioShots,
   videoCreateBatchEligibleShots,
   videoCreateJobValues,
   videoCreateMaterialVersionJobDetails,
@@ -292,6 +301,7 @@ const VideoCreateMaterialVersionSchema = z.object({
   inputVersionId: z.string().uuid().nullable(),
   jobId: z.string().uuid().nullable(),
   subtitlesComposed: z.boolean(),
+  subtitleStyleId: VideoCreateSubtitleStyleIdSchema.nullable(),
   generation: z
     .object({
       model: z.string().nullable(),
@@ -329,6 +339,9 @@ const VideoCreateShotSchema = z.object({
   materialProcessing: z.boolean(),
   subtitlesComposed: z.boolean(),
   audioArtifactId: z.string().uuid().nullable(),
+  audioSettingsKey: z.string().nullable(),
+  audioStale: z.boolean(),
+  subtitleStyleStale: z.boolean(),
   subtitleCues: z.array(
     z.object({
       startSec: z.number().nonnegative(),
@@ -407,7 +420,7 @@ export const adScripts = new AdScriptStore();
 export const videoCreates = new VideoCreateStore();
 export const providerAudits = new ProviderGenerationAuditStore();
 export const customPortraits = new CustomPortraitStore();
-export const queue = new BullJobQueue();
+export const queue = new BullJobQueue((jobId) => store.get(jobId));
 function adminUser(userId: string) {
   const user = accounts.getUser(userId);
   return Boolean(user?.isAdmin);
@@ -1253,6 +1266,82 @@ const ordersRoute = createRoute({
   },
 });
 app.openapi(ordersRoute, (c) => c.json({ orders: accounts.listOrders(c.get("userId")) }, 200));
+const BillingPageQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(10).max(100).default(25),
+});
+const AiRechargeRecordSchema = z
+  .object({
+    id: z.string().uuid(),
+    source: z.enum(["mock_recharge", "admin_grant"]),
+    credits: z.number().int().min(1),
+    amountCny: z.number().int().nonnegative().optional(),
+    balanceAfter: z.number().int().nonnegative(),
+    status: z.literal("succeeded"),
+    createdAt: z.string(),
+  })
+  .openapi("AiRechargeRecord");
+const AiConsumptionRecordSchema = z
+  .object({
+    id: z.string().uuid(),
+    jobId: z.string().uuid(),
+    moduleId: JobModuleSchema.optional(),
+    jobTitle: z.string().optional(),
+    type: z.enum(["charge", "refund"]),
+    creditChange: z.number().int(),
+    balanceAfter: z.number().int().nonnegative(),
+    note: z.string().optional(),
+    createdAt: z.string(),
+  })
+  .openapi("AiConsumptionRecord");
+const listAiRechargeRecordsRoute = createRoute({
+  method: "get",
+  path: "/api/billing/ai/recharges",
+  operationId: "listAiRechargeRecords",
+  request: { query: BillingPageQuerySchema },
+  responses: {
+    200: {
+      description: "Owned AI recharge records",
+      content: {
+        "application/json": {
+          schema: z.object({
+            records: z.array(AiRechargeRecordSchema),
+            total: z.number().int().nonnegative(),
+            page: z.number().int().min(1),
+            pageSize: z.number().int().min(1),
+          }),
+        },
+      },
+    },
+  },
+});
+app.openapi(listAiRechargeRecordsRoute, (c) =>
+  c.json(accounts.listAiRechargeRecords(c.get("userId"), c.req.valid("query")), 200),
+);
+const listAiConsumptionRecordsRoute = createRoute({
+  method: "get",
+  path: "/api/billing/ai/consumption",
+  operationId: "listAiConsumptionRecords",
+  request: { query: BillingPageQuerySchema },
+  responses: {
+    200: {
+      description: "Owned AI consumption and refund records",
+      content: {
+        "application/json": {
+          schema: z.object({
+            records: z.array(AiConsumptionRecordSchema),
+            total: z.number().int().nonnegative(),
+            page: z.number().int().min(1),
+            pageSize: z.number().int().min(1),
+          }),
+        },
+      },
+    },
+  },
+});
+app.openapi(listAiConsumptionRecordsRoute, (c) =>
+  c.json(accounts.listAiConsumptionRecords(c.get("userId"), c.req.valid("query")), 200),
+);
 const createOrderRoute = createRoute({
   method: "post",
   path: "/api/recharge/orders",
@@ -1364,6 +1453,8 @@ const providerFeaturesRoute = createRoute({
             operations: z.object({
               assetUpload: FeatureAvailabilitySchema,
               shareImport: FeatureAvailabilitySchema,
+              portraitCreation: FeatureAvailabilitySchema,
+              voiceSynthesis: FeatureAvailabilitySchema,
             }),
           }),
         },
@@ -2143,6 +2234,7 @@ const CustomPortraitSchema = z.object({
   jobId: z.string().uuid().optional(),
   name: z.string(),
   description: z.string().optional(),
+  gender: z.enum(["男", "女"]).optional(),
   imageUrl: z.string(),
   status: CustomPortraitStatusSchema,
   errorCode: z.string().optional(),
@@ -2160,6 +2252,7 @@ function customPortraitResponse(record: CustomPortraitRecord) {
     jobId: record.jobId,
     name: asset.displayName,
     description: asset.description,
+    gender: record.gender,
     imageUrl: `/api/assets/${asset.id}/content`,
     status: record.status,
     errorCode: record.errorCode,
@@ -2199,7 +2292,9 @@ const registerCustomPortraitRoute = createRoute({
   request: {
     body: {
       required: true,
-      content: { "application/json": { schema: z.object({ assetId: z.string().uuid() }) } },
+      content: {
+        "application/json": { schema: z.object({ assetId: z.string().uuid(), gender: z.enum(["男", "女"]) }) },
+      },
     },
   },
   responses: {
@@ -2220,7 +2315,8 @@ const registerCustomPortraitRoute = createRoute({
 app.openapi(registerCustomPortraitRoute, async (c) => {
   const requestId = crypto.randomUUID();
   const ownerUserId = c.get("userId");
-  const asset = accounts.getOwnedAsset(ownerUserId, c.req.valid("json").assetId);
+  const body = c.req.valid("json");
+  const asset = accounts.getOwnedAsset(ownerUserId, body.assetId);
   if (!asset || asset.kind !== "portrait")
     return c.json(
       { error: { code: "PORTRAIT_ASSET_NOT_FOUND", message: "人像素材不存在", retryable: false, requestId } },
@@ -2255,7 +2351,7 @@ app.openapi(registerCustomPortraitRoute, async (c) => {
     progress: 0,
     stage: "排队中",
     overallExecutionMode: "real",
-    values: { assetId: asset.id },
+    values: { assetId: asset.id, gender: body.gender },
     executionPlan: [
       {
         id: "plan:0:portrait-asset-register",
@@ -2275,7 +2371,13 @@ app.openapi(registerCustomPortraitRoute, async (c) => {
     updatedAt: timestamp,
   };
   store.create(job);
-  const record = customPortraits.create({ assetId: asset.id, jobId, ownerUserId, createdAt: timestamp });
+  const record = customPortraits.create({
+    assetId: asset.id,
+    jobId,
+    ownerUserId,
+    gender: body.gender,
+    createdAt: timestamp,
+  });
   if (!record) throw new Error("CUSTOM_PORTRAIT_CREATE_FAILED");
   try {
     await queue.enqueue(jobId);
@@ -4768,16 +4870,26 @@ function videoCreateJobRecord(input: {
             ? "aihubmix-gpt-image-analysis"
             : operation === "shot"
               ? "ark-seedance-video"
-              : "aihubmix-text",
-        provider: local ? undefined : operation === "shot" ? "ark" : "aihubmix",
+              : operation === "audio-generate"
+                ? "volc-tts-v3-unidirectional"
+                : "aihubmix-text",
+        provider: local
+          ? undefined
+          : operation === "shot"
+            ? "ark"
+            : operation === "audio-generate"
+              ? "volc-speech"
+              : "aihubmix",
         model:
           operation === "analyze"
             ? VIDEO_CREATE_ANALYSIS_MODEL
             : operation === "shot"
               ? input.videoModel
-              : local
-                ? undefined
-                : "deepseek-v4-pro",
+              : operation === "audio-generate"
+                ? env.volcSpeech.presetTtsResourceId
+                : local
+                  ? undefined
+                  : "deepseek-v4-pro",
         startedAt: "",
       },
     ],
@@ -5064,6 +5176,7 @@ async function enqueueVideoCreateOperation(input: {
     | "regenerate-section"
     | "storyboard"
     | "shot"
+    | "audio-generate"
     | "audio-replace"
     | "subtitle-compose"
     | "compose";
@@ -5095,12 +5208,20 @@ async function enqueueVideoCreateOperation(input: {
   const referenceId = aggregate.project.input.productAssetIds[0];
   const explicitReferences = input.shotOptions?.references;
   const explicitPortrait = input.shotOptions?.portrait;
+  const materialInputVersionId =
+    shot?.currentMaterialVersionId && input.operation === "subtitle-compose"
+      ? (videoCreates.getSubtitleSourceMaterialVersion(input.projectId, shot.id, shot.currentMaterialVersionId)?.id ??
+        shot.currentMaterialVersionId)
+      : shot?.currentMaterialVersionId;
   const values = {
     ...videoCreateJobValues(input),
     ...(shot
       ? {
           previousShotStatus: shot.status,
-          ...(shot.currentMaterialVersionId ? { inputMaterialVersionId: shot.currentMaterialVersionId } : {}),
+          ...(materialInputVersionId ? { inputMaterialVersionId: materialInputVersionId } : {}),
+          ...(shot.currentMaterialVersionId && materialInputVersionId !== shot.currentMaterialVersionId
+            ? { expectedCurrentMaterialVersionId: shot.currentMaterialVersionId }
+            : {}),
         }
       : {}),
     ...(shot
@@ -5111,6 +5232,11 @@ async function enqueueVideoCreateOperation(input: {
           resolution: input.shotOptions?.resolution ?? "720p",
           generateAudio: String(input.shotOptions?.generateAudio ?? shot.audioEnabled),
           subtitleEnabled: String(shot.subtitleEnabled),
+          voicePresetId: aggregate.project.input.voiceSettings.presetVoiceId,
+          voiceSpeed: aggregate.project.input.voiceSettings.speed,
+          voiceStyle: aggregate.project.input.voiceSettings.style,
+          voiceSettingsKey: videoCreateVoiceSettingsKey(aggregate.project.input.voiceSettings),
+          subtitleStyleId: aggregate.project.input.subtitleStyleId,
           ...(input.shotOptions?.referenceMode ? { referenceMode: input.shotOptions.referenceMode } : {}),
           ...(explicitReferences
             ? {
@@ -5152,7 +5278,7 @@ async function enqueueVideoCreateOperation(input: {
       input.operation === "shot" ? (input.shotOptions?.videoModel ?? aggregate.project.input.videoModel) : undefined,
   });
   store.create(job);
-  if (shot) {
+  if (shot && input.operation !== "audio-generate") {
     const source =
       input.operation === "audio-replace"
         ? "audio_replaced"
@@ -5163,7 +5289,7 @@ async function enqueueVideoCreateOperation(input: {
       projectId: input.projectId,
       shotId: shot.id,
       source,
-      inputVersionId: shot.currentMaterialVersionId,
+      inputVersionId: materialInputVersionId,
       jobId: job.id,
       subtitlesComposed:
         input.operation === "subtitle-compose"
@@ -5172,10 +5298,26 @@ async function enqueueVideoCreateOperation(input: {
             ? (videoCreates.getMaterialVersion(input.projectId, shot.id, shot.currentMaterialVersionId)
                 ?.subtitlesComposed ?? false)
             : false,
+      subtitleStyleId:
+        input.operation === "subtitle-compose"
+          ? aggregate.project.input.subtitleStyleId
+          : input.operation === "audio-replace" && shot.currentMaterialVersionId
+            ? (videoCreates.getMaterialVersion(input.projectId, shot.id, shot.currentMaterialVersionId)
+                ?.subtitleStyleId ?? null)
+            : input.operation === "shot" && shot.subtitleEnabled
+              ? aggregate.project.input.subtitleStyleId
+              : null,
     });
     videoCreates.updateShot(shot.id, {
       ...(input.operation === "shot" && !shot.currentMaterialVersionId ? { status: "queued" as const } : {}),
       ...(input.operation === "shot" && input.shotOptions ? { audioEnabled: !input.shotOptions.generateAudio } : {}),
+      jobId: job.id,
+      error: null,
+    });
+  } else if (shot) {
+    videoCreates.updateShot(shot.id, {
+      status: "queued",
+      ...(input.operation === "audio-generate" ? { audioEnabled: true } : {}),
       jobId: job.id,
       error: null,
     });
@@ -5917,6 +6059,7 @@ const processVideoCreateShotMaterialRoute = createRoute({
     202: { description: "Accepted", content: { "application/json": { schema: JobSchema } } },
     404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },
     409: { description: "Invalid state", content: { "application/json": { schema: ErrorSchema } } },
+    422: { description: "Provider unavailable", content: { "application/json": { schema: ErrorSchema } } },
   },
 });
 app.openapi(processVideoCreateShotMaterialRoute, async (c) => {
@@ -5927,6 +6070,21 @@ app.openapi(processVideoCreateShotMaterialRoute, async (c) => {
       { error: { code: "NOT_FOUND", message: "分镜不存在", retryable: false, requestId: crypto.randomUUID() } },
       404,
     );
+  if (action === "audio-replace") {
+    const availability = providerFeatureAvailability(["volc-speech"]);
+    if (!availability.enabled)
+      return c.json(
+        {
+          error: {
+            code: "PROVIDER_UNAVAILABLE",
+            message: availability.disabledReason ?? "火山语音不可用",
+            retryable: false,
+            requestId: crypto.randomUUID(),
+          },
+        },
+        422,
+      );
+  }
   if (!shot.currentMaterialVersionId || !shot.videoAssetId)
     return c.json(
       {
@@ -5963,7 +6121,7 @@ app.openapi(processVideoCreateShotMaterialRoute, async (c) => {
       },
       409,
     );
-  if (action === "subtitle-compose" && shot.subtitlesComposed)
+  if (action === "subtitle-compose" && shot.subtitlesComposed && !shot.subtitleStyleStale)
     return c.json(
       {
         error: {
@@ -6078,6 +6236,192 @@ app.openapi(updateAllVideoCreateShotSettingsRoute, (c) => {
         },
         404,
       );
+});
+
+const updateVideoCreateMediaSettingsRoute = createRoute({
+  method: "patch",
+  path: "/api/video-create/projects/{projectId}/media-settings",
+  operationId: "updateVideoCreateMediaSettings",
+  request: {
+    params: z.object({ projectId: z.string().uuid() }),
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: z
+            .object({
+              voiceSettings: VideoCreateVoiceSettingsSchema.optional(),
+              subtitleStyleId: VideoCreateSubtitleStyleIdSchema.optional(),
+            })
+            .refine((value) => value.voiceSettings !== undefined || value.subtitleStyleId !== undefined),
+        },
+      },
+    },
+  },
+  responses: {
+    200: { description: "Updated", content: { "application/json": { schema: VideoCreateProjectSchema } } },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },
+    409: { description: "Action in progress", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(updateVideoCreateMediaSettingsRoute, (c) => {
+  try {
+    const updated = videoCreates.updateMediaSettings(
+      c.req.valid("param").projectId,
+      c.get("userId"),
+      c.req.valid("json"),
+    );
+    return updated
+      ? c.json(updated, 200)
+      : c.json(
+          {
+            error: {
+              code: "NOT_FOUND",
+              message: "一键成片项目不存在",
+              retryable: false,
+              requestId: crypto.randomUUID(),
+            },
+          },
+          404,
+        );
+  } catch (error) {
+    if (!(error instanceof VideoCreateStateError)) throw error;
+    return c.json(
+      {
+        error: {
+          code: "ACTION_IN_PROGRESS",
+          message: error.message,
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      409,
+    );
+  }
+});
+
+const previewVideoCreateVoiceRoute = createRoute({
+  method: "post",
+  path: "/api/video-create/voice-preview",
+  operationId: "previewVideoCreateVoice",
+  request: {
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: z.object({ voiceSettings: VideoCreateVoiceSettingsSchema, text: z.string().trim().min(1).max(80) }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: "Voice preview",
+      content: {
+        "application/json": {
+          schema: z.object({ audioBase64: z.string(), mimeType: z.literal("audio/mpeg") }),
+        },
+      },
+    },
+    422: { description: "Provider unavailable", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(previewVideoCreateVoiceRoute, async (c) => {
+  const availability = providerFeatureAvailability(["volc-speech"]);
+  if (!availability.enabled)
+    return c.json(
+      {
+        error: {
+          code: "PROVIDER_UNAVAILABLE",
+          message: availability.disabledReason ?? "火山语音不可用",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      422,
+    );
+  const { voiceSettings, text } = c.req.valid("json");
+  const result = await volcSpeech.synthesize({
+    requestId: crypto.randomUUID(),
+    resourceId: env.volcSpeech.presetTtsResourceId,
+    speaker: voiceSettings.presetVoiceId,
+    text,
+    model: "seed-tts-2.0-expressive",
+    speechRate: videoCreateVoiceSpeechRate(voiceSettings.speed),
+    explicitLanguage: "zh",
+    contextText: videoCreateVoiceContextText(voiceSettings.style),
+    toneFidelity: false,
+  });
+  return c.json({ audioBase64: Buffer.from(result.bytes).toString("base64"), mimeType: "audio/mpeg" as const }, 200);
+});
+
+const batchGenerateVideoCreateAudioRoute = createRoute({
+  method: "post",
+  path: "/api/video-create/projects/{projectId}/shots/batch-audio",
+  operationId: "batchGenerateVideoCreateAudio",
+  request: { params: z.object({ projectId: z.string().uuid() }) },
+  responses: {
+    202: {
+      description: "Accepted",
+      content: {
+        "application/json": {
+          schema: z.object({ jobs: z.array(JobSchema), submittedShotIds: z.array(z.string().uuid()) }),
+        },
+      },
+    },
+    404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },
+    409: { description: "Nothing to generate", content: { "application/json": { schema: ErrorSchema } } },
+    422: { description: "Provider unavailable", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+app.openapi(batchGenerateVideoCreateAudioRoute, async (c) => {
+  const { projectId } = c.req.valid("param");
+  const ownerUserId = c.get("userId");
+  const aggregate = videoCreates.getOwned(projectId, ownerUserId);
+  if (!aggregate)
+    return c.json(
+      { error: { code: "NOT_FOUND", message: "一键成片项目不存在", retryable: false, requestId: crypto.randomUUID() } },
+      404,
+    );
+  const availability = providerFeatureAvailability(["volc-speech"]);
+  if (!availability.enabled)
+    return c.json(
+      {
+        error: {
+          code: "PROVIDER_UNAVAILABLE",
+          message: availability.disabledReason ?? "火山语音不可用",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      422,
+    );
+  const shots = videoCreateBatchEligibleAudioShots(aggregate.shots);
+  if (!shots.length)
+    return c.json(
+      {
+        error: {
+          code: "NO_AUDIO_TO_GENERATE",
+          message: "没有可生成配音的分镜",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      409,
+    );
+  const batchKey = c.req.header("Idempotency-Key")?.trim().slice(0, 64) ?? crypto.randomUUID();
+  const jobs = [];
+  for (const shot of shots)
+    jobs.push(
+      await enqueueVideoCreateOperation({
+        ownerUserId,
+        projectId,
+        operation: "audio-generate",
+        shotId: shot.id,
+        idempotencyKey: `${batchKey}:${shot.id}`,
+      }),
+    );
+  return c.json({ jobs, submittedShotIds: shots.map((shot) => shot.id) }, 202);
 });
 
 const qwenVoiceSamplePreflightRoute = createRoute({

@@ -15,6 +15,18 @@ type OpenApiOperation = {
 };
 
 describe("video create shot generation API contract", () => {
+  test("publishes project media settings, voice preview, and batch audio operations", () => {
+    const document = JSON.parse(readFileSync(resolve(import.meta.dir, "../../openapi/openapi.json"), "utf8")) as {
+      paths: Record<string, Record<string, { operationId?: string }>>;
+    };
+    expect(document.paths["/api/video-create/projects/{projectId}/media-settings"]?.patch?.operationId).toBe(
+      "updateVideoCreateMediaSettings",
+    );
+    expect(document.paths["/api/video-create/voice-preview"]?.post?.operationId).toBe("previewVideoCreateVoice");
+    expect(document.paths["/api/video-create/projects/{projectId}/shots/batch-audio"]?.post?.operationId).toBe(
+      "batchGenerateVideoCreateAudio",
+    );
+  });
   test("publishes the owned script clearing operation", async () => {
     const spec = (await Bun.file(resolve(import.meta.dir, "../../openapi/openapi.json")).json()) as {
       paths: Record<string, Record<string, OpenApiOperation>>;

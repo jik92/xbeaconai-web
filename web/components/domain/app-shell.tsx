@@ -1,5 +1,5 @@
-import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import {
   AudioLines,
   Bell,
@@ -13,24 +13,31 @@ import {
   Files,
   GripVertical,
   Images,
+  LockKeyhole,
+  LogOut,
   type LucideIcon,
   Package,
   PanelLeftClose,
   PanelLeftOpen,
+  PanelsTopLeft,
+  ReceiptText,
   RotateCcw,
   Settings2,
+  UserRound,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { fetchLibraryAssets, fetchProducts } from "@/api/api-client";
 import { listNotifications } from "@/api/generated/sdk.gen";
 import { APP_CONFIG, type AssetFeatureId, isAssetOpen, isModuleOpen } from "@/app/config";
 import { modules } from "@/app/routes";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuth } from "@/features/account/auth-context";
 import { AuthScreen } from "@/features/account/auth-screen";
+import { type WorkspacePanel, WorkspacePanelDrawer } from "@/features/account/workspace-panels";
 import { fetchPortraits } from "@/features/portrait-library/portrait-data";
 import { moduleProviderAvailability, useProviderFeatures } from "@/features/provider/provider-features";
-import { type WorkspacePanel, WorkspacePanelDrawer } from "@/features/account/workspace-panels";
-import { Button } from "@/components/ui/button";
+import { sceneCatalog } from "../../../shared/scenes/scene-catalog";
 import { BrandLogo } from "./brand-logo";
 import { GlobalSearch } from "./global-search";
 import {
@@ -58,6 +65,7 @@ const ASSET_MENU_ITEMS = [
   { id: "materials", path: "/assets/materials", label: "素材库", icon: Files },
   { id: "portraits", path: "/assets/portraits", label: "人像库", icon: Images },
   { id: "products", path: "/assets/products", label: "商品库", icon: Package },
+  { id: "scenes", path: "/assets/scenes", label: "场景库", icon: PanelsTopLeft },
   { id: "voices", path: "/assets/voices", label: "音色库", icon: AudioLines },
 ] as const;
 
@@ -65,6 +73,7 @@ export function assetSidebarCounts(input: {
   materials?: readonly unknown[];
   portraits?: readonly unknown[];
   products?: readonly unknown[];
+  scenes?: readonly unknown[];
   voices?: readonly unknown[];
 }): Partial<Record<AssetFeatureId, string>> {
   return Object.fromEntries(
@@ -106,7 +115,7 @@ function loadSidebarMenuPreferences() {
 
 export function AppShell() {
   const path = useRouterState({ select: (s) => s.location.pathname });
-  const { status, user } = useAuth();
+  const { status, user, logout } = useAuth();
   const providerFeatures = useProviderFeatures(status === "authenticated");
   const assetQueriesEnabled = status === "authenticated";
   const materials = useQuery({
@@ -137,6 +146,7 @@ export function AppShell() {
     materials: materials.data,
     portraits: portraits.data,
     products: products.data,
+    scenes: sceneCatalog,
     voices: voices.data,
   });
   const runtimeAvailability = (item: SidebarMenuItem) => {
@@ -149,18 +159,15 @@ export function AppShell() {
       () => window.localStorage.getItem("sidebar-collapsed") === "true",
     ),
     [menuEditing, setMenuEditing] = useState(false),
-    [menuPreferences, setMenuPreferences] = useState(loadSidebarMenuPreferences);
-  const searchPages = useMemo(
-    () =>
-      SIDEBAR_GROUPS.flatMap((group) =>
-        menuPreferences.order[group]
-          .map((itemId) => sidebarMenuItems[group].find((item) => item.id === itemId))
-          .filter((item): item is SidebarMenuItem => Boolean(item))
-          .filter((item) => !isSidebarMenuItemHidden(menuPreferences, item.id, item.available))
-          .filter((item) => !item.id.startsWith("module:") || runtimeAvailability(item)?.enabled === true)
-          .map((item) => ({ id: item.id, label: item.label, path: item.path, group })),
-      ),
-    [menuPreferences, providerFeatures.data],
+    [menuPreferences, setMenuPreferences] = useState(loadSidebarMenuPreferences),
+    [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const searchPages = SIDEBAR_GROUPS.flatMap((group) =>
+    menuPreferences.order[group]
+      .map((itemId) => sidebarMenuItems[group].find((item) => item.id === itemId))
+      .filter((item): item is SidebarMenuItem => Boolean(item))
+      .filter((item) => !isSidebarMenuItemHidden(menuPreferences, item.id, item.available))
+      .filter((item) => !item.id.startsWith("module:") || runtimeAvailability(item)?.enabled === true)
+      .map((item) => ({ id: item.id, label: item.label, path: item.path, group })),
   );
 
   useEffect(() => {
@@ -187,7 +194,6 @@ export function AppShell() {
       // The navigation remains usable if private browsing blocks local storage writes.
     }
   }, [menuPreferences]);
-
   if (status === "loading")
     return (
       <main className="grid min-h-screen place-items-center bg-white font-sans">
@@ -233,15 +239,79 @@ export function AppShell() {
           >
             <Bell />
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="account-trigger"
-            aria-label="个人账号"
-            onClick={() => setPanel("account")}
-          >
-            {user.displayName || user.phone}
-          </Button>
+          <Popover open={accountMenuOpen} onOpenChange={setAccountMenuOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="sm" className="account-trigger" aria-label="打开用户菜单">
+                <span className="truncate">{user.displayName || user.phone}</span>
+                <ChevronDown className="size-3.5 shrink-0" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" sideOffset={8} className="w-60 p-2" role="menu" aria-label="用户菜单">
+              <div className="border-b border-line px-2 py-2">
+                <b className="block truncate text-sm font-medium">{user.displayName || user.phone}</b>
+                <span className="block truncate text-xs text-muted">{user.phone}</span>
+                <small className="mt-1 block text-xs text-muted">{user.credits.toLocaleString()} 创作点</small>
+              </div>
+              <div className="grid gap-1 py-2">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="flex h-9 items-center gap-2 rounded-md px-2 text-left text-sm text-ink hover:bg-surface-muted"
+                  onClick={() => {
+                    setAccountMenuOpen(false);
+                    setPanel("profile");
+                  }}
+                >
+                  <UserRound className="size-4" />
+                  个人资料
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="flex h-9 items-center gap-2 rounded-md px-2 text-left text-sm text-ink hover:bg-surface-muted"
+                  onClick={() => {
+                    setAccountMenuOpen(false);
+                    setPanel("security");
+                  }}
+                >
+                  <LockKeyhole className="size-4" />
+                  账号与密码
+                </button>
+                <Link
+                  to="/billing/ai"
+                  role="menuitem"
+                  className="flex h-9 items-center gap-2 rounded-md px-2 text-sm text-ink hover:bg-surface-muted"
+                  onClick={() => setAccountMenuOpen(false)}
+                >
+                  <ReceiptText className="size-4" />
+                  AI账单
+                </Link>
+                {user.isAdmin && (
+                  <Link
+                    to="/admin"
+                    role="menuitem"
+                    className="flex h-9 items-center gap-2 rounded-md px-2 text-sm text-ink hover:bg-surface-muted"
+                    onClick={() => setAccountMenuOpen(false)}
+                  >
+                    <Settings2 className="size-4" />
+                    管理后台
+                  </Link>
+                )}
+              </div>
+              <button
+                type="button"
+                role="menuitem"
+                className="flex h-9 w-full items-center gap-2 border-t border-line px-2 pt-2 text-left text-sm text-danger"
+                onClick={() => {
+                  setAccountMenuOpen(false);
+                  void logout();
+                }}
+              >
+                <LogOut className="size-4" />
+                退出登录
+              </button>
+            </PopoverContent>
+          </Popover>
         </div>
       </header>
       <aside
@@ -369,20 +439,6 @@ export function AppShell() {
               </nav>
             );
           })}
-          {user.isAdmin && (
-            <nav aria-label="系统管理">
-              <h3>系统管理</h3>
-              <Link
-                to="/admin"
-                aria-label="管理后台"
-                title={sidebarCollapsed ? "管理后台" : undefined}
-                className={path === "/admin" ? "active" : ""}
-              >
-                <Settings2 />
-                <span>管理后台</span>
-              </Link>
-            </nav>
-          )}
         </div>
         <footer className="sidebar-footer">
           {menuEditing && (

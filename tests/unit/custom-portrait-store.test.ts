@@ -68,9 +68,10 @@ describe("custom portrait persistence", () => {
       updatedAt: timestamp,
     };
     jobs.create(job);
-    portraits.create({ assetId, jobId, ownerUserId: first.userId, createdAt: timestamp });
+    portraits.create({ assetId, jobId, ownerUserId: first.userId, gender: "男", createdAt: timestamp });
 
     expect(portraits.getOwned(second.userId, assetId)).toBeUndefined();
+    expect(portraits.getOwned(first.userId, assetId)?.gender).toBe("男");
     expect(
       resolvePortraitReference({
         ownerUserId: first.userId,
@@ -98,6 +99,7 @@ describe("custom portrait persistence", () => {
       }),
     ).toMatchObject({
       name: "中国 22岁 男 牙医",
+      gender: "男",
       arkAssetUri: "asset://asset-custom-1",
       imageUrl: `/api/assets/${assetId}/content`,
     });

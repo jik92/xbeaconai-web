@@ -1,4 +1,6 @@
 import { and, asc, desc, eq, max } from "drizzle-orm";
+import type { VideoCreateSubtitleStyleId, VideoCreateVoiceSettings } from "../../shared/video-create/media-settings";
+import { videoCreateVoiceSettingsKey } from "../../shared/video-create/media-settings";
 import { type AppDatabase, openDatabase } from "../db/database";
 import {
   videoCreateMaterialVersions,
@@ -23,12 +25,19 @@ type ProjectRow = typeof videoCreateProjects.$inferSelect;
 type SectionRow = typeof videoCreateScriptSections.$inferSelect;
 type VersionRow = typeof videoCreateScriptVersions.$inferSelect;
 type ShotRow = typeof videoCreateShots.$inferSelect;
-type MaterialVersionRow = typeof videoCreateMaterialVersions.$inferSelect;
+export type MaterialVersionRow = typeof videoCreateMaterialVersions.$inferSelect;
 
 export interface VideoCreateAggregate {
   project: ProjectRow;
   sections: Array<SectionRow & { versions: VersionRow[]; currentVersion?: VersionRow }>;
-  shots: Array<ShotRow & { materialProcessing: boolean; subtitlesComposed: boolean }>;
+  shots: Array<
+    ShotRow & {
+      materialProcessing: boolean;
+      subtitlesComposed: boolean;
+      audioStale: boolean;
+      subtitleStyleStale: boolean;
+    }
+  >;
   canCompose: boolean;
 }
 
@@ -40,6 +49,22 @@ export function videoCreateBatchEligibleShots<
   T extends { status: VideoCreateShotStatus; materialProcessing?: boolean },
 >(shots: T[]) {
   return shots.filter((shot) => !shot.materialProcessing && (shot.status === "pending" || shot.status === "failed"));
+}
+
+export function videoCreateBatchEligibleAudioShots<
+  T extends {
+    status?: VideoCreateShotStatus;
+    narration: string;
+    materialProcessing?: boolean;
+  },
+>(shots: T[]) {
+  return shots.filter(
+    (shot) =>
+      Boolean(shot.narration.trim()) &&
+      shot.status !== "queued" &&
+      shot.status !== "generating" &&
+      !shot.materialProcessing,
+  );
 }
 
 export function videoCreateMinimumStoryboardCount(durationSec: number) {
@@ -207,6 +232,8 @@ export class VideoCreateStore {
       videoModel: aggregate.project.input.videoModel,
       ratio: aggregate.project.input.ratio,
       subtitles: aggregate.project.input.subtitles,
+      voiceSettings: aggregate.project.input.voiceSettings,
+      subtitleStyleId: aggregate.project.input.subtitleStyleId,
       ...normalized,
     };
     this.db
@@ -438,6 +465,7 @@ export class VideoCreateStore {
         | "videoAssetId"
         | "currentMaterialVersionId"
         | "audioArtifactId"
+        | "audioSettingsKey"
         | "subtitleCues"
         | "attempts"
         | "error"
@@ -482,6 +510,27 @@ export class VideoCreateStore {
       .get();
   }
 
+  getSubtitleSourceMaterialVersion(projectId: string, shotId: string, versionId: string) {
+    return this.getMaterialVersionLineage(projectId, shotId, versionId).find(
+      (version) => version.status === "succeeded" && !version.subtitlesComposed,
+    );
+  }
+
+  getMaterialVersionLineage(projectId: string, shotId: string, versionId: string) {
+    const lineage: MaterialVersionRow[] = [];
+    let current = this.getMaterialVersion(projectId, shotId, versionId);
+    const visited = new Set<string>();
+    while (current && !visited.has(current.id)) {
+      visited.add(current.id);
+      lineage.push(current);
+      if (!current.inputVersionId) break;
+      const parent = this.getMaterialVersion(projectId, shotId, current.inputVersionId);
+      if (!parent) break;
+      current = parent;
+    }
+    return lineage;
+  }
+
   getMaterialVersionByJobId(jobId: string) {
     return this.db.select().from(videoCreateMaterialVersions).where(eq(videoCreateMaterialVersions.jobId, jobId)).get();
   }
@@ -494,6 +543,7 @@ export class VideoCreateStore {
     inputVersionId?: string | null;
     jobId: string;
     subtitlesComposed?: boolean;
+    subtitleStyleId?: VideoCreateSubtitleStyleId | null;
   }) {
     const timestamp = new Date().toISOString();
     const version: typeof videoCreateMaterialVersions.$inferInsert = {
@@ -505,11 +555,47 @@ export class VideoCreateStore {
       inputVersionId: input.inputVersionId,
       jobId: input.jobId,
       subtitlesComposed: input.subtitlesComposed ?? false,
+      subtitleStyleId: input.subtitleStyleId,
       createdAt: timestamp,
       updatedAt: timestamp,
     };
     this.db.insert(videoCreateMaterialVersions).values(version).run();
-    return version;
+    const created = this.getMaterialVersion(input.projectId, input.shotId, version.id);
+    if (!created) throw new Error("VIDEO_CREATE_MATERIAL_VERSION_NOT_FOUND");
+    return created;
+  }
+
+  createMaterialVersion(input: {
+    projectId: string;
+    shotId: string;
+    source: MaterialVersionRow["source"];
+    storageKind: NonNullable<MaterialVersionRow["storageKind"]>;
+    contentId: string;
+    inputVersionId?: string | null;
+    jobId?: string | null;
+    subtitlesComposed?: boolean;
+    subtitleStyleId?: VideoCreateSubtitleStyleId | null;
+  }) {
+    const timestamp = new Date().toISOString();
+    const version: typeof videoCreateMaterialVersions.$inferInsert = {
+      id: crypto.randomUUID(),
+      projectId: input.projectId,
+      shotId: input.shotId,
+      source: input.source,
+      status: "succeeded",
+      storageKind: input.storageKind,
+      contentId: input.contentId,
+      inputVersionId: input.inputVersionId,
+      jobId: input.jobId,
+      subtitlesComposed: input.subtitlesComposed ?? false,
+      subtitleStyleId: input.subtitleStyleId,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    this.db.insert(videoCreateMaterialVersions).values(version).run();
+    const created = this.getMaterialVersion(input.projectId, input.shotId, version.id);
+    if (!created) throw new Error("VIDEO_CREATE_MATERIAL_VERSION_NOT_FOUND");
+    return created;
   }
 
   createAndApplyMaterialVersion(input: {
@@ -522,6 +608,7 @@ export class VideoCreateStore {
     jobId?: string | null;
     status?: Extract<VideoCreateShotStatus, "succeeded" | "replaced">;
     subtitlesComposed?: boolean;
+    subtitleStyleId?: VideoCreateSubtitleStyleId | null;
   }) {
     const timestamp = new Date().toISOString();
     return this.db.transaction(
@@ -537,6 +624,7 @@ export class VideoCreateStore {
           inputVersionId: input.inputVersionId,
           jobId: input.jobId,
           subtitlesComposed: input.subtitlesComposed ?? false,
+          subtitleStyleId: input.subtitleStyleId,
           createdAt: timestamp,
           updatedAt: timestamp,
         };
@@ -563,6 +651,8 @@ export class VideoCreateStore {
     storageKind: NonNullable<MaterialVersionRow["storageKind"]>;
     contentId: string;
     subtitlesComposed?: boolean;
+    subtitleStyleId?: VideoCreateSubtitleStyleId | null;
+    inputVersionId?: string | null;
   }) {
     const timestamp = new Date().toISOString();
     return this.db.transaction(
@@ -579,6 +669,8 @@ export class VideoCreateStore {
             storageKind: input.storageKind,
             contentId: input.contentId,
             ...(input.subtitlesComposed === undefined ? {} : { subtitlesComposed: input.subtitlesComposed }),
+            ...(input.subtitleStyleId === undefined ? {} : { subtitleStyleId: input.subtitleStyleId }),
+            ...(input.inputVersionId === undefined ? {} : { inputVersionId: input.inputVersionId }),
             error: null,
             updatedAt: timestamp,
           })
@@ -658,6 +750,29 @@ export class VideoCreateStore {
     return this.get(projectId);
   }
 
+  updateMediaSettings(
+    projectId: string,
+    ownerUserId: string,
+    settings: { voiceSettings?: VideoCreateVoiceSettings; subtitleStyleId?: VideoCreateSubtitleStyleId },
+  ) {
+    const aggregate = this.getOwned(projectId, ownerUserId);
+    if (!aggregate) return undefined;
+    if (
+      ["analyzing", "script_generating", "storyboard_generating", "composing"].includes(aggregate.project.status) ||
+      aggregate.shots.some(
+        (shot) => shot.status === "queued" || shot.status === "generating" || shot.materialProcessing,
+      )
+    )
+      throw new VideoCreateStateError("项目仍有任务执行中，暂时不能修改媒体设置");
+    const input = VideoCreateInputSchema.parse({ ...aggregate.project.input, ...settings });
+    this.db
+      .update(videoCreateProjects)
+      .set({ input, version: aggregate.project.version + 1, updatedAt: new Date().toISOString() })
+      .where(and(eq(videoCreateProjects.id, projectId), eq(videoCreateProjects.ownerUserId, ownerUserId)))
+      .run();
+    return this.getOwned(projectId, ownerUserId);
+  }
+
   getOwnedShot(projectId: string, shotId: string, ownerUserId: string) {
     const aggregate = this.getOwned(projectId, ownerUserId);
     return aggregate?.shots.find((shot) => shot.id === shotId);
@@ -709,18 +824,25 @@ export class VideoCreateStore {
       .from(videoCreateMaterialVersions)
       .where(eq(videoCreateMaterialVersions.projectId, project.id))
       .all();
-    const resolvedShots = shots.map((shot) => ({
-      ...shot,
-      materialProcessing: materialVersions.some(
-        (version) => version.shotId === shot.id && version.status === "pending",
-      ),
-      subtitlesComposed:
-        materialVersions.find((version) => version.id === shot.currentMaterialVersionId)?.subtitlesComposed ?? false,
-      narration:
-        shot.narration.trim() ||
-        enriched.find((section) => section.id === shot.scriptSectionId)?.currentVersion?.text.trim() ||
-        "",
-    }));
+    const voiceSettingsKey = videoCreateVoiceSettingsKey(normalizedProject.input.voiceSettings);
+    const resolvedShots = shots.map((shot) => {
+      const currentMaterialVersion = materialVersions.find((version) => version.id === shot.currentMaterialVersionId);
+      return {
+        ...shot,
+        materialProcessing: materialVersions.some(
+          (version) => version.shotId === shot.id && version.status === "pending",
+        ),
+        subtitlesComposed: currentMaterialVersion?.subtitlesComposed ?? false,
+        audioStale: Boolean(shot.audioArtifactId) && shot.audioSettingsKey !== voiceSettingsKey,
+        subtitleStyleStale:
+          Boolean(currentMaterialVersion?.subtitlesComposed) &&
+          currentMaterialVersion?.subtitleStyleId !== normalizedProject.input.subtitleStyleId,
+        narration:
+          shot.narration.trim() ||
+          enriched.find((section) => section.id === shot.scriptSectionId)?.currentVersion?.text.trim() ||
+          "",
+      };
+    });
     return {
       project: normalizedProject,
       sections: enriched,
@@ -732,7 +854,9 @@ export class VideoCreateStore {
             (shot.status === "succeeded" || shot.status === "replaced") &&
             !shot.materialProcessing &&
             (!shot.audioEnabled || Boolean(shot.audioArtifactId)) &&
-            (!shot.subtitleEnabled || shot.subtitleCues.length > 0),
+            (!shot.audioEnabled || !shot.audioStale) &&
+            (!shot.subtitleEnabled || shot.subtitleCues.length > 0) &&
+            (!shot.subtitleEnabled || !shot.subtitleStyleStale),
         ),
     };
   }
@@ -745,6 +869,7 @@ export function videoCreateJobValues(input: {
     | "regenerate-section"
     | "storyboard"
     | "shot"
+    | "audio-generate"
     | "audio-replace"
     | "subtitle-compose"
     | "compose";

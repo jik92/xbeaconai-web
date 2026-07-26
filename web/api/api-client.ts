@@ -1,11 +1,13 @@
 import type { AssetFolder, AssetKind, LibraryAsset, LibraryProduct } from "@/entities/types";
 import { getAuthToken } from "@/features/account/auth-context";
 import { randomUuid } from "@/lib/random-id";
+import type { PortraitGender } from "../../shared/portraits/portrait-tags";
 import type { RemixPromptTool, RemixPromptToolConfig } from "../../shared/video-remix/prompt-tools";
 import { apiBaseUrl, apiUrl } from "./base-url";
 import { client } from "./generated/client.gen";
 import {
   applyVideoCreateShotMaterialVersion as applyVideoCreateShotMaterialVersionRequest,
+  batchGenerateVideoCreateAudio as batchGenerateVideoCreateAudioRequest,
   batchGenerateVideoCreateShots,
   cancelJob,
   clearVideoCreateScript as clearVideoCreateScriptRequest,
@@ -46,6 +48,7 @@ import {
   listVideoRemixShotGenerationJobs,
   parseAdScriptSource,
   preflightQwenVoiceSample as preflightQwenVoiceSampleRequest,
+  previewVideoCreateVoice as previewVideoCreateVoiceRequest,
   processVideoCreateShotMaterial,
   regenerateVideoCreateSection,
   registerCustomPortrait,
@@ -59,6 +62,7 @@ import {
   updateAdminCredential,
   updateAdminUserStatus,
   updateAllVideoCreateShotSettings,
+  updateVideoCreateMediaSettings as updateVideoCreateMediaSettingsRequest,
   updateVideoCreateProject,
   updateVideoCreateShotSettings,
   updateVideoRemixProject,
@@ -488,6 +492,46 @@ export async function updateAllVideoCreateShotOptions(
   if (!data) throw new Error("分镜批量设置保存失败");
   return data;
 }
+
+export async function saveVideoCreateMediaSettings(
+  projectId: string,
+  settings: Pick<VideoCreateInput, "voiceSettings" | "subtitleStyleId">,
+) {
+  configure();
+  const { data } = await updateVideoCreateMediaSettingsRequest({
+    path: { projectId },
+    body: settings,
+    headers: authHeaders(),
+    throwOnError: true,
+  });
+  if (!data) throw new Error("媒体设置保存失败");
+  return data;
+}
+
+export async function previewVideoCreatePresetVoice(
+  voiceSettings: NonNullable<VideoCreateInput["voiceSettings"]>,
+  text = "让每一次表达，都更自然、更有感染力。",
+) {
+  configure();
+  const { data } = await previewVideoCreateVoiceRequest({
+    body: { voiceSettings, text },
+    headers: authHeaders(),
+    throwOnError: true,
+  });
+  if (!data) throw new Error("音色试听失败");
+  return data;
+}
+
+export async function batchGenerateVideoCreateVoices(projectId: string) {
+  configure();
+  const { data } = await batchGenerateVideoCreateAudioRequest({
+    path: { projectId },
+    headers: { ...authHeaders(), "Idempotency-Key": randomUuid() },
+    throwOnError: true,
+  });
+  if (!data) throw new Error("批量生成配音任务提交失败");
+  return data;
+}
 export async function parseExistingAdScript(sourceScript: string, idempotencyKey = randomUuid()) {
   configure();
   const { data } = await parseAdScriptSource({
@@ -636,11 +680,11 @@ export async function fetchCustomPortraits() {
   const { data } = await listCustomPortraits({ headers: authHeaders(), throwOnError: true });
   return data?.portraits ?? [];
 }
-export async function createCustomPortrait(file: File, displayName: string, description = "") {
+export async function createCustomPortrait(file: File, displayName: string, gender: PortraitGender, description = "") {
   const asset = await uploadLibraryAsset(file, "portrait", displayName, description);
   configure();
   const { data } = await registerCustomPortrait({
-    body: { assetId: asset.id },
+    body: { assetId: asset.id, gender },
     headers: authHeaders(),
     throwOnError: true,
   });

@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { applyVideoCreateShotMaterialVersion, batchGenerateVideoCreateShots, cancelJob, changePassword, clearVideoCreateScript, completeDirectUpload, createAdScriptAction, createAdScriptProject, createAiGenerateJob, createDirectUpload, createJob, createRechargeOrder, createShareImport, createVideoCreateProject, createVideoRemixComposeJob, createVideoRemixPromptToolJob, createVideoRemixShotGenerationJob, deleteAdminCredential, deleteAsset, deleteProduct, downloadArtifact, exportAdminEnvKey, exportAdScriptVersion, generateVideoCreateShot, getAdminCredentialDoctorResults, getAdminProviderAudit, getAdScriptProject, getAssetContent, getCapabilities, getCreationCapabilities, getCurrentUser, getHealth, getJob, getModels, getPortraitContent, getPreferences, getProviderFeatures, getShareImport, getToolOutputFolder, getVideoCreateProject, getVideoCreateShotGenerationDraft, getVideoRemixProject, grantAdminUserCredits, importAdminEnvKey, listAdminCredentials, listAdminJobs, listAdminProviderAudits, listAdminUsers, listAdScriptProjects, listAssets, listCustomPortraits, listJobs, listNotifications, listRechargeOrders, listRechargePackages, listVideoCreateProjects, listVideoCreateShotMaterialVersions, listVideoRemixProjects, listVideoRemixShotGenerationJobs, login, logout, markAllNotificationsRead, markNotificationRead, type Options, parseAdScriptSource, parseShareContent, preflightQwenVoiceSample, previewAdminProviderAuditAsset, processVideoCreateShotMaterial, regenerateVideoCreateSection, register, registerCustomPortrait, replaceVideoCreateShot, retryJob, runAdminCredentialDoctor, runVideoCreateAction, saveAdScriptVersion, saveAssetMetadata, savePreferences, saveVideoCreateSection, sendSmsVerificationCode, setToolOutputFolder, setupPassword, stopAllAdminJobs, updateAdminCredential, updateAdminUserStatus, updateAllVideoCreateShotSettings, updateProfile, updateVideoCreateProject, updateVideoCreateShotSettings, updateVideoRemixProject, uploadMedia, verifyPasswordReset } from '../sdk.gen';
-import type { ApplyVideoCreateShotMaterialVersionData, ApplyVideoCreateShotMaterialVersionError, ApplyVideoCreateShotMaterialVersionResponse, BatchGenerateVideoCreateShotsData, BatchGenerateVideoCreateShotsError, BatchGenerateVideoCreateShotsResponse, CancelJobData, CancelJobError, CancelJobResponse, ChangePasswordData, ChangePasswordError, ChangePasswordResponse, ClearVideoCreateScriptData, ClearVideoCreateScriptError, ClearVideoCreateScriptResponse, CompleteDirectUploadData, CompleteDirectUploadError, CompleteDirectUploadResponse, CreateAdScriptActionData, CreateAdScriptActionError, CreateAdScriptActionResponse, CreateAdScriptProjectData, CreateAdScriptProjectError, CreateAdScriptProjectResponse, CreateAiGenerateJobData, CreateAiGenerateJobError, CreateAiGenerateJobResponse, CreateDirectUploadData, CreateDirectUploadError, CreateDirectUploadResponse, CreateJobData, CreateJobError, CreateJobResponse, CreateRechargeOrderData, CreateRechargeOrderError, CreateRechargeOrderResponse, CreateShareImportData, CreateShareImportError, CreateShareImportResponse, CreateVideoCreateProjectData, CreateVideoCreateProjectError, CreateVideoCreateProjectResponse, CreateVideoRemixComposeJobData, CreateVideoRemixComposeJobError, CreateVideoRemixComposeJobResponse, CreateVideoRemixPromptToolJobData, CreateVideoRemixPromptToolJobError, CreateVideoRemixPromptToolJobResponse, CreateVideoRemixShotGenerationJobData, CreateVideoRemixShotGenerationJobError, CreateVideoRemixShotGenerationJobResponse, DeleteAdminCredentialData, DeleteAdminCredentialError, DeleteAdminCredentialResponse, DeleteAssetData, DeleteAssetError, DeleteAssetResponse, DeleteProductData, DeleteProductError, DeleteProductResponse, DownloadArtifactData, DownloadArtifactError, DownloadArtifactResponse, ExportAdminEnvKeyData, ExportAdminEnvKeyError, ExportAdminEnvKeyResponse, ExportAdScriptVersionData, ExportAdScriptVersionError, ExportAdScriptVersionResponse, GenerateVideoCreateShotData, GenerateVideoCreateShotError, GenerateVideoCreateShotResponse, GetAdminCredentialDoctorResultsData, GetAdminCredentialDoctorResultsError, GetAdminCredentialDoctorResultsResponse, GetAdminProviderAuditData, GetAdminProviderAuditError, GetAdminProviderAuditResponse, GetAdScriptProjectData, GetAdScriptProjectError, GetAdScriptProjectResponse, GetAssetContentData, GetAssetContentError, GetAssetContentResponse, GetCapabilitiesData, GetCapabilitiesResponse, GetCreationCapabilitiesData, GetCreationCapabilitiesResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetHealthData, GetHealthResponse, GetJobData, GetJobError, GetJobResponse, GetModelsData, GetModelsResponse, GetPortraitContentData, GetPortraitContentError, GetPortraitContentResponse, GetPreferencesData, GetPreferencesResponse, GetProviderFeaturesData, GetProviderFeaturesResponse, GetShareImportData, GetShareImportError, GetShareImportResponse, GetToolOutputFolderData, GetToolOutputFolderError, GetToolOutputFolderResponse, GetVideoCreateProjectData, GetVideoCreateProjectError, GetVideoCreateProjectResponse, GetVideoCreateShotGenerationDraftData, GetVideoCreateShotGenerationDraftError, GetVideoCreateShotGenerationDraftResponse, GetVideoRemixProjectData, GetVideoRemixProjectError, GetVideoRemixProjectResponse, GrantAdminUserCreditsData, GrantAdminUserCreditsError, GrantAdminUserCreditsResponse, ImportAdminEnvKeyData, ImportAdminEnvKeyError, ImportAdminEnvKeyResponse, ListAdminCredentialsData, ListAdminCredentialsError, ListAdminCredentialsResponse, ListAdminJobsData, ListAdminJobsError, ListAdminJobsResponse, ListAdminProviderAuditsData, ListAdminProviderAuditsError, ListAdminProviderAuditsResponse, ListAdminUsersData, ListAdminUsersError, ListAdminUsersResponse, ListAdScriptProjectsData, ListAdScriptProjectsResponse, ListAssetsData, ListAssetsResponse, ListCustomPortraitsData, ListCustomPortraitsResponse, ListJobsData, ListJobsResponse, ListNotificationsData, ListNotificationsResponse, ListRechargeOrdersData, ListRechargeOrdersResponse, ListRechargePackagesData, ListRechargePackagesResponse, ListVideoCreateProjectsData, ListVideoCreateProjectsResponse, ListVideoCreateShotMaterialVersionsData, ListVideoCreateShotMaterialVersionsError, ListVideoCreateShotMaterialVersionsResponse, ListVideoRemixProjectsData, ListVideoRemixProjectsResponse, ListVideoRemixShotGenerationJobsData, ListVideoRemixShotGenerationJobsError, ListVideoRemixShotGenerationJobsResponse, LoginData, LoginError, LoginResponse, LogoutData, LogoutError, LogoutResponse, MarkAllNotificationsReadData, MarkAllNotificationsReadResponse, MarkNotificationReadData, MarkNotificationReadError, MarkNotificationReadResponse, ParseAdScriptSourceData, ParseAdScriptSourceError, ParseAdScriptSourceResponse, ParseShareContentData, ParseShareContentResponse, PreflightQwenVoiceSampleData, PreflightQwenVoiceSampleError, PreflightQwenVoiceSampleResponse, PreviewAdminProviderAuditAssetData, PreviewAdminProviderAuditAssetError, PreviewAdminProviderAuditAssetResponse, ProcessVideoCreateShotMaterialData, ProcessVideoCreateShotMaterialError, ProcessVideoCreateShotMaterialResponse, RegenerateVideoCreateSectionData, RegenerateVideoCreateSectionError, RegenerateVideoCreateSectionResponse, RegisterCustomPortraitData, RegisterCustomPortraitError, RegisterCustomPortraitResponse, RegisterData, RegisterError, RegisterResponse, ReplaceVideoCreateShotData, ReplaceVideoCreateShotError, ReplaceVideoCreateShotResponse, RetryJobData, RetryJobError, RetryJobResponse, RunAdminCredentialDoctorData, RunAdminCredentialDoctorError, RunAdminCredentialDoctorResponse, RunVideoCreateActionData, RunVideoCreateActionError, RunVideoCreateActionResponse, SaveAdScriptVersionData, SaveAdScriptVersionError, SaveAdScriptVersionResponse, SaveAssetMetadataData, SaveAssetMetadataError, SaveAssetMetadataResponse, SavePreferencesData, SavePreferencesResponse, SaveVideoCreateSectionData, SaveVideoCreateSectionError, SaveVideoCreateSectionResponse, SendSmsVerificationCodeData, SendSmsVerificationCodeError, SendSmsVerificationCodeResponse, SetToolOutputFolderData, SetToolOutputFolderError, SetToolOutputFolderResponse, SetupPasswordData, SetupPasswordError, SetupPasswordResponse, StopAllAdminJobsData, StopAllAdminJobsError, StopAllAdminJobsResponse, UpdateAdminCredentialData, UpdateAdminCredentialError, UpdateAdminCredentialResponse, UpdateAdminUserStatusData, UpdateAdminUserStatusError, UpdateAdminUserStatusResponse, UpdateAllVideoCreateShotSettingsData, UpdateAllVideoCreateShotSettingsError, UpdateAllVideoCreateShotSettingsResponse, UpdateProfileData, UpdateProfileResponse, UpdateVideoCreateProjectData, UpdateVideoCreateProjectError, UpdateVideoCreateProjectResponse, UpdateVideoCreateShotSettingsData, UpdateVideoCreateShotSettingsError, UpdateVideoCreateShotSettingsResponse, UpdateVideoRemixProjectData, UpdateVideoRemixProjectError, UpdateVideoRemixProjectResponse, UploadMediaData, UploadMediaError, UploadMediaResponse, VerifyPasswordResetData, VerifyPasswordResetError, VerifyPasswordResetResponse } from '../types.gen';
+import { applyVideoCreateShotMaterialVersion, batchGenerateVideoCreateAudio, batchGenerateVideoCreateShots, cancelJob, changePassword, clearVideoCreateScript, completeDirectUpload, createAdScriptAction, createAdScriptProject, createAiGenerateJob, createDirectUpload, createJob, createRechargeOrder, createShareImport, createVideoCreateProject, createVideoRemixComposeJob, createVideoRemixPromptToolJob, createVideoRemixShotGenerationJob, deleteAdminCredential, deleteAsset, deleteProduct, downloadArtifact, exportAdminEnvKey, exportAdScriptVersion, generateVideoCreateShot, getAdminCredentialDoctorResults, getAdminProviderAudit, getAdScriptProject, getAssetContent, getCapabilities, getCreationCapabilities, getCurrentUser, getHealth, getJob, getModels, getPortraitContent, getPreferences, getProviderFeatures, getShareImport, getToolOutputFolder, getVideoCreateProject, getVideoCreateShotGenerationDraft, getVideoRemixProject, grantAdminUserCredits, importAdminEnvKey, listAdminCredentials, listAdminJobs, listAdminProviderAudits, listAdminUsers, listAdScriptProjects, listAiConsumptionRecords, listAiRechargeRecords, listAssets, listCustomPortraits, listJobs, listNotifications, listRechargeOrders, listRechargePackages, listVideoCreateProjects, listVideoCreateShotMaterialVersions, listVideoRemixProjects, listVideoRemixShotGenerationJobs, login, logout, markAllNotificationsRead, markNotificationRead, type Options, parseAdScriptSource, parseShareContent, preflightQwenVoiceSample, previewAdminProviderAuditAsset, previewVideoCreateVoice, processVideoCreateShotMaterial, regenerateVideoCreateSection, register, registerCustomPortrait, replaceVideoCreateShot, retryJob, runAdminCredentialDoctor, runVideoCreateAction, saveAdScriptVersion, saveAssetMetadata, savePreferences, saveVideoCreateSection, sendSmsVerificationCode, setToolOutputFolder, setupPassword, stopAllAdminJobs, updateAdminCredential, updateAdminUserStatus, updateAllVideoCreateShotSettings, updateProfile, updateVideoCreateMediaSettings, updateVideoCreateProject, updateVideoCreateShotSettings, updateVideoRemixProject, uploadMedia, verifyPasswordReset } from '../sdk.gen';
+import type { ApplyVideoCreateShotMaterialVersionData, ApplyVideoCreateShotMaterialVersionError, ApplyVideoCreateShotMaterialVersionResponse, BatchGenerateVideoCreateAudioData, BatchGenerateVideoCreateAudioError, BatchGenerateVideoCreateAudioResponse, BatchGenerateVideoCreateShotsData, BatchGenerateVideoCreateShotsError, BatchGenerateVideoCreateShotsResponse, CancelJobData, CancelJobError, CancelJobResponse, ChangePasswordData, ChangePasswordError, ChangePasswordResponse, ClearVideoCreateScriptData, ClearVideoCreateScriptError, ClearVideoCreateScriptResponse, CompleteDirectUploadData, CompleteDirectUploadError, CompleteDirectUploadResponse, CreateAdScriptActionData, CreateAdScriptActionError, CreateAdScriptActionResponse, CreateAdScriptProjectData, CreateAdScriptProjectError, CreateAdScriptProjectResponse, CreateAiGenerateJobData, CreateAiGenerateJobError, CreateAiGenerateJobResponse, CreateDirectUploadData, CreateDirectUploadError, CreateDirectUploadResponse, CreateJobData, CreateJobError, CreateJobResponse, CreateRechargeOrderData, CreateRechargeOrderError, CreateRechargeOrderResponse, CreateShareImportData, CreateShareImportError, CreateShareImportResponse, CreateVideoCreateProjectData, CreateVideoCreateProjectError, CreateVideoCreateProjectResponse, CreateVideoRemixComposeJobData, CreateVideoRemixComposeJobError, CreateVideoRemixComposeJobResponse, CreateVideoRemixPromptToolJobData, CreateVideoRemixPromptToolJobError, CreateVideoRemixPromptToolJobResponse, CreateVideoRemixShotGenerationJobData, CreateVideoRemixShotGenerationJobError, CreateVideoRemixShotGenerationJobResponse, DeleteAdminCredentialData, DeleteAdminCredentialError, DeleteAdminCredentialResponse, DeleteAssetData, DeleteAssetError, DeleteAssetResponse, DeleteProductData, DeleteProductError, DeleteProductResponse, DownloadArtifactData, DownloadArtifactError, DownloadArtifactResponse, ExportAdminEnvKeyData, ExportAdminEnvKeyError, ExportAdminEnvKeyResponse, ExportAdScriptVersionData, ExportAdScriptVersionError, ExportAdScriptVersionResponse, GenerateVideoCreateShotData, GenerateVideoCreateShotError, GenerateVideoCreateShotResponse, GetAdminCredentialDoctorResultsData, GetAdminCredentialDoctorResultsError, GetAdminCredentialDoctorResultsResponse, GetAdminProviderAuditData, GetAdminProviderAuditError, GetAdminProviderAuditResponse, GetAdScriptProjectData, GetAdScriptProjectError, GetAdScriptProjectResponse, GetAssetContentData, GetAssetContentError, GetAssetContentResponse, GetCapabilitiesData, GetCapabilitiesResponse, GetCreationCapabilitiesData, GetCreationCapabilitiesResponse, GetCurrentUserData, GetCurrentUserError, GetCurrentUserResponse, GetHealthData, GetHealthResponse, GetJobData, GetJobError, GetJobResponse, GetModelsData, GetModelsResponse, GetPortraitContentData, GetPortraitContentError, GetPortraitContentResponse, GetPreferencesData, GetPreferencesResponse, GetProviderFeaturesData, GetProviderFeaturesResponse, GetShareImportData, GetShareImportError, GetShareImportResponse, GetToolOutputFolderData, GetToolOutputFolderError, GetToolOutputFolderResponse, GetVideoCreateProjectData, GetVideoCreateProjectError, GetVideoCreateProjectResponse, GetVideoCreateShotGenerationDraftData, GetVideoCreateShotGenerationDraftError, GetVideoCreateShotGenerationDraftResponse, GetVideoRemixProjectData, GetVideoRemixProjectError, GetVideoRemixProjectResponse, GrantAdminUserCreditsData, GrantAdminUserCreditsError, GrantAdminUserCreditsResponse, ImportAdminEnvKeyData, ImportAdminEnvKeyError, ImportAdminEnvKeyResponse, ListAdminCredentialsData, ListAdminCredentialsError, ListAdminCredentialsResponse, ListAdminJobsData, ListAdminJobsError, ListAdminJobsResponse, ListAdminProviderAuditsData, ListAdminProviderAuditsError, ListAdminProviderAuditsResponse, ListAdminUsersData, ListAdminUsersError, ListAdminUsersResponse, ListAdScriptProjectsData, ListAdScriptProjectsResponse, ListAiConsumptionRecordsData, ListAiConsumptionRecordsResponse, ListAiRechargeRecordsData, ListAiRechargeRecordsResponse, ListAssetsData, ListAssetsResponse, ListCustomPortraitsData, ListCustomPortraitsResponse, ListJobsData, ListJobsResponse, ListNotificationsData, ListNotificationsResponse, ListRechargeOrdersData, ListRechargeOrdersResponse, ListRechargePackagesData, ListRechargePackagesResponse, ListVideoCreateProjectsData, ListVideoCreateProjectsResponse, ListVideoCreateShotMaterialVersionsData, ListVideoCreateShotMaterialVersionsError, ListVideoCreateShotMaterialVersionsResponse, ListVideoRemixProjectsData, ListVideoRemixProjectsResponse, ListVideoRemixShotGenerationJobsData, ListVideoRemixShotGenerationJobsError, ListVideoRemixShotGenerationJobsResponse, LoginData, LoginError, LoginResponse, LogoutData, LogoutError, LogoutResponse, MarkAllNotificationsReadData, MarkAllNotificationsReadResponse, MarkNotificationReadData, MarkNotificationReadError, MarkNotificationReadResponse, ParseAdScriptSourceData, ParseAdScriptSourceError, ParseAdScriptSourceResponse, ParseShareContentData, ParseShareContentResponse, PreflightQwenVoiceSampleData, PreflightQwenVoiceSampleError, PreflightQwenVoiceSampleResponse, PreviewAdminProviderAuditAssetData, PreviewAdminProviderAuditAssetError, PreviewAdminProviderAuditAssetResponse, PreviewVideoCreateVoiceData, PreviewVideoCreateVoiceError, PreviewVideoCreateVoiceResponse, ProcessVideoCreateShotMaterialData, ProcessVideoCreateShotMaterialError, ProcessVideoCreateShotMaterialResponse, RegenerateVideoCreateSectionData, RegenerateVideoCreateSectionError, RegenerateVideoCreateSectionResponse, RegisterCustomPortraitData, RegisterCustomPortraitError, RegisterCustomPortraitResponse, RegisterData, RegisterError, RegisterResponse, ReplaceVideoCreateShotData, ReplaceVideoCreateShotError, ReplaceVideoCreateShotResponse, RetryJobData, RetryJobError, RetryJobResponse, RunAdminCredentialDoctorData, RunAdminCredentialDoctorError, RunAdminCredentialDoctorResponse, RunVideoCreateActionData, RunVideoCreateActionError, RunVideoCreateActionResponse, SaveAdScriptVersionData, SaveAdScriptVersionError, SaveAdScriptVersionResponse, SaveAssetMetadataData, SaveAssetMetadataError, SaveAssetMetadataResponse, SavePreferencesData, SavePreferencesResponse, SaveVideoCreateSectionData, SaveVideoCreateSectionError, SaveVideoCreateSectionResponse, SendSmsVerificationCodeData, SendSmsVerificationCodeError, SendSmsVerificationCodeResponse, SetToolOutputFolderData, SetToolOutputFolderError, SetToolOutputFolderResponse, SetupPasswordData, SetupPasswordError, SetupPasswordResponse, StopAllAdminJobsData, StopAllAdminJobsError, StopAllAdminJobsResponse, UpdateAdminCredentialData, UpdateAdminCredentialError, UpdateAdminCredentialResponse, UpdateAdminUserStatusData, UpdateAdminUserStatusError, UpdateAdminUserStatusResponse, UpdateAllVideoCreateShotSettingsData, UpdateAllVideoCreateShotSettingsError, UpdateAllVideoCreateShotSettingsResponse, UpdateProfileData, UpdateProfileResponse, UpdateVideoCreateMediaSettingsData, UpdateVideoCreateMediaSettingsError, UpdateVideoCreateMediaSettingsResponse, UpdateVideoCreateProjectData, UpdateVideoCreateProjectError, UpdateVideoCreateProjectResponse, UpdateVideoCreateShotSettingsData, UpdateVideoCreateShotSettingsError, UpdateVideoCreateShotSettingsResponse, UpdateVideoRemixProjectData, UpdateVideoRemixProjectError, UpdateVideoRemixProjectResponse, UploadMediaData, UploadMediaError, UploadMediaResponse, VerifyPasswordResetData, VerifyPasswordResetError, VerifyPasswordResetResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -310,6 +310,119 @@ export const createRechargeOrderMutation = (options?: Partial<Options<CreateRech
         }
     };
     return mutationOptions;
+};
+
+export const listAiRechargeRecordsQueryKey = (options?: Options<ListAiRechargeRecordsData>) => createQueryKey('listAiRechargeRecords', options);
+
+export const listAiRechargeRecordsOptions = (options?: Options<ListAiRechargeRecordsData>) => queryOptions<ListAiRechargeRecordsResponse, DefaultError, ListAiRechargeRecordsResponse, ReturnType<typeof listAiRechargeRecordsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listAiRechargeRecords({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listAiRechargeRecordsQueryKey(options)
+});
+
+const createInfiniteParams = <K extends Pick<QueryKey<Options>[0], 'body' | 'headers' | 'path' | 'query'>>(queryKey: QueryKey<Options>, page: K) => {
+    const params = { ...queryKey[0] };
+    if (page.body) {
+        params.body = {
+            ...queryKey[0].body as any,
+            ...page.body as any
+        };
+    }
+    if (page.headers) {
+        params.headers = {
+            ...queryKey[0].headers,
+            ...page.headers
+        };
+    }
+    if (page.path) {
+        params.path = {
+            ...queryKey[0].path as any,
+            ...page.path as any
+        };
+    }
+    if (page.query) {
+        params.query = {
+            ...queryKey[0].query as any,
+            ...page.query as any
+        };
+    }
+    return params as unknown as typeof page;
+};
+
+export const listAiRechargeRecordsInfiniteQueryKey = (options?: Options<ListAiRechargeRecordsData>): QueryKey<Options<ListAiRechargeRecordsData>> => createQueryKey('listAiRechargeRecords', options, true);
+
+export const listAiRechargeRecordsInfiniteOptions = (options?: Options<ListAiRechargeRecordsData>) => {
+    const opts = infiniteQueryOptions<ListAiRechargeRecordsResponse, DefaultError, InfiniteData<ListAiRechargeRecordsResponse>, QueryKey<Options<ListAiRechargeRecordsData>>, number | Pick<QueryKey<Options<ListAiRechargeRecordsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<ListAiRechargeRecordsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await listAiRechargeRecords({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: listAiRechargeRecordsInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
+
+export const listAiConsumptionRecordsQueryKey = (options?: Options<ListAiConsumptionRecordsData>) => createQueryKey('listAiConsumptionRecords', options);
+
+export const listAiConsumptionRecordsOptions = (options?: Options<ListAiConsumptionRecordsData>) => queryOptions<ListAiConsumptionRecordsResponse, DefaultError, ListAiConsumptionRecordsResponse, ReturnType<typeof listAiConsumptionRecordsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listAiConsumptionRecords({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listAiConsumptionRecordsQueryKey(options)
+});
+
+export const listAiConsumptionRecordsInfiniteQueryKey = (options?: Options<ListAiConsumptionRecordsData>): QueryKey<Options<ListAiConsumptionRecordsData>> => createQueryKey('listAiConsumptionRecords', options, true);
+
+export const listAiConsumptionRecordsInfiniteOptions = (options?: Options<ListAiConsumptionRecordsData>) => {
+    const opts = infiniteQueryOptions<ListAiConsumptionRecordsResponse, DefaultError, InfiniteData<ListAiConsumptionRecordsResponse>, QueryKey<Options<ListAiConsumptionRecordsData>>, number | Pick<QueryKey<Options<ListAiConsumptionRecordsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<ListAiConsumptionRecordsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await listAiConsumptionRecords({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: listAiConsumptionRecordsInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
 };
 
 export const getCapabilitiesQueryKey = (options?: Options<GetCapabilitiesData>) => createQueryKey('getCapabilities', options);
@@ -673,35 +786,6 @@ export const listAdminProviderAuditsOptions = (options?: Options<ListAdminProvid
     },
     queryKey: listAdminProviderAuditsQueryKey(options)
 });
-
-const createInfiniteParams = <K extends Pick<QueryKey<Options>[0], 'body' | 'headers' | 'path' | 'query'>>(queryKey: QueryKey<Options>, page: K) => {
-    const params = { ...queryKey[0] };
-    if (page.body) {
-        params.body = {
-            ...queryKey[0].body as any,
-            ...page.body as any
-        };
-    }
-    if (page.headers) {
-        params.headers = {
-            ...queryKey[0].headers,
-            ...page.headers
-        };
-    }
-    if (page.path) {
-        params.path = {
-            ...queryKey[0].path as any,
-            ...page.path as any
-        };
-    }
-    if (page.query) {
-        params.query = {
-            ...queryKey[0].query as any,
-            ...page.query as any
-        };
-    }
-    return params as unknown as typeof page;
-};
 
 export const listAdminProviderAuditsInfiniteQueryKey = (options?: Options<ListAdminProviderAuditsData>): QueryKey<Options<ListAdminProviderAuditsData>> => createQueryKey('listAdminProviderAudits', options, true);
 
@@ -1362,6 +1446,48 @@ export const updateAllVideoCreateShotSettingsMutation = (options?: Partial<Optio
     const mutationOptions: UseMutationOptions<UpdateAllVideoCreateShotSettingsResponse, UpdateAllVideoCreateShotSettingsError, Options<UpdateAllVideoCreateShotSettingsData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await updateAllVideoCreateShotSettings({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const updateVideoCreateMediaSettingsMutation = (options?: Partial<Options<UpdateVideoCreateMediaSettingsData>>): UseMutationOptions<UpdateVideoCreateMediaSettingsResponse, UpdateVideoCreateMediaSettingsError, Options<UpdateVideoCreateMediaSettingsData>> => {
+    const mutationOptions: UseMutationOptions<UpdateVideoCreateMediaSettingsResponse, UpdateVideoCreateMediaSettingsError, Options<UpdateVideoCreateMediaSettingsData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await updateVideoCreateMediaSettings({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const previewVideoCreateVoiceMutation = (options?: Partial<Options<PreviewVideoCreateVoiceData>>): UseMutationOptions<PreviewVideoCreateVoiceResponse, PreviewVideoCreateVoiceError, Options<PreviewVideoCreateVoiceData>> => {
+    const mutationOptions: UseMutationOptions<PreviewVideoCreateVoiceResponse, PreviewVideoCreateVoiceError, Options<PreviewVideoCreateVoiceData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await previewVideoCreateVoice({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const batchGenerateVideoCreateAudioMutation = (options?: Partial<Options<BatchGenerateVideoCreateAudioData>>): UseMutationOptions<BatchGenerateVideoCreateAudioResponse, BatchGenerateVideoCreateAudioError, Options<BatchGenerateVideoCreateAudioData>> => {
+    const mutationOptions: UseMutationOptions<BatchGenerateVideoCreateAudioResponse, BatchGenerateVideoCreateAudioError, Options<BatchGenerateVideoCreateAudioData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await batchGenerateVideoCreateAudio({
                 ...options,
                 ...fnOptions,
                 throwOnError: true

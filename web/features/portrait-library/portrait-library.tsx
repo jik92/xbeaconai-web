@@ -2,13 +2,14 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Check, Download, Images, LoaderCircle, Shuffle, UserRound } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createCustomPortrait } from "@/api/api-client";
 import { AssetPageShell, AssetPageToolbar } from "@/components/domain/asset-page-shell";
-import { ImagePreview, MediaPreview } from "@/components/domain/media-preview";
+import { MediaPreview } from "@/components/domain/media-preview";
 import { ToolCreatorModal } from "@/components/domain/tool-creator-modal";
 import { Button } from "@/components/ui/button";
-import { NativeSelect } from "@/components/ui/native-select";
 import { Input } from "@/components/ui/input";
-import { createCustomPortrait } from "@/api/api-client";
+import { NativeSelect } from "@/components/ui/native-select";
+import type { PortraitGender } from "../../../shared/portraits/portrait-tags";
 import { fetchPortraits, type Portrait } from "./portrait-data";
 
 const getPortraitColumns = () =>
@@ -33,6 +34,7 @@ export function PortraitLibrary() {
   const [createOpen, setCreateOpen] = useState(false);
   const [portraitFile, setPortraitFile] = useState<File | null>(null);
   const [portraitName, setPortraitName] = useState("");
+  const [portraitGender, setPortraitGender] = useState<PortraitGender | "">("");
   const [portraitDescription, setPortraitDescription] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
@@ -289,20 +291,21 @@ export function PortraitLibrary() {
           </div>
         )}
       </ToolCreatorModal>
-      <ToolCreatorModal open={createOpen} title="新建人像" onClose={() => !creating && setCreateOpen(false)}>
+      <ToolCreatorModal open={createOpen} title="新建自建虚拟人像" onClose={() => !creating && setCreateOpen(false)}>
         <form
           className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4"
           onSubmit={(event) => {
             event.preventDefault();
-            if (!portraitFile || !portraitName.trim() || creating) return;
+            if (!portraitFile || !portraitName.trim() || !portraitGender || creating) return;
             setCreating(true);
             setCreateError("");
-            void createCustomPortrait(portraitFile, portraitName.trim(), portraitDescription.trim())
+            void createCustomPortrait(portraitFile, portraitName.trim(), portraitGender, portraitDescription.trim())
               .then(async () => {
                 await queryClient.invalidateQueries({ queryKey: ["portrait-library"] });
                 setSource("custom");
                 setPortraitFile(null);
                 setPortraitName("");
+                setPortraitGender("");
                 setPortraitDescription("");
                 setCreateOpen(false);
               })
@@ -310,27 +313,47 @@ export function PortraitLibrary() {
               .finally(() => setCreating(false));
           }}
         >
-          <label className="grid gap-1 text-xs text-muted">
+          <label className="grid gap-1 text-xs text-muted" htmlFor="custom-portrait-file">
             人像图片
             <Input
+              id="custom-portrait-file"
               type="file"
               accept="image/jpeg,image/png,image/webp"
               disabled={creating}
               onChange={(event) => setPortraitFile(event.target.files?.[0] ?? null)}
             />
           </label>
-          <label className="grid gap-1 text-xs text-muted">
+          <label className="grid gap-1 text-xs text-muted" htmlFor="custom-portrait-name">
             人像名称
             <Input
+              id="custom-portrait-name"
               value={portraitName}
               maxLength={80}
               disabled={creating}
               onChange={(event) => setPortraitName(event.target.value)}
             />
           </label>
-          <label className="grid gap-1 text-xs text-muted">
-            描述
-            <Input
+          <label className="grid gap-1 text-xs text-muted" htmlFor="custom-portrait-gender">
+            性别
+            <NativeSelect
+              id="custom-portrait-gender"
+              className="h-9"
+              value={portraitGender}
+              disabled={creating}
+              onChange={(event) => setPortraitGender(event.target.value as PortraitGender | "")}
+            >
+              <option value="" disabled>
+                请选择性别
+              </option>
+              <option value="男">男</option>
+              <option value="女">女</option>
+            </NativeSelect>
+          </label>
+          <label className="grid gap-1 text-xs text-muted" htmlFor="custom-portrait-description">
+            基础描述
+            <textarea
+              id="custom-portrait-description"
+              className="min-h-24 resize-y rounded-md border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-ink"
               value={portraitDescription}
               maxLength={300}
               disabled={creating}
@@ -342,7 +365,11 @@ export function PortraitLibrary() {
             <Button type="button" size="sm" variant="outline" disabled={creating} onClick={() => setCreateOpen(false)}>
               取消
             </Button>
-            <Button type="submit" size="sm" disabled={!portraitFile || !portraitName.trim() || creating}>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={!portraitFile || !portraitName.trim() || !portraitGender || creating}
+            >
               {creating && <LoaderCircle className="animate-spin" />}
               创建
             </Button>

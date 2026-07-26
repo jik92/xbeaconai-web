@@ -3,7 +3,7 @@ import type { ModuleId } from "@/entities/types";
 export type CreationWorkflowId = "video-remix" | "video-create" | "ad-script";
 export type UtilityId = "video-extract" | "video-editor";
 export type AiToolboxId = Exclude<ModuleId, CreationWorkflowId | UtilityId>;
-export type AssetFeatureId = "materials" | "portraits" | "products" | "voices";
+export type AssetFeatureId = "materials" | "portraits" | "products" | "scenes" | "voices";
 
 export interface MenuFeatureConfig {
   readonly creationWorkflow: Readonly<Record<CreationWorkflowId, boolean>>;
@@ -85,6 +85,7 @@ export const APP_CONFIG = {
       materials: true,
       portraits: true,
       products: true,
+      scenes: true,
       voices: true,
     },
   },

@@ -6,9 +6,11 @@ import { AdScriptPage } from "@/features/ad-script/ad-script-page";
 import { AdminPage } from "@/features/admin/admin-page";
 import { AiGeneratePage } from "@/features/ai-generate/ai-generate-page";
 import { AssetLibrary } from "@/features/asset-library/asset-library";
+import { AiBillingPage } from "@/features/billing/ai-billing-page";
 import { MediaUnderstandPage } from "@/features/media-understand/media-understand-page";
 import { PortraitLibrary } from "@/features/portrait-library/portrait-library";
 import { ProviderFeatureGate } from "@/features/provider/provider-feature-gate";
+import { SceneLibrary } from "@/features/scene-library/scene-library";
 import { VideoCreatePage } from "@/features/video-create/video-create-page";
 import { VideoEditorPage } from "@/features/video-editor/video-editor-page";
 import { VideoExtractPage } from "@/features/video-extract/video-extract-page";
@@ -81,6 +83,12 @@ const productRoute = createRoute({
       <ComingSoonPage config={{ id: "products", label: "商品库" }} />
     ),
 });
+const sceneRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/assets/scenes",
+  component: () =>
+    isAssetOpen("scenes") ? <SceneLibrary /> : <ComingSoonPage config={{ id: "scenes", label: "场景库" }} />,
+});
 const voiceRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/assets/voices",
@@ -96,13 +104,20 @@ const adminRoute = createRoute({
   path: "/admin",
   component: AdminPage,
 });
+const aiBillingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/billing/ai",
+  component: AiBillingPage,
+});
 const routeTree = rootRoute.addChildren([
   indexRoute,
   ...moduleRoutes,
   materialRoute,
   portraitRoute,
   productRoute,
+  sceneRoute,
   voiceRoute,
+  aiBillingRoute,
   adminRoute,
 ]);
 export const router = createRouter({ routeTree, defaultPreload: "intent" });

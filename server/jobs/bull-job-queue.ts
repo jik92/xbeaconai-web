@@ -1,7 +1,14 @@
 import { Queue } from "bullmq";
 import IORedis from "ioredis";
-import { type ExecuteJobPayload, executeJobName, executeJobOptions } from "../../shared/jobs/queue-contract";
+import { classifyJobWorkload, type JobWorkload } from "../../shared/jobs/job-workload";
+import {
+  type ExecuteJobPayload,
+  executeJobName,
+  executeJobOptions,
+  jobQueueName,
+} from "../../shared/jobs/queue-contract";
 import { env } from "../env";
+import type { JobRecord } from "../types";
 
 function createRedisConnection() {
   return new IORedis(env.redisUrl, {
@@ -12,33 +19,58 @@ function createRedisConnection() {
 
 export class BullJobQueue {
   private redis?: IORedis;
-  private queue?: Queue<ExecuteJobPayload>;
+  private readonly queues = new Map<JobWorkload, Queue<ExecuteJobPayload>>();
 
-  private client() {
+  constructor(private readonly getJob: (jobId: string) => JobRecord | undefined) {}
+
+  private client(workload: JobWorkload) {
     if (!this.redis) this.redis = createRedisConnection();
-    if (!this.queue)
-      this.queue = new Queue<ExecuteJobPayload>(env.redisQueueName, {
+    let queue = this.queues.get(workload);
+    if (!queue) {
+      queue = new Queue<ExecuteJobPayload>(jobQueueName(env.redisQueueName, workload), {
         connection: this.redis,
         defaultJobOptions: executeJobOptions,
       });
-    return this.queue;
+      this.queues.set(workload, queue);
+    }
+    return queue;
   }
 
   async enqueue(jobId: string) {
-    await this.client().add(executeJobName, { jobId }, { jobId });
+    const job = this.getJob(jobId);
+    if (!job) throw new Error(`JOB_NOT_FOUND: ${jobId}`);
+    const workload = classifyJobWorkload(job);
+    await this.client(workload).add(executeJobName, { jobId }, { jobId });
   }
 
   async remove(jobId: string) {
-    const job = await this.client().getJob(jobId);
-    if (job) await job.remove();
+    await Promise.all(
+      (["network", "ffmpeg"] as const).map(async (workload) => {
+        const job = await this.client(workload).getJob(jobId);
+        if (job) await job.remove();
+      }),
+    );
   }
 
   async state() {
-    return this.client().getJobCounts("wait", "active", "delayed", "failed");
+    const counts = await Promise.all(
+      (["network", "ffmpeg"] as const).map((workload) =>
+        this.client(workload).getJobCounts("wait", "active", "delayed", "failed"),
+      ),
+    );
+    return counts.reduce(
+      (total, count) => ({
+        wait: total.wait + count.wait,
+        active: total.active + count.active,
+        delayed: total.delayed + count.delayed,
+        failed: total.failed + count.failed,
+      }),
+      { wait: 0, active: 0, delayed: 0, failed: 0 },
+    );
   }
 
   async close() {
-    await this.queue?.close();
+    await Promise.all([...this.queues.values()].map((queue) => queue.close()));
     await this.redis?.quit();
   }
 }
