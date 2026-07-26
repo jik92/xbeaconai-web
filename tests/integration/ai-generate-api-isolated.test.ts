@@ -114,14 +114,21 @@ const imageRequest = () => ({
 });
 
 describe("dedicated AI creation API", () => {
-  test("publishes only real provider-backed image capabilities", async () => {
+  test("publishes real image and video capabilities from independent Provider Doctor checks", async () => {
     const response = await app.request("/api/creation/capabilities", {
       headers: { Authorization: `Bearer ${token}` },
     });
 
     expect(response.status).toBe(200);
     const body = (await response.json()) as {
-      models: Array<{ id: string; kind: string; executionMode: string; minReferences: number; maxReferences: number }>;
+      models: Array<{
+        id: string;
+        kind: string;
+        enabled: boolean;
+        executionMode: string;
+        minReferences: number;
+        maxReferences: number;
+      }>;
     };
     const imageModels = body.models.filter((model) => model.kind === "image");
     expect(imageModels.map((model) => model.id)).toEqual([
@@ -133,10 +140,48 @@ describe("dedicated AI creation API", () => {
       "nano-banana-pro",
       "gpt-image-2-stable",
     ]);
-    expect(imageModels.every((model) => model.executionMode === "real")).toBeTrue();
+    expect(imageModels.every((model) => model.executionMode === "real" && model.enabled)).toBeTrue();
     expect(
-      body.models.filter((model) => model.kind === "video").every((model) => model.executionMode === "real"),
+      body.models
+        .filter((model) => model.kind === "video")
+        .every((model) => model.executionMode === "real" && !model.enabled),
     ).toBeTrue();
+
+    providerCredentials.saveChecks([
+      {
+        providerId: "aihubmix",
+        provider: "AIHubMix",
+        status: "invalid",
+        message: "test unavailable",
+        latencyMs: 1,
+        checkedAt: new Date().toISOString(),
+      },
+      {
+        providerId: "ark",
+        provider: "Ark",
+        status: "available",
+        message: "test verified",
+        latencyMs: 1,
+        checkedAt: new Date().toISOString(),
+      },
+    ]);
+    const reversedResponse = await app.request("/api/creation/capabilities", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const reversed = (await reversedResponse.json()) as typeof body;
+    expect(reversed.models.filter((model) => model.kind === "image").every((model) => !model.enabled)).toBeTrue();
+    expect(reversed.models.filter((model) => model.kind === "video").every((model) => model.enabled)).toBeTrue();
+
+    providerCredentials.saveChecks([
+      {
+        providerId: "aihubmix",
+        provider: "AIHubMix",
+        status: "available",
+        message: "test verified",
+        latencyMs: 1,
+        checkedAt: new Date().toISOString(),
+      },
+    ]);
   });
 
   test("queues a normalized real-only image job and charges once for an idempotent request", async () => {

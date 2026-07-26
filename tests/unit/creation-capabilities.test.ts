@@ -1,18 +1,29 @@
 import { describe, expect, test } from "bun:test";
 import { creationCapabilities, quoteCreation, validateCreationValues } from "../../server/creation/capabilities";
 
-const models = creationCapabilities((id) => id.endsWith("fast-260128"));
+const models = creationCapabilities(true, true);
+const modelsWithVideoDisabled = creationCapabilities(true, false);
 const imageModel = models.find((model) => model.kind === "image");
 const enabledVideoModel = models.find((model) => model.kind === "video" && model.enabled);
-const disabledVideoModel = models.find((model) => model.kind === "video" && !model.enabled);
+const disabledVideoModel = modelsWithVideoDisabled.find((model) => model.kind === "video" && !model.enabled);
 
 if (!imageModel || !enabledVideoModel || !disabledVideoModel) {
   throw new Error("Expected image, enabled video, and disabled video capabilities");
 }
 
 describe("creation capabilities", () => {
+  test("enables image and video models independently by Provider Doctor status", () => {
+    const imageOnly = creationCapabilities(true, false);
+    expect(imageOnly.filter((model) => model.kind === "image").every((model) => model.enabled)).toBeTrue();
+    expect(imageOnly.filter((model) => model.kind === "video").every((model) => !model.enabled)).toBeTrue();
+
+    const videoOnly = creationCapabilities(false, true);
+    expect(videoOnly.filter((model) => model.kind === "image").every((model) => !model.enabled)).toBeTrue();
+    expect(videoOnly.filter((model) => model.kind === "video").every((model) => model.enabled)).toBeTrue();
+  });
+
   test("publishes every enabled Seedance model as real", () => {
-    const videoModels = creationCapabilities(() => true).filter((model) => model.kind === "video");
+    const videoModels = creationCapabilities(true, true).filter((model) => model.kind === "video");
     expect(videoModels.length).toBeGreaterThan(0);
     expect(videoModels.every((model) => model.enabled && model.executionMode === "real")).toBeTrue();
   });
@@ -49,7 +60,7 @@ describe("creation capabilities", () => {
     });
     expect(videoModels.filter((model) => model.isDefault)).toHaveLength(1);
     expect(enabledVideoModel.executionMode).toBe("real");
-    expect(disabledVideoModel.disabledReason).toBe("真实基线尚未验证");
+    expect(disabledVideoModel.disabledReason).toBe("请先在密钥管理中检测并通过 Ark");
   });
 
   test("validates model capability constraints before task creation", () => {

@@ -1,4 +1,4 @@
-import { type SeedanceModelId, videoModels } from "../models/video-models";
+import { videoModels } from "../models/video-models";
 import { imageModelDefinitions } from "./image-models";
 
 export type CreationKind = "image" | "video";
@@ -30,15 +30,15 @@ export interface CreationModelCapability {
 const imageModels = imageModelDefinitions.map((model) => model.capability);
 
 export function creationCapabilities(
-  videoEnabled: (id: SeedanceModelId) => boolean,
-  imageEnabled = true,
+  imageProviderEnabled: boolean,
+  videoProviderEnabled: boolean,
 ): CreationModelCapability[] {
   const images = imageModels.map((model) =>
     model.executionMode === "real"
       ? {
           ...model,
-          enabled: imageEnabled,
-          disabledReason: imageEnabled ? undefined : "真实图片生成基线尚未验证",
+          enabled: imageProviderEnabled,
+          disabledReason: imageProviderEnabled ? undefined : "请先在密钥管理中检测并通过 AIHubMix",
         }
       : model,
   );
@@ -49,8 +49,8 @@ export function creationCapabilities(
       displayName: model.name.replace(" 多模态参考", ""),
       description: model.description,
       badges: model.tags,
-      enabled: videoEnabled(model.id),
-      disabledReason: videoEnabled(model.id) ? undefined : "真实基线尚未验证",
+      enabled: videoProviderEnabled,
+      disabledReason: videoProviderEnabled ? undefined : "请先在密钥管理中检测并通过 Ark",
       executionMode: "real",
       isDefault: index === 0,
       supportedRatios: ["adaptive", "1:1", "16:9", "4:3", "3:4", "9:16", "21:9"],

@@ -463,8 +463,14 @@ function getVerifiedSdkIds(): Set<string> {
 }
 
 function videoModelEnabled(modelId: string) {
-  const sdk = auditSdkRegistry().find((item) => item.model === modelId && item.capability === "video-generate");
-  return Boolean(sdk && getVerifiedSdkIds().has(sdk.id));
+  return isSeedanceModelId(modelId) && providerCredentials.isProviderVerified("ark");
+}
+
+function getCreationProviderStatus() {
+  return {
+    imageEnabled: providerCredentials.isProviderVerified("aihubmix"),
+    videoEnabled: providerCredentials.isProviderVerified("ark"),
+  };
 }
 
 app.use(
@@ -1472,14 +1478,10 @@ const creationCapabilitiesRoute = createRoute({
     },
   },
 });
-app.openapi(creationCapabilitiesRoute, (c) =>
-  c.json(
-    {
-      models: creationCapabilities(videoModelEnabled, getVerifiedSdkIds().has("aihubmix-image")),
-    },
-    200,
-  ),
-);
+app.openapi(creationCapabilitiesRoute, (c) => {
+  const providers = getCreationProviderStatus();
+  return c.json({ models: creationCapabilities(providers.imageEnabled, providers.videoEnabled) }, 200);
+});
 
 app.use("/api/ai-generate/jobs", async (c, next) => {
   if (c.req.method === "POST") {
@@ -1544,7 +1546,8 @@ app.openapi(createAiGenerateJobRoute, async (c) => {
       403,
     );
 
-  const models = creationCapabilities(videoModelEnabled, getVerifiedSdkIds().has("aihubmix-image"));
+  const providers = getCreationProviderStatus();
+  const models = creationCapabilities(providers.imageEnabled, providers.videoEnabled);
   const capabilityValues = {
     creationKind: body.kind,
     prompt: body.prompt,
@@ -4182,7 +4185,8 @@ app.openapi(remixShotGenerationRoute, async (c) => {
     referenceMode: body.referenceMode,
     duration: String(body.duration),
   };
-  const models = creationCapabilities(videoModelEnabled, getVerifiedSdkIds().has("aihubmix-image"));
+  const providers = getCreationProviderStatus();
+  const models = creationCapabilities(providers.imageEnabled, providers.videoEnabled);
   const validationError = validateCreationValues(creationValues, models);
   if (validationError)
     return c.json(
