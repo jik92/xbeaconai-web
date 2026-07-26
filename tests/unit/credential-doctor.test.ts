@@ -96,4 +96,10 @@ describe("credential doctor", () => {
   test("uses a 30 second timeout for live provider checks", () => {
     expect(PROVIDER_DOCTOR_TIMEOUT_MS).toBe(30_000);
   });
+
+  test("keeps the Bun HTTP connection open long enough to return timeout results", async () => {
+    const serverEntry = await Bun.file("server/index.ts").text();
+    expect(serverEntry).toContain("idleTimeout: 60");
+    expect(60_000).toBeGreaterThan(PROVIDER_DOCTOR_TIMEOUT_MS);
+  });
 });

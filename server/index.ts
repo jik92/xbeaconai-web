@@ -33,4 +33,4 @@ async function fetch(request: Request) {
   return new Response("Frontend build not found. Run bun run build first.", { status: 503 });
 }
 
-export default { port: env.port, hostname: env.host, fetch };
+export default { port: env.port, hostname: env.host, idleTimeout: 60, fetch };
