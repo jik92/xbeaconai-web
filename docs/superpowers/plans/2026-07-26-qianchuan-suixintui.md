@@ -1,4 +1,7 @@
-# 巨量千川随心推 Implementation Plan
+# 巨量千川随心推 Implementation Plan（已废弃）
+
+> 2026-07-26：产品方向已改为千川 PC 商品短视频推广。本计划不再执行，以
+> `docs/superpowers/plans/2026-07-26-qianchuan-pc-product-video.md` 为准。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
