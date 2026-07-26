@@ -64,5 +64,6 @@ describe("worker concurrency pools", () => {
     expect(deploy).toContain(`readonly BUILD_NODE_OPTIONS="\${BUILD_NODE_OPTIONS:---max-old-space-size=1280}"`);
     expect(deploy).toContain('systemctl stop "$API_SERVICE_NAME" "$WORKER_SERVICE_NAME"');
     expect(deploy).toContain("build_production");
+    expect(deploy).toContain("grep -Eq 'BullMQ workers? ready'");
   });
 });

@@ -181,7 +181,7 @@ wait_for_worker() {
     local attempt
     for attempt in $(seq 1 30); do
         if systemctl is-active --quiet "$WORKER_SERVICE_NAME" && \
-            journalctl -u "$WORKER_SERVICE_NAME" --no-pager -n 30 | grep -q 'BullMQ worker ready'; then
+            journalctl -u "$WORKER_SERVICE_NAME" --no-pager -n 30 | grep -Eq 'BullMQ workers? ready'; then
             return 0
         fi
         sleep 1
