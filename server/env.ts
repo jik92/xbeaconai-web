@@ -61,7 +61,6 @@ export const env = {
     120_000,
     Math.max(0, Number(process.env.DOUYIN_LOGIN_GUIDANCE_WAIT_MS ?? 30_000)),
   ),
-  openaiBaseUrl: APP_CONFIG.providerDefaults.openai.baseUrl,
   videoAnalysisModel: APP_CONFIG.providerDefaults.openai.videoAnalysisModel,
   volcSpeech: APP_CONFIG.providerDefaults.volcSpeech,
   mediaKit: {

@@ -84,14 +84,19 @@ export function buildGptImageAnalysisRequest(input: GptImageAnalysisInput) {
 
 export class AihubmixClient {
   constructor(
-    private readonly baseUrl: string = env.openaiBaseUrl || "https://aihubmix.com",
+    private readonly configuredBaseUrl?: string,
     private readonly configuredApiKey?: string,
     private readonly fetchFn: Fetch = fetch,
     private readonly geminiFactory: GeminiFactory = defaultGeminiFactory,
+    private readonly getManagedBaseUrl: () => string | undefined = () => providerCredentials.get("OPENAI_BASE_URL"),
   ) {}
 
   private get apiKey() {
     return this.configuredApiKey ?? providerCredentials.get("OPENAI_KEY") ?? "";
+  }
+
+  private get baseUrl() {
+    return this.configuredBaseUrl ?? this.getManagedBaseUrl() ?? "";
   }
 
   get configured() {
@@ -100,7 +105,8 @@ export class AihubmixClient {
 
   private async request(path: string, init: RequestInit = {}) {
     const apiKey = this.apiKey;
-    if (!apiKey || !this.baseUrl) throw new Error("AIHUBMIX_NOT_CONFIGURED");
+    const baseUrl = this.baseUrl;
+    if (!apiKey || !baseUrl) throw new Error("AIHUBMIX_NOT_CONFIGURED");
     if (env.blockAiOutbound) throw new Error(`AI_OUTBOUND_BLOCKED:${path}`);
     const method = (init.method ?? "GET").toUpperCase();
     const retryableMethod = method === "GET" || method === "HEAD" || method === "DELETE";
@@ -108,7 +114,7 @@ export class AihubmixClient {
     let lastError: unknown;
     for (let attempt = 0; attempt < attempts; attempt += 1) {
       try {
-        const response = await this.fetchFn(new URL(path, this.baseUrl), {
+        const response = await this.fetchFn(new URL(path, baseUrl), {
           ...init,
           headers: { Authorization: `Bearer ${apiKey}`, ...init.headers },
           signal: init.signal ?? AbortSignal.timeout(120_000),
@@ -269,11 +275,12 @@ export class AihubmixClient {
 
   private geminiClient() {
     const apiKey = this.apiKey;
-    if (!apiKey || !this.baseUrl) throw new Error("AIHUBMIX_NOT_CONFIGURED");
+    const baseUrl = this.baseUrl;
+    if (!apiKey || !baseUrl) throw new Error("AIHUBMIX_NOT_CONFIGURED");
     if (env.blockAiOutbound) throw new Error("AI_OUTBOUND_BLOCKED:/gemini");
     return this.geminiFactory({
       apiKey,
-      baseUrl: new URL("/gemini", this.baseUrl).toString().replace(/\/$/, ""),
+      baseUrl: new URL("/gemini", baseUrl).toString().replace(/\/$/, ""),
     });
   }
 

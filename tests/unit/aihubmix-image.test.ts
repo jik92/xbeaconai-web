@@ -2,6 +2,27 @@ import { describe, expect, test } from "bun:test";
 import { AihubmixClient } from "../../server/providers/aihubmix";
 
 describe("AIHubMix image API", () => {
+  test("uses the latest managed BASE URL without recreating the client", async () => {
+    const calls: string[] = [];
+    let managedBaseUrl = "https://first.example.test";
+    const client = new AihubmixClient(
+      undefined,
+      "test-key",
+      async (url) => {
+        calls.push(String(url));
+        return Response.json({ data: [] });
+      },
+      undefined,
+      () => managedBaseUrl,
+    );
+
+    await client.listModels();
+    managedBaseUrl = "https://api.inferera.com";
+    await client.listModels();
+
+    expect(calls).toEqual(["https://first.example.test/api/v1/models", "https://api.inferera.com/api/v1/models"]);
+  });
+
   test("sends a single paid JSON generation request and normalizes every image", async () => {
     const calls: Array<{ url: string; init?: RequestInit }> = [];
     const client = new AihubmixClient("https://aihubmix.example.test", "test-key", async (url, init) => {

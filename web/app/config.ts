@@ -17,7 +17,7 @@ export interface MenuFeatureConfig {
 export interface PublicAppConfig {
   readonly projectName: string;
   readonly providerDefaults: {
-    readonly openai: { readonly baseUrl: string; readonly videoAnalysisModel: string };
+    readonly openai: { readonly videoAnalysisModel: string };
     readonly volcSpeech: {
       readonly baseUrl: string;
       readonly cloneResourceId: string;
@@ -40,7 +40,6 @@ export const APP_CONFIG = {
   projectName: "烽火AI",
   providerDefaults: {
     openai: {
-      baseUrl: "https://aihubmix.com",
       videoAnalysisModel: "gemini-3.6-flash",
     },
     volcSpeech: {

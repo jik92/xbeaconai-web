@@ -5,6 +5,7 @@ import {
   type CredentialDoctorProvider,
   type CredentialValues,
   PROVIDER_DOCTOR_TIMEOUT_MS,
+  validateAihubmixBaseUrl,
 } from "../../server/byok/credential-doctor";
 import type { ProviderCredentialName } from "../../server/byok/credential-store";
 
@@ -45,6 +46,14 @@ describe("credential doctor", () => {
     expect(providerIds).toContain("ark");
     expect(providerIds).toContain("tos");
     expect(providerIds).toContain("volc-speech");
+    expect(activeCredentialDoctorProviders.find((provider) => provider.providerId === "aihubmix")?.credentials).toEqual(
+      ["OPENAI_KEY", "OPENAI_BASE_URL"],
+    );
+  });
+
+  test("requires an HTTPS AIHubMix BASE URL", () => {
+    expect(validateAihubmixBaseUrl("https://api.inferera.com")).toBe("https://api.inferera.com/");
+    expect(() => validateAihubmixBaseUrl("http://api.inferera.com")).toThrow("BASE URL 必须是有效的 HTTPS 地址");
   });
 
   test("reports available, missing, invalid and timeout without exposing provider errors", async () => {

@@ -274,6 +274,7 @@ export const zAiToolModuleId = z.enum([
 
 export const zProviderCredentialName = z.enum([
     'OPENAI_KEY',
+    'OPENAI_BASE_URL',
     'ARK_API_KEY',
     'VOLC_SPEECH_API_KEY_ID',
     'VOLC_SPEECH_API_KEY',

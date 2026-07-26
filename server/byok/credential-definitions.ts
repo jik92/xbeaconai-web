@@ -1,5 +1,6 @@
 export const providerCredentialNames = [
   "OPENAI_KEY",
+  "OPENAI_BASE_URL",
   "ARK_API_KEY",
   "VOLC_SPEECH_API_KEY_ID",
   "VOLC_SPEECH_API_KEY",
@@ -24,6 +25,14 @@ export const providerCredentialCatalog = [
     provider: "AIHubMix",
     label: "OpenAI-compatible API Key",
     secret: true,
+    docsUrl: "https://aihubmix.mintlify.app/cn/api/Models-API",
+  },
+  {
+    name: "OPENAI_BASE_URL",
+    providerId: "aihubmix",
+    provider: "AIHubMix",
+    label: "BASE URL",
+    secret: false,
     docsUrl: "https://aihubmix.mintlify.app/cn/api/Models-API",
   },
   {

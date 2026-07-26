@@ -34,6 +34,16 @@ class InvalidCredentialError extends Error {}
 class DoctorTimeoutError extends Error {}
 export const PROVIDER_DOCTOR_TIMEOUT_MS = 30_000;
 
+export function validateAihubmixBaseUrl(value: string) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" || !url.hostname || url.username || url.password) throw new Error("invalid URL");
+    return url.toString();
+  } catch {
+    throw new InvalidCredentialError("BASE URL 必须是有效的 HTTPS 地址");
+  }
+}
+
 const safeJson = async (response: Response) => {
   try {
     return (await response.json()) as {
@@ -119,9 +129,10 @@ export const activeCredentialDoctorProviders: CredentialDoctorProvider[] = [
   {
     providerId: "aihubmix",
     provider: "AIHubMix",
-    credentials: ["OPENAI_KEY"],
+    credentials: ["OPENAI_KEY", "OPENAI_BASE_URL"],
     probe: async (values, signal) => {
-      const models = await new AihubmixClient(env.openaiBaseUrl, values.OPENAI_KEY).listModels(signal);
+      const baseUrl = validateAihubmixBaseUrl(values.OPENAI_BASE_URL ?? "");
+      const models = await new AihubmixClient(baseUrl, values.OPENAI_KEY).listModels(signal);
       return `鉴权通过，可读取 ${models.length} 个模型`;
     },
   },

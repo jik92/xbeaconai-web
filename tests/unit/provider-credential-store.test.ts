@@ -30,6 +30,7 @@ describe("ProviderCredentialStore", () => {
     expect(names).toContain("TOS_ACCESS_KEY_ID");
     expect(names).toContain("TOS_SECRET_ACCESS_KEY");
     expect(names).toContain("QWEN_AUDIO_API_KEY");
+    expect(names).toContain("OPENAI_BASE_URL");
     expect(store.get("VOLC_SPEECH_API_KEY")).toBe("historical-speech-key");
     store.close();
   });
