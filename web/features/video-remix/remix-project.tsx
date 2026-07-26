@@ -16,6 +16,7 @@ import {
   Plus,
   Search,
   Sparkles,
+  TriangleAlert,
   Upload,
   Video,
   X,
@@ -1765,23 +1766,11 @@ export function RemixProject() {
   const orderedSources = composeOrder
     .map((assetId) => sources.find((source) => source.id === assetId))
     .filter((source): source is AttachmentSelection => Boolean(source));
+  const composeReadyCount = orderedSources.filter((source) =>
+    Boolean(selectedShotAssets[source.id] && selectedShotAssets[source.id] !== source.id),
+  ).length;
   const composePreviewSource =
     orderedSources.find((source) => source.id === composePreviewId) ?? orderedSources[0] ?? sources[0];
-  const selectedComposeAssetId = composePreviewSource
-    ? (selectedShotAssets[composePreviewSource.id] ?? composePreviewSource.id)
-    : "";
-  const selectedComposeVersion = shotJobs
-    .filter((shotJob) => shotJob.values.sourceAssetId === composePreviewSource?.id && shotJob.status === "succeeded")
-    .flatMap((shotJob) => (shotJob.result as ApiJobResult | undefined)?.artifacts ?? [])
-    .find((artifact) => artifact.id === selectedComposeAssetId);
-  const moveComposeSource = (assetId: string, direction: -1 | 1) => {
-    setComposeOrder((current) => {
-      const fromIndex = current.indexOf(assetId);
-      const toIndex = fromIndex + direction;
-      return moveRemixSource(current, fromIndex, toIndex);
-    });
-    setComposeJob(null);
-  };
   const startCompose = async () => {
     if (!job?.id || composeOrder.length < 2 || activeComposeJobId) return;
     setNotice("");
@@ -2215,121 +2204,114 @@ export function RemixProject() {
           )}
           {stage === 4 && (
             <div className="compose-stage">
-              <div className="compose-top">
-                <div>
-                  <b>成片时间线</b>
-                  <span>拖拽片段调整顺序</span>
+              <section className="compose-timeline-panel" aria-label="成片时间线">
+                <div className="compose-top">
+                  <div>
+                    <b>成片时间线</b>
+                    <span>拖拽片段调整顺序</span>
+                  </div>
+                  <i>
+                    {composeReadyCount}/{sources.length} 片段就绪
+                  </i>
                 </div>
-                <i>
-                  {orderedSources.length}/{sources.length} 片段就绪
-                </i>
-              </div>
-              <div className="timeline">
-                {orderedSources.map((source, index) => (
-                  <article
-                    key={source.id}
-                    className={source.id === composePreviewSource?.id ? "active" : ""}
-                    draggable
-                    onDragStart={() => setDraggingSourceId(source.id)}
-                    onDragEnd={() => setDraggingSourceId("")}
-                    onDragOver={(event) => event.preventDefault()}
-                    onDrop={() => {
-                      setComposeOrder((current) =>
-                        moveRemixSource(current, current.indexOf(draggingSourceId), current.indexOf(source.id)),
-                      );
-                      setComposeJob(null);
-                      setDraggingSourceId("");
-                    }}
-                  >
-                    <button
-                      type="button"
-                      className="timeline-preview-button"
-                      onClick={() => setComposePreviewId(source.id)}
-                    >
-                      <AuthenticatedMedia
-                        url={`/api/assets/${selectedShotAssets[source.id] ?? source.id}/content`}
-                        mimeType="video/mp4"
-                        alt={`${source.name}${selectedShotAssets[source.id] && selectedShotAssets[source.id] !== source.id ? "生成版本" : "原片"}`}
-                        controls={false}
-                        previewable={false}
-                        loadingText="载入中…"
-                        errorText="预览失败"
-                      />
-                      <b>{index + 1}</b>
-                    </button>
-                    <footer>
-                      <span title={source.name}>
-                        {source.name}
-                        <small>
-                          {selectedShotAssets[source.id] && selectedShotAssets[source.id] !== source.id
-                            ? "生成版本"
-                            : "原片"}
-                        </small>
-                      </span>
-                      <div>
+                <div className="timeline">
+                  {orderedSources.map((source, index) => {
+                    const isReady = Boolean(
+                      selectedShotAssets[source.id] && selectedShotAssets[source.id] !== source.id,
+                    );
+                    return (
+                      <article
+                        key={source.id}
+                        className={`${source.id === composePreviewSource?.id ? "active " : ""}${isReady ? "ready" : "missing"}`}
+                        draggable
+                        onDragStart={() => setDraggingSourceId(source.id)}
+                        onDragEnd={() => setDraggingSourceId("")}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={() => {
+                          setComposeOrder((current) =>
+                            moveRemixSource(current, current.indexOf(draggingSourceId), current.indexOf(source.id)),
+                          );
+                          setComposeJob(null);
+                          setDraggingSourceId("");
+                        }}
+                      >
                         <button
                           type="button"
-                          aria-label={`前移 ${source.name}`}
-                          disabled={index === 0}
-                          onClick={() => moveComposeSource(source.id, -1)}
+                          className="timeline-preview-button"
+                          aria-label={`预览第 ${index + 1} 个片段：${source.name}`}
+                          onClick={() => setComposePreviewId(source.id)}
                         >
-                          <ChevronLeft />
+                          {isReady ? (
+                            <AuthenticatedMedia
+                              url={`/api/assets/${selectedShotAssets[source.id]}/content`}
+                              mimeType="video/mp4"
+                              alt={`${source.name}生成版本`}
+                              controls={false}
+                              previewable={false}
+                              loadingText="载入中…"
+                              errorText="预览失败"
+                            />
+                          ) : (
+                            <span className="timeline-missing-state">
+                              <TriangleAlert />
+                              <small>未生成</small>
+                            </span>
+                          )}
+                          <b>{index + 1}</b>
                         </button>
-                        <button
-                          type="button"
-                          aria-label={`后移 ${source.name}`}
-                          disabled={index === orderedSources.length - 1}
-                          onClick={() => moveComposeSource(source.id, 1)}
-                        >
-                          <ChevronRight />
-                        </button>
-                      </div>
-                    </footer>
-                  </article>
-                ))}
-              </div>
+                        <footer>
+                          <span title={source.name}>{source.name}</span>
+                          <small className={isReady ? "ready" : "missing"}>{isReady ? "就绪" : "缺失"}</small>
+                        </footer>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
               <article className="compose-preview">
                 <header>
                   <b>
                     <Video />
-                    {resultVideo?.url ? "合并成片预览" : "待合并顺序预览"}
+                    成片预览
                   </b>
-                  {!resultVideo?.url && composePreviewSource && (
-                    <span>
-                      {orderedSources.findIndex((source) => source.id === composePreviewSource.id) + 1}/
-                      {orderedSources.length} · {composePreviewSource.name}
-                    </span>
-                  )}
                 </header>
-                <div>
+                <div className="compose-preview-body">
                   {resultVideo?.url ? (
                     <AuthenticatedMedia url={resultVideo.url} mimeType={resultVideo.mimeType} alt={resultVideo.name} />
-                  ) : composePreviewSource ? (
-                    <AuthenticatedMedia
-                      key={selectedComposeAssetId}
-                      url={selectedComposeVersion?.url ?? `/api/assets/${selectedComposeAssetId}/content`}
-                      mimeType={selectedComposeVersion?.mimeType ?? "video/mp4"}
-                      alt={`${composePreviewSource.name}待合并版本`}
-                      loadingText="正在载入待合并视频…"
-                      errorText="待合并视频预览失败"
-                    />
+                  ) : activeComposeJobId ? (
+                    <>
+                      <LoaderCircle className="animate-spin" />
+                      <p>{composeJob?.stage || "正在合并成片，请耐心等待"}</p>
+                    </>
                   ) : (
                     <>
                       <Video />
-                      <p>暂无可预览的视频</p>
+                      <p>点击下方「开始合并」生成成片</p>
                     </>
                   )}
                 </div>
                 <footer>
-                  <button onClick={() => setStage(3)}>返回分镜</button>
-                  <button
-                    className="primary"
-                    disabled={composeOrder.length < 2 || Boolean(activeComposeJobId)}
-                    onClick={() => void startCompose()}
-                  >
-                    {activeComposeJobId ? <LoaderCircle className="animate-spin" /> : <Video />}
-                    {activeComposeJobId ? composeJob?.stage || "正在合并" : resultVideo?.url ? "重新合并" : "开始合并"}
-                  </button>
+                  <span className="compose-warning">
+                    {composeReadyCount < sources.length && <TriangleAlert />}
+                    {composeReadyCount < sources.length
+                      ? "有片段未生成，仍可合并已就绪片段"
+                      : "全部片段已生成，可以开始合并"}
+                  </span>
+                  <div>
+                    <button onClick={() => setStage(3)}>返回分镜</button>
+                    <button
+                      className="primary"
+                      disabled={composeOrder.length < 2 || Boolean(activeComposeJobId)}
+                      onClick={() => void startCompose()}
+                    >
+                      {activeComposeJobId ? <LoaderCircle className="animate-spin" /> : <Video />}
+                      {activeComposeJobId
+                        ? composeJob?.stage || "正在合并"
+                        : resultVideo?.url
+                          ? "重新合并"
+                          : "开始合并"}
+                    </button>
+                  </div>
                 </footer>
               </article>
             </div>
