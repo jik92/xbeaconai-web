@@ -61,8 +61,8 @@ describe("worker concurrency pools", () => {
     const deploy = await Bun.file("deploy.sh").text();
     expect(deploy).toContain(`readonly BUILD_SWAP_SIZE_MB="\${BUILD_SWAP_SIZE_MB:-2048}"`);
     expect(deploy).toContain("ensure_build_capacity");
-    expect(deploy).toContain(
-      `NODE_OPTIONS="\${NODE_OPTIONS:-$BUILD_NODE_OPTIONS}" VITE_API_BASE_URL="$API_ORIGIN" bun run build`,
-    );
+    expect(deploy).toContain(`readonly BUILD_NODE_OPTIONS="\${BUILD_NODE_OPTIONS:---max-old-space-size=1280}"`);
+    expect(deploy).toContain('systemctl stop "$API_SERVICE_NAME" "$WORKER_SERVICE_NAME"');
+    expect(deploy).toContain("build_production");
   });
 });

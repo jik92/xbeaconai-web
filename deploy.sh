@@ -18,7 +18,7 @@ readonly LOCK_FILE="/var/lock/xbeaconai-web-deploy.lock"
 readonly API_HEALTH_URL="http://127.0.0.1:8787/api/health"
 readonly BUILD_SWAP_FILE="${BUILD_SWAP_FILE:-${DATA_DIR}/build.swap}"
 readonly BUILD_SWAP_SIZE_MB="${BUILD_SWAP_SIZE_MB:-2048}"
-readonly BUILD_NODE_OPTIONS="${BUILD_NODE_OPTIONS:---max-old-space-size=1536}"
+readonly BUILD_NODE_OPTIONS="${BUILD_NODE_OPTIONS:---max-old-space-size=1280}"
 readonly APP_ORIGIN="${APP_ORIGIN:-https://app.xbeaconai.com}"
 readonly API_ORIGIN="${API_ORIGIN:-https://api.xbeaconai.com}"
 readonly DIRECT_ORIGIN="${DIRECT_ORIGIN:-http://118.196.101.57:9000}"
@@ -136,6 +136,34 @@ ensure_build_capacity() {
     fi
 }
 
+build_production() {
+    local api_was_active=0
+    local worker_was_active=0
+    if systemctl is-active --quiet "$API_SERVICE_NAME"; then
+        api_was_active=1
+    fi
+    if systemctl is-active --quiet "$WORKER_SERVICE_NAME"; then
+        worker_was_active=1
+    fi
+    if (( api_was_active || worker_was_active )); then
+        log "暂停现有 API/Worker，为低内存生产构建释放内存..."
+        systemctl stop "$API_SERVICE_NAME" "$WORKER_SERVICE_NAME"
+    fi
+    if ! NODE_OPTIONS="${NODE_OPTIONS:-$BUILD_NODE_OPTIONS}" VITE_API_BASE_URL="$API_ORIGIN" bun run build; then
+        (( api_was_active )) && systemctl start "$API_SERVICE_NAME"
+        (( worker_was_active )) && systemctl start "$WORKER_SERVICE_NAME"
+        return 1
+    fi
+    if (( api_was_active )); then
+        systemctl start "$API_SERVICE_NAME"
+        wait_for_api
+    fi
+    if (( worker_was_active )); then
+        systemctl start "$WORKER_SERVICE_NAME"
+        wait_for_worker
+    fi
+}
+
 wait_for_api() {
     local attempt
     for attempt in $(seq 1 30); do
@@ -224,7 +252,7 @@ bun install --frozen-lockfile --registry="$NPM_REGISTRY"
 
 log "构建生产版本..."
 ensure_build_capacity
-NODE_OPTIONS="${NODE_OPTIONS:-$BUILD_NODE_OPTIONS}" VITE_API_BASE_URL="$API_ORIGIN" bun run build
+build_production
 
 log "配置 Redis、Bun API 和 BullMQ Worker..."
 ensure_runtime_environment
