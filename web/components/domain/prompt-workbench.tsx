@@ -7,6 +7,7 @@ export interface PromptReference {
   id: string;
   name: string;
   kind: "image" | "video" | "audio";
+  previewUrl?: string;
 }
 
 export function PromptWorkbench({
@@ -24,6 +25,7 @@ export function PromptWorkbench({
   controls,
   children,
   submitting = false,
+  submitLabel,
   onChooseAssets,
   onRemoveReference,
   onPromptChange,
@@ -44,6 +46,7 @@ export function PromptWorkbench({
   controls: ReactNode;
   children?: ReactNode;
   submitting?: boolean;
+  submitLabel?: string;
   onChooseAssets: (assets: AttachmentSelection[]) => void;
   onRemoveReference: (id: string) => void;
   onPromptChange: (value: string) => void;
@@ -67,8 +70,16 @@ export function PromptWorkbench({
           onSelect={onChooseAssets}
         />
         {references.map((reference) => (
-          <div className="ag-reference" key={reference.id}>
-            {reference.kind === "image" ? <FileImage /> : reference.kind === "video" ? <FileVideo /> : <FileAudio />}
+          <div className={`ag-reference ${reference.previewUrl ? "has-preview" : ""}`} key={reference.id}>
+            {reference.previewUrl && reference.kind === "image" ? (
+              <img src={reference.previewUrl} alt={reference.name} />
+            ) : reference.kind === "image" ? (
+              <FileImage />
+            ) : reference.kind === "video" ? (
+              <FileVideo />
+            ) : (
+              <FileAudio />
+            )}
             <span>
               <b>{reference.name}</b>
               <small>{reference.kind}</small>
@@ -105,6 +116,7 @@ export function PromptWorkbench({
         <div>{controls}</div>
         <button className="ag-send" aria-label="提交" disabled={submitting} onClick={onSubmit}>
           <ArrowUp />
+          {submitLabel && <span>{submitLabel}</span>}
         </button>
       </div>
       {children}

@@ -276,6 +276,13 @@
   width: 22px;
   color: #5a8ce5;
 }
+.ag-reference > img {
+  width: 40px;
+  height: 46px;
+  flex: none;
+  border-radius: 5px;
+  object-fit: cover;
+}
 .ag-reference > span {
   min-width: 0;
   flex: 1;
@@ -385,6 +392,9 @@
 }
 .ag-send svg {
   width: 17px;
+}
+.ag-send > span {
+  @apply text-xs;
 }
 .ag-manual-confirm {
   position: absolute;

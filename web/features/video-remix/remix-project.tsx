@@ -6,9 +6,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleCheck,
-  Clock3,
   Copy,
-  Download,
   FileText,
   History,
   ImageOff,
@@ -22,7 +20,7 @@ import {
   Video,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   composeRemixVideos,
   downloadAuthenticated,
@@ -43,7 +41,7 @@ import type { Job, SeedanceModelId } from "@/api/generated/types.gen";
 import { AttachmentPicker, type AttachmentSelection } from "@/components/domain/attachment-picker";
 import { AuthenticatedMedia } from "@/components/domain/authenticated-media";
 import { ImagePreview } from "@/components/domain/media-preview";
-import { type PromptReference, PromptWorkbench } from "@/components/domain/prompt-workbench";
+import { PromptWorkbench } from "@/components/domain/prompt-workbench";
 import type { ApiJobResult, LibraryAsset, LibraryProduct } from "@/entities/types";
 import type { CreationModelCapability } from "@/features/ai-creation/ai-creation-composer";
 import { fetchPortraits, type Portrait, portraitDisplayUrl } from "@/features/portrait-library/portrait-data";
@@ -1028,6 +1026,8 @@ export function RemixProject() {
   const [shotDrafts, setShotDrafts] = useState<Record<string, ShotGenerationDraft>>({});
   const [selectedShotAssets, setSelectedShotAssets] = useState<Record<string, string>>({});
   const [shotSelectionTouched, setShotSelectionTouched] = useState<Record<string, boolean>>({});
+  const [referencesExpanded, setReferencesExpanded] = useState(false);
+  const [submittedShotJobId, setSubmittedShotJobId] = useState("");
   const [draggingSourceId, setDraggingSourceId] = useState("");
   const [mode, setMode] = useState<"product" | "talking">("product");
   const [projectName, setProjectName] = useState("");
@@ -1061,8 +1061,10 @@ export function RemixProject() {
     queryKey: ["creation-capabilities"],
     queryFn: fetchCreationCapabilities,
   });
+  // 即使模型尚未通过可用性验证，也保留在校对工作台中展示；否则整个编辑器会被错误地替换成空态。
+  // 提交按钮仍会根据 enabled 禁用，后端也会做最终校验。
   const videoModels = (creationCapabilities?.models ?? []).filter(
-    (model): model is CreationModelCapability & { id: SeedanceModelId } => model.kind === "video" && model.enabled,
+    (model): model is CreationModelCapability & { id: SeedanceModelId } => model.kind === "video",
   );
   const defaultVideoModel = videoModels.find((model) => model.isDefault) ?? videoModels[0];
   const { data: shotJobs = [], refetch: refetchShotJobs } = useQuery({
@@ -1105,7 +1107,7 @@ export function RemixProject() {
                 },
               ]
             : [],
-          expanded: false,
+          expanded: true,
         };
         changed = true;
       }
@@ -1369,6 +1371,8 @@ export function RemixProject() {
     setShotDrafts({});
     setSelectedShotAssets({});
     setShotSelectionTouched({});
+    setReferencesExpanded(false);
+    setSubmittedShotJobId("");
     setDraggingSourceId("");
     setProjectName("");
     setDescription("");
@@ -1544,40 +1548,62 @@ export function RemixProject() {
   const activeShotRunning = activeShotJobs.find(
     (shotJob) => shotJob.status === "queued" || shotJob.status === "processing",
   );
-  const activeShotVersions = activeShotJobs.flatMap((shotJob) => {
-    if (shotJob.status !== "succeeded") return [];
-    const artifact = (shotJob.result as ApiJobResult | undefined)?.artifacts.find((item) =>
-      item.mimeType.startsWith("video/"),
-    );
-    return artifact ? [{ job: shotJob, artifact }] : [];
-  });
-  const activeSelectedAssetId = selectedShotAssets[sourceAssetId] ?? sourceAssetId;
-  const activeGeneratedVersion = activeShotVersions.find(({ artifact }) => artifact.id === activeSelectedAssetId);
-  const activeGeneratedSequence = activeGeneratedVersion
-    ? activeShotVersions.length - activeShotVersions.indexOf(activeGeneratedVersion)
-    : 0;
-  const activePreview = activeGeneratedVersion?.artifact ?? {
-    id: sourceAssetId,
-    name: fileName,
-    mimeType: activeSource?.mimeType || "video/mp4",
-    url: sourceAssetId ? `/api/assets/${sourceAssetId}/content` : undefined,
-  };
-  const promptReferences: PromptReference[] = activeSource
-    ? [
-        { id: activeSource.id, name: activeSource.name, kind: "video" },
-        ...(activeDraft?.references ?? []).map((reference) => ({
-          id: reference.id,
+  useEffect(() => {
+    if (!submittedShotJobId) return;
+    const submitted = shotJobs.find((shotJob) => shotJob.id === submittedShotJobId);
+    if (!submitted || submitted.status === "queued" || submitted.status === "processing") return;
+    setSubmittedShotJobId("");
+    if (submitted.status === "succeeded") {
+      setStage(4);
+      return;
+    }
+    if (submitted.status === "failed") setNotice(submitted.error?.message || "分镜视频生成失败");
+  }, [shotJobs, submittedShotJobId]);
+  const storyboardReferenceImages = useMemo(() => {
+    const images = [
+      ...(selectedProduct?.images ?? []).map((image) => ({
+        id: `product:${image.id}`,
+        name: image.name,
+        url: image.url || "",
+        mimeType: image.mimeType,
+        source: "product" as const,
+      })),
+      ...selectedPortraits.map((portrait) => ({
+        id: `portrait:${portrait.index}`,
+        name: portrait.name,
+        url: portrait.source_url,
+        mimeType: "image/*",
+        source: "portrait" as const,
+      })),
+      ...(activeDraft?.references ?? [])
+        .filter((reference) => reference.mimeType.startsWith("image/"))
+        .map((reference) => ({
+          id: `attachment:${reference.id}`,
           name: reference.name,
-          kind: reference.mimeType.startsWith("image/") ? ("image" as const) : ("audio" as const),
+          url: reference.url || "",
+          mimeType: reference.mimeType,
+          source: "attachment" as const,
         })),
-      ]
-    : [];
+    ];
+    return [...new Map(images.map((image) => [image.url, image])).values()];
+  }, [activeDraft?.references, selectedPortraits, selectedProduct]);
   const patchShotDraft = (update: Partial<ShotGenerationDraft>) => {
     if (!sourceAssetId || !activeDraft) return;
     setShotDrafts((current) => ({
       ...current,
       [sourceAssetId]: { ...current[sourceAssetId], ...update },
     }));
+  };
+  const appendShotReferences = (assets: AttachmentSelection[]) => {
+    if (!activeDraft) return;
+    const merged = [...activeDraft.references];
+    for (const asset of assets) {
+      const kind = asset.mimeType.split("/")[0];
+      const existingIndex = merged.findIndex((item) => item.mimeType.startsWith(`${kind}/`));
+      if (existingIndex >= 0) merged.splice(existingIndex, 1, asset);
+      else merged.push(asset);
+    }
+    patchShotDraft({ references: merged.slice(0, 2) });
   };
   const submitShotGeneration = async () => {
     if (!job?.id || !sourceAssetId || !activeDraft || activeShotRunning) return;
@@ -1587,7 +1613,7 @@ export function RemixProject() {
     }
     setNotice("");
     try {
-      await generateRemixShot({
+      const created = await generateRemixShot({
         sourceJobId: job.id,
         sourceAssetId,
         prompt,
@@ -1599,8 +1625,9 @@ export function RemixProject() {
         referenceAssetIds: activeDraft.references.map((reference) => reference.id),
         generateAudio: true,
       });
+      setSubmittedShotJobId(created.id);
       setShotSelectionTouched((current) => ({ ...current, [sourceAssetId]: false }));
-      setNotice("当前分镜已提交生成，可继续处理其他分镜");
+      setNotice("分镜视频已提交生成，完成后将自动进入合并成片");
       await refetchShotJobs();
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "分镜生成任务提交失败");
@@ -1764,6 +1791,7 @@ export function RemixProject() {
                     onClick={() => {
                       setActiveSourceId(source.id);
                       setEditing(false);
+                      setReferencesExpanded(false);
                     }}
                   >
                     <span className="source-mini">
@@ -1862,235 +1890,146 @@ export function RemixProject() {
           )}
           {stage === 3 && (
             <div className="storyboard-proof">
-              <article className="result-card">
-                <header>
-                  <b>
-                    <Video />
-                    结果预览 <i>{activeGeneratedVersion ? `v${activeGeneratedSequence}` : "原片"}</i>
-                  </b>
-                  <button disabled={!activeShotVersions.length}>
-                    <Clock3 />
-                    版本历史（{activeShotVersions.length + 1}）
-                  </button>
-                </header>
-                <div className="result-main">
-                  <div className="result-video">
-                    {activePreview.url ? (
-                      <AuthenticatedMedia
-                        key={activePreview.id}
-                        url={activePreview.url}
-                        mimeType={activePreview.mimeType}
-                        alt={activePreview.name}
-                        loadingText="正在载入分镜视频…"
-                        errorText="分镜视频加载失败"
-                      />
-                    ) : (
-                      <div className="result-media-empty">
-                        <Video />
-                        <span>未选择分镜视频</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="result-info">
-                    <h3>{activeGeneratedVersion ? activeGeneratedVersion.job.videoModel : "原始片源"}</h3>
-                    <p>
-                      {activeGeneratedVersion
-                        ? new Date(activeGeneratedVersion.job.createdAt).toLocaleString()
-                        : "未生成时将使用原始片源参与合成"}
-                    </p>
-                    <div className="result-assets">
-                      {selectedProduct?.images.slice(0, 4).map((image) => (
-                        <span className="result-asset" key={image.id}>
-                          <AuthenticatedMedia
-                            url={image.url}
-                            mimeType={image.mimeType}
-                            alt={image.name}
-                            loadingText="加载中…"
-                            errorText="加载失败"
-                          />
-                        </span>
-                      ))}
-                      {selectedPortraits.map((portrait) => (
-                        <span className="result-asset" key={portrait.key}>
-                          {portrait.reference.type === "custom" ? (
-                            <AuthenticatedMedia url={portrait.display_url} mimeType="image/jpeg" alt={portrait.name} />
-                          ) : (
-                            <PublicPreviewImage url={portrait.display_url} alt={portrait.name} />
-                          )}
-                        </span>
-                      ))}
-                      {!selectedProduct?.images.length && !selectedPortraits.length && (
-                        <span className="result-assets-empty">未选择图片素材</span>
-                      )}
-                    </div>
-                    <div className="result-meta">
-                      <i>{activeDraft?.duration ?? 5}秒</i>
-                      <i>{activeDraft?.ratio ?? "9:16"}</i>
-                      <i>{activeDraft?.resolution ?? "720p"}</i>
-                      <i>{activeGeneratedVersion?.artifact.executionMode ?? "原片"}</i>
-                    </div>
-                    <b className="creative-title">创意描述</b>
-                    <pre>{prompt}</pre>
-                    <div className="result-actions">
-                      <button onClick={() => setNotice("字幕已擦除")}>
-                        <Pencil />
-                        擦除字幕
-                      </button>
-                      <button onClick={() => setStage(2)}>
-                        <Pencil />
-                        重新编辑
-                      </button>
-                      <button
-                        disabled={!activeGeneratedVersion?.artifact.url}
-                        onClick={() => {
-                          if (activeGeneratedVersion?.artifact.url)
-                            void downloadAuthenticated(
-                              activeGeneratedVersion.artifact.url,
-                              activeGeneratedVersion.artifact.name,
-                            );
-                        }}
-                      >
-                        <Download />
-                        下载
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </article>
-              <div className="shot-version-strip">
-                <button
-                  className={activeSelectedAssetId === sourceAssetId ? "active" : ""}
-                  onClick={() => {
-                    setSelectedShotAssets((current) => ({ ...current, [sourceAssetId]: sourceAssetId }));
-                    setShotSelectionTouched((current) => ({ ...current, [sourceAssetId]: true }));
-                  }}
-                >
-                  <b>原片</b>
-                  <small>用于合成</small>
-                </button>
-                {activeShotVersions.map(({ artifact }, index) => (
-                  <button
-                    key={artifact.id}
-                    className={activeSelectedAssetId === artifact.id ? "active" : ""}
-                    onClick={() => {
-                      setSelectedShotAssets((current) => ({ ...current, [sourceAssetId]: artifact.id }));
-                      setShotSelectionTouched((current) => ({ ...current, [sourceAssetId]: true }));
-                    }}
-                  >
-                    <b>生成 v{activeShotVersions.length - index}</b>
-                    <small>{artifact.executionMode}</small>
-                  </button>
-                ))}
-                {activeShotRunning && (
-                  <span>
-                    <LoaderCircle className="animate-spin" />
-                    {activeShotRunning.stage} {activeShotRunning.progress}%
-                  </span>
-                )}
-                {activeShotJobs[0]?.status === "failed" && (
-                  <span className="failed">{activeShotJobs[0].error?.message}</span>
-                )}
-              </div>
               {activeDraft && (
-                <PromptWorkbench
-                  embedded
-                  expanded={activeDraft.expanded}
-                  references={promptReferences}
-                  lockedReferenceIds={sourceAssetId ? [sourceAssetId] : []}
-                  prompt={prompt}
-                  placeholder="描述当前镜头的动作、主体、场景与运镜"
-                  inputLabel="当前分镜生成提示词"
-                  accept="image/*,audio/*"
-                  multiple
-                  submitting={Boolean(activeShotRunning)}
-                  onChooseAssets={(assets) => {
-                    const merged = [...activeDraft.references];
-                    for (const asset of assets) {
-                      const kind = asset.mimeType.split("/")[0];
-                      const existingIndex = merged.findIndex((item) => item.mimeType.startsWith(`${kind}/`));
-                      if (existingIndex >= 0) merged.splice(existingIndex, 1, asset);
-                      else merged.push(asset);
+                <div className="storyboard-editor">
+                  <div
+                    className={`storyboard-reference-cluster ${referencesExpanded ? "expanded" : ""}`}
+                    aria-label="当前参考图片"
+                  >
+                    {storyboardReferenceImages.map((reference, index) => (
+                      <span
+                        className="storyboard-reference-image"
+                        key={reference.id}
+                        title={reference.name}
+                        style={{ "--reference-index": index } as CSSProperties}
+                      >
+                        {reference.source === "portrait" ? (
+                          <PublicPreviewImage url={reference.url} alt={reference.name} />
+                        ) : (
+                          <AuthenticatedMedia
+                            url={reference.url}
+                            mimeType={reference.mimeType}
+                            alt={reference.name}
+                            previewable={false}
+                            loadingText=""
+                            errorText="图片加载失败"
+                          />
+                        )}
+                      </span>
+                    ))}
+                    <AttachmentPicker
+                      accept="image/*,audio/*"
+                      multiple
+                      trigger={(open) => (
+                        <button
+                          type="button"
+                          className="storyboard-add-reference"
+                          aria-label="添加参考素材"
+                          style={{ "--reference-index": storyboardReferenceImages.length } as CSSProperties}
+                          onClick={open}
+                        >
+                          <Plus />
+                        </button>
+                      )}
+                      onSelect={appendShotReferences}
+                    />
+                    <button
+                      type="button"
+                      className="storyboard-reference-toggle"
+                      aria-label={referencesExpanded ? "收起参考图片" : "展开参考图片"}
+                      onClick={() => setReferencesExpanded((current) => !current)}
+                      style={{ "--reference-index": storyboardReferenceImages.length + 1 } as CSSProperties}
+                    >
+                      {referencesExpanded ? <ChevronLeft /> : <ChevronRight />}
+                    </button>
+                  </div>
+                  <PromptWorkbench
+                    embedded
+                    expanded={activeDraft.expanded}
+                    references={[]}
+                    lockedReferenceIds={[]}
+                    prompt={prompt}
+                    placeholder="描述当前镜头的动作、主体、场景与运镜"
+                    inputLabel="当前分镜生成提示词"
+                    accept="image/*,audio/*"
+                    multiple
+                    submitting={Boolean(activeShotRunning) || !activeModel?.enabled}
+                    submitLabel="生成视频"
+                    onChooseAssets={appendShotReferences}
+                    onRemoveReference={(id) =>
+                      patchShotDraft({ references: activeDraft.references.filter((reference) => reference.id !== id) })
                     }
-                    patchShotDraft({ references: merged.slice(0, 2) });
-                  }}
-                  onRemoveReference={(id) =>
-                    patchShotDraft({ references: activeDraft.references.filter((reference) => reference.id !== id) })
-                  }
-                  onPromptChange={(value) => {
-                    setPrompt(value);
-                    setActivePromptVersionId("");
-                  }}
-                  onExpandedChange={(expanded) => patchShotDraft({ expanded })}
-                  onSubmit={() => void submitShotGeneration()}
-                  controls={
-                    <>
-                      <select
-                        aria-label="视频模型"
-                        value={activeDraft.modelId}
-                        onChange={(event) => {
-                          const model = videoModels.find((item) => item.id === event.target.value);
-                          if (!model) return;
-                          patchShotDraft({
-                            modelId: model.id,
-                            ratio: model.supportedRatios.includes(activeDraft.ratio)
-                              ? activeDraft.ratio
-                              : model.supportedRatios[0],
-                            resolution: model.supportedResolutions.includes(activeDraft.resolution)
-                              ? activeDraft.resolution
-                              : model.supportedResolutions[0],
-                            duration: model.supportedDurations.includes(activeDraft.duration)
-                              ? activeDraft.duration
-                              : model.supportedDurations[0],
-                            referenceMode: model.referenceModes[0] || "omni",
-                          });
-                        }}
-                      >
-                        {videoModels.map((model) => (
-                          <option key={model.id} value={model.id}>
-                            {model.displayName}
-                          </option>
-                        ))}
-                      </select>
-                      <select
-                        aria-label="画面比例"
-                        value={activeDraft.ratio}
-                        onChange={(event) => patchShotDraft({ ratio: event.target.value })}
-                      >
-                        {(activeModel?.supportedRatios ?? []).map((value) => (
-                          <option key={value}>{value}</option>
-                        ))}
-                      </select>
-                      <select
-                        aria-label="清晰度"
-                        value={activeDraft.resolution}
-                        onChange={(event) => patchShotDraft({ resolution: event.target.value })}
-                      >
-                        {(activeModel?.supportedResolutions ?? []).map((value) => (
-                          <option key={value}>{value}</option>
-                        ))}
-                      </select>
-                      <select
-                        aria-label="视频时长"
-                        value={activeDraft.duration}
-                        onChange={(event) => patchShotDraft({ duration: Number(event.target.value) })}
-                      >
-                        {(activeModel?.supportedDurations ?? []).map((value) => (
-                          <option key={value} value={value}>
-                            {value}秒
-                          </option>
-                        ))}
-                      </select>
-                    </>
-                  }
-                />
+                    onPromptChange={(value) => {
+                      setPrompt(value);
+                      setActivePromptVersionId("");
+                    }}
+                    onExpandedChange={(expanded) => patchShotDraft({ expanded })}
+                    onSubmit={() => void submitShotGeneration()}
+                    controls={
+                      <>
+                        <select
+                          aria-label="视频模型"
+                          value={activeDraft.modelId}
+                          onChange={(event) => {
+                            const model = videoModels.find((item) => item.id === event.target.value);
+                            if (!model) return;
+                            patchShotDraft({
+                              modelId: model.id,
+                              ratio: model.supportedRatios.includes(activeDraft.ratio)
+                                ? activeDraft.ratio
+                                : model.supportedRatios[0],
+                              resolution: model.supportedResolutions.includes(activeDraft.resolution)
+                                ? activeDraft.resolution
+                                : model.supportedResolutions[0],
+                              duration: model.supportedDurations.includes(activeDraft.duration)
+                                ? activeDraft.duration
+                                : model.supportedDurations[0],
+                              referenceMode: model.referenceModes[0] || "omni",
+                            });
+                          }}
+                        >
+                          {videoModels.map((model) => (
+                            <option key={model.id} value={model.id}>
+                              {model.displayName}
+                              {model.enabled ? "" : "（未验证）"}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          aria-label="画面比例"
+                          value={activeDraft.ratio}
+                          onChange={(event) => patchShotDraft({ ratio: event.target.value })}
+                        >
+                          {(activeModel?.supportedRatios ?? []).map((value) => (
+                            <option key={value}>{value}</option>
+                          ))}
+                        </select>
+                        <select
+                          aria-label="清晰度"
+                          value={activeDraft.resolution}
+                          onChange={(event) => patchShotDraft({ resolution: event.target.value })}
+                        >
+                          {(activeModel?.supportedResolutions ?? []).map((value) => (
+                            <option key={value}>{value}</option>
+                          ))}
+                        </select>
+                        <select
+                          aria-label="视频时长"
+                          value={activeDraft.duration}
+                          onChange={(event) => patchShotDraft({ duration: Number(event.target.value) })}
+                        >
+                          {(activeModel?.supportedDurations ?? []).map((value) => (
+                            <option key={value} value={value}>
+                              {value}秒
+                            </option>
+                          ))}
+                        </select>
+                      </>
+                    }
+                  />
+                </div>
               )}
               {!activeDraft && <div className="shot-generation-unavailable">当前没有已启用的视频生成模型</div>}
-              <footer className="stage-actions shot-stage-actions">
-                <span>未生成的镜头将直接使用原始片源</span>
-                <button className="primary" onClick={() => setStage(4)}>
-                  下一步
-                </button>
-              </footer>
             </div>
           )}
           {stage === 4 && (
