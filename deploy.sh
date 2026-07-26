@@ -49,6 +49,15 @@ upsert_env() {
     rm -f "$temporary"
 }
 
+remove_env() {
+    local key="$1"
+    local temporary
+    temporary="$(mktemp)"
+    awk -v key="$key" '$0 !~ "^" key "=" { print }' "$ENV_FILE" >"$temporary"
+    install -m 0600 "$temporary" "$ENV_FILE"
+    rm -f "$temporary"
+}
+
 ensure_runtime_environment() {
     install -d -m 0700 "$DATA_DIR"
     if [[ ! -f "$ENV_FILE" ]]; then
@@ -69,8 +78,11 @@ ensure_runtime_environment() {
     upsert_env "REDIS_QUEUE_NAME" "yaozuo-jobs"
     upsert_env "TOS_REGION" "cn-shanghai"
     upsert_env "TOS_BUCKET" "xbeacon-shanghai"
-    upsert_env "TOS_INTERNAL_ENDPOINT" "tos-cn-shanghai.ivolces.com"
+    upsert_env "TOS_SERVER_ENDPOINT" "tos-cn-shanghai.ivolces.com"
     upsert_env "TOS_PUBLIC_ENDPOINT" "tos-cn-shanghai.volces.com"
+    upsert_env "TOS_CORS_ORIGINS" "$DIRECT_ORIGIN"
+    remove_env "TOS_ENDPOINT"
+    remove_env "TOS_INTERNAL_ENDPOINT"
     upsert_env "NETWORK_WORKER_CONCURRENCY" "${NETWORK_WORKER_CONCURRENCY:-40}"
     upsert_env "FFMPEG_WORKER_CONCURRENCY" "${FFMPEG_WORKER_CONCURRENCY:-2}"
 }
@@ -260,6 +272,9 @@ fi
 log "使用国内镜像安装依赖..."
 bun install --frozen-lockfile --registry="$NPM_REGISTRY"
 
+log "写入生产运行环境..."
+ensure_runtime_environment
+
 ensure_playwright_runtime
 
 log "构建生产版本..."
@@ -267,7 +282,6 @@ ensure_build_capacity
 build_production
 
 log "配置 Redis、Bun API 和 BullMQ Worker..."
-ensure_runtime_environment
 ensure_redis
 systemctl stop "$API_SERVICE_NAME" "$WORKER_SERVICE_NAME" 2>/dev/null || true
 log "检查并备份旧版 SQLite 数据库..."

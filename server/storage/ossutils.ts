@@ -69,7 +69,7 @@ class WeightedUploadGate {
 const uploadGate = new WeightedUploadGate();
 
 export class OssUtils {
-  private internalClient?: TosClient;
+  private serverClient?: TosClient;
   private publicClient?: TosClient;
   private credentialFingerprint = "";
 
@@ -85,28 +85,28 @@ export class OssUtils {
     return Boolean(credentials.accessKeyId && credentials.accessKeySecret);
   }
 
-  private ready(kind: "internal" | "public" = "internal") {
+  private ready(kind: "server" | "public" = "server") {
     const credentials = this.credentials();
     if (!credentials.accessKeyId || !credentials.accessKeySecret) throw new Error("TOS_NOT_CONFIGURED");
     const fingerprint = `${credentials.accessKeyId}\0${credentials.accessKeySecret}`;
     if (fingerprint !== this.credentialFingerprint) {
-      this.internalClient = undefined;
+      this.serverClient = undefined;
       this.publicClient = undefined;
       this.credentialFingerprint = fingerprint;
     }
-    const existing = kind === "internal" ? this.internalClient : this.publicClient;
+    const existing = kind === "server" ? this.serverClient : this.publicClient;
     if (existing) return existing;
     const client = new TosClient({
       ...credentials,
       region: env.tos.region,
-      endpoint: kind === "internal" ? env.tos.internalEndpoint : env.tos.publicEndpoint,
+      endpoint: kind === "server" ? env.tos.serverEndpoint : env.tos.publicEndpoint,
       bucket: env.tos.bucket,
       secure: true,
       requestTimeout: 10 * 60_000,
       connectionTimeout: 15_000,
       maxRetryCount: 2,
     });
-    if (kind === "internal") this.internalClient = client;
+    if (kind === "server") this.serverClient = client;
     else this.publicClient = client;
     return client;
   }

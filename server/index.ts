@@ -1,7 +1,10 @@
 import { resolve, sep } from "node:path";
 import { APP_CONFIG } from "../web/app/config";
 import { app } from "./app";
+import { refreshTosDoctorForStartup } from "./byok/tos-startup-doctor";
 import { env } from "./env";
+
+await refreshTosDoctorForStartup("api");
 
 console.log(`${APP_CONFIG.projectName} API ready at http://${env.host}:${env.port}`);
 console.log(`OpenAPI: http://${env.host}:${env.port}/openapi.json`);

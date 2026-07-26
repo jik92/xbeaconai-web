@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import TosClient from "@volcengine/tos-sdk";
 import { env } from "../env";
 import { AihubmixClient } from "../providers/aihubmix";
@@ -33,6 +34,111 @@ export interface CredentialDoctorProvider {
 class InvalidCredentialError extends Error {}
 class DoctorTimeoutError extends Error {}
 export const PROVIDER_DOCTOR_TIMEOUT_MS = 30_000;
+
+export interface TosDoctorConfig {
+  region: string;
+  bucket: string;
+  serverEndpoint: string;
+  publicEndpoint: string;
+  corsOrigins: string[];
+}
+
+export interface TosDoctorClient {
+  headBucket: (bucket?: string) => Promise<unknown>;
+  getBucketCORS: (input: { bucket: string }) => Promise<{
+    data: {
+      CORSRules?: Array<{
+        AllowedOrigins: string[];
+        AllowedMethods: string[];
+      }>;
+    };
+  }>;
+  getPreSignedUrl: (input: { bucket: string; key: string; method: "GET"; expires: number }) => string;
+}
+export type TosDoctorClientFactory = (values: CredentialValues, endpoint: string) => TosDoctorClient;
+
+export function tosDoctorConfigurationFingerprint(config: TosDoctorConfig = env.tos) {
+  return createHash("sha256")
+    .update(
+      JSON.stringify({
+        ...config,
+        corsOrigins: [...config.corsOrigins].sort(),
+      }),
+    )
+    .digest("hex");
+}
+
+export function createTosDoctorProvider(
+  config: TosDoctorConfig = env.tos,
+  createClient: TosDoctorClientFactory = (values, endpoint) =>
+    new TosClient({
+      accessKeyId: values.TOS_ACCESS_KEY_ID ?? "",
+      accessKeySecret: values.TOS_SECRET_ACCESS_KEY ?? "",
+      region: config.region,
+      endpoint,
+      bucket: config.bucket,
+      secure: true,
+      connectionTimeout: 8_000,
+      requestTimeout: 8_000,
+      maxRetryCount: 0,
+    }),
+): CredentialDoctorProvider {
+  const access = async (operation: () => Promise<unknown>, label: string) => {
+    try {
+      await operation();
+    } catch (error) {
+      if (error instanceof Error && /timeout|timed? out/i.test(`${error.name} ${error.message}`))
+        throw new DoctorTimeoutError(`${label}检测超时`);
+      throw new InvalidCredentialError(`${label}无法访问 Bucket ${config.bucket}`);
+    }
+  };
+  return {
+    providerId: "tos",
+    provider: "火山 TOS",
+    credentials: ["TOS_ACCESS_KEY_ID", "TOS_SECRET_ACCESS_KEY"],
+    probe: async (values) => {
+      const serverClient = createClient(values, config.serverEndpoint);
+      const publicClient = createClient(values, config.publicEndpoint);
+      const corsTask = (async () => {
+        try {
+          return (await serverClient.getBucketCORS({ bucket: config.bucket })).data.CORSRules ?? [];
+        } catch (error) {
+          if (error instanceof Error && /timeout|timed? out/i.test(`${error.name} ${error.message}`))
+            throw new DoctorTimeoutError("Bucket CORS 检测超时");
+          throw new InvalidCredentialError("无法读取 Bucket CORS 配置");
+        }
+      })();
+      const [, , rules] = await Promise.all([
+        access(() => serverClient.headBucket(config.bucket), "服务端 Endpoint "),
+        config.publicEndpoint === config.serverEndpoint
+          ? Promise.resolve()
+          : access(() => publicClient.headBucket(config.bucket), "公网 Endpoint "),
+        corsTask,
+      ]);
+      const requiredMethods = ["GET", "HEAD", "PUT"];
+      const missingOrigins = config.corsOrigins.filter(
+        (origin) =>
+          !rules.some(
+            (rule) =>
+              rule.AllowedOrigins.includes(origin) &&
+              requiredMethods.every((method) => (rule.AllowedMethods as string[]).includes(method)),
+          ),
+      );
+      if (missingOrigins.length)
+        throw new InvalidCredentialError(`Bucket CORS 缺少 Origin 或 GET/HEAD/PUT：${missingOrigins.join("、")}`);
+      const signedUrl = publicClient.getPreSignedUrl({
+        bucket: config.bucket,
+        key: "__credential-doctor__/public-route-check",
+        method: "GET",
+        expires: 60,
+      });
+      const expectedHost = `${config.bucket}.${config.publicEndpoint}`;
+      if (new URL(signedUrl).hostname !== expectedHost)
+        throw new InvalidCredentialError(`公网签名 URL 未使用 ${expectedHost}`);
+      return `Bucket ${config.bucket} 可用（${config.region}，Server=${config.serverEndpoint}，Public=${config.publicEndpoint}）`;
+    },
+  };
+}
 
 export function validateAihubmixBaseUrl(value: string) {
   try {
@@ -147,32 +253,7 @@ export const activeCredentialDoctorProviders: CredentialDoctorProvider[] = [
   },
   volcSpeechDoctorProvider,
   qwenAudioDoctorProvider,
-  {
-    providerId: "tos",
-    provider: "火山 TOS",
-    credentials: ["TOS_ACCESS_KEY_ID", "TOS_SECRET_ACCESS_KEY"],
-    probe: async (values) => {
-      const client = new TosClient({
-        accessKeyId: values.TOS_ACCESS_KEY_ID ?? "",
-        accessKeySecret: values.TOS_SECRET_ACCESS_KEY ?? "",
-        region: env.tos.region,
-        endpoint: env.tos.internalEndpoint,
-        bucket: env.tos.bucket,
-        secure: true,
-        connectionTimeout: 8_000,
-        requestTimeout: 8_000,
-        maxRetryCount: 0,
-      });
-      try {
-        await client.headBucket(env.tos.bucket);
-      } catch (error) {
-        if (error instanceof Error && /timeout|timed? out/i.test(`${error.name} ${error.message}`))
-          throw new DoctorTimeoutError("检测超时");
-        throw new InvalidCredentialError("无法访问配置的 TOS Bucket");
-      }
-      return "凭证与 Bucket 访问权限可用";
-    },
-  },
+  createTosDoctorProvider(),
   {
     providerId: "mediakit",
     provider: "AI MediaKit",
@@ -219,6 +300,14 @@ export class CredentialDoctor {
     const results = await Promise.all(this.providers.map((provider) => this.check(provider)));
     this.persistResults(results);
     return results;
+  }
+
+  async runProvider(providerId: ProviderId): Promise<CredentialDoctorResult> {
+    const provider = this.providers.find((candidate) => candidate.providerId === providerId);
+    if (!provider) throw new Error(`PROVIDER_DOCTOR_NOT_FOUND:${providerId}`);
+    const result = await this.check(provider);
+    this.persistResults([result]);
+    return result;
   }
 
   private async check(provider: CredentialDoctorProvider): Promise<CredentialDoctorResult> {

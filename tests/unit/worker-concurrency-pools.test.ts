@@ -57,6 +57,17 @@ describe("worker concurrency pools", () => {
     expect(deploy).toContain(`upsert_env "FFMPEG_WORKER_CONCURRENCY" "\${FFMPEG_WORKER_CONCURRENCY:-2}"`);
   });
 
+  test("writes strict TOS production settings before a build can restart services", async () => {
+    const deploy = await Bun.file("deploy.sh").text();
+    const runtimeEnvironment = deploy.lastIndexOf("\nensure_runtime_environment\n");
+    const build = deploy.lastIndexOf("\nbuild_production\n");
+    expect(runtimeEnvironment).toBeGreaterThan(deploy.indexOf("bun install --frozen-lockfile"));
+    expect(runtimeEnvironment).toBeLessThan(build);
+    expect(deploy).toContain('upsert_env "TOS_SERVER_ENDPOINT" "tos-cn-shanghai.ivolces.com"');
+    expect(deploy).toContain('upsert_env "TOS_PUBLIC_ENDPOINT" "tos-cn-shanghai.volces.com"');
+    expect(deploy).toContain('upsert_env "TOS_CORS_ORIGINS" "$DIRECT_ORIGIN"');
+  });
+
   test("provisions build swap before running TypeScript on low-memory hosts", async () => {
     const deploy = await Bun.file("deploy.sh").text();
     expect(deploy).toContain(`readonly BUILD_SWAP_SIZE_MB="\${BUILD_SWAP_SIZE_MB:-2048}"`);

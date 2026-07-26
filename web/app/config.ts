@@ -51,9 +51,9 @@ export const APP_CONFIG = {
       pollTimeoutMs: 180_000,
     },
     tos: {
-      region: "cn-beijing",
-      endpoint: "tos-cn-beijing.volces.com",
-      bucket: "xbeacon",
+      region: "cn-shanghai",
+      endpoint: "tos-cn-shanghai.volces.com",
+      bucket: "xbeacon-shanghai",
     },
     volcSms: {
       smsAccount: "8c444a41",

@@ -3,6 +3,7 @@ import IORedis from "ioredis";
 import { AccountStore } from "../server/accounts/account-store";
 import { AdScriptStore } from "../server/ad-script/ad-script-store";
 import { ProviderGenerationAuditStore } from "../server/audit/provider-generation-audit-store";
+import { refreshTosDoctorForStartup } from "../server/byok/tos-startup-doctor";
 import { env } from "../server/env";
 import { SqliteJobStore } from "../server/jobs/sqlite-job-store";
 import { CustomPortraitStore } from "../server/portraits/custom-portrait-store";
@@ -12,6 +13,8 @@ import { type ExecuteJobPayload, executeJobName, executeJobOptions, jobQueueName
 import { JobProcessor } from "./job-processor";
 import { safelySyncProviderGenerationAudits } from "./jobs/provider-audit";
 import { createWorkerRedisConnection } from "./redis";
+
+await refreshTosDoctorForStartup("worker");
 
 const store = new SqliteJobStore();
 const accounts = new AccountStore();

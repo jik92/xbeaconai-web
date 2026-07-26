@@ -16,20 +16,61 @@ export function resolveWorkerConcurrencies(input: { network?: string; ffmpeg?: s
   };
 }
 export function resolveTosConfig(input: {
+  isProduction: boolean;
   region?: string;
   bucket?: string;
-  endpoint?: string;
-  internalEndpoint?: string;
+  serverEndpoint?: string;
   publicEndpoint?: string;
+  corsOrigins?: string;
 }) {
   const defaults = APP_CONFIG.providerDefaults.tos;
-  const legacyEndpoint = input.endpoint?.trim();
-  return {
+  const requiredProductionValues = {
+    TOS_REGION: input.region?.trim(),
+    TOS_BUCKET: input.bucket?.trim(),
+    TOS_SERVER_ENDPOINT: input.serverEndpoint?.trim(),
+    TOS_PUBLIC_ENDPOINT: input.publicEndpoint?.trim(),
+    TOS_CORS_ORIGINS: input.corsOrigins?.trim(),
+  };
+  if (input.isProduction) {
+    const missing = Object.entries(requiredProductionValues)
+      .filter(([, value]) => !value)
+      .map(([name]) => name);
+    if (missing.length) throw new Error(`生产启动必须配置 ${missing.join("、")}`);
+  }
+  const localCorsOrigins = [
+    "http://127.0.0.1:5173",
+    "http://localhost:5173",
+    "http://127.0.0.1:4173",
+    "http://localhost:4173",
+  ];
+  const config = {
     region: input.region?.trim() || defaults.region,
     bucket: input.bucket?.trim() || defaults.bucket,
-    internalEndpoint: input.internalEndpoint?.trim() || legacyEndpoint || defaults.endpoint,
-    publicEndpoint: input.publicEndpoint?.trim() || legacyEndpoint || defaults.endpoint,
+    serverEndpoint: input.serverEndpoint?.trim() || defaults.endpoint,
+    publicEndpoint: input.publicEndpoint?.trim() || defaults.endpoint,
+    corsOrigins: [
+      ...new Set(
+        input.corsOrigins
+          ? input.corsOrigins
+              .split(",")
+              .map((origin) => origin.trim())
+              .filter(Boolean)
+          : localCorsOrigins,
+      ),
+    ],
   };
+  if (!config.corsOrigins.length) throw new Error("TOS_CORS_ORIGINS 至少需要一个 Origin");
+  const expectedPublicEndpoint = `tos-${config.region}.volces.com`;
+  const expectedServerEndpoint = input.isProduction ? `tos-${config.region}.ivolces.com` : expectedPublicEndpoint;
+  if (config.serverEndpoint !== expectedServerEndpoint)
+    throw new Error(
+      input.isProduction
+        ? `生产 TOS_SERVER_ENDPOINT 必须是 ${expectedServerEndpoint}`
+        : `本地 TOS_SERVER_ENDPOINT 必须是 ${expectedServerEndpoint}`,
+    );
+  if (config.publicEndpoint !== expectedPublicEndpoint)
+    throw new Error(`TOS_PUBLIC_ENDPOINT 必须是 ${expectedPublicEndpoint}`);
+  return config;
 }
 const workerConcurrencies = resolveWorkerConcurrencies({
   network: process.env.NETWORK_WORKER_CONCURRENCY,
@@ -85,11 +126,12 @@ export const env = {
     pollTimeoutMs: Math.max(30_000, Number(process.env.MEDIAKIT_POLL_TIMEOUT_MS ?? 30 * 60_000)),
   },
   tos: resolveTosConfig({
+    isProduction: process.env.NODE_ENV === "production",
     region: process.env.TOS_REGION,
     bucket: process.env.TOS_BUCKET,
-    endpoint: process.env.TOS_ENDPOINT,
-    internalEndpoint: process.env.TOS_INTERNAL_ENDPOINT,
+    serverEndpoint: process.env.TOS_SERVER_ENDPOINT,
     publicEndpoint: process.env.TOS_PUBLIC_ENDPOINT,
+    corsOrigins: process.env.TOS_CORS_ORIGINS,
   }),
   jwtSecret: process.env.JWT_SECRET ?? generatedJwtSecret,
   authRateLimitMax: Number(process.env.AUTH_RATE_LIMIT_MAX ?? 12),

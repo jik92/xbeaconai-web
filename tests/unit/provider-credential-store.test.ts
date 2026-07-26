@@ -136,6 +136,38 @@ describe("ProviderCredentialStore", () => {
     reopened.close();
   });
 
+  test("invalidates a persisted Doctor result when its runtime configuration changes", () => {
+    const store = new ProviderCredentialStore(temporaryDatabase("byok-doctor-context-"), masterKey);
+    store.saveChecks([
+      {
+        providerId: "tos",
+        provider: "火山 TOS",
+        status: "available",
+        message: "鉴权通过",
+        latencyMs: 12,
+        checkedAt: "2026-07-27T00:00:00.000Z",
+      },
+    ]);
+
+    expect(store.ensureProviderCheckContext("tos", "shanghai-public-v1")).toBe(true);
+    expect(store.isProviderVerified("tos")).toBe(false);
+    store.saveChecks([
+      {
+        providerId: "tos",
+        provider: "火山 TOS",
+        status: "available",
+        message: "上海公网与内网可用",
+        latencyMs: 8,
+        checkedAt: "2026-07-27T00:01:00.000Z",
+      },
+    ]);
+    expect(store.ensureProviderCheckContext("tos", "shanghai-public-v1")).toBe(false);
+    expect(store.isProviderVerified("tos")).toBe(true);
+    expect(store.ensureProviderCheckContext("tos", "shanghai-intranet-v2")).toBe(true);
+    expect(store.isProviderVerified("tos")).toBe(false);
+    store.close();
+  });
+
   test("imports the legacy env keys without printing secret values", async () => {
     const path = temporaryDatabase("byok-import-");
     const directory = join(path, "..");

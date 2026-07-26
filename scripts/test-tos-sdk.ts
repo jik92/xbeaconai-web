@@ -13,7 +13,7 @@ await mkdir(artifactsDir, { recursive: true });
 const sha256 = (bytes: Uint8Array) => new Bun.CryptoHasher("sha256").update(bytes).digest("hex");
 const evidence: Record<string, unknown> = {
   region: env.tos.region,
-  internalEndpoint: env.tos.internalEndpoint,
+  serverEndpoint: env.tos.serverEndpoint,
   publicEndpoint: env.tos.publicEndpoint,
   bucket: env.tos.bucket,
 };

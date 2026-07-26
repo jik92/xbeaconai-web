@@ -3,8 +3,11 @@ import {
   activeCredentialDoctorProviders,
   CredentialDoctor,
   type CredentialDoctorProvider,
+  type CredentialDoctorResult,
   type CredentialValues,
+  createTosDoctorProvider,
   PROVIDER_DOCTOR_TIMEOUT_MS,
+  tosDoctorConfigurationFingerprint,
   validateAihubmixBaseUrl,
 } from "../../server/byok/credential-doctor";
 import type { ProviderCredentialName } from "../../server/byok/credential-store";
@@ -106,9 +109,109 @@ describe("credential doctor", () => {
     expect(PROVIDER_DOCTOR_TIMEOUT_MS).toBe(30_000);
   });
 
+  test("refreshes and persists only the requested startup Provider", async () => {
+    let persisted: CredentialDoctorResult[] = [];
+    const doctor = new CredentialDoctor(
+      () => "configured-value",
+      providers.slice(0, 2),
+      100,
+      (results) => {
+        persisted = results;
+      },
+    );
+
+    const result = await doctor.runProvider("aihubmix");
+
+    expect(result.providerId).toBe("aihubmix");
+    expect(persisted.map((item) => item.providerId)).toEqual(["aihubmix"]);
+  });
+
   test("keeps the Bun HTTP connection open long enough to return timeout results", async () => {
     const serverEntry = await Bun.file("server/index.ts").text();
     expect(serverEntry).toContain("idleTimeout: 60");
     expect(60_000).toBeGreaterThan(PROVIDER_DOCTOR_TIMEOUT_MS);
+  });
+
+  test("checks the configured TOS Server/Public routes and required CORS origins", async () => {
+    const endpoints: string[] = [];
+    const config = {
+      region: "cn-shanghai",
+      bucket: "xbeacon-shanghai",
+      serverEndpoint: "tos-cn-shanghai.ivolces.com",
+      publicEndpoint: "tos-cn-shanghai.volces.com",
+      corsOrigins: ["http://118.196.101.57:9000"],
+    };
+    const provider = createTosDoctorProvider(config, (_values, endpoint) => {
+      endpoints.push(endpoint);
+      return {
+        headBucket: async () => ({ statusCode: 200 }),
+        getBucketCORS: async () => ({
+          data: {
+            CORSRules: [
+              {
+                AllowedOrigins: config.corsOrigins,
+                AllowedMethods: ["GET", "HEAD", "PUT"],
+                AllowedHeaders: ["*"],
+                ExposeHeaders: ["ETag"],
+                MaxAgeSeconds: 3600,
+              },
+            ],
+          },
+        }),
+        getPreSignedUrl: () => `https://${config.bucket}.${config.publicEndpoint}/doctor`,
+      } as never;
+    });
+
+    const message = await provider.probe(
+      { TOS_ACCESS_KEY_ID: "tos-id", TOS_SECRET_ACCESS_KEY: "tos-secret" },
+      new AbortController().signal,
+    );
+
+    expect(endpoints).toEqual([config.serverEndpoint, config.publicEndpoint]);
+    expect(message).toContain("xbeacon-shanghai");
+    expect(message).toContain(config.serverEndpoint);
+    expect(message).toContain(config.publicEndpoint);
+  });
+
+  test("rejects a TOS Bucket that is missing the current runtime CORS origin", async () => {
+    const config = {
+      region: "cn-shanghai",
+      bucket: "xbeacon-shanghai",
+      serverEndpoint: "tos-cn-shanghai.volces.com",
+      publicEndpoint: "tos-cn-shanghai.volces.com",
+      corsOrigins: ["http://localhost:5173"],
+    };
+    const provider = createTosDoctorProvider(
+      config,
+      () =>
+        ({
+          headBucket: async () => ({ statusCode: 200 }),
+          getBucketCORS: async () => ({ data: { CORSRules: [] } }),
+          getPreSignedUrl: () => `https://${config.bucket}.${config.publicEndpoint}/doctor`,
+        }) as never,
+    );
+
+    expect(
+      provider.probe(
+        { TOS_ACCESS_KEY_ID: "tos-id", TOS_SECRET_ACCESS_KEY: "tos-secret" },
+        new AbortController().signal,
+      ),
+    ).rejects.toThrow("Bucket CORS 缺少 Origin");
+  });
+
+  test("binds the TOS Doctor fingerprint to endpoints, bucket and normalized CORS origins", () => {
+    const base = {
+      region: "cn-shanghai",
+      bucket: "xbeacon-shanghai",
+      serverEndpoint: "tos-cn-shanghai.volces.com",
+      publicEndpoint: "tos-cn-shanghai.volces.com",
+      corsOrigins: ["http://localhost:5173", "http://127.0.0.1:5173"],
+    };
+    expect(tosDoctorConfigurationFingerprint(base)).toBe(
+      tosDoctorConfigurationFingerprint({ ...base, corsOrigins: [...base.corsOrigins].reverse() }),
+    );
+    expect(tosDoctorConfigurationFingerprint(base)).not.toBe(
+      tosDoctorConfigurationFingerprint({ ...base, bucket: "another-bucket" }),
+    );
   });
 });

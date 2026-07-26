@@ -1,13 +1,17 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { eq, inArray } from "drizzle-orm";
 import { type AppDatabase, openDatabase } from "../db/database";
-import { providerCredentialChecks as checkTable, providerCredentials as credentialTable } from "../db/schema";
+import {
+  providerCredentialChecks as checkTable,
+  providerCredentials as credentialTable,
+  migrationState,
+} from "../db/schema";
 import { env } from "../env";
 import {
-  type ProviderCredentialName,
-  type ProviderId,
   managedProviderCredentialCatalog,
   managedProviderIds,
+  type ProviderCredentialName,
+  type ProviderId,
   providerCredentialCatalog,
   providerCredentialNames,
   providerIdForCredential,
@@ -157,6 +161,22 @@ export class ProviderCredentialStore {
   isProviderVerified(providerId: ProviderId) {
     if (!this.available) return false;
     return this.db.select().from(checkTable).where(eq(checkTable.providerId, providerId)).get()?.status === "available";
+  }
+
+  ensureProviderCheckContext(providerId: ProviderId, fingerprint: string) {
+    if (!fingerprint) throw new Error("Provider Doctor 配置指纹不能为空");
+    const key = `provider-check-context:${providerId}`;
+    const existing = this.db.select().from(migrationState).where(eq(migrationState.key, key)).get();
+    if (existing?.value === fingerprint) return false;
+    const timestamp = new Date().toISOString();
+    this.db.transaction((tx) => {
+      tx.delete(checkTable).where(eq(checkTable.providerId, providerId)).run();
+      tx.insert(migrationState)
+        .values({ key, value: fingerprint, updatedAt: timestamp })
+        .onConflictDoUpdate({ target: migrationState.key, set: { value: fingerprint, updatedAt: timestamp } })
+        .run();
+    });
+    return true;
   }
 
   private invalidateChecks(tx: AppDatabase, names: ProviderCredentialName[]) {
