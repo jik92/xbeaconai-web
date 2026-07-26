@@ -15,6 +15,16 @@ type OpenApiOperation = {
 };
 
 describe("video create shot generation API contract", () => {
+  test("publishes the persistent full-generation action and workflow state", async () => {
+    const spec = (await Bun.file(resolve(import.meta.dir, "../../openapi/openapi.json")).json()) as {
+      paths: Record<string, Record<string, OpenApiOperation>>;
+      components?: { schemas?: Record<string, unknown> };
+    };
+    const action = spec.paths["/api/video-create/projects/{projectId}/actions/{action}"]?.post;
+    expect(JSON.stringify(action)).toContain('"full"');
+    expect(JSON.stringify(spec.components?.schemas?.VideoCreateProject)).toContain('"autoGenerate"');
+    expect(JSON.stringify(spec.components?.schemas?.VideoCreateProject)).toContain('"autoGenerateRunId"');
+  });
   test("publishes project media settings, voice preview, and batch audio operations", () => {
     const document = JSON.parse(readFileSync(resolve(import.meta.dir, "../../openapi/openapi.json"), "utf8")) as {
       paths: Record<string, Record<string, { operationId?: string }>>;

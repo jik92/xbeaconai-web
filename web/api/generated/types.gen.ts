@@ -300,6 +300,8 @@ export type VideoCreateProject = {
         recommendation: VideoCreateRecommendation;
         currentJobId: string;
         finalArtifactId: string;
+        autoGenerate: boolean;
+        autoGenerateRunId: string;
         version: number;
         idempotencyKey: string;
         error?: {
@@ -3283,7 +3285,7 @@ export type RunVideoCreateActionData = {
     body?: never;
     path: {
         projectId: string;
-        action: 'analyze' | 'script' | 'storyboard' | 'compose';
+        action: 'analyze' | 'script' | 'storyboard' | 'compose' | 'full';
     };
     query?: never;
     url: '/api/video-create/projects/{projectId}/actions/{action}';

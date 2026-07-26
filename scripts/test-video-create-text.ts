@@ -55,6 +55,8 @@ const aggregate: VideoCreateAggregate = {
     recommendation: null,
     currentJobId: null,
     finalArtifactId: null,
+    autoGenerate: false,
+    autoGenerateRunId: null,
     version: 1,
     idempotencyKey: null,
     error: null,

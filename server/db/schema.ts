@@ -492,6 +492,8 @@ export const videoCreateProjects = sqliteTable(
     >(),
     currentJobId: text("current_job_id").references(() => jobs.id),
     finalArtifactId: text("final_artifact_id"),
+    autoGenerate: integer("auto_generate", { mode: "boolean" }).notNull().default(false),
+    autoGenerateRunId: text("auto_generate_run_id"),
     version: integer("version").notNull().default(1),
     idempotencyKey: text("idempotency_key"),
     error: text("error_json", { mode: "json" }).$type<JobRecord["error"]>(),

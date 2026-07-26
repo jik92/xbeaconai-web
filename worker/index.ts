@@ -19,7 +19,6 @@ const adScripts = new AdScriptStore();
 const videoCreates = new VideoCreateStore();
 const providerAudits = new ProviderGenerationAuditStore();
 const customPortraits = new CustomPortraitStore();
-const processor = new JobProcessor(store, accounts, adScripts, videoCreates, providerAudits, customPortraits);
 const recoveryRedis = new IORedis(env.redisUrl, { lazyConnect: true, maxRetriesPerRequest: 1 });
 const recoveryQueues = new Map<JobWorkload, Queue<ExecuteJobPayload>>(
   (["network", "ffmpeg"] as const).map((workload) => [
@@ -36,6 +35,20 @@ const recoveryQueueFor = (workload: JobWorkload) => {
   if (!queue) throw new Error(`WORKER_QUEUE_NOT_FOUND: ${workload}`);
   return queue;
 };
+const enqueueJob = async (jobId: string) => {
+  const job = store.get(jobId);
+  if (!job) throw new Error(`JOB_NOT_FOUND: ${jobId}`);
+  await recoveryQueueFor(classifyJobWorkload(job)).add(executeJobName, { jobId }, { jobId });
+};
+const processor = new JobProcessor(
+  store,
+  accounts,
+  adScripts,
+  videoCreates,
+  providerAudits,
+  customPortraits,
+  enqueueJob,
+);
 
 await processor.startMaintenance();
 for (const job of store.recoverable()) {

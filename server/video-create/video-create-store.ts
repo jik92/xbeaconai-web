@@ -191,6 +191,15 @@ export class VideoCreateStore {
       .map((project) => this.aggregate(project));
   }
 
+  listAutoGenerateProjects() {
+    return this.db
+      .select()
+      .from(videoCreateProjects)
+      .where(eq(videoCreateProjects.autoGenerate, true))
+      .all()
+      .map((project) => this.aggregate(project));
+  }
+
   updateInput(projectId: string, ownerUserId: string, expectedVersion: number, input: VideoCreateInput) {
     const project = this.getOwned(projectId, ownerUserId)?.project;
     if (!project) return undefined;
@@ -209,7 +218,8 @@ export class VideoCreateStore {
   setProject(
     projectId: string,
     patch: Partial<
-      Pick<ProjectRow, "status" | "recommendation" | "currentJobId" | "finalArtifactId" | "error" | "title" | "input">
+      Pick<ProjectRow, "status" | "recommendation" | "currentJobId" | "finalArtifactId" | "error" | "title" | "input"> &
+        Pick<ProjectRow, "autoGenerate" | "autoGenerateRunId">
     >,
   ) {
     this.db

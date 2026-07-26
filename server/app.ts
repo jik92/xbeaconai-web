@@ -104,6 +104,7 @@ import {
   validateVideoCreateShotGenerationReferences,
   videoCreateReferenceRole,
 } from "./video-create/shot-generation";
+import { advanceVideoCreateAutoWorkflow } from "./video-create/auto-workflow";
 import {
   VIDEO_CREATE_ANALYSIS_MODEL,
   VideoCreateInputSchema,
@@ -367,6 +368,8 @@ const VideoCreateProjectSchema = z
       recommendation: VideoCreateRecommendationSchema.nullable(),
       currentJobId: z.string().uuid().nullable(),
       finalArtifactId: z.string().uuid().nullable(),
+      autoGenerate: z.boolean(),
+      autoGenerateRunId: z.string().uuid().nullable(),
       version: z.number().int().min(1),
       idempotencyKey: z.string().nullable(),
       error: ApiErrorSchema.nullish(),
@@ -5338,7 +5341,7 @@ const runVideoCreateActionRoute = createRoute({
   request: {
     params: z.object({
       projectId: z.string().uuid(),
-      action: z.enum(["analyze", "script", "storyboard", "compose"]),
+      action: z.enum(["analyze", "script", "storyboard", "compose", "full"]),
     }),
   },
   responses: {
@@ -5367,6 +5370,71 @@ app.openapi(runVideoCreateActionRoute, async (c) => {
       },
       409,
     );
+  if (
+    aggregate.shots.some((shot) => shot.status === "queued" || shot.status === "generating" || shot.materialProcessing)
+  )
+    return c.json(
+      {
+        error: {
+          code: "ACTION_IN_PROGRESS",
+          message: "当前仍有分镜任务执行中",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      409,
+    );
+  if (action === "analyze" && !aggregate.project.input.productAssetIds.length)
+    return c.json(
+      {
+        error: {
+          code: "PRODUCT_IMAGE_REQUIRED",
+          message: "请先添加至少一张商品图片",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      409,
+    );
+  if (action === "full") {
+    if (!aggregate.project.input.productAssetIds.length)
+      return c.json(
+        {
+          error: {
+            code: "PRODUCT_IMAGE_REQUIRED",
+            message: "请先添加至少一张商品图片",
+            retryable: false,
+            requestId: crypto.randomUUID(),
+          },
+        },
+        409,
+      );
+    const runId = crypto.randomUUID();
+    videoCreates.setProject(projectId, {
+      autoGenerate: true,
+      autoGenerateRunId: runId,
+      status: aggregate.project.status === "failed" ? "draft" : aggregate.project.status,
+      recommendation: aggregate.sections.length ? aggregate.project.recommendation : null,
+      error: null,
+    });
+    const started = await advanceVideoCreateAutoWorkflow(
+      { store, videoCreates, accounts, customPortraits, queue },
+      projectId,
+    );
+    const job = Array.isArray(started) ? started[0] : started;
+    if (job) return c.json(job, 202);
+    return c.json(
+      {
+        error: {
+          code: "AUTO_GENERATE_NOT_STARTED",
+          message: "当前项目没有可继续执行的生成阶段",
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      409,
+    );
+  }
   if (action === "storyboard" && !aggregate.sections.length)
     return c.json(
       {

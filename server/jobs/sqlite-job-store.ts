@@ -117,6 +117,24 @@ export class SqliteJobStore {
     return job;
   }
 
+  createIdempotent(job: JobRecord): { job: JobRecord; created: boolean } {
+    const idempotencyKey = job.idempotencyKey;
+    if (!idempotencyKey) return { job: this.create(job), created: true };
+    return this.db.transaction(
+      (tx) => {
+        const existing = tx
+          .select()
+          .from(jobs)
+          .where(and(eq(jobs.ownerUserId, job.ownerUserId), eq(jobs.idempotencyKey, idempotencyKey)))
+          .get();
+        if (existing) return { job: this.fromRow(existing), created: false };
+        tx.insert(jobs).values(jobValues(job)).run();
+        return { job, created: true };
+      },
+      { behavior: "immediate" },
+    );
+  }
+
   /**
    * Inserts an import job while preserving request de-duplication for work
    * that is still running. Failed/cancelled jobs, and a successful job whose

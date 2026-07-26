@@ -558,6 +558,24 @@ export function VideoCreatePage() {
     invalidate(updated);
     return updated;
   };
+  const saveDraft = () =>
+    execute("save-draft", async () => {
+      const saved = project
+        ? await updateVideoCreate(project, input)
+        : await createVideoCreate(input, input.productName || "一键成片新项目");
+      invalidate(saved);
+      setNotice("草稿已保存");
+    });
+  const generateAll = () =>
+    execute("full", async () => {
+      const saved = await persist();
+      await runVideoCreateProjectAction(saved.project.id, "full");
+      setProject({
+        ...saved,
+        project: { ...saved.project, status: "analyzing", autoGenerate: true },
+      });
+      void queryClient.invalidateQueries({ queryKey: ["video-create-project", saved.project.id] });
+    });
   const action = (name: "analyze" | "script" | "storyboard" | "compose") =>
     execute(name, async () => {
       const saved = name === "compose" && project ? project : await persist();
@@ -605,966 +623,1010 @@ export function VideoCreatePage() {
 
   return (
     <div
-      className="grid h-[calc(100vh-56px)] min-h-0 grid-cols-[360px_minmax(0,1fr)] overflow-hidden bg-surface text-sm text-body max-[1100px]:grid-cols-[320px_minmax(0,1fr)] max-[760px]:block max-[760px]:h-auto max-[760px]:overflow-auto"
+      className="flex h-[calc(100vh-56px)] min-h-0 flex-col overflow-hidden bg-surface text-sm text-body max-[760px]:h-auto max-[760px]:overflow-auto"
       data-testid="video-create-page"
     >
-      <aside
-        className="flex min-h-0 min-w-0 flex-col overflow-hidden border-r border-line bg-surface max-[760px]:min-h-[calc(100vh-56px)] max-[760px]:overflow-visible"
-        data-testid="video-create-config-panel"
-      >
-        <header className="flex h-[52px] shrink-0 items-center justify-between border-b border-line px-3">
-          <h1 className="text-lg font-medium text-ink">新建项目</h1>
-          <Button variant="ghost" size="sm" onClick={reset}>
-            <Plus /> 新建
-          </Button>
-        </header>
-        <div
-          className="flex-1 space-y-4 overflow-y-auto p-3 max-[760px]:overflow-visible"
-          data-testid="video-create-config-scroll"
-        >
-          <section className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>产品图片</Label>
-              <span className="text-xs text-muted">最多 6 张</span>
-            </div>
-            <ProductImages
-              assets={productAssets}
-              ids={input.productAssetIds}
-              onAdd={(assets) => {
-                setProductAssets((current) => [
-                  ...current,
-                  ...assets.filter((asset) => !current.some((item) => item.id === asset.id)),
-                ]);
-                mutateInput(
-                  "productAssetIds",
-                  [...new Set([...input.productAssetIds, ...assets.map((asset) => asset.id)])].slice(0, 6),
-                );
-              }}
-              onRemove={(id) =>
-                mutateInput(
-                  "productAssetIds",
-                  input.productAssetIds.filter((item) => item !== id),
-                )
-              }
-            />
-            <Button
-              className="w-full"
-              variant="outline"
-              size="sm"
-              disabled={!input.productAssetIds.length || Boolean(busy)}
-              onClick={() => action("analyze")}
-            >
-              {busy === "analyze" || active === "analyzing" ? <LoaderCircle className="animate-spin" /> : <Sparkles />}
-              AI 填充参数
-            </Button>
-          </section>
-
-          <section className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>人像图片</Label>
-              <span className="text-xs text-muted">可选</span>
-            </div>
-            {selectedPortrait ? (
-              <div className="flex items-center gap-2 rounded-lg border border-line p-2 [&_img]:h-12 [&_img]:w-9 [&_img]:rounded-md [&_img]:object-cover">
-                {selectedPortrait.type === "custom" ? (
-                  <AuthenticatedMedia
-                    url={selectedPortrait.display_url}
-                    mimeType="image/jpeg"
-                    alt={selectedPortrait.name}
-                    previewable={false}
-                  />
-                ) : (
-                  <ImagePreview src={selectedPortrait.display_url} alt={selectedPortrait.name} />
-                )}
-                <span className="min-w-0 flex-1 truncate text-xs text-muted">{selectedPortrait.name}</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    setInput((current) => ({ ...current, portraitReference: undefined, portraitId: undefined }))
-                  }
-                >
-                  移除
-                </Button>
-              </div>
+      <header className="flex h-[52px] shrink-0 items-center justify-between gap-3 border-b border-line px-3">
+        <h1 className="shrink-0 text-lg font-medium text-ink">新建项目</h1>
+        <div className="flex min-w-0 items-center gap-2 overflow-x-auto">
+          <Button
+            className="shrink-0"
+            size="sm"
+            disabled={Boolean(busy) || polling || !input.productAssetIds.length}
+            onClick={generateAll}
+          >
+            {busy === "full" || project?.project.autoGenerate ? (
+              <LoaderCircle className="animate-spin" />
             ) : (
-              <Button
-                className="w-full justify-between"
-                variant="outline"
-                size="sm"
-                onClick={() => setPortraitPickerOpen(true)}
-              >
-                未添加人像 <span>添加</span>
-              </Button>
+              <WandSparkles />
             )}
-          </section>
-
-          <section className="space-y-2">
-            <Label>广告场景</Label>
-            <div className="flex flex-wrap gap-2">
-              {scenes.map((scene) => (
-                <Button
-                  className={cn(
-                    "h-8 rounded-full px-3 font-normal",
-                    input.scene === scene && "border-primary bg-primary text-white hover:bg-primary/90",
-                  )}
-                  variant="outline"
-                  size="sm"
-                  key={scene}
-                  onClick={() => mutateInput("scene", scene)}
-                >
-                  {scene}
-                </Button>
-              ))}
-            </div>
-          </section>
-
-          <div className="space-y-2">
-            <Label htmlFor="video-create-product-name">
-              产品名称 <span className="text-error">*</span>
-            </Label>
-            <Input
-              id="video-create-product-name"
-              value={input.productName}
-              maxLength={60}
-              placeholder="输入产品名称"
-              onChange={(event) => mutateInput("productName", event.target.value)}
-            />
-          </div>
-
-          <section className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>核心卖点</Label>
-              <span className="text-xs text-muted">最多 8 条</span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {sellingPoints.map((point, index) => (
-                <span
-                  className="inline-flex h-8 items-center gap-1 rounded-full bg-surface-strong px-3 text-xs text-ink"
-                  key={point}
-                >
-                  {point}
-                  <Button
-                    className="size-5 rounded-full p-0"
-                    variant="ghost"
-                    size="icon"
-                    aria-label="删除卖点"
-                    onClick={() =>
-                      mutateInput(
-                        "sellingPoints",
-                        sellingPoints.filter((_, item) => item !== index),
-                      )
-                    }
-                  >
-                    <X />
-                  </Button>
-                </span>
-              ))}
-              <Input
-                className="min-w-40 flex-1"
-                placeholder="输入卖点回车添加"
-                onKeyDown={(event) => {
-                  if (event.key !== "Enter") return;
-                  const value = event.currentTarget.value.trim();
-                  if (!value || sellingPoints.length >= 8) return;
-                  mutateInput("sellingPoints", [...sellingPoints, value]);
-                  event.currentTarget.value = "";
-                }}
-              />
-            </div>
-          </section>
-
-          <section className="space-y-2">
-            <Label>视频时长</Label>
-            <div className="grid grid-cols-4 gap-2">
-              {durationOptions.map((seconds) => (
-                <Button
-                  className={cn(
-                    input.durationSec === seconds && "border-primary bg-primary text-white hover:bg-primary/90",
-                  )}
-                  variant="outline"
-                  size="sm"
-                  key={seconds}
-                  onClick={() => mutateInput("durationSec", seconds)}
-                >
-                  {seconds < 60 ? `${seconds}s` : `${seconds / 60}min`}
-                </Button>
-              ))}
-            </div>
-          </section>
-
-          <section className="space-y-2">
-            <Label>分镜段数</Label>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => mutateInput("segmentCount", Math.max(1, input.segmentCount - 1))}
-              >
-                −
-              </Button>
-              <span className="w-8 text-center font-medium text-ink">{input.segmentCount}</span>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => mutateInput("segmentCount", Math.min(12, input.segmentCount + 1))}
-              >
-                ＋
-              </Button>
-              <span className="text-xs text-muted">段，单段不超过 15 秒</span>
-            </div>
-          </section>
-
-          <section className="space-y-2">
-            <Label>配音语速</Label>
-            <div className="grid grid-cols-3 gap-2">
-              {(["slow", "medium", "fast"] as const).map((speed) => (
-                <Button
-                  className={cn(
-                    "h-auto flex-col gap-0.5 py-2",
-                    input.speechRate === speed && "border-primary bg-primary text-white hover:bg-primary/90",
-                  )}
-                  variant="outline"
-                  key={speed}
-                  onClick={() => mutateInput("speechRate", speed)}
-                >
-                  <span>{speed === "slow" ? "慢" : speed === "medium" ? "中" : "快"}</span>
-                  <span className={cn("text-xs font-normal text-muted", input.speechRate === speed && "text-white/75")}>
-                    {speed === "slow" ? "3字/s" : speed === "medium" ? "4字/s" : "5字/s"}
-                  </span>
-                </Button>
-              ))}
-            </div>
-          </section>
-
-          <ParameterPanel
-            title="广告诉求"
-            count={requirementCount}
-            open={openPanels.requirements}
-            onToggle={() => togglePanel("requirements")}
+            一键生成
+          </Button>
+          <Button
+            className="shrink-0"
+            variant="outline"
+            size="sm"
+            disabled={
+              Boolean(busy) ||
+              polling ||
+              Boolean(project && !["draft", "script_review", "failed"].includes(project.project.status))
+            }
+            onClick={saveDraft}
           >
-            <ChoiceGroup
-              label="营销目标"
-              options={marketingGoals}
-              selected={input.marketingGoals ?? []}
-              onToggle={(option) => toggleOption("marketingGoals", option)}
-            />
-            <ChoiceGroup
-              label="目标受众"
-              options={targetAudiences}
-              selected={input.targetAudiences ?? []}
-              onToggle={(option) => toggleOption("targetAudiences", option)}
-            />
-            <div className="space-y-2">
-              <Label htmlFor="video-create-pain-points">用户痛点</Label>
-              <textarea
-                id="video-create-pain-points"
-                className="min-h-20 w-full resize-y rounded-md border border-line bg-transparent px-3 py-2 text-sm text-ink outline-none placeholder:text-muted focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
-                value={input.audiencePainPoints}
-                onChange={(event) => mutateInput("audiencePainPoints", event.target.value)}
-                placeholder="例：夏天防晒产品总是厚重泛白"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="video-create-benefits">产品利益点</Label>
-              <textarea
-                id="video-create-benefits"
-                className="min-h-20 w-full resize-y rounded-md border border-line bg-transparent px-3 py-2 text-sm text-ink outline-none placeholder:text-muted focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
-                value={input.productBenefits}
-                onChange={(event) => mutateInput("productBenefits", event.target.value)}
-                placeholder="例：零感轻薄，一抹即化"
-              />
-            </div>
-          </ParameterPanel>
-
-          <ParameterPanel
-            title="脚本风格"
-            count={styleCount}
-            open={openPanels.style}
-            onToggle={() => togglePanel("style")}
-          >
-            <ChoiceGroup
-              label="主播角色"
-              options={presenterRoles}
-              selected={input.presenterRoles ?? []}
-              onToggle={(option) => toggleOption("presenterRoles", option)}
-            />
-            <ChoiceGroup
-              label="主播性别"
-              options={presenterGenders}
-              selected={input.presenterGenders ?? []}
-              onToggle={(option) => toggleOption("presenterGenders", option)}
-            />
-            <ChoiceGroup
-              label="内容风格"
-              options={contentStyles}
-              selected={input.contentStyles ?? []}
-              onToggle={(option) => toggleOption("contentStyles", option)}
-            />
-            <ChoiceGroup
-              label="开场方式"
-              options={openingStyles}
-              selected={input.openingStyles ?? []}
-              onToggle={(option) => toggleOption("openingStyles", option)}
-            />
-            <ChoiceGroup
-              label="结尾引导"
-              options={closingGuides}
-              selected={input.closingGuides ?? []}
-              onToggle={(option) => toggleOption("closingGuides", option)}
-            />
-          </ParameterPanel>
-
-          <ParameterPanel
-            title="高级设置"
-            count={advancedCount}
-            open={openPanels.advanced}
-            onToggle={() => togglePanel("advanced")}
-          >
-            <ChoiceGroup
-              label="脚本题材"
-              options={scriptTopics}
-              selected={input.scriptTopics ?? []}
-              onToggle={(option) => toggleOption("scriptTopics", option)}
-            />
-            <ChoiceGroup
-              label="素材话题"
-              options={materialTopics}
-              selected={input.materialTopics ?? []}
-              onToggle={(option) => toggleOption("materialTopics", option)}
-            />
-            <ChoiceGroup
-              label="营销手法"
-              options={marketingMethods}
-              selected={input.marketingMethods ?? []}
-              onToggle={(option) => toggleOption("marketingMethods", option)}
-            />
-            <ChoiceGroup
-              label="模板"
-              options={templates}
-              selected={input.templates ?? []}
-              onToggle={(option) => toggleOption("templates", option)}
-            />
-            <div className="space-y-2">
-              <Label htmlFor="video-create-sensitive-words">敏感词</Label>
-              <Input
-                id="video-create-sensitive-words"
-                value={input.sensitiveWords}
-                onChange={(event) => mutateInput("sensitiveWords", event.target.value)}
-                placeholder="用空格分隔，如：最佳 极致"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="video-create-custom-requirements">自定义要求</Label>
-              <textarea
-                id="video-create-custom-requirements"
-                className="min-h-20 w-full resize-y rounded-md border border-line bg-transparent px-3 py-2 text-sm text-ink outline-none placeholder:text-muted focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
-                value={input.customRequirements}
-                onChange={(event) => mutateInput("customRequirements", event.target.value)}
-                placeholder="补充品牌语气、禁用表达或其他要求"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="video-create-model">视频模型</Label>
-                <NativeSelect
-                  id="video-create-model"
-                  value={input.videoModel}
-                  onChange={(event) => mutateInput("videoModel", event.target.value as VideoCreateInput["videoModel"])}
-                >
-                  <option value="doubao-seedance-2-0-fast-260128">Seedance 2.0 Fast</option>
-                  <option value="doubao-seedance-2-0-mini-260615">Seedance 2.0 Mini</option>
-                  <option value="doubao-seedance-2-0-260128">Seedance 2.0 Standard</option>
-                </NativeSelect>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="video-create-ratio">画面比例</Label>
-                <NativeSelect
-                  id="video-create-ratio"
-                  value={input.ratio}
-                  onChange={(event) => mutateInput("ratio", event.target.value as VideoCreateInput["ratio"])}
-                >
-                  <option>9:16</option>
-                  <option>16:9</option>
-                  <option>1:1</option>
-                </NativeSelect>
-              </div>
-            </div>
-            <div className="space-y-2" data-testid="video-create-voice-field">
-              <Label>配音音色</Label>
-              <AttachmentPicker
-                accept="audio/*"
-                onSelect={([asset]) => asset && mutateInput("voiceAssetId", asset.id)}
-                trigger={(open) => (
-                  <Button className="w-full justify-start" variant="outline" size="sm" onClick={open}>
-                    {input.voiceAssetId ? "已选择我的音色" : "默认推荐音色（点击更换）"}
-                  </Button>
-                )}
-              />
-            </div>
-          </ParameterPanel>
-        </div>
-        {!hasScript && (
-          <footer className="shrink-0 border-t border-line bg-surface p-3">
-            <Button
-              className="h-10 w-full rounded-full"
-              disabled={Boolean(busy) || polling || !input.productAssetIds.length}
-              onClick={() => action("script")}
-            >
-              {busy === "script" || active === "script_generating" ? (
-                <LoaderCircle className="animate-spin" />
-              ) : (
-                <WandSparkles />
-              )}
-              生成脚本
-            </Button>
-          </footer>
-        )}
-      </aside>
-
-      <main
-        className="relative flex min-h-0 min-w-0 flex-col overflow-hidden bg-surface max-[760px]:min-h-[calc(100vh-56px)] max-[760px]:border-t-8 max-[760px]:border-surface-muted"
-        data-testid="video-create-output-panel"
-      >
-        <header className="flex h-[52px] shrink-0 items-center justify-between border-b border-line px-3">
-          <nav className="flex h-full items-center gap-1">
-            <Button
-              className={cn("h-8 rounded-full", tab === "script" && "bg-primary text-white hover:bg-primary/90")}
-              variant="ghost"
-              size="sm"
-              onClick={() => setTab("script")}
-            >
-              脚本 <span className="rounded-full bg-current/10 px-1.5 text-xs">{project?.sections.length ?? 0}</span>
-            </Button>
-            <Button
-              className={cn("h-8 rounded-full", tab === "storyboard" && "bg-primary text-white hover:bg-primary/90")}
-              variant="ghost"
-              size="sm"
-              onClick={() => setTab("storyboard")}
-            >
-              分镜 <span className="rounded-full bg-current/10 px-1.5 text-xs">{project?.shots.length ?? 0}</span>
-            </Button>
-          </nav>
-          <Button variant="outline" size="sm" onClick={() => setHistoryOpen(true)}>
+            {busy === "save-draft" ? <LoaderCircle className="animate-spin" /> : <Check />}
+            保存草稿
+          </Button>
+          <Button className="shrink-0" variant="outline" size="sm" onClick={() => setHistoryOpen(true)}>
             <History /> 生成记录
           </Button>
-        </header>
-        {(notice || project?.project.error?.message) && (
-          <Button
-            className="absolute left-1/2 top-16 z-10 h-auto max-w-[calc(100%-24px)] -translate-x-1/2 whitespace-normal border-error/25 bg-surface px-3 py-2 text-left text-error shadow-sm"
-            variant="outline"
-            onClick={() => setNotice("")}
-          >
-            <AlertTriangle />
-            <span className="flex-1">{notice || project?.project.error?.message}</span>
-            <X />
+          <Button className="shrink-0" variant="ghost" size="sm" disabled={Boolean(busy) || polling} onClick={reset}>
+            <Plus /> 新建
           </Button>
-        )}
-
-        {!project?.sections.length && !["script_generating", "analyzing"].includes(active ?? "") && (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center text-muted">
-            <span className="grid size-12 place-items-center rounded-full bg-surface-muted">
-              <Film className="size-5" />
-            </span>
-            <b className="font-medium text-body-strong">产出物将在这里呈现</b>
-          </div>
-        )}
-        {["script_generating", "analyzing", "storyboard_generating", "composing"].includes(active ?? "") && (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center text-muted">
-            <span className="grid size-12 place-items-center rounded-full bg-surface-muted text-ink">
-              <LoaderCircle className="animate-spin" />
-            </span>
-            <h2 className="text-base font-medium text-ink">{statusLabels[active ?? ""]}</h2>
-            <p className="text-xs">任务在 Worker 中执行，关闭页面后也会继续。</p>
-          </div>
-        )}
-
-        {tab === "script" && project?.sections.length ? (
-          <section className="flex min-h-0 flex-1 flex-col">
-            <div className="flex h-12 shrink-0 items-center justify-between border-b border-line bg-canvas-soft px-3">
-              <span className="text-xs text-muted">
-                共 <b>{totalCharacters}</b> 字 · 约 <b>{totalDuration}s</b>
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    void navigator.clipboard.writeText(
-                      project.sections
-                        .map((section) => drafts[section.id] ?? section.currentVersion?.text ?? "")
-                        .join("\n"),
-                    )
-                  }
-                >
-                  <Copy />
-                  复制脚本
-                </Button>
-                <Button
-                  className="text-error hover:text-error"
-                  variant="outline"
-                  size="sm"
-                  disabled={Boolean(busy) || polling}
-                  onClick={() => setClearScriptDialogOpen(true)}
-                >
-                  <Trash2 />
-                  清除脚本
-                </Button>
+        </div>
+      </header>
+      <div className="grid min-h-0 flex-1 grid-cols-[360px_minmax(0,1fr)] overflow-hidden max-[1100px]:grid-cols-[320px_minmax(0,1fr)] max-[760px]:block max-[760px]:overflow-visible">
+        <aside
+          className="flex min-h-0 min-w-0 flex-col overflow-hidden border-r border-line bg-surface max-[760px]:min-h-[calc(100vh-56px)] max-[760px]:overflow-visible"
+          data-testid="video-create-config-panel"
+        >
+          <div
+            className="flex-1 space-y-4 overflow-y-auto p-3 max-[760px]:overflow-visible"
+            data-testid="video-create-config-scroll"
+          >
+            <section className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>产品图片</Label>
+                <span className="text-xs text-muted">最多 6 张</span>
               </div>
-            </div>
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
-              {project.sections.map((section) => {
-                const version = section.currentVersion;
-                const value = drafts[section.id] ?? version?.text ?? "";
-                const dirty = value !== (version?.text ?? "");
-                return (
-                  <article className="overflow-hidden rounded-xl border border-line bg-surface" key={section.id}>
-                    <header className="flex min-h-10 items-center justify-between border-b border-line bg-canvas-soft px-3 py-2">
-                      <span className="rounded-full bg-surface-strong px-2.5 py-1 text-xs font-medium text-ink">
-                        {section.label}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted">
-                          {estimateDuration(value, input.speechRate)}s · {[...value].length}字
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={!version || actionAvailability.scriptLocked || Boolean(busy) || polling}
-                          onClick={() =>
-                            execute(`regen-${section.id}`, async () => {
-                              if (!version) return;
-                              await regenerateVideoCreateScriptSection({
-                                projectId: project.project.id,
-                                sectionId: section.id,
-                                expectedVersionId: version.id,
-                              });
-                              void queryClient.invalidateQueries({
-                                queryKey: ["video-create-project", project.project.id],
-                              });
-                            })
-                          }
-                        >
-                          <RefreshCw />
-                          换一版
-                        </Button>
-                        <Pencil className="size-4 text-muted" />
-                      </div>
-                    </header>
-                    <textarea
-                      className="min-h-24 w-full resize-y bg-transparent p-3 text-sm leading-relaxed text-body outline-none disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-muted"
-                      value={value}
-                      disabled={actionAvailability.scriptLocked}
-                      onChange={(event) => setDrafts((current) => ({ ...current, [section.id]: event.target.value }))}
-                    />
-                    {dirty && (
-                      <footer className="flex justify-end border-t border-line px-3 py-2">
-                        <Button
-                          size="sm"
-                          disabled={actionAvailability.scriptLocked || Boolean(busy) || polling}
-                          onClick={() =>
-                            execute(`save-${section.id}`, async () => {
-                              if (!version) return;
-                              const next = await saveVideoCreateScriptSection({
-                                projectId: project.project.id,
-                                sectionId: section.id,
-                                expectedVersionId: version.id,
-                                text: value,
-                                durationSec: estimateDuration(value, input.speechRate),
-                              });
-                              setDrafts((current) => {
-                                const copy = { ...current };
-                                delete copy[section.id];
-                                return copy;
-                              });
-                              invalidate(next);
-                            })
-                          }
-                        >
-                          <Check />
-                          保存修改
-                        </Button>
-                      </footer>
-                    )}
-                  </article>
-                );
-              })}
-            </div>
-            <footer className="flex h-14 shrink-0 items-center justify-end border-t border-line bg-surface px-3">
+              <ProductImages
+                assets={productAssets}
+                ids={input.productAssetIds}
+                onAdd={(assets) => {
+                  setProductAssets((current) => [
+                    ...current,
+                    ...assets.filter((asset) => !current.some((item) => item.id === asset.id)),
+                  ]);
+                  mutateInput(
+                    "productAssetIds",
+                    [...new Set([...input.productAssetIds, ...assets.map((asset) => asset.id)])].slice(0, 6),
+                  );
+                }}
+                onRemove={(id) =>
+                  mutateInput(
+                    "productAssetIds",
+                    input.productAssetIds.filter((item) => item !== id),
+                  )
+                }
+              />
               <Button
-                className="rounded-full"
-                disabled={actionAvailability.storyboardLocked || Boolean(busy) || polling}
-                onClick={() => action("storyboard")}
+                className="w-full"
+                variant="outline"
+                size="sm"
+                disabled={!input.productAssetIds.length || Boolean(busy)}
+                onClick={() => action("analyze")}
               >
-                {busy === "storyboard" || active === "storyboard_generating" ? (
+                {busy === "analyze" || active === "analyzing" ? (
                   <LoaderCircle className="animate-spin" />
-                ) : actionAvailability.storyboardLocked ? (
-                  <Check />
+                ) : (
+                  <Sparkles />
+                )}
+                AI 填充参数
+              </Button>
+            </section>
+
+            <section className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>人像图片</Label>
+                <span className="text-xs text-muted">可选</span>
+              </div>
+              {selectedPortrait ? (
+                <div className="flex items-center gap-2 rounded-lg border border-line p-2 [&_img]:h-12 [&_img]:w-9 [&_img]:rounded-md [&_img]:object-cover">
+                  {selectedPortrait.type === "custom" ? (
+                    <AuthenticatedMedia
+                      url={selectedPortrait.display_url}
+                      mimeType="image/jpeg"
+                      alt={selectedPortrait.name}
+                      previewable={false}
+                    />
+                  ) : (
+                    <ImagePreview src={selectedPortrait.display_url} alt={selectedPortrait.name} />
+                  )}
+                  <span className="min-w-0 flex-1 truncate text-xs text-muted">{selectedPortrait.name}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      setInput((current) => ({ ...current, portraitReference: undefined, portraitId: undefined }))
+                    }
+                  >
+                    移除
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  className="w-full justify-between"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPortraitPickerOpen(true)}
+                >
+                  未添加人像 <span>添加</span>
+                </Button>
+              )}
+            </section>
+
+            <section className="space-y-2">
+              <Label>广告场景</Label>
+              <div className="flex flex-wrap gap-2">
+                {scenes.map((scene) => (
+                  <Button
+                    className={cn(
+                      "h-8 rounded-full px-3 font-normal",
+                      input.scene === scene && "border-primary bg-primary text-white hover:bg-primary/90",
+                    )}
+                    variant="outline"
+                    size="sm"
+                    key={scene}
+                    onClick={() => mutateInput("scene", scene)}
+                  >
+                    {scene}
+                  </Button>
+                ))}
+              </div>
+            </section>
+
+            <div className="space-y-2">
+              <Label htmlFor="video-create-product-name">
+                产品名称 <span className="text-error">*</span>
+              </Label>
+              <Input
+                id="video-create-product-name"
+                value={input.productName}
+                maxLength={60}
+                placeholder="输入产品名称"
+                onChange={(event) => mutateInput("productName", event.target.value)}
+              />
+            </div>
+
+            <section className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>核心卖点</Label>
+                <span className="text-xs text-muted">最多 8 条</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {sellingPoints.map((point, index) => (
+                  <span
+                    className="inline-flex h-8 items-center gap-1 rounded-full bg-surface-strong px-3 text-xs text-ink"
+                    key={point}
+                  >
+                    {point}
+                    <Button
+                      className="size-5 rounded-full p-0"
+                      variant="ghost"
+                      size="icon"
+                      aria-label="删除卖点"
+                      onClick={() =>
+                        mutateInput(
+                          "sellingPoints",
+                          sellingPoints.filter((_, item) => item !== index),
+                        )
+                      }
+                    >
+                      <X />
+                    </Button>
+                  </span>
+                ))}
+                <Input
+                  className="min-w-40 flex-1"
+                  placeholder="输入卖点回车添加"
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter") return;
+                    const value = event.currentTarget.value.trim();
+                    if (!value || sellingPoints.length >= 8) return;
+                    mutateInput("sellingPoints", [...sellingPoints, value]);
+                    event.currentTarget.value = "";
+                  }}
+                />
+              </div>
+            </section>
+
+            <section className="space-y-2">
+              <Label>视频时长</Label>
+              <div className="grid grid-cols-4 gap-2">
+                {durationOptions.map((seconds) => (
+                  <Button
+                    className={cn(
+                      input.durationSec === seconds && "border-primary bg-primary text-white hover:bg-primary/90",
+                    )}
+                    variant="outline"
+                    size="sm"
+                    key={seconds}
+                    onClick={() => mutateInput("durationSec", seconds)}
+                  >
+                    {seconds < 60 ? `${seconds}s` : `${seconds / 60}min`}
+                  </Button>
+                ))}
+              </div>
+            </section>
+
+            <section className="space-y-2">
+              <Label>分镜段数</Label>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => mutateInput("segmentCount", Math.max(1, input.segmentCount - 1))}
+                >
+                  −
+                </Button>
+                <span className="w-8 text-center font-medium text-ink">{input.segmentCount}</span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => mutateInput("segmentCount", Math.min(12, input.segmentCount + 1))}
+                >
+                  ＋
+                </Button>
+                <span className="text-xs text-muted">段，单段不超过 15 秒</span>
+              </div>
+            </section>
+
+            <section className="space-y-2">
+              <Label>配音语速</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {(["slow", "medium", "fast"] as const).map((speed) => (
+                  <Button
+                    className={cn(
+                      "h-auto flex-col gap-0.5 py-2",
+                      input.speechRate === speed && "border-primary bg-primary text-white hover:bg-primary/90",
+                    )}
+                    variant="outline"
+                    key={speed}
+                    onClick={() => mutateInput("speechRate", speed)}
+                  >
+                    <span>{speed === "slow" ? "慢" : speed === "medium" ? "中" : "快"}</span>
+                    <span
+                      className={cn("text-xs font-normal text-muted", input.speechRate === speed && "text-white/75")}
+                    >
+                      {speed === "slow" ? "3字/s" : speed === "medium" ? "4字/s" : "5字/s"}
+                    </span>
+                  </Button>
+                ))}
+              </div>
+            </section>
+
+            <ParameterPanel
+              title="广告诉求"
+              count={requirementCount}
+              open={openPanels.requirements}
+              onToggle={() => togglePanel("requirements")}
+            >
+              <ChoiceGroup
+                label="营销目标"
+                options={marketingGoals}
+                selected={input.marketingGoals ?? []}
+                onToggle={(option) => toggleOption("marketingGoals", option)}
+              />
+              <ChoiceGroup
+                label="目标受众"
+                options={targetAudiences}
+                selected={input.targetAudiences ?? []}
+                onToggle={(option) => toggleOption("targetAudiences", option)}
+              />
+              <div className="space-y-2">
+                <Label htmlFor="video-create-pain-points">用户痛点</Label>
+                <textarea
+                  id="video-create-pain-points"
+                  className="min-h-20 w-full resize-y rounded-md border border-line bg-transparent px-3 py-2 text-sm text-ink outline-none placeholder:text-muted focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                  value={input.audiencePainPoints}
+                  onChange={(event) => mutateInput("audiencePainPoints", event.target.value)}
+                  placeholder="例：夏天防晒产品总是厚重泛白"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="video-create-benefits">产品利益点</Label>
+                <textarea
+                  id="video-create-benefits"
+                  className="min-h-20 w-full resize-y rounded-md border border-line bg-transparent px-3 py-2 text-sm text-ink outline-none placeholder:text-muted focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                  value={input.productBenefits}
+                  onChange={(event) => mutateInput("productBenefits", event.target.value)}
+                  placeholder="例：零感轻薄，一抹即化"
+                />
+              </div>
+            </ParameterPanel>
+
+            <ParameterPanel
+              title="脚本风格"
+              count={styleCount}
+              open={openPanels.style}
+              onToggle={() => togglePanel("style")}
+            >
+              <ChoiceGroup
+                label="主播角色"
+                options={presenterRoles}
+                selected={input.presenterRoles ?? []}
+                onToggle={(option) => toggleOption("presenterRoles", option)}
+              />
+              <ChoiceGroup
+                label="主播性别"
+                options={presenterGenders}
+                selected={input.presenterGenders ?? []}
+                onToggle={(option) => toggleOption("presenterGenders", option)}
+              />
+              <ChoiceGroup
+                label="内容风格"
+                options={contentStyles}
+                selected={input.contentStyles ?? []}
+                onToggle={(option) => toggleOption("contentStyles", option)}
+              />
+              <ChoiceGroup
+                label="开场方式"
+                options={openingStyles}
+                selected={input.openingStyles ?? []}
+                onToggle={(option) => toggleOption("openingStyles", option)}
+              />
+              <ChoiceGroup
+                label="结尾引导"
+                options={closingGuides}
+                selected={input.closingGuides ?? []}
+                onToggle={(option) => toggleOption("closingGuides", option)}
+              />
+            </ParameterPanel>
+
+            <ParameterPanel
+              title="高级设置"
+              count={advancedCount}
+              open={openPanels.advanced}
+              onToggle={() => togglePanel("advanced")}
+            >
+              <ChoiceGroup
+                label="脚本题材"
+                options={scriptTopics}
+                selected={input.scriptTopics ?? []}
+                onToggle={(option) => toggleOption("scriptTopics", option)}
+              />
+              <ChoiceGroup
+                label="素材话题"
+                options={materialTopics}
+                selected={input.materialTopics ?? []}
+                onToggle={(option) => toggleOption("materialTopics", option)}
+              />
+              <ChoiceGroup
+                label="营销手法"
+                options={marketingMethods}
+                selected={input.marketingMethods ?? []}
+                onToggle={(option) => toggleOption("marketingMethods", option)}
+              />
+              <ChoiceGroup
+                label="模板"
+                options={templates}
+                selected={input.templates ?? []}
+                onToggle={(option) => toggleOption("templates", option)}
+              />
+              <div className="space-y-2">
+                <Label htmlFor="video-create-sensitive-words">敏感词</Label>
+                <Input
+                  id="video-create-sensitive-words"
+                  value={input.sensitiveWords}
+                  onChange={(event) => mutateInput("sensitiveWords", event.target.value)}
+                  placeholder="用空格分隔，如：最佳 极致"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="video-create-custom-requirements">自定义要求</Label>
+                <textarea
+                  id="video-create-custom-requirements"
+                  className="min-h-20 w-full resize-y rounded-md border border-line bg-transparent px-3 py-2 text-sm text-ink outline-none placeholder:text-muted focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                  value={input.customRequirements}
+                  onChange={(event) => mutateInput("customRequirements", event.target.value)}
+                  placeholder="补充品牌语气、禁用表达或其他要求"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="video-create-model">视频模型</Label>
+                  <NativeSelect
+                    id="video-create-model"
+                    value={input.videoModel}
+                    onChange={(event) =>
+                      mutateInput("videoModel", event.target.value as VideoCreateInput["videoModel"])
+                    }
+                  >
+                    <option value="doubao-seedance-2-0-fast-260128">Seedance 2.0 Fast</option>
+                    <option value="doubao-seedance-2-0-mini-260615">Seedance 2.0 Mini</option>
+                    <option value="doubao-seedance-2-0-260128">Seedance 2.0 Standard</option>
+                  </NativeSelect>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="video-create-ratio">画面比例</Label>
+                  <NativeSelect
+                    id="video-create-ratio"
+                    value={input.ratio}
+                    onChange={(event) => mutateInput("ratio", event.target.value as VideoCreateInput["ratio"])}
+                  >
+                    <option>9:16</option>
+                    <option>16:9</option>
+                    <option>1:1</option>
+                  </NativeSelect>
+                </div>
+              </div>
+              <div className="space-y-2" data-testid="video-create-voice-field">
+                <Label>配音音色</Label>
+                <AttachmentPicker
+                  accept="audio/*"
+                  onSelect={([asset]) => asset && mutateInput("voiceAssetId", asset.id)}
+                  trigger={(open) => (
+                    <Button className="w-full justify-start" variant="outline" size="sm" onClick={open}>
+                      {input.voiceAssetId ? "已选择我的音色" : "默认推荐音色（点击更换）"}
+                    </Button>
+                  )}
+                />
+              </div>
+            </ParameterPanel>
+          </div>
+          {!hasScript && (
+            <footer className="shrink-0 border-t border-line bg-surface p-3">
+              <Button
+                className="h-10 w-full rounded-full"
+                disabled={Boolean(busy) || polling || !input.productAssetIds.length}
+                onClick={() => action("script")}
+              >
+                {busy === "script" || active === "script_generating" ? (
+                  <LoaderCircle className="animate-spin" />
                 ) : (
                   <WandSparkles />
                 )}
-                {actionAvailability.storyboardLabel}
+                生成脚本
               </Button>
             </footer>
-          </section>
-        ) : null}
+          )}
+        </aside>
 
-        {tab === "storyboard" && project?.shots.length ? (
-          <section className="flex min-h-0 flex-1 flex-col">
-            <div className="flex h-12 shrink-0 items-center border-b border-line bg-canvas-soft px-3">
-              <div className="flex items-center gap-2">
-                <b className="font-medium text-ink">分镜编辑</b>
-                <span className="rounded-full bg-surface-strong px-2 py-0.5 text-xs text-muted">
-                  {project.shots.length} 个段落
-                </span>
-              </div>
+        <main
+          className="relative flex min-h-0 min-w-0 flex-col overflow-hidden bg-surface max-[760px]:min-h-[calc(100vh-56px)] max-[760px]:border-t-8 max-[760px]:border-surface-muted"
+          data-testid="video-create-output-panel"
+        >
+          <header className="flex h-[52px] shrink-0 items-center border-b border-line px-3">
+            <nav className="flex h-full items-center gap-1">
+              <Button
+                className={cn("h-8 rounded-full", tab === "script" && "bg-primary text-white hover:bg-primary/90")}
+                variant="ghost"
+                size="sm"
+                onClick={() => setTab("script")}
+              >
+                脚本 <span className="rounded-full bg-current/10 px-1.5 text-xs">{project?.sections.length ?? 0}</span>
+              </Button>
+              <Button
+                className={cn("h-8 rounded-full", tab === "storyboard" && "bg-primary text-white hover:bg-primary/90")}
+                variant="ghost"
+                size="sm"
+                onClick={() => setTab("storyboard")}
+              >
+                分镜 <span className="rounded-full bg-current/10 px-1.5 text-xs">{project?.shots.length ?? 0}</span>
+              </Button>
+            </nav>
+          </header>
+          {(notice || project?.project.error?.message) && (
+            <Button
+              className="absolute left-1/2 top-16 z-10 h-auto max-w-[calc(100%-24px)] -translate-x-1/2 whitespace-normal border-error/25 bg-surface px-3 py-2 text-left text-error shadow-sm"
+              variant="outline"
+              onClick={() => setNotice("")}
+            >
+              <AlertTriangle />
+              <span className="flex-1">{notice || project?.project.error?.message}</span>
+              <X />
+            </Button>
+          )}
+
+          {!project?.sections.length && !["script_generating", "analyzing"].includes(active ?? "") && (
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center text-muted">
+              <span className="grid size-12 place-items-center rounded-full bg-surface-muted">
+                <Film className="size-5" />
+              </span>
+              <b className="font-medium text-body-strong">产出物将在这里呈现</b>
             </div>
-            {project.project.finalArtifactId && (
-              <div className="m-3 grid grid-cols-[112px_1fr] gap-4 rounded-xl border border-line bg-canvas-soft p-3 [&_img]:h-36 [&_img]:w-28 [&_img]:rounded-lg [&_img]:object-cover [&_video]:h-36 [&_video]:w-28 [&_video]:rounded-lg [&_video]:object-cover">
-                <AuthenticatedMedia
-                  url={`/api/artifacts/${project.project.finalArtifactId}`}
-                  mimeType="video/mp4"
-                  alt="最终成片"
-                />
-                <div className="flex min-w-0 flex-col items-start justify-center gap-2">
-                  <h2 className="text-base font-medium text-ink">完整成片已生成</h2>
+          )}
+          {["script_generating", "analyzing", "storyboard_generating", "composing"].includes(active ?? "") && (
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center text-muted">
+              <span className="grid size-12 place-items-center rounded-full bg-surface-muted text-ink">
+                <LoaderCircle className="animate-spin" />
+              </span>
+              <h2 className="text-base font-medium text-ink">{statusLabels[active ?? ""]}</h2>
+              <p className="text-xs">任务在 Worker 中执行，关闭页面后也会继续。</p>
+            </div>
+          )}
+
+          {tab === "script" && project?.sections.length ? (
+            <section className="flex min-h-0 flex-1 flex-col">
+              <div className="flex h-12 shrink-0 items-center justify-between border-b border-line bg-canvas-soft px-3">
+                <span className="text-xs text-muted">
+                  共 <b>{totalCharacters}</b> 字 · 约 <b>{totalDuration}s</b>
+                </span>
+                <div className="flex gap-2">
                   <Button
+                    variant="outline"
                     size="sm"
                     onClick={() =>
-                      void downloadAuthenticated(
-                        `/api/artifacts/${project.project.finalArtifactId}`,
-                        `${project.project.title}.mp4`,
+                      void navigator.clipboard.writeText(
+                        project.sections
+                          .map((section) => drafts[section.id] ?? section.currentVersion?.text ?? "")
+                          .join("\n"),
                       )
                     }
                   >
-                    <Download /> 下载成片
+                    <Copy />
+                    复制脚本
+                  </Button>
+                  <Button
+                    className="text-error hover:text-error"
+                    variant="outline"
+                    size="sm"
+                    disabled={Boolean(busy) || polling}
+                    onClick={() => setClearScriptDialogOpen(true)}
+                  >
+                    <Trash2 />
+                    清除脚本
                   </Button>
                 </div>
               </div>
-            )}
-            <div className="min-h-0 flex-1 overflow-auto pb-16">
-              <div className="grid h-10 min-w-[1120px] grid-cols-[40px_minmax(240px,1fr)_minmax(240px,1fr)_minmax(280px,1fr)_minmax(280px,1fr)] items-center border-b border-line bg-canvas-soft text-xs font-medium text-muted">
-                <span>#</span>
-                <span>分镜段落</span>
-                <span className="flex items-center justify-between gap-2 pr-3">
-                  素材
-                  <Button
-                    className="h-7 px-2"
-                    variant="outline"
-                    size="sm"
-                    disabled={!batchEligibleShots.length || Boolean(busy)}
-                    onClick={() => setBatchDialogOpen(true)}
-                  >
-                    <WandSparkles /> 批量生成
-                  </Button>
-                </span>
-                <span className="flex items-center justify-between px-3">
-                  <span className="flex items-center gap-1.5">
-                    <Mic className="size-4" />
-                    配音
-                    <Button
-                      className="size-7 p-0"
-                      variant="ghost"
-                      size="icon"
-                      aria-label="配音设置"
-                      onClick={() => setVoiceSettingsOpen(true)}
-                    >
-                      <Settings2 />
-                    </Button>
-                  </span>
-                  <Switch
-                    checked={project.shots.every((item) => item.audioEnabled)}
-                    aria-label="全部分镜配音"
-                    disabled={Boolean(busy)}
-                    onCheckedChange={(checked) =>
-                      void execute("audio-all", async () => {
-                        const next = await updateAllVideoCreateShotOptions(project.project.id, {
-                          audioEnabled: checked,
-                        });
-                        invalidate(next);
-                      })
-                    }
-                  />
-                </span>
-                <span className="flex items-center justify-between px-3">
-                  <span className="flex items-center gap-1.5">
-                    <Captions className="size-4" />
-                    字幕
-                    <Button
-                      className="size-7 p-0"
-                      variant="ghost"
-                      size="icon"
-                      aria-label="字幕样式设置"
-                      onClick={() => setSubtitleSettingsOpen(true)}
-                    >
-                      <Settings2 />
-                    </Button>
-                  </span>
-                  <Switch
-                    checked={project.shots.every((item) => item.subtitleEnabled)}
-                    aria-label="全部分镜字幕"
-                    disabled={Boolean(busy)}
-                    onCheckedChange={(checked) =>
-                      void execute("subtitle-all", async () => {
-                        const next = await updateAllVideoCreateShotOptions(project.project.id, {
-                          subtitleEnabled: checked,
-                        });
-                        invalidate(next);
-                      })
-                    }
-                  />
-                </span>
-              </div>
-              {project.shots.map((shot) => {
-                const generating = shot.status === "queued" || shot.status === "generating" || shot.materialProcessing;
-                return (
-                  <article
-                    className="grid min-h-64 min-w-[1120px] grid-cols-[40px_minmax(240px,1fr)_minmax(240px,1fr)_minmax(280px,1fr)_minmax(280px,1fr)] border-b border-line"
-                    key={shot.id}
-                  >
-                    <span className="border-r border-line p-3 text-xs text-muted">
-                      {String(shot.ordinal).padStart(2, "0")}
-                    </span>
-                    <div className="space-y-2 border-r border-line p-3">
-                      <span className="inline-flex rounded-full bg-surface-strong px-2 py-1 text-xs text-muted">
-                        {shot.durationSec}s
-                      </span>
-                      <p className="leading-relaxed text-body">{shot.narration}</p>
-                      <small className="text-xs text-muted">0–{shot.durationSec}s · 1 镜</small>
-                    </div>
-                    <div className="border-r border-line p-3">
-                      {shot.videoAssetId ? (
-                        <div className="h-36 w-24 overflow-hidden rounded-lg bg-surface-muted [&_img]:h-full [&_img]:w-full [&_img]:object-cover [&_video]:h-full [&_video]:w-full [&_video]:object-cover">
-                          <AuthenticatedMedia
-                            url={
-                              shot.status === "replaced"
-                                ? `/api/assets/${shot.videoAssetId}/content`
-                                : `/api/artifacts/${shot.videoAssetId}`
+              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+                {project.sections.map((section) => {
+                  const version = section.currentVersion;
+                  const value = drafts[section.id] ?? version?.text ?? "";
+                  const dirty = value !== (version?.text ?? "");
+                  return (
+                    <article className="overflow-hidden rounded-xl border border-line bg-surface" key={section.id}>
+                      <header className="flex min-h-10 items-center justify-between border-b border-line bg-canvas-soft px-3 py-2">
+                        <span className="rounded-full bg-surface-strong px-2.5 py-1 text-xs font-medium text-ink">
+                          {section.label}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted">
+                            {estimateDuration(value, input.speechRate)}s · {[...value].length}字
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={!version || actionAvailability.scriptLocked || Boolean(busy) || polling}
+                            onClick={() =>
+                              execute(`regen-${section.id}`, async () => {
+                                if (!version) return;
+                                await regenerateVideoCreateScriptSection({
+                                  projectId: project.project.id,
+                                  sectionId: section.id,
+                                  expectedVersionId: version.id,
+                                });
+                                void queryClient.invalidateQueries({
+                                  queryKey: ["video-create-project", project.project.id],
+                                });
+                              })
                             }
-                            mimeType="video/mp4"
-                            alt={`分镜 ${shot.ordinal}`}
+                          >
+                            <RefreshCw />
+                            换一版
+                          </Button>
+                          <Pencil className="size-4 text-muted" />
+                        </div>
+                      </header>
+                      <textarea
+                        className="min-h-24 w-full resize-y bg-transparent p-3 text-sm leading-relaxed text-body outline-none disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-muted"
+                        value={value}
+                        disabled={actionAvailability.scriptLocked}
+                        onChange={(event) => setDrafts((current) => ({ ...current, [section.id]: event.target.value }))}
+                      />
+                      {dirty && (
+                        <footer className="flex justify-end border-t border-line px-3 py-2">
+                          <Button
+                            size="sm"
+                            disabled={actionAvailability.scriptLocked || Boolean(busy) || polling}
+                            onClick={() =>
+                              execute(`save-${section.id}`, async () => {
+                                if (!version) return;
+                                const next = await saveVideoCreateScriptSection({
+                                  projectId: project.project.id,
+                                  sectionId: section.id,
+                                  expectedVersionId: version.id,
+                                  text: value,
+                                  durationSec: estimateDuration(value, input.speechRate),
+                                });
+                                setDrafts((current) => {
+                                  const copy = { ...current };
+                                  delete copy[section.id];
+                                  return copy;
+                                });
+                                invalidate(next);
+                              })
+                            }
+                          >
+                            <Check />
+                            保存修改
+                          </Button>
+                        </footer>
+                      )}
+                    </article>
+                  );
+                })}
+              </div>
+              <footer className="flex h-14 shrink-0 items-center justify-end border-t border-line bg-surface px-3">
+                <Button
+                  className="rounded-full"
+                  disabled={actionAvailability.storyboardLocked || Boolean(busy) || polling}
+                  onClick={() => action("storyboard")}
+                >
+                  {busy === "storyboard" || active === "storyboard_generating" ? (
+                    <LoaderCircle className="animate-spin" />
+                  ) : actionAvailability.storyboardLocked ? (
+                    <Check />
+                  ) : (
+                    <WandSparkles />
+                  )}
+                  {actionAvailability.storyboardLabel}
+                </Button>
+              </footer>
+            </section>
+          ) : null}
+
+          {tab === "storyboard" && project?.shots.length ? (
+            <section className="flex min-h-0 flex-1 flex-col">
+              <div className="flex h-12 shrink-0 items-center border-b border-line bg-canvas-soft px-3">
+                <div className="flex items-center gap-2">
+                  <b className="font-medium text-ink">分镜编辑</b>
+                  <span className="rounded-full bg-surface-strong px-2 py-0.5 text-xs text-muted">
+                    {project.shots.length} 个段落
+                  </span>
+                </div>
+              </div>
+              {project.project.finalArtifactId && (
+                <div className="m-3 grid grid-cols-[112px_1fr] gap-4 rounded-xl border border-line bg-canvas-soft p-3 [&_img]:h-36 [&_img]:w-28 [&_img]:rounded-lg [&_img]:object-cover [&_video]:h-36 [&_video]:w-28 [&_video]:rounded-lg [&_video]:object-cover">
+                  <AuthenticatedMedia
+                    url={`/api/artifacts/${project.project.finalArtifactId}`}
+                    mimeType="video/mp4"
+                    alt="最终成片"
+                  />
+                  <div className="flex min-w-0 flex-col items-start justify-center gap-2">
+                    <h2 className="text-base font-medium text-ink">完整成片已生成</h2>
+                    <Button
+                      size="sm"
+                      onClick={() =>
+                        void downloadAuthenticated(
+                          `/api/artifacts/${project.project.finalArtifactId}`,
+                          `${project.project.title}.mp4`,
+                        )
+                      }
+                    >
+                      <Download /> 下载成片
+                    </Button>
+                  </div>
+                </div>
+              )}
+              <div className="min-h-0 flex-1 overflow-auto pb-16">
+                <div className="grid h-10 min-w-[1120px] grid-cols-[40px_minmax(240px,1fr)_minmax(240px,1fr)_minmax(280px,1fr)_minmax(280px,1fr)] items-center border-b border-line bg-canvas-soft text-xs font-medium text-muted">
+                  <span>#</span>
+                  <span>分镜段落</span>
+                  <span className="flex items-center justify-between gap-2 pr-3">
+                    素材
+                    <Button
+                      className="h-7 px-2"
+                      variant="outline"
+                      size="sm"
+                      disabled={!batchEligibleShots.length || Boolean(busy)}
+                      onClick={() => setBatchDialogOpen(true)}
+                    >
+                      <WandSparkles /> 批量生成
+                    </Button>
+                  </span>
+                  <span className="flex items-center justify-between px-3">
+                    <span className="flex items-center gap-1.5">
+                      <Mic className="size-4" />
+                      配音
+                      <Button
+                        className="size-7 p-0"
+                        variant="ghost"
+                        size="icon"
+                        aria-label="配音设置"
+                        onClick={() => setVoiceSettingsOpen(true)}
+                      >
+                        <Settings2 />
+                      </Button>
+                    </span>
+                    <Switch
+                      checked={project.shots.every((item) => item.audioEnabled)}
+                      aria-label="全部分镜配音"
+                      disabled={Boolean(busy)}
+                      onCheckedChange={(checked) =>
+                        void execute("audio-all", async () => {
+                          const next = await updateAllVideoCreateShotOptions(project.project.id, {
+                            audioEnabled: checked,
+                          });
+                          invalidate(next);
+                        })
+                      }
+                    />
+                  </span>
+                  <span className="flex items-center justify-between px-3">
+                    <span className="flex items-center gap-1.5">
+                      <Captions className="size-4" />
+                      字幕
+                      <Button
+                        className="size-7 p-0"
+                        variant="ghost"
+                        size="icon"
+                        aria-label="字幕样式设置"
+                        onClick={() => setSubtitleSettingsOpen(true)}
+                      >
+                        <Settings2 />
+                      </Button>
+                    </span>
+                    <Switch
+                      checked={project.shots.every((item) => item.subtitleEnabled)}
+                      aria-label="全部分镜字幕"
+                      disabled={Boolean(busy)}
+                      onCheckedChange={(checked) =>
+                        void execute("subtitle-all", async () => {
+                          const next = await updateAllVideoCreateShotOptions(project.project.id, {
+                            subtitleEnabled: checked,
+                          });
+                          invalidate(next);
+                        })
+                      }
+                    />
+                  </span>
+                </div>
+                {project.shots.map((shot) => {
+                  const generating =
+                    shot.status === "queued" || shot.status === "generating" || shot.materialProcessing;
+                  return (
+                    <article
+                      className="grid min-h-64 min-w-[1120px] grid-cols-[40px_minmax(240px,1fr)_minmax(240px,1fr)_minmax(280px,1fr)_minmax(280px,1fr)] border-b border-line"
+                      key={shot.id}
+                    >
+                      <span className="border-r border-line p-3 text-xs text-muted">
+                        {String(shot.ordinal).padStart(2, "0")}
+                      </span>
+                      <div className="space-y-2 border-r border-line p-3">
+                        <span className="inline-flex rounded-full bg-surface-strong px-2 py-1 text-xs text-muted">
+                          {shot.durationSec}s
+                        </span>
+                        <p className="leading-relaxed text-body">{shot.narration}</p>
+                        <small className="text-xs text-muted">0–{shot.durationSec}s · 1 镜</small>
+                      </div>
+                      <div className="border-r border-line p-3">
+                        {shot.videoAssetId ? (
+                          <div className="h-36 w-24 overflow-hidden rounded-lg bg-surface-muted [&_img]:h-full [&_img]:w-full [&_img]:object-cover [&_video]:h-full [&_video]:w-full [&_video]:object-cover">
+                            <AuthenticatedMedia
+                              url={
+                                shot.status === "replaced"
+                                  ? `/api/assets/${shot.videoAssetId}/content`
+                                  : `/api/artifacts/${shot.videoAssetId}`
+                              }
+                              mimeType="video/mp4"
+                              alt={`分镜 ${shot.ordinal}`}
+                            />
+                          </div>
+                        ) : (
+                          <div
+                            className={cn(
+                              "flex h-36 w-24 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-line bg-surface-muted text-xs text-muted",
+                              shot.status === "failed" && "border-error/40 bg-error/5 text-error",
+                            )}
+                          >
+                            {generating ? (
+                              <LoaderCircle className="animate-spin" />
+                            ) : shot.status === "failed" ? (
+                              <>
+                                <AlertTriangle />
+                                <span>失败</span>
+                              </>
+                            ) : (
+                              <>
+                                <Video />
+                                <span>待生成</span>
+                              </>
+                            )}
+                          </div>
+                        )}
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            disabled={generating || Boolean(busy)}
+                            onClick={() => void openShotGeneration(shot.id)}
+                          >
+                            {generating ? <LoaderCircle className="animate-spin" /> : <Video />}
+                            {shot.status === "failed" ? "重新生成" : shot.videoAssetId ? "再生成" : "AI生成视频"}
+                          </Button>
+                          <AttachmentPicker
+                            accept="video/*"
+                            initialSource="library"
+                            onSelect={([asset]) =>
+                              asset &&
+                              void execute(`replace-${shot.id}`, async () => {
+                                const next = await replaceVideoCreateShotVideo(
+                                  project.project.id,
+                                  shot.id,
+                                  asset.id,
+                                  asset.source === "upload" ? "upload_replacement" : "library_replacement",
+                                );
+                                invalidate(next);
+                              })
+                            }
+                            trigger={(open) => (
+                              <Button variant="outline" size="sm" onClick={open}>
+                                <FolderOpen /> 素材库
+                              </Button>
+                            )}
+                          />
+                          <AttachmentPicker
+                            accept="video/*"
+                            initialSource="upload"
+                            onSelect={([asset]) =>
+                              asset &&
+                              void execute(`upload-replace-${shot.id}`, async () => {
+                                const next = await replaceVideoCreateShotVideo(
+                                  project.project.id,
+                                  shot.id,
+                                  asset.id,
+                                  asset.source === "upload" ? "upload_replacement" : "library_replacement",
+                                );
+                                invalidate(next);
+                              })
+                            }
+                            trigger={(open) => (
+                              <Button variant="outline" size="sm" onClick={open}>
+                                <Upload /> 本地上传
+                              </Button>
+                            )}
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setMaterialHistoryShotId(shot.id);
+                              setMaterialHistoryOpen(true);
+                            }}
+                          >
+                            <History /> 生成历史
+                          </Button>
+                        </div>
+                        {shot.error && <small className="mt-2 block text-xs text-error">{shot.error.message}</small>}
+                      </div>
+                      <div className={cn("border-r border-line p-3", !shot.audioEnabled && "opacity-50")}>
+                        <div className="mb-3 flex items-start justify-between gap-3">
+                          <p className="leading-relaxed text-body">{shot.narration}</p>
+                          <Switch
+                            checked={shot.audioEnabled}
+                            aria-label={`分镜 ${shot.ordinal} 配音`}
+                            disabled={Boolean(busy)}
+                            onCheckedChange={(checked) =>
+                              void execute(`audio-${shot.id}`, async () => {
+                                const next = await updateVideoCreateShotOptions(project.project.id, shot.id, {
+                                  audioEnabled: checked,
+                                  subtitleEnabled: shot.subtitleEnabled,
+                                });
+                                invalidate(next);
+                              })
+                            }
                           />
                         </div>
-                      ) : (
-                        <div
-                          className={cn(
-                            "flex h-36 w-24 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-line bg-surface-muted text-xs text-muted",
-                            shot.status === "failed" && "border-error/40 bg-error/5 text-error",
-                          )}
-                        >
-                          {generating ? (
-                            <LoaderCircle className="animate-spin" />
-                          ) : shot.status === "failed" ? (
-                            <>
-                              <AlertTriangle />
-                              <span>失败</span>
-                            </>
-                          ) : (
-                            <>
-                              <Video />
-                              <span>待生成</span>
-                            </>
-                          )}
-                        </div>
-                      )}
-                      <div className="mt-2 flex flex-wrap gap-2">
+                        {shot.audioArtifactId ? (
+                          <div className="w-full space-y-2 [&_audio]:h-9 [&_audio]:w-full">
+                            <AuthenticatedMedia
+                              url={`/api/artifacts/${shot.audioArtifactId}`}
+                              mimeType="audio/wav"
+                              alt={`分镜 ${shot.ordinal} 配音`}
+                            />
+                            {shot.audioStale && (
+                              <span className="block text-xs text-warning">配音配置已更新，待重新生成</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted">生成分镜视频后可试听配音</span>
+                        )}
                         <Button
-                          size="sm"
-                          disabled={generating || Boolean(busy)}
-                          onClick={() => void openShotGeneration(shot.id)}
-                        >
-                          {generating ? <LoaderCircle className="animate-spin" /> : <Video />}
-                          {shot.status === "failed" ? "重新生成" : shot.videoAssetId ? "再生成" : "AI生成视频"}
-                        </Button>
-                        <AttachmentPicker
-                          accept="video/*"
-                          initialSource="library"
-                          onSelect={([asset]) =>
-                            asset &&
-                            void execute(`replace-${shot.id}`, async () => {
-                              const next = await replaceVideoCreateShotVideo(
-                                project.project.id,
-                                shot.id,
-                                asset.id,
-                                asset.source === "upload" ? "upload_replacement" : "library_replacement",
-                              );
-                              invalidate(next);
-                            })
-                          }
-                          trigger={(open) => (
-                            <Button variant="outline" size="sm" onClick={open}>
-                              <FolderOpen /> 素材库
-                            </Button>
-                          )}
-                        />
-                        <AttachmentPicker
-                          accept="video/*"
-                          initialSource="upload"
-                          onSelect={([asset]) =>
-                            asset &&
-                            void execute(`upload-replace-${shot.id}`, async () => {
-                              const next = await replaceVideoCreateShotVideo(
-                                project.project.id,
-                                shot.id,
-                                asset.id,
-                                asset.source === "upload" ? "upload_replacement" : "library_replacement",
-                              );
-                              invalidate(next);
-                            })
-                          }
-                          trigger={(open) => (
-                            <Button variant="outline" size="sm" onClick={open}>
-                              <Upload /> 本地上传
-                            </Button>
-                          )}
-                        />
-                        <Button
+                          className="mt-3"
                           variant="outline"
                           size="sm"
-                          onClick={() => {
-                            setMaterialHistoryShotId(shot.id);
-                            setMaterialHistoryOpen(true);
-                          }}
+                          disabled={
+                            !voiceAvailability?.enabled ||
+                            !shot.videoAssetId ||
+                            !shot.audioArtifactId ||
+                            generating ||
+                            Boolean(busy)
+                          }
+                          title={!voiceAvailability?.enabled ? voiceAvailability?.disabledReason : undefined}
+                          onClick={() => void processShotMaterial(shot.id, "audio-replace")}
                         >
-                          <History /> 生成历史
+                          {busy === `audio-replace-${shot.id}` ? <LoaderCircle className="animate-spin" /> : <Mic />}
+                          配音替换
                         </Button>
                       </div>
-                      {shot.error && <small className="mt-2 block text-xs text-error">{shot.error.message}</small>}
-                    </div>
-                    <div className={cn("border-r border-line p-3", !shot.audioEnabled && "opacity-50")}>
-                      <div className="mb-3 flex items-start justify-between gap-3">
-                        <p className="leading-relaxed text-body">{shot.narration}</p>
-                        <Switch
-                          checked={shot.audioEnabled}
-                          aria-label={`分镜 ${shot.ordinal} 配音`}
-                          disabled={Boolean(busy)}
-                          onCheckedChange={(checked) =>
-                            void execute(`audio-${shot.id}`, async () => {
-                              const next = await updateVideoCreateShotOptions(project.project.id, shot.id, {
-                                audioEnabled: checked,
-                                subtitleEnabled: shot.subtitleEnabled,
-                              });
-                              invalidate(next);
-                            })
-                          }
-                        />
-                      </div>
-                      {shot.audioArtifactId ? (
-                        <div className="w-full space-y-2 [&_audio]:h-9 [&_audio]:w-full">
-                          <AuthenticatedMedia
-                            url={`/api/artifacts/${shot.audioArtifactId}`}
-                            mimeType="audio/wav"
-                            alt={`分镜 ${shot.ordinal} 配音`}
+                      <div className={cn("p-3", !shot.subtitleEnabled && "opacity-50")}>
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                          <span className="text-xs text-muted">{shot.subtitleCues.length} 条字幕</span>
+                          <Switch
+                            checked={shot.subtitleEnabled}
+                            aria-label={`分镜 ${shot.ordinal} 字幕`}
+                            disabled={Boolean(busy)}
+                            onCheckedChange={(checked) =>
+                              void execute(`subtitle-${shot.id}`, async () => {
+                                const next = await updateVideoCreateShotOptions(project.project.id, shot.id, {
+                                  audioEnabled: shot.audioEnabled,
+                                  subtitleEnabled: checked,
+                                });
+                                invalidate(next);
+                              })
+                            }
                           />
-                          {shot.audioStale && (
-                            <span className="block text-xs text-warning">配音配置已更新，待重新生成</span>
-                          )}
                         </div>
-                      ) : (
-                        <span className="text-xs text-muted">生成分镜视频后可试听配音</span>
-                      )}
-                      <Button
-                        className="mt-3"
-                        variant="outline"
-                        size="sm"
-                        disabled={
-                          !voiceAvailability?.enabled ||
-                          !shot.videoAssetId ||
-                          !shot.audioArtifactId ||
-                          generating ||
-                          Boolean(busy)
-                        }
-                        title={!voiceAvailability?.enabled ? voiceAvailability?.disabledReason : undefined}
-                        onClick={() => void processShotMaterial(shot.id, "audio-replace")}
-                      >
-                        {busy === `audio-replace-${shot.id}` ? <LoaderCircle className="animate-spin" /> : <Mic />}
-                        配音替换
-                      </Button>
-                    </div>
-                    <div className={cn("p-3", !shot.subtitleEnabled && "opacity-50")}>
-                      <div className="mb-3 flex items-center justify-between gap-3">
-                        <span className="text-xs text-muted">{shot.subtitleCues.length} 条字幕</span>
-                        <Switch
-                          checked={shot.subtitleEnabled}
-                          aria-label={`分镜 ${shot.ordinal} 字幕`}
-                          disabled={Boolean(busy)}
-                          onCheckedChange={(checked) =>
-                            void execute(`subtitle-${shot.id}`, async () => {
-                              const next = await updateVideoCreateShotOptions(project.project.id, shot.id, {
-                                audioEnabled: shot.audioEnabled,
-                                subtitleEnabled: checked,
-                              });
-                              invalidate(next);
-                            })
-                          }
-                        />
-                      </div>
-                      {shot.subtitleCues.length ? (
-                        <div className="space-y-2">
-                          {shot.subtitleCues.map((cue) => (
-                            <div key={`${cue.startSec}-${cue.endSec}-${cue.text}`}>
-                              <div className="text-xs text-muted">
-                                {cue.startSec.toFixed(1)}s ～ {cue.endSec.toFixed(1)}s
+                        {shot.subtitleCues.length ? (
+                          <div className="space-y-2">
+                            {shot.subtitleCues.map((cue) => (
+                              <div key={`${cue.startSec}-${cue.endSec}-${cue.text}`}>
+                                <div className="text-xs text-muted">
+                                  {cue.startSec.toFixed(1)}s ～ {cue.endSec.toFixed(1)}s
+                                </div>
+                                <p className="mt-0.5 leading-relaxed text-body">{cue.text}</p>
                               </div>
-                              <p className="mt-0.5 leading-relaxed text-body">{cue.text}</p>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted">生成配音后自动生成字幕时间轴</span>
-                      )}
-                      <Button
-                        className="mt-3"
-                        variant="outline"
-                        size="sm"
-                        disabled={
-                          (shot.subtitlesComposed && !shot.subtitleStyleStale) ||
-                          !shot.videoAssetId ||
-                          !shot.subtitleCues.length ||
-                          generating ||
-                          Boolean(busy)
-                        }
-                        onClick={() => void processShotMaterial(shot.id, "subtitle-compose")}
-                      >
-                        {busy === `subtitle-compose-${shot.id}` ? (
-                          <LoaderCircle className="animate-spin" />
+                            ))}
+                          </div>
                         ) : (
-                          <Captions />
+                          <span className="text-xs text-muted">生成配音后自动生成字幕时间轴</span>
                         )}
-                        {shot.subtitleStyleStale ? "按新样式合成" : shot.subtitlesComposed ? "字幕已合成" : "字幕合成"}
-                      </Button>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-            <footer className="absolute inset-x-0 bottom-0 flex h-14 items-center justify-end gap-3 border-t border-line bg-surface px-3">
-              <span className="text-xs text-muted">
-                {project.canCompose
-                  ? "全部分镜已就绪"
-                  : `还有 ${
-                      project.shots.filter(
-                        (shot) =>
-                          !["succeeded", "replaced"].includes(shot.status) ||
-                          (shot.audioEnabled && !shot.audioArtifactId) ||
-                          (shot.audioEnabled && shot.audioStale) ||
-                          (shot.subtitleEnabled && !shot.subtitleCues.length) ||
-                          (shot.subtitleEnabled && shot.subtitleStyleStale),
-                      ).length
-                    } 个分镜未就绪`}
-              </span>
-              <Button
-                className="rounded-full"
-                disabled={!project.canCompose || Boolean(busy)}
-                onClick={() => action("compose")}
-              >
-                <Film />
-                合并视频
-              </Button>
-            </footer>
-          </section>
-        ) : null}
-      </main>
+                        <Button
+                          className="mt-3"
+                          variant="outline"
+                          size="sm"
+                          disabled={
+                            (shot.subtitlesComposed && !shot.subtitleStyleStale) ||
+                            !shot.videoAssetId ||
+                            !shot.subtitleCues.length ||
+                            generating ||
+                            Boolean(busy)
+                          }
+                          onClick={() => void processShotMaterial(shot.id, "subtitle-compose")}
+                        >
+                          {busy === `subtitle-compose-${shot.id}` ? (
+                            <LoaderCircle className="animate-spin" />
+                          ) : (
+                            <Captions />
+                          )}
+                          {shot.subtitleStyleStale
+                            ? "按新样式合成"
+                            : shot.subtitlesComposed
+                              ? "字幕已合成"
+                              : "字幕合成"}
+                        </Button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+              <footer className="absolute inset-x-0 bottom-0 flex h-14 items-center justify-end gap-3 border-t border-line bg-surface px-3">
+                <span className="text-xs text-muted">
+                  {project.canCompose
+                    ? "全部分镜已就绪"
+                    : `还有 ${
+                        project.shots.filter(
+                          (shot) =>
+                            !["succeeded", "replaced"].includes(shot.status) ||
+                            (shot.audioEnabled && !shot.audioArtifactId) ||
+                            (shot.audioEnabled && shot.audioStale) ||
+                            (shot.subtitleEnabled && !shot.subtitleCues.length) ||
+                            (shot.subtitleEnabled && shot.subtitleStyleStale),
+                        ).length
+                      } 个分镜未就绪`}
+                </span>
+                <Button
+                  className="rounded-full"
+                  disabled={!project.canCompose || Boolean(busy)}
+                  onClick={() => action("compose")}
+                >
+                  <Film />
+                  合并视频
+                </Button>
+              </footer>
+            </section>
+          ) : null}
+        </main>
+      </div>
       <Dialog open={batchDialogOpen} onOpenChange={setBatchDialogOpen}>
         <DialogContent className="max-h-[calc(100vh-32px)] overflow-y-auto p-0">
           <DialogHeader className="border-b border-line px-5 py-4">

@@ -313,7 +313,7 @@ export async function clearVideoCreateScript(projectId: string) {
 
 export async function runVideoCreateProjectAction(
   projectId: string,
-  action: "analyze" | "script" | "storyboard" | "compose",
+  action: "analyze" | "script" | "storyboard" | "compose" | "full",
 ) {
   configure();
   const { data } = await runVideoCreateAction({

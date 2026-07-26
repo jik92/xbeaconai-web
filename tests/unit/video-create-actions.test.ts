@@ -4,6 +4,17 @@ import { resolve } from "node:path";
 import { videoCreateActionAvailability } from "../../web/features/video-create/video-create-actions";
 
 describe("video create action boundaries", () => {
+  test("uses one shared header for the four project actions above the two-column workbench", () => {
+    const source = readFileSync(
+      resolve(import.meta.dir, "../../web/features/video-create/video-create-page.tsx"),
+      "utf8",
+    );
+    for (const label of ["一键生成", "保存草稿", "生成记录", "新建"]) expect(source).toContain(label);
+    expect(source.match(/<h1[^>]*>新建项目<\/h1>/g)).toHaveLength(1);
+    expect(source.match(/<History \/> 生成记录/g)).toHaveLength(1);
+    expect(source).toContain('className="grid min-h-0 flex-1 grid-cols-[360px_minmax(0,1fr)]');
+    expect(source).toContain('runVideoCreateProjectAction(saved.project.id, "full")');
+  });
   test("keeps script generation available before a storyboard exists", () => {
     expect(videoCreateActionAvailability({ hasScript: false, hasStoryboard: false })).toEqual({
       scriptLabel: "生成脚本",

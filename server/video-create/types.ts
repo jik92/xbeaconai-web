@@ -120,7 +120,7 @@ export const VideoCreateSubtitleStyleIdSchema = z.enum(videoCreateSubtitlePreset
 
 export const VideoCreateInputSchema = z
   .object({
-    productAssetIds: z.array(z.string().uuid()).min(1).max(6),
+    productAssetIds: z.array(z.string().uuid()).max(6),
     portraitReference: PortraitReferenceSchema.optional(),
     /** @deprecated Kept only for projects persisted before explicit portrait references. */
     portraitId: z.number().int().min(1).optional(),

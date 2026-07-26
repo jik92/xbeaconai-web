@@ -420,7 +420,7 @@ export const zAdScriptProject = z.object({
 });
 
 export const zVideoCreateInput = z.object({
-    productAssetIds: z.array(z.uuid()).min(1).max(6),
+    productAssetIds: z.array(z.uuid()).max(6),
     portraitReference: z.union([
         z.object({
             type: z.enum(['general']),
@@ -699,6 +699,8 @@ export const zVideoCreateProject = z.object({
         recommendation: zVideoCreateRecommendation,
         currentJobId: z.uuid(),
         finalArtifactId: z.uuid(),
+        autoGenerate: z.boolean(),
+        autoGenerateRunId: z.uuid(),
         version: z.int().gte(1),
         idempotencyKey: z.string(),
         error: z.object({
@@ -2415,7 +2417,8 @@ export const zRunVideoCreateActionPath = z.object({
         'analyze',
         'script',
         'storyboard',
-        'compose'
+        'compose',
+        'full'
     ])
 });
 

@@ -127,6 +127,13 @@
       "when": 1785022003337,
       "tag": "0017_quiet_ultron",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1785031233228,
+      "tag": "0018_premium_sentinel",
+      "breakpoints": true
     }
   ]
 }

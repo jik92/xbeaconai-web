@@ -6,6 +6,7 @@ import type { CustomPortraitStore } from "../server/portraits/custom-portrait-st
 import { ossutils } from "../server/storage/ossutils";
 import type { JobRecord } from "../server/types";
 import type { VideoCreateStore } from "../server/video-create/video-create-store";
+import { advanceVideoCreateAutoWorkflow } from "../server/video-create/auto-workflow";
 import { safelySyncProviderGenerationAudits } from "./jobs/provider-audit";
 import { findJobHandler } from "./jobs/registry";
 import type { JobHandlerContext } from "./jobs/types";
@@ -23,6 +24,7 @@ export class JobProcessor {
     readonly videoCreates?: VideoCreateStore,
     readonly providerAudits?: ProviderGenerationAuditStore,
     readonly customPortraits?: CustomPortraitStore,
+    readonly enqueueJob?: (jobId: string) => Promise<void>,
   ) {
     this.context = {
       store,
@@ -37,6 +39,18 @@ export class JobProcessor {
 
   async startMaintenance() {
     await this.recoverObjectCleanup();
+    if (this.videoCreates && this.accounts && this.customPortraits && this.enqueueJob)
+      for (const aggregate of this.videoCreates.listAutoGenerateProjects())
+        await advanceVideoCreateAutoWorkflow(
+          {
+            store: this.store,
+            videoCreates: this.videoCreates,
+            accounts: this.accounts,
+            customPortraits: this.customPortraits,
+            queue: { enqueue: this.enqueueJob },
+          },
+          aggregate.project.id,
+        );
   }
 
   private async recoverObjectCleanup() {
@@ -64,6 +78,25 @@ export class JobProcessor {
     if (!job || job.status === "cancelled") return;
     try {
       await findJobHandler(job).execute(job, this.context);
+      const updated = this.store.get(id);
+      if (
+        updated?.moduleId === "video-create" &&
+        this.videoCreates &&
+        this.accounts &&
+        this.customPortraits &&
+        this.enqueueJob
+      )
+        await advanceVideoCreateAutoWorkflow(
+          {
+            store: this.store,
+            videoCreates: this.videoCreates,
+            accounts: this.accounts,
+            customPortraits: this.customPortraits,
+            queue: { enqueue: this.enqueueJob },
+          },
+          updated.values.projectId ?? "",
+          updated,
+        );
     } finally {
       safelySyncProviderGenerationAudits(this.providerAudits, this.store.get(id));
     }

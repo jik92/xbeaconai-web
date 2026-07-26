@@ -1336,6 +1336,14 @@
                 "nullable": true,
                 "format": "uuid"
               },
+              "autoGenerate": {
+                "type": "boolean"
+              },
+              "autoGenerateRunId": {
+                "type": "string",
+                "nullable": true,
+                "format": "uuid"
+              },
               "version": {
                 "type": "integer",
                 "minimum": 1
@@ -1384,6 +1392,8 @@
               "recommendation",
               "currentJobId",
               "finalArtifactId",
+              "autoGenerate",
+              "autoGenerateRunId",
               "version",
               "idempotencyKey",
               "createdAt",
@@ -1847,7 +1857,6 @@
               "type": "string",
               "format": "uuid"
             },
-            "minItems": 1,
             "maxItems": 6
           },
           "portraitReference": {
@@ -9773,7 +9782,8 @@
                 "analyze",
                 "script",
                 "storyboard",
-                "compose"
+                "compose",
+                "full"
               ]
             },
             "required": true,
