@@ -1,6 +1,6 @@
 BUN ?= bun
 
-.PHONY: _check_bun run-dev run-server run-worker lint test ci
+.PHONY: _check_bun run-dev run-server run-worker db-generate db-migrate lint test ci
 
 _check_bun:
 	@command -v $(BUN) >/dev/null 2>&1 || { echo "Error: Bun ('$(BUN)') not found. Please install Bun or set BUN=/path/to/bun." >&2; exit 1; }
@@ -13,6 +13,12 @@ run-server: _check_bun
 
 run-worker: _check_bun
 	$(BUN) run dev:worker
+
+db-generate: _check_bun
+	$(BUN) run db:generate
+
+db-migrate: _check_bun
+	$(BUN) run db:migrate
 
 lint: _check_bun
 	$(BUN) run format:check
