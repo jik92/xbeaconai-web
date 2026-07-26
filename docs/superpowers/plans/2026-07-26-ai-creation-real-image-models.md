@@ -1,6 +1,6 @@
 # AI Creation Real Image Models Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Replace every Mock image model in AI 创作 with a verified real AIHubMix-backed implementation and remove the nonexistent Seedream 5 Pro entry.
 
@@ -30,7 +30,7 @@
 - Produces: `ImageModelId`, `ImageProviderProtocol`, `ImageModelDefinition`, `imageModelDefinitions`, `getImageModelDefinition(id)`.
 - Consumes: existing `CreationModelCapability`.
 
-- [ ] **Step 1: Write the failing model-directory test**
+- [x] **Step 1: Write the failing model-directory test**
 
 Assert that the image capability IDs are exactly the seven approved product IDs, no item uses Mock, every model has a Provider mapping, and GPT Image 2 requires a reference:
 
@@ -48,13 +48,13 @@ expect(imageModels.every((model) => model.executionMode === "real")).toBeTrue();
 expect(imageModels.find((model) => model.id === "gpt-image-2-stable")?.minReferences).toBe(1);
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run: `bun test tests/unit/creation-capabilities.test.ts`
 
 Expected: FAIL because seven entries are still Mock, `seedream-5-pro` exists, and `minReferences` is absent.
 
-- [ ] **Step 3: Implement the typed catalog**
+- [x] **Step 3: Implement the typed catalog**
 
 Create definitions with stable and Provider IDs:
 
@@ -89,13 +89,13 @@ Populate exact mappings:
 
 Extend `CreationModelCapability` with `minReferences` and `maxReferences`, and derive image capabilities entirely from this catalog.
 
-- [ ] **Step 4: Run the test and verify GREEN**
+- [x] **Step 4: Run the test and verify GREEN**
 
 Run: `bun test tests/unit/creation-capabilities.test.ts`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/creation/image-models.ts server/creation/capabilities.ts tests/unit/creation-capabilities.test.ts
@@ -117,7 +117,7 @@ git commit -m "feat: publish real image model catalog"
   `generateGeminiInteractionImages(input: AihubmixGeminiImageInput): Promise<AihubmixImageResult[]>`,
   `generateGeminiContentImages(input: AihubmixGeminiImageInput): Promise<AihubmixImageResult[]>`.
 
-- [ ] **Step 1: Add failing Seedream request/response tests**
+- [x] **Step 1: Add failing Seedream request/response tests**
 
 Use an injected fetch function and assert:
 
@@ -138,23 +138,23 @@ expect(JSON.parse(String(init?.body))).toEqual({
 
 Cover both `{ output: ["https://..."] }` and OpenAI-shaped `{ data: [{ url: "https://..." }] }` normalization, rejecting empty output.
 
-- [ ] **Step 2: Run the Seedream test and verify RED**
+- [x] **Step 2: Run the Seedream test and verify RED**
 
 Run: `bun test tests/unit/aihubmix-image.test.ts`
 
 Expected: FAIL because `generateSeedreamImages` does not exist.
 
-- [ ] **Step 3: Implement the Seedream Predictions adapter**
+- [x] **Step 3: Implement the Seedream Predictions adapter**
 
 Add a typed input containing `model`, `prompt`, `size`, `count`, and `imageUrls`. Submit exactly one mutating POST and normalize URL/Base64 outputs without retrying the paid request.
 
-- [ ] **Step 4: Run the Seedream test and verify GREEN**
+- [x] **Step 4: Run the Seedream test and verify GREEN**
 
 Run: `bun test tests/unit/aihubmix-image.test.ts`
 
 Expected: PASS.
 
-- [ ] **Step 5: Add failing Gemini tests**
+- [x] **Step 5: Add failing Gemini tests**
 
 Add `@google/genai` at version `^2.0.0`, but inject a narrow Gemini client in tests. Assert Nano Banana 2 receives:
 
@@ -169,23 +169,23 @@ Add `@google/genai` at version `^2.0.0`, but inject a narrow Gemini client in te
 
 Assert Nano Banana Pro receives non-streaming `generateContent` parts with text and optional `inlineData`, uppercase `1K/2K/4K`, and extracts every returned image part.
 
-- [ ] **Step 6: Run the Gemini tests and verify RED**
+- [x] **Step 6: Run the Gemini tests and verify RED**
 
 Run: `bun test tests/unit/aihubmix-image.test.ts`
 
 Expected: FAIL because the Gemini adapter methods do not exist.
 
-- [ ] **Step 7: Implement Gemini adapters**
+- [x] **Step 7: Implement Gemini adapters**
 
 Construct `GoogleGenAI` with the existing AIHubMix key and `{ baseUrl: "<base>/gemini" }`. Reject reference payloads above the existing 20 MB inline limit, malformed Base64, and responses without image data.
 
-- [ ] **Step 8: Run Provider tests and verify GREEN**
+- [x] **Step 8: Run Provider tests and verify GREEN**
 
 Run: `bun test tests/unit/aihubmix-image.test.ts`
 
 Expected: PASS.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add package.json bun.lock server/providers/aihubmix.ts tests/unit/aihubmix-image.test.ts
@@ -203,7 +203,7 @@ git commit -m "feat: add Seedream and Gemini image providers"
 - Consumes: `getImageModelDefinition`, normalized `AihubmixImageResult[]`, owned `MediaAsset`s.
 - Produces: real image artifacts whose provenance model is the exact Provider model ID.
 
-- [ ] **Step 1: Write failing Worker routing tests**
+- [x] **Step 1: Write failing Worker routing tests**
 
 Extend the injected image client to capture `generateImages`, `editImages`, `generateSeedreamImages`,
 `generateGeminiInteractionImages`, and `generateGeminiContentImages`. Add one test per protocol:
@@ -221,13 +221,13 @@ expect(openAiEditCalls[0]).toMatchObject({ model: "gpt-image-2" });
 
 Assert no Mock artifact or fallback call exists and lineage records the Provider model ID.
 
-- [ ] **Step 2: Run Worker tests and verify RED**
+- [x] **Step 2: Run Worker tests and verify RED**
 
 Run: `bun test tests/unit/ai-generate-worker.test.ts`
 
 Expected: FAIL because the Worker always forwards the product ID to OpenAI Images.
 
-- [ ] **Step 3: Implement protocol-aware routing**
+- [x] **Step 3: Implement protocol-aware routing**
 
 Resolve the definition before any paid request. Load byte references for OpenAI/Gemini and short-lived signed read URLs for Seedream:
 
@@ -246,7 +246,7 @@ switch (definition.protocol) {
 
 Use `definition.providerModel` for the upstream request and provenance. Keep cancellation checks before and after the paid call, response decoding, artifact ownership, and error redaction.
 
-- [ ] **Step 4: Run Worker tests and verify GREEN**
+- [x] **Step 4: Run Worker tests and verify GREEN**
 
 Run:
 
@@ -257,7 +257,7 @@ bun test tests/unit/worker-job-registry.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add worker/jobs/job-ai-generate.ts tests/integration/ai-generate-worker-isolated.test.ts tests/unit/ai-generate-worker.test.ts
@@ -277,7 +277,7 @@ git commit -m "feat: route AI image jobs by provider protocol"
 - Consumes: `CreationModelCapability.minReferences`, `.maxReferences`, and existing `referenceAssetIds`.
 - Produces: early structured rejection for unsupported reference counts and a disabled submit state in the composer.
 
-- [ ] **Step 1: Write failing API capability tests**
+- [x] **Step 1: Write failing API capability tests**
 
 Assert the capability response contains seven real image models and no `seedream-5-pro`. Submit GPT Image 2 without a reference and expect:
 
@@ -290,23 +290,23 @@ expect(await response.json()).toMatchObject({
 
 Also submit more references than a model supports and expect a 422 before credits or queue mutation.
 
-- [ ] **Step 2: Run API tests and verify RED**
+- [x] **Step 2: Run API tests and verify RED**
 
 Run: `bun test tests/unit/ai-generate-api.test.ts`
 
 Expected: FAIL because reference counts are not part of capability validation.
 
-- [ ] **Step 3: Implement API reference-count validation**
+- [x] **Step 3: Implement API reference-count validation**
 
 Add `referenceCount` to the values passed into `validateCreationValues`, check `minReferences`/`maxReferences`, and add both fields to `creationModelSchema`. Keep MIME and ownership checks after capability validation and before charging.
 
-- [ ] **Step 4: Run API tests and verify GREEN**
+- [x] **Step 4: Run API tests and verify GREEN**
 
 Run: `bun test tests/unit/ai-generate-api.test.ts`
 
 Expected: PASS.
 
-- [ ] **Step 5: Write and satisfy the frontend test**
+- [x] **Step 5: Write and satisfy the frontend test**
 
 Update the page test to assert model options no longer display `Mock` and `Seedream 5 Pro` is absent. Disable submission with the API-compatible reference-count message when the selected model requires a reference. Re-run:
 
@@ -319,7 +319,7 @@ bun test tests/unit/ai-generate-runtime.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/app.ts web/features/ai-generate/ai-generate-page.tsx tests/integration/ai-generate-api-isolated.test.ts tests/unit/ai-generate-api.test.ts tests/unit/ai-generate-page.test.ts
@@ -339,11 +339,11 @@ git commit -m "feat: enforce real image model capabilities"
 - Consumes: final API schema and exact Provider model IDs.
 - Produces: regenerated SDK, model doctor coverage, and checked-off implementation record.
 
-- [ ] **Step 1: Add registry/doctor coverage**
+- [x] **Step 1: Add registry/doctor coverage**
 
 Publish separate image registry entries for the three protocol families so verification evidence identifies the exact real model path rather than treating GPT Image 1 Mini as proof for every model.
 
-- [ ] **Step 2: Regenerate API artifacts**
+- [x] **Step 2: Regenerate API artifacts**
 
 Run:
 
@@ -354,7 +354,7 @@ bun run api:generate
 
 Expected: generated capability types include `minReferences` and `maxReferences`; no generated file is hand-edited.
 
-- [ ] **Step 3: Run focused verification**
+- [x] **Step 3: Run focused verification**
 
 Run:
 
@@ -366,7 +366,7 @@ bun run build
 
 Expected: all commands PASS.
 
-- [ ] **Step 4: Run the repository baseline**
+- [x] **Step 4: Run the repository baseline**
 
 Run:
 
@@ -378,7 +378,7 @@ bun run build
 
 Expected: image-model work passes. If the two previously observed FFmpeg failures remain, record their exact unchanged output and do not modify unrelated video/subtitle code.
 
-- [ ] **Step 5: Audit the completed scope**
+- [x] **Step 5: Audit the completed scope**
 
 Run:
 
@@ -390,7 +390,7 @@ git status --short
 
 Expected: no Mock image model or removed model remains; only intended source/generated files and the pre-existing `.DS_Store` appear.
 
-- [ ] **Step 6: Mark this plan complete and commit**
+- [x] **Step 6: Mark this plan complete and commit**
 
 Check every completed box in this file, then:
 
@@ -399,7 +399,7 @@ git add docs/superpowers/plans/2026-07-26-ai-creation-real-image-models.md opena
 git commit -m "chore: verify real AI image models"
 ```
 
-- [ ] **Step 7: Push the branch**
+- [x] **Step 7: Push the branch**
 
 Run:
 

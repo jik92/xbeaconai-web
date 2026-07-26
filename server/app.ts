@@ -463,7 +463,6 @@ function getVerifiedSdkIds(): Set<string> {
 }
 
 function videoModelEnabled(modelId: string) {
-  if (env.forceMock || env.mockGenerateVideoApi) return true;
   const sdk = auditSdkRegistry().find((item) => item.model === modelId && item.capability === "video-generate");
   return Boolean(sdk && getVerifiedSdkIds().has(sdk.id));
 }
@@ -1476,11 +1475,7 @@ const creationCapabilitiesRoute = createRoute({
 app.openapi(creationCapabilitiesRoute, (c) =>
   c.json(
     {
-      models: creationCapabilities(
-        videoModelEnabled,
-        env.mockGenerateVideoApi ? "mock" : "real",
-        getVerifiedSdkIds().has("aihubmix-image"),
-      ),
+      models: creationCapabilities(videoModelEnabled, getVerifiedSdkIds().has("aihubmix-image")),
     },
     200,
   ),
@@ -1549,11 +1544,7 @@ app.openapi(createAiGenerateJobRoute, async (c) => {
       403,
     );
 
-  const models = creationCapabilities(
-    videoModelEnabled,
-    env.mockGenerateVideoApi ? "mock" : "real",
-    getVerifiedSdkIds().has("aihubmix-image"),
-  );
+  const models = creationCapabilities(videoModelEnabled, getVerifiedSdkIds().has("aihubmix-image"));
   const capabilityValues = {
     creationKind: body.kind,
     prompt: body.prompt,
@@ -1563,9 +1554,7 @@ app.openapi(createAiGenerateJobRoute, async (c) => {
     count: String(body.kind === "image" ? body.count : 1),
     duration: String(body.kind === "video" ? body.duration : 0),
     referenceMode: body.kind === "video" ? body.referenceMode : "",
-    referenceCount: String(
-      body.referenceAssetIds.length || (body.parentJobId && body.revisionMode !== "new" ? 1 : 0),
-    ),
+    referenceCount: String(body.referenceAssetIds.length || (body.parentJobId && body.revisionMode !== "new" ? 1 : 0)),
     seed: "",
   };
   const validationError = validateCreationValues(capabilityValues, models);
@@ -4193,11 +4182,7 @@ app.openapi(remixShotGenerationRoute, async (c) => {
     referenceMode: body.referenceMode,
     duration: String(body.duration),
   };
-  const models = creationCapabilities(
-    videoModelEnabled,
-    env.mockGenerateVideoApi ? "mock" : "real",
-    getVerifiedSdkIds().has("aihubmix-image"),
-  );
+  const models = creationCapabilities(videoModelEnabled, getVerifiedSdkIds().has("aihubmix-image"));
   const validationError = validateCreationValues(creationValues, models);
   if (validationError)
     return c.json(
@@ -4238,7 +4223,7 @@ app.openapi(remixShotGenerationRoute, async (c) => {
     status: "queued",
     progress: 0,
     stage: "排队中",
-    overallExecutionMode: env.mockGenerateVideoApi ? "mock" : "real",
+    overallExecutionMode: "real",
     values: {
       ...creationValues,
       workflowPhase: "shot-generation",
@@ -4753,7 +4738,6 @@ function videoCreateJobRecord(input: {
   const timestamp = new Date().toISOString();
   const operation = input.values.operation;
   const local = operation === "compose" || operation === "audio-replace" || operation === "subtitle-compose";
-  const mockVideo = operation === "shot" && env.mockGenerateVideoApi;
   return {
     id: crypto.randomUUID(),
     ownerUserId: input.ownerUserId,
@@ -4762,31 +4746,28 @@ function videoCreateJobRecord(input: {
     status: "queued",
     progress: 0,
     stage: "排队中",
-    overallExecutionMode: mockVideo ? "mock" : local ? "local" : "real",
+    overallExecutionMode: local ? "local" : "real",
     values: input.values,
     videoModel: input.videoModel,
     executionPlan: [
       {
         id: `plan:0:${operation}`,
         capability: operation,
-        executionMode: mockVideo ? "mock" : local ? "local" : "real",
-        implementation: mockVideo
-          ? "ffmpeg-seedance-mock"
-          : local
-            ? operation === "audio-replace"
-              ? "ffmpeg-audio-replace"
-              : operation === "subtitle-compose"
-                ? "ffmpeg-subtitle"
-                : "ffmpeg-concat"
-            : operation === "analyze"
-              ? "aihubmix-gpt-image-analysis"
-              : operation === "shot"
-                ? "ark-seedance-video"
-                : "aihubmix-text",
-        provider: local || mockVideo ? undefined : operation === "shot" ? "ark" : "aihubmix",
-        model: mockVideo
-          ? undefined
+        executionMode: local ? "local" : "real",
+        implementation: local
+          ? operation === "audio-replace"
+            ? "ffmpeg-audio-replace"
+            : operation === "subtitle-compose"
+              ? "ffmpeg-subtitle"
+              : "ffmpeg-concat"
           : operation === "analyze"
+            ? "aihubmix-gpt-image-analysis"
+            : operation === "shot"
+              ? "ark-seedance-video"
+              : "aihubmix-text",
+        provider: local ? undefined : operation === "shot" ? "ark" : "aihubmix",
+        model:
+          operation === "analyze"
             ? VIDEO_CREATE_ANALYSIS_MODEL
             : operation === "shot"
               ? input.videoModel
@@ -5478,7 +5459,7 @@ function getVideoCreateShotGenerationDraft(projectId: string, shotId: string, ow
     }),
     referenceMode: "omni" as const,
     attachments,
-    executionMode: env.mockGenerateVideoApi ? ("mock" as const) : ("real" as const),
+    executionMode: "real" as const,
     postProcessAudio: { model: "tts-1" as const, voice: "alloy" as const, replacesNativeAudio: shot.audioEnabled },
   };
 }

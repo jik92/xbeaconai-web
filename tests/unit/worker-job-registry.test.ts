@@ -58,7 +58,7 @@ describe("worker job registry", () => {
     expect(findJobHandler(job("subtitle-erase")).name).toBe("mediakit-subtitle-erase");
     expect(findJobHandler(job("video-enhancement")).name).toBe("mediakit-video-enhancement");
     expect(findJobHandler(job("ad-script")).name).toBe("ad-script");
-    expect(findJobHandler(job("ai-generate")).name).toBe("generic-creation");
+    expect(findJobHandler(job("ai-generate")).name).toBe("ai-generate");
     expect(findJobHandler(job("douyin-video-import")).name).toBe("share-content-import");
     expect(findJobHandler(job("share-content-import")).name).toBe("share-content-import");
   });
@@ -99,7 +99,7 @@ describe("worker job registry", () => {
     const path = join(tmpdir(), `worker-job-registry-${crypto.randomUUID()}.sqlite`);
     databases.push(path);
     const store = new SqliteJobStore(path);
-    const record = job("ai-generate", { __scenario: "insufficient-credits" });
+    const record = job("kickart", { __scenario: "insufficient-credits" });
     store.create(record);
 
     await new JobProcessor(store).process(record.id);

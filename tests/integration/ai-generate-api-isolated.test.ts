@@ -134,6 +134,9 @@ describe("dedicated AI creation API", () => {
       "gpt-image-2-stable",
     ]);
     expect(imageModels.every((model) => model.executionMode === "real")).toBeTrue();
+    expect(
+      body.models.filter((model) => model.kind === "video").every((model) => model.executionMode === "real"),
+    ).toBeTrue();
   });
 
   test("queues a normalized real-only image job and charges once for an idempotent request", async () => {

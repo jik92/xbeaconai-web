@@ -1,20 +1,20 @@
-import { mkdtemp, rm, unlink } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, resolve } from "node:path";
-import { env } from "../../server/env";
-import { generateNumberedMockVideo, type MockVideoRatio, probeMedia } from "../../server/media/ffmpeg";
+import { probeMedia } from "../../server/media/ffmpeg";
 import type { SeedanceModelId, SeedanceReferenceKind } from "../../server/models/video-models";
 import { resolvePortraitReference } from "../../server/portraits/portrait-resolver";
 import { arkSeedance } from "../../server/providers/ark-seedance";
 import { ossutils } from "../../server/storage/ossutils";
 import type { JobRecord } from "../../server/types";
-import type { JobHandlerContext } from "./types";
 import { parsePortraitReference } from "../../shared/portraits/portrait-reference";
+import type { JobHandlerContext } from "./types";
 import { assetIdsFromValues } from "./utils";
 import { materializeRemoteAsset } from "./video-remix-assets";
 
 const wait = (ms: number) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
 export const SEEDANCE_DURATION_TOLERANCE_SECONDS = 1;
+type SeedanceRatio = "16:9" | "9:16" | "1:1";
 
 export class SeedanceFlowError extends Error {
   constructor(
@@ -68,7 +68,7 @@ export function seedanceVideoSettings(values: Record<string, string>) {
     | 13
     | 14
     | 15;
-  const ratio: MockVideoRatio = values.ratio?.startsWith("9:16")
+  const ratio: SeedanceRatio = values.ratio?.startsWith("9:16")
     ? "9:16"
     : values.ratio?.startsWith("1:1")
       ? "1:1"
@@ -203,36 +203,6 @@ export class SeedanceVideoJob {
   }
 
   async execute(job: JobRecord, model: SeedanceModelId) {
-    if (env.mockGenerateVideoApi && !job.providerTaskId && !job.providerStatus) {
-      if (this.context.store.get(job.id)?.cancelRequested)
-        throw new SeedanceFlowError("JOB_CANCELLED", "任务已取消", false);
-      const settings = seedanceVideoSettings(job.values);
-      const output = resolve(env.dataDir, "results", `.seedance-mock-${job.id}-${crypto.randomUUID()}.mp4`);
-      try {
-        await generateNumberedMockVideo({
-          output,
-          durationSec: settings.duration,
-          ratio: settings.ratio,
-          resolution: settings.resolution,
-        });
-        const durationSec = assertSeedanceDuration(
-          settings.duration,
-          mediaDurationSec(await probeMedia(output)),
-          "本地生成结果",
-        );
-        if (this.context.store.get(job.id)?.cancelRequested)
-          throw new SeedanceFlowError("JOB_CANCELLED", "任务已取消", false);
-        return {
-          bytes: new Uint8Array(await Bun.file(output).arrayBuffer()),
-          mimeType: "video/mp4",
-          executionMode: "mock" as const,
-          implementation: "ffmpeg-seedance-mock" as const,
-          durationSec,
-        };
-      } finally {
-        await unlink(output).catch(() => undefined);
-      }
-    }
     let taskId = job.providerTaskId;
     if (taskId && job.executionPlan.some((stage) => stage.implementation === "aihubmix-video"))
       throw new SeedanceFlowError(

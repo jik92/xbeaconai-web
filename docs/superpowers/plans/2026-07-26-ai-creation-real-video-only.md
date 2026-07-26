@@ -1,6 +1,6 @@
 # AI Creation Real-Only Video Execution Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Ensure every AI 创作 Seedance model is real-only and can never switch to a local Mock execution path.
 
@@ -29,10 +29,10 @@
 - Consumes: `videoModelEnabled(id)`.
 - Produces: `creationCapabilities(videoModelEnabled, imageEnabled)` with real-only Seedance models.
 
-- [ ] Write a failing test proving every image and video capability is real even when the legacy Mock environment variable is set.
-- [ ] Run `bun test tests/unit/creation-capabilities.test.ts tests/unit/ai-generate-api.test.ts` and verify the old Mock assertion fails.
-- [ ] Remove `videoExecutionMode` from `creationCapabilities`, publish Seedance as `real`, and remove environment-derived mode arguments from all callers.
-- [ ] Re-run the tests and verify they pass.
+- [x] Write a failing test proving every image and video capability is real even when the legacy Mock environment variable is set.
+- [x] Run `bun test tests/unit/creation-capabilities.test.ts tests/unit/ai-generate-api.test.ts` and verify the old Mock assertion fails.
+- [x] Remove `videoExecutionMode` from `creationCapabilities`, publish Seedance as `real`, and remove environment-derived mode arguments from all callers.
+- [x] Re-run the tests and verify they pass.
 
 ### Task 2: Remove runtime Seedance Mock generation
 
@@ -45,10 +45,10 @@
 - Consumes: Ark Seedance client and existing injected AI creation test executor.
 - Produces: real-only `SeedanceVideoJob.execute`.
 
-- [ ] Replace the environment-controlled FFmpeg Mock test with a failing source-path or behavior test proving `SeedanceVideoJob` cannot return a local Mock response.
-- [ ] Run `bun test tests/unit/seedance-video-mock.test.ts tests/unit/ai-generate-worker.test.ts` and verify failure against the current branch.
-- [ ] Delete the `env.mockGenerateVideoApi` execution branch and its production-only Mock imports from `job-seedance-video.ts`.
-- [ ] Keep request normalization and downloaded-video validation tests, then re-run both suites.
+- [x] Replace the environment-controlled FFmpeg Mock test with a failing source-path or behavior test proving `SeedanceVideoJob` cannot return a local Mock response.
+- [x] Run `bun test tests/unit/seedance-video-mock.test.ts tests/unit/ai-generate-worker.test.ts` and verify failure against the current branch.
+- [x] Delete the `env.mockGenerateVideoApi` execution branch and its production-only Mock imports from `job-seedance-video.ts`.
+- [x] Keep request normalization and downloaded-video validation tests, then re-run both suites.
 
 ### Task 3: Complete combined image/video verification
 
@@ -60,8 +60,8 @@
 - Consumes: all completed image and video model work.
 - Produces: checked implementation records and pushed branch.
 
-- [ ] Run focused AI creation suites, `bun run typecheck`, and `bun run build`.
-- [ ] Run `make ci`; record only unchanged unrelated environment failures if present.
-- [ ] Run `rg -n 'executionMode: "mock"|mockGenerateVideoApi|seedream-5-pro' server/creation worker/jobs/job-ai-generate.ts worker/jobs/job-seedance-video.ts`.
-- [ ] Run `git diff --check` and inspect `git status --short`, preserving `.DS_Store`.
-- [ ] Check completed plan boxes, commit all intended changes, and push `agent/assistant-ui-ai-generate`.
+- [x] Run focused AI creation suites, `bun run typecheck`, and `bun run build`.
+- [x] Run `make ci`; record only unchanged unrelated environment failures if present.
+- [x] Run `rg -n 'executionMode: "mock"|mockGenerateVideoApi|seedream-5-pro' server/creation worker/jobs/job-ai-generate.ts worker/jobs/job-seedance-video.ts`.
+- [x] Run `git diff --check` and inspect `git status --short`, preserving `.DS_Store`.
+- [x] Check completed plan boxes, commit all intended changes, and push `agent/assistant-ui-ai-generate`.

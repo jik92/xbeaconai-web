@@ -172,7 +172,7 @@ function AiGenerateProvider({ children }: { children: React.ReactNode }) {
     const model = models.find((item) => item.id === nextDraft.modelId && item.kind === nextDraft.kind);
     if (!model?.enabled) throw new Error(model?.disabledReason ?? "所选模型当前不可用");
     const referenceError = validateModelReferenceCount(
-      model as typeof model & { minReferences?: number; maxReferences?: number },
+      model,
       countEffectiveReferences(resolved.references.length, parentJobId, mode),
     );
     if (referenceError) throw new Error(referenceError);
@@ -383,7 +383,7 @@ function AiGenerateComposer() {
   const model = filteredModels.find((item) => item.id === draft.modelId);
   const referenceError = model
     ? validateModelReferenceCount(
-        model as typeof model & { minReferences?: number; maxReferences?: number },
+        model,
         countEffectiveReferences(attachedReferences.length, draft.parentJobId, draft.revisionMode),
       )
     : undefined;

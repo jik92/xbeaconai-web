@@ -100,17 +100,6 @@ export function buildExecutionPlan(
     if (localSdkId && verifiedSdkIds.has(localSdkId)) {
       executionMode = "local";
       implementation = "ffmpeg-local";
-    } else if (env.mockGenerateVideoApi && videoModel && capability === "video-generate") {
-      executionMode = "mock";
-      implementation = "ffmpeg-seedance-mock";
-    } else if (
-      env.mockGenerateVideoApi &&
-      videoModel &&
-      capability === "multimodal-generate" &&
-      values.type === "视频"
-    ) {
-      executionMode = "mock";
-      implementation = "ffmpeg-seedance-mock";
     } else if (
       !env.forceMock &&
       aihubmix.configured &&
@@ -171,7 +160,7 @@ export function buildExecutionPlan(
 
 export const genericCreationJob: WorkerJobHandler = {
   name: "generic-creation",
-  supports: () => true,
+  supports: (job) => job.moduleId !== "ai-generate",
   async execute(initialJob, context) {
     let job = initialJob;
     const id = job.id;
@@ -304,8 +293,8 @@ export const genericCreationJob: WorkerJobHandler = {
             url: `/api/artifacts/${name}`,
             executionMode: "real",
           });
-        } else if (stage.implementation === "ark-seedance-video" || stage.implementation === "ffmpeg-seedance-mock") {
-          const videoModel = stage.implementation === "ffmpeg-seedance-mock" ? job.videoModel : stage.model;
+        } else if (stage.implementation === "ark-seedance-video") {
+          const videoModel = stage.model;
           if (!isSeedanceModelId(videoModel)) throw new SeedanceFlowError("INVALID_VIDEO_MODEL", "视频模型无效", false);
           const response = await new SeedanceVideoJob(context).execute(job, videoModel);
           const name = `${id}-${capability}.mp4`;
@@ -313,8 +302,8 @@ export const genericCreationJob: WorkerJobHandler = {
           await probeMedia(resolve(env.dataDir, "results", name));
           stage.executionMode = response.executionMode;
           stage.implementation = response.implementation;
-          stage.provider = response.executionMode === "real" ? "ark" : undefined;
-          stage.model = response.executionMode === "real" ? videoModel : undefined;
+          stage.provider = "ark";
+          stage.model = videoModel;
           produced.push({
             id: crypto.randomUUID(),
             name,
@@ -328,11 +317,7 @@ export const genericCreationJob: WorkerJobHandler = {
           context.change(id, { status: "cancelled", stage: "已取消", error: undefined });
           return;
         }
-        if (
-          stage.implementation === "ark-seedance-video" ||
-          stage.implementation === "ffmpeg-seedance-mock" ||
-          !allowMockFallback
-        ) {
+        if (stage.implementation === "ark-seedance-video" || !allowMockFallback) {
           context.change(id, {
             status: "failed",
             stage: `${label}失败`,

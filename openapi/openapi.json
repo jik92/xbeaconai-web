@@ -242,108 +242,6 @@
           "qwen-audio"
         ]
       },
-      "AssetKind": {
-        "type": "string",
-        "enum": [
-          "media",
-          "product",
-          "portrait",
-          "voice"
-        ]
-      },
-      "AssetFolder": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "parentId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string"
-          },
-          "storagePrefix": {
-            "type": "string"
-          },
-          "createdAt": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "type": "string"
-          },
-          "isDefault": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "storagePrefix",
-          "createdAt",
-          "updatedAt"
-        ]
-      },
-      "AiToolModuleId": {
-        "type": "string",
-        "enum": [
-          "ai-generate",
-          "video-cut",
-          "media-understand",
-          "video-mashup",
-          "voice-clone",
-          "video-renewal",
-          "subtitle-erase",
-          "video-enhancement",
-          "kickart"
-        ]
-      },
-      "ProviderCredentialName": {
-        "type": "string",
-        "enum": [
-          "OPENAI_KEY",
-          "ARK_API_KEY",
-          "VOLC_SPEECH_API_KEY_ID",
-          "VOLC_SPEECH_API_KEY",
-          "TOS_ACCESS_KEY_ID",
-          "TOS_SECRET_ACCESS_KEY",
-          "MEDIAKIT_API_KEY",
-          "QWEN_AUDIO_API_KEY",
-          "QWEN_AUDIO_WORKSPACE_ID"
-        ]
-      },
-      "JobModuleId": {
-        "type": "string",
-        "enum": [
-          "video-remix",
-          "video-create",
-          "ad-script",
-          "ai-generate",
-          "video-cut",
-          "media-understand",
-          "video-mashup",
-          "voice-clone",
-          "video-renewal",
-          "subtitle-erase",
-          "video-enhancement",
-          "video-extract",
-          "video-editor",
-          "kickart",
-          "douyin-video-import",
-          "share-content-import",
-          "portrait-asset-register"
-        ]
-      },
-      "SeedanceModelId": {
-        "type": "string",
-        "enum": [
-          "doubao-seedance-2-0-260128",
-          "doubao-seedance-2-0-mini-260615",
-          "doubao-seedance-2-0-fast-260128"
-        ]
-      },
       "Job": {
         "type": "object",
         "properties": {
@@ -713,6 +611,108 @@
           "jobSchemaVersion",
           "createdAt",
           "updatedAt"
+        ]
+      },
+      "JobModuleId": {
+        "type": "string",
+        "enum": [
+          "video-remix",
+          "video-create",
+          "ad-script",
+          "ai-generate",
+          "video-cut",
+          "media-understand",
+          "video-mashup",
+          "voice-clone",
+          "video-renewal",
+          "subtitle-erase",
+          "video-enhancement",
+          "video-extract",
+          "video-editor",
+          "kickart",
+          "douyin-video-import",
+          "share-content-import",
+          "portrait-asset-register"
+        ]
+      },
+      "SeedanceModelId": {
+        "type": "string",
+        "enum": [
+          "doubao-seedance-2-0-260128",
+          "doubao-seedance-2-0-mini-260615",
+          "doubao-seedance-2-0-fast-260128"
+        ]
+      },
+      "AssetKind": {
+        "type": "string",
+        "enum": [
+          "media",
+          "product",
+          "portrait",
+          "voice"
+        ]
+      },
+      "AssetFolder": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "parentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "storagePrefix": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "isDefault": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "storagePrefix",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "AiToolModuleId": {
+        "type": "string",
+        "enum": [
+          "ai-generate",
+          "video-cut",
+          "media-understand",
+          "video-mashup",
+          "voice-clone",
+          "video-renewal",
+          "subtitle-erase",
+          "video-enhancement",
+          "kickart"
+        ]
+      },
+      "ProviderCredentialName": {
+        "type": "string",
+        "enum": [
+          "OPENAI_KEY",
+          "ARK_API_KEY",
+          "VOLC_SPEECH_API_KEY_ID",
+          "VOLC_SPEECH_API_KEY",
+          "TOS_ACCESS_KEY_ID",
+          "TOS_SECRET_ACCESS_KEY",
+          "MEDIAKIT_API_KEY",
+          "QWEN_AUDIO_API_KEY",
+          "QWEN_AUDIO_WORKSPACE_ID"
         ]
       },
       "ModuleId": {
@@ -4066,6 +4066,14 @@
                               "type": "string"
                             }
                           },
+                          "minReferences": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "maxReferences": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
                           "pricing": {
                             "type": "object",
                             "properties": {
@@ -4119,6 +4127,8 @@
                           "supportsSeed",
                           "referenceModes",
                           "acceptedReferenceKinds",
+                          "minReferences",
+                          "maxReferences",
                           "pricing"
                         ]
                       }
@@ -4127,6 +4137,216 @@
                   "required": [
                     "models"
                   ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai-generate/jobs": {
+      "post": {
+        "operationId": "createAiGenerateJob",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      },
+                      "prompt": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 10000
+                      },
+                      "modelId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 120
+                      },
+                      "ratio": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 20
+                      },
+                      "resolution": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 20
+                      },
+                      "referenceAssetIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "maxItems": 12
+                      },
+                      "parentJobId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "revisionMode": {
+                        "type": "string",
+                        "enum": [
+                          "new",
+                          "edit",
+                          "variant"
+                        ]
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "image"
+                        ]
+                      },
+                      "count": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 8
+                      }
+                    },
+                    "required": [
+                      "title",
+                      "prompt",
+                      "modelId",
+                      "ratio",
+                      "resolution",
+                      "referenceAssetIds",
+                      "revisionMode",
+                      "kind",
+                      "count"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      },
+                      "prompt": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 10000
+                      },
+                      "modelId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 120
+                      },
+                      "ratio": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 20
+                      },
+                      "resolution": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 20
+                      },
+                      "referenceAssetIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "maxItems": 12
+                      },
+                      "parentJobId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "revisionMode": {
+                        "type": "string",
+                        "enum": [
+                          "new",
+                          "edit",
+                          "variant"
+                        ]
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "video"
+                        ]
+                      },
+                      "duration": {
+                        "type": "integer",
+                        "minimum": 4,
+                        "maximum": 15
+                      },
+                      "referenceMode": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 40
+                      }
+                    },
+                    "required": [
+                      "title",
+                      "prompt",
+                      "modelId",
+                      "ratio",
+                      "resolution",
+                      "referenceAssetIds",
+                      "revisionMode",
+                      "kind",
+                      "duration",
+                      "referenceMode"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Provider not verified",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid creation request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
             }

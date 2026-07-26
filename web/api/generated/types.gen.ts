@@ -64,26 +64,6 @@ export type RechargeOrder = {
 
 export type ProviderId = 'aihubmix' | 'ark' | 'volc-speech' | 'tos' | 'mediakit' | 'qwen-audio';
 
-export type AssetKind = 'media' | 'product' | 'portrait' | 'voice';
-
-export type AssetFolder = {
-    id: string;
-    parentId?: string;
-    name: string;
-    storagePrefix: string;
-    createdAt: string;
-    updatedAt: string;
-    isDefault?: boolean;
-};
-
-export type AiToolModuleId = 'ai-generate' | 'video-cut' | 'media-understand' | 'video-mashup' | 'voice-clone' | 'video-renewal' | 'subtitle-erase' | 'video-enhancement' | 'kickart';
-
-export type ProviderCredentialName = 'OPENAI_KEY' | 'ARK_API_KEY' | 'VOLC_SPEECH_API_KEY_ID' | 'VOLC_SPEECH_API_KEY' | 'TOS_ACCESS_KEY_ID' | 'TOS_SECRET_ACCESS_KEY' | 'MEDIAKIT_API_KEY' | 'QWEN_AUDIO_API_KEY' | 'QWEN_AUDIO_WORKSPACE_ID';
-
-export type JobModuleId = 'video-remix' | 'video-create' | 'ad-script' | 'ai-generate' | 'video-cut' | 'media-understand' | 'video-mashup' | 'voice-clone' | 'video-renewal' | 'subtitle-erase' | 'video-enhancement' | 'video-extract' | 'video-editor' | 'kickart' | 'douyin-video-import' | 'share-content-import' | 'portrait-asset-register';
-
-export type SeedanceModelId = 'doubao-seedance-2-0-260128' | 'doubao-seedance-2-0-mini-260615' | 'doubao-seedance-2-0-fast-260128';
-
 export type Job = {
     id: string;
     moduleId: JobModuleId;
@@ -168,6 +148,26 @@ export type Job = {
     createdAt: string;
     updatedAt: string;
 };
+
+export type JobModuleId = 'video-remix' | 'video-create' | 'ad-script' | 'ai-generate' | 'video-cut' | 'media-understand' | 'video-mashup' | 'voice-clone' | 'video-renewal' | 'subtitle-erase' | 'video-enhancement' | 'video-extract' | 'video-editor' | 'kickart' | 'douyin-video-import' | 'share-content-import' | 'portrait-asset-register';
+
+export type SeedanceModelId = 'doubao-seedance-2-0-260128' | 'doubao-seedance-2-0-mini-260615' | 'doubao-seedance-2-0-fast-260128';
+
+export type AssetKind = 'media' | 'product' | 'portrait' | 'voice';
+
+export type AssetFolder = {
+    id: string;
+    parentId?: string;
+    name: string;
+    storagePrefix: string;
+    createdAt: string;
+    updatedAt: string;
+    isDefault?: boolean;
+};
+
+export type AiToolModuleId = 'ai-generate' | 'video-cut' | 'media-understand' | 'video-mashup' | 'voice-clone' | 'video-renewal' | 'subtitle-erase' | 'video-enhancement' | 'kickart';
+
+export type ProviderCredentialName = 'OPENAI_KEY' | 'ARK_API_KEY' | 'VOLC_SPEECH_API_KEY_ID' | 'VOLC_SPEECH_API_KEY' | 'TOS_ACCESS_KEY_ID' | 'TOS_SECRET_ACCESS_KEY' | 'MEDIAKIT_API_KEY' | 'QWEN_AUDIO_API_KEY' | 'QWEN_AUDIO_WORKSPACE_ID';
 
 export type ModuleId = 'video-remix' | 'video-create' | 'ad-script' | 'ai-generate' | 'video-cut' | 'media-understand' | 'video-mashup' | 'voice-clone' | 'video-renewal' | 'subtitle-erase' | 'video-enhancement' | 'video-extract' | 'video-editor' | 'kickart';
 
@@ -1177,6 +1177,8 @@ export type GetCreationCapabilitiesResponses = {
             supportsSeed: boolean;
             referenceModes: Array<string>;
             acceptedReferenceKinds: Array<string>;
+            minReferences: number;
+            maxReferences: number;
             pricing: {
                 baseCredits: number;
                 perOutputCredits: number;
@@ -1194,6 +1196,62 @@ export type GetCreationCapabilitiesResponses = {
 };
 
 export type GetCreationCapabilitiesResponse = GetCreationCapabilitiesResponses[keyof GetCreationCapabilitiesResponses];
+
+export type CreateAiGenerateJobData = {
+    body: {
+        title: string;
+        prompt: string;
+        modelId: string;
+        ratio: string;
+        resolution: string;
+        referenceAssetIds: Array<string>;
+        parentJobId?: string;
+        revisionMode: 'new' | 'edit' | 'variant';
+        kind: 'image';
+        count: number;
+    } | {
+        title: string;
+        prompt: string;
+        modelId: string;
+        ratio: string;
+        resolution: string;
+        referenceAssetIds: Array<string>;
+        parentJobId?: string;
+        revisionMode: 'new' | 'edit' | 'variant';
+        kind: 'video';
+        duration: number;
+        referenceMode: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/ai-generate/jobs';
+};
+
+export type CreateAiGenerateJobErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ApiErrorResponse;
+    /**
+     * Provider not verified
+     */
+    403: ApiErrorResponse;
+    /**
+     * Invalid creation request
+     */
+    422: ApiErrorResponse;
+};
+
+export type CreateAiGenerateJobError = CreateAiGenerateJobErrors[keyof CreateAiGenerateJobErrors];
+
+export type CreateAiGenerateJobResponses = {
+    /**
+     * Accepted
+     */
+    202: Job;
+};
+
+export type CreateAiGenerateJobResponse = CreateAiGenerateJobResponses[keyof CreateAiGenerateJobResponses];
 
 export type CreateDirectUploadData = {
     body: {

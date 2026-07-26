@@ -73,47 +73,6 @@ export const zProviderId = z.enum([
     'qwen-audio'
 ]);
 
-export const zAssetKind = z.enum([
-    'media',
-    'product',
-    'portrait',
-    'voice'
-]);
-
-export const zAssetFolder = z.object({
-    id: z.uuid(),
-    parentId: z.uuid().optional(),
-    name: z.string(),
-    storagePrefix: z.string(),
-    createdAt: z.string(),
-    updatedAt: z.string(),
-    isDefault: z.boolean().optional()
-});
-
-export const zAiToolModuleId = z.enum([
-    'ai-generate',
-    'video-cut',
-    'media-understand',
-    'video-mashup',
-    'voice-clone',
-    'video-renewal',
-    'subtitle-erase',
-    'video-enhancement',
-    'kickart'
-]);
-
-export const zProviderCredentialName = z.enum([
-    'OPENAI_KEY',
-    'ARK_API_KEY',
-    'VOLC_SPEECH_API_KEY_ID',
-    'VOLC_SPEECH_API_KEY',
-    'TOS_ACCESS_KEY_ID',
-    'TOS_SECRET_ACCESS_KEY',
-    'MEDIAKIT_API_KEY',
-    'QWEN_AUDIO_API_KEY',
-    'QWEN_AUDIO_WORKSPACE_ID'
-]);
-
 export const zJobModuleId = z.enum([
     'video-remix',
     'video-create',
@@ -257,6 +216,47 @@ export const zJob = z.object({
     createdAt: z.string(),
     updatedAt: z.string()
 });
+
+export const zAssetKind = z.enum([
+    'media',
+    'product',
+    'portrait',
+    'voice'
+]);
+
+export const zAssetFolder = z.object({
+    id: z.uuid(),
+    parentId: z.uuid().optional(),
+    name: z.string(),
+    storagePrefix: z.string(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    isDefault: z.boolean().optional()
+});
+
+export const zAiToolModuleId = z.enum([
+    'ai-generate',
+    'video-cut',
+    'media-understand',
+    'video-mashup',
+    'voice-clone',
+    'video-renewal',
+    'subtitle-erase',
+    'video-enhancement',
+    'kickart'
+]);
+
+export const zProviderCredentialName = z.enum([
+    'OPENAI_KEY',
+    'ARK_API_KEY',
+    'VOLC_SPEECH_API_KEY_ID',
+    'VOLC_SPEECH_API_KEY',
+    'TOS_ACCESS_KEY_ID',
+    'TOS_SECRET_ACCESS_KEY',
+    'MEDIAKIT_API_KEY',
+    'QWEN_AUDIO_API_KEY',
+    'QWEN_AUDIO_WORKSPACE_ID'
+]);
 
 export const zModuleId = z.enum([
     'video-remix',
@@ -1127,6 +1127,8 @@ export const zGetCreationCapabilitiesResponse = z.object({
         supportsSeed: z.boolean(),
         referenceModes: z.array(z.string()),
         acceptedReferenceKinds: z.array(z.string()),
+        minReferences: z.int().gte(0),
+        maxReferences: z.int().gte(0),
         pricing: z.object({
             baseCredits: z.int(),
             perOutputCredits: z.int()
@@ -1137,6 +1139,47 @@ export const zGetCreationCapabilitiesResponse = z.object({
         }))).optional()
     }))
 });
+
+export const zCreateAiGenerateJobBody = z.union([
+    z.object({
+        title: z.string().min(1).max(200),
+        prompt: z.string().min(1).max(10000),
+        modelId: z.string().min(1).max(120),
+        ratio: z.string().min(1).max(20),
+        resolution: z.string().min(1).max(20),
+        referenceAssetIds: z.array(z.uuid()).max(12),
+        parentJobId: z.uuid().optional(),
+        revisionMode: z.enum([
+            'new',
+            'edit',
+            'variant'
+        ]),
+        kind: z.enum(['image']),
+        count: z.int().gte(1).lte(8)
+    }),
+    z.object({
+        title: z.string().min(1).max(200),
+        prompt: z.string().min(1).max(10000),
+        modelId: z.string().min(1).max(120),
+        ratio: z.string().min(1).max(20),
+        resolution: z.string().min(1).max(20),
+        referenceAssetIds: z.array(z.uuid()).max(12),
+        parentJobId: z.uuid().optional(),
+        revisionMode: z.enum([
+            'new',
+            'edit',
+            'variant'
+        ]),
+        kind: z.enum(['video']),
+        duration: z.int().gte(4).lte(15),
+        referenceMode: z.string().min(1).max(40)
+    })
+]);
+
+/**
+ * Accepted
+ */
+export const zCreateAiGenerateJobResponse = zJob;
 
 export const zCreateDirectUploadBody = z.object({
     fileName: z.string().min(1).max(200),

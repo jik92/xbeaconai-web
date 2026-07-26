@@ -2,7 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { probeMedia } from "../server/media/ffmpeg";
 import { isSeedanceModelId, seedanceModelIds } from "../server/models/video-models";
-import { aihubmix } from "../server/providers/aihubmix";
+import { type AihubmixImageResult, aihubmix } from "../server/providers/aihubmix";
 import { arkSeedance } from "../server/providers/ark-seedance";
 import { auditSdkRegistry } from "../server/sdk-registry";
 import { APP_CONFIG } from "../web/app/config";
@@ -42,6 +42,14 @@ const decodeBase64 = (value: string) => {
   for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
   return bytes;
 };
+const imageBytes = async (result: { b64Json?: string; url?: string }) =>
+  result.b64Json
+    ? decodeBase64(result.b64Json)
+    : result.url
+      ? await fetch(result.url).then((item) => item.bytes())
+      : (() => {
+          throw new Error("IMAGE_RESULT_URL_MISSING");
+        })();
 const entries = auditSdkRegistry().filter((entry) => entry.kind === "model");
 const only = process.argv.find((arg) => arg.startsWith("--only="))?.slice(7);
 const selected = only ? entries.filter((entry) => entry.capability === only || entry.id === only) : entries;
@@ -74,17 +82,62 @@ for (const entry of selected) {
       const response = await aihubmix.generateText(`只回复：${APP_CONFIG.projectName}接口测试成功`, entry.model);
       result = { characters: response.text.length, model: response.model, nonEmpty: Boolean(response.text.trim()) };
     } else if (entry.capability === "image-generate") {
-      const response = await aihubmix.generateImage(
-        "A simple orange circle centered on a clean white background, flat icon",
-        entry.model,
-      );
-      const bytes = response.b64_json
-        ? decodeBase64(response.b64_json)
-        : response.url
-          ? await fetch(response.url).then((item) => item.bytes())
-          : (() => {
-              throw new Error("IMAGE_RESULT_URL_MISSING");
-            })();
+      if (!entry.model) throw new Error(`IMAGE_MODEL_MISSING:${entry.id}`);
+      const prompt = "A simple orange circle centered on a clean white background, flat icon";
+      let responses: AihubmixImageResult[];
+      if (entry.testAdapter === "test-image-openai")
+        responses = await aihubmix.generateImages({
+          prompt,
+          model: entry.model,
+          size: "1024x1024",
+          count: 1,
+          quality: "low",
+        });
+      else if (entry.testAdapter === "test-image-seedream")
+        responses = await aihubmix.generateSeedreamImages({
+          prompt,
+          model: entry.model,
+          size: "2K",
+          count: 1,
+          imageUrls: [],
+        });
+      else if (entry.testAdapter === "test-image-gemini-interactions")
+        responses = await aihubmix.generateGeminiInteractionImages({
+          prompt,
+          model: entry.model,
+          aspectRatio: "1:1",
+          imageSize: "1K",
+          images: [],
+        });
+      else if (entry.testAdapter === "test-image-gemini-content")
+        responses = await aihubmix.generateGeminiContentImages({
+          prompt,
+          model: entry.model,
+          aspectRatio: "1:1",
+          imageSize: "1K",
+          images: [],
+        });
+      else if (entry.testAdapter === "test-image-openai-edit") {
+        const [reference] = await aihubmix.generateImages({
+          prompt,
+          model: "gpt-image-1-mini",
+          size: "1024x1024",
+          count: 1,
+          quality: "low",
+        });
+        if (!reference) throw new Error("IMAGE_REFERENCE_MISSING");
+        const referenceBytes = await imageBytes(reference);
+        responses = await aihubmix.editImages({
+          prompt: "Keep the orange circle and change the background to pale blue",
+          model: entry.model,
+          size: "1024x1024",
+          count: 1,
+          images: [{ bytes: referenceBytes, mimeType: "image/png", name: "reference.png" }],
+        });
+      } else throw new Error(`No image test adapter for ${entry.testAdapter}`);
+      const response = responses[0];
+      if (!response) throw new Error("IMAGE_RESULT_MISSING");
+      const bytes = await imageBytes(response);
       const path = resolve(outputDir, `${entry.id}.png`);
       await Bun.write(path, bytes);
       const media = await probeMedia(path);

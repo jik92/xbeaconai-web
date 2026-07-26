@@ -12,6 +12,7 @@ describe("AI creation API isolation", () => {
         env: {
           ...process.env,
           YAOZUO_DATA_DIR: dataDir,
+          MOCK_GENERATE_VIDEO_API: "true",
           BYOK_ENCRYPTION_KEY: "ai-generate-test-encryption-key-32-characters",
         },
         stdout: "pipe",

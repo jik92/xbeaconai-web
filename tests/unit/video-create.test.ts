@@ -34,9 +34,7 @@ import { createTestAccountStore, registerTestAccount } from "./account-test-help
 
 const databases: string[] = [];
 const generatedFiles: string[] = [];
-const originalMockGenerateVideoApi = env.mockGenerateVideoApi;
 afterEach(() => {
-  env.mockGenerateVideoApi = originalMockGenerateVideoApi;
   for (const path of databases.splice(0)) {
     rmSync(path, { force: true });
     rmSync(`${path}-wal`, { force: true });
@@ -550,8 +548,7 @@ describe("video create domain", () => {
     accounts.close();
   });
 
-  test("uses the environment-controlled FFmpeg mock for Seedance shots", async () => {
-    env.mockGenerateVideoApi = true;
+  test.skip("legacy Seedance mock coverage is disabled after production mock removal", async () => {
     const path = join(tmpdir(), `video-create-mock-${crypto.randomUUID()}.sqlite`);
     databases.push(path);
     const accounts = createTestAccountStore(path);

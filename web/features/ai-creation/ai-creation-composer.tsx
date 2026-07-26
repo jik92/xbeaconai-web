@@ -40,6 +40,8 @@ export interface CreationModelCapability {
   supportsSeed: boolean;
   referenceModes: string[];
   acceptedReferenceKinds: string[];
+  minReferences: number;
+  maxReferences: number;
   pricing: { baseCredits: number; perOutputCredits: number };
   dimensions?: Record<string, Record<string, { width: number; height: number }>>;
 }

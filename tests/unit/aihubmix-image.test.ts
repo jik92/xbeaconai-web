@@ -96,9 +96,7 @@ describe("AIHubMix image API", () => {
     });
 
     expect(calls).toHaveLength(1);
-    expect(calls[0]?.url).toBe(
-      "https://aihubmix.example.test/v1/models/doubao/doubao-seedream-4-5/predictions",
-    );
+    expect(calls[0]?.url).toBe("https://aihubmix.example.test/v1/models/doubao/doubao-seedream-4-5/predictions");
     expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
       input: {
         model: "doubao-seedream-4-5",
@@ -196,10 +194,7 @@ describe("AIHubMix image API", () => {
             candidates: [
               {
                 content: {
-                  parts: [
-                    { text: "done" },
-                    { inlineData: { data: "cHJvLWltYWdl", mimeType: "image/webp" } },
-                  ],
+                  parts: [{ text: "done" }, { inlineData: { data: "cHJvLWltYWdl", mimeType: "image/webp" } }],
                 },
               },
             ],
@@ -222,10 +217,7 @@ describe("AIHubMix image API", () => {
         contents: [
           {
             role: "user",
-            parts: [
-              { text: "put the product in a studio" },
-              { inlineData: { data: "AQID", mimeType: "image/png" } },
-            ],
+            parts: [{ text: "put the product in a studio" }, { inlineData: { data: "AQID", mimeType: "image/png" } }],
           },
         ],
         config: {

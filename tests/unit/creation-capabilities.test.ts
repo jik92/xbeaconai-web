@@ -11,10 +11,10 @@ if (!imageModel || !enabledVideoModel || !disabledVideoModel) {
 }
 
 describe("creation capabilities", () => {
-  test("reports enabled Seedance models as Mock when local video generation is selected", () => {
-    const mockModels = creationCapabilities(() => true, "mock").filter((model) => model.kind === "video");
-    expect(mockModels.length).toBeGreaterThan(0);
-    expect(mockModels.every((model) => model.enabled && model.executionMode === "mock")).toBeTrue();
+  test("publishes every enabled Seedance model as real", () => {
+    const videoModels = creationCapabilities(() => true).filter((model) => model.kind === "video");
+    expect(videoModels.length).toBeGreaterThan(0);
+    expect(videoModels.every((model) => model.enabled && model.executionMode === "real")).toBeTrue();
   });
 
   test("publishes only the seven provider-backed image models and enabled real video models", () => {

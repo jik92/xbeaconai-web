@@ -9,11 +9,7 @@ export type ImageModelId =
   | "nano-banana-pro"
   | "gpt-image-2-stable";
 
-export type ImageProviderProtocol =
-  | "openai-images"
-  | "aihubmix-predictions"
-  | "gemini-interactions"
-  | "gemini-content";
+export type ImageProviderProtocol = "openai-images" | "aihubmix-predictions" | "gemini-interactions" | "gemini-content";
 
 export interface ImageModelDefinition {
   id: ImageModelId;

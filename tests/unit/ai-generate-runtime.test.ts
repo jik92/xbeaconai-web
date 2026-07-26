@@ -19,12 +19,8 @@ const reference: AiGenerateReference = {
 };
 
 test("blocks reference counts outside the selected real model capability", () => {
-  expect(validateModelReferenceCount({ minReferences: 1, maxReferences: 1 }, 0)).toBe(
-    "该模型至少需要 1 张参考图",
-  );
-  expect(validateModelReferenceCount({ minReferences: 0, maxReferences: 0 }, 1)).toBe(
-    "该模型最多支持 0 张参考图",
-  );
+  expect(validateModelReferenceCount({ minReferences: 1, maxReferences: 1 }, 0)).toBe("该模型至少需要 1 张参考图");
+  expect(validateModelReferenceCount({ minReferences: 0, maxReferences: 0 }, 1)).toBe("该模型最多支持 0 张参考图");
   expect(validateModelReferenceCount({ minReferences: 0, maxReferences: 12 }, 2)).toBeUndefined();
 });
 

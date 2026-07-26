@@ -24,10 +24,10 @@ export const videoRemixShotGenerationJob: WorkerJobHandler = {
     const stage: StageProvenance = {
       id: `${job.id}:video-generate`,
       capability: "video-generate",
-      executionMode: job.overallExecutionMode === "mock" ? "mock" : "real",
-      implementation: job.overallExecutionMode === "mock" ? "ffmpeg-seedance-mock" : "ark-seedance-video",
-      provider: job.overallExecutionMode === "mock" ? undefined : "ark",
-      model: job.overallExecutionMode === "mock" ? undefined : job.videoModel,
+      executionMode: "real",
+      implementation: "ark-seedance-video",
+      provider: "ark",
+      model: job.videoModel,
       startedAt: new Date().toISOString(),
     };
     context.change(job.id, {
@@ -35,7 +35,7 @@ export const videoRemixShotGenerationJob: WorkerJobHandler = {
       stage: "正在生成当前分镜",
       progress: 8,
       provenance: [stage],
-      overallExecutionMode: job.overallExecutionMode === "mock" ? "mock" : "real",
+      overallExecutionMode: "real",
     });
 
     const tempDir = await mkdtemp(resolve(tmpdir(), "yaozuo-remix-shot-"));
@@ -102,7 +102,7 @@ export const videoRemixShotGenerationJob: WorkerJobHandler = {
         data: {
           values: { ...job.values, generatedAssetId: assetId },
           generatedAt: new Date().toISOString(),
-          mock: generated.executionMode === "mock",
+          mock: false,
         },
       };
       context.change(job.id, {

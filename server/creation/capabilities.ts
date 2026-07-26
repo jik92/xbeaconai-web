@@ -31,7 +31,6 @@ const imageModels = imageModelDefinitions.map((model) => model.capability);
 
 export function creationCapabilities(
   videoEnabled: (id: SeedanceModelId) => boolean,
-  videoExecutionMode: CreationExecutionMode = "real",
   imageEnabled = true,
 ): CreationModelCapability[] {
   const images = imageModels.map((model) =>
@@ -52,7 +51,7 @@ export function creationCapabilities(
       badges: model.tags,
       enabled: videoEnabled(model.id),
       disabledReason: videoEnabled(model.id) ? undefined : "真实基线尚未验证",
-      executionMode: videoExecutionMode,
+      executionMode: "real",
       isDefault: index === 0,
       supportedRatios: ["adaptive", "1:1", "16:9", "4:3", "3:4", "9:16", "21:9"],
       supportedResolutions: ["480p", "720p"],
@@ -78,6 +77,10 @@ export function validateCreationValues(values: Record<string, string>, models: C
   const model = models.find((item) => item.id === values.modelId && item.kind === kind);
   if (!model?.enabled) return "所选模型当前不可用";
   if (!values.prompt?.trim()) return "请输入创意描述";
+  const referenceCount = Number(values.referenceCount || 0);
+  if (!Number.isInteger(referenceCount) || referenceCount < 0) return "参考图数量无效";
+  if (referenceCount < model.minReferences) return `该模型至少需要 ${model.minReferences} 张参考图`;
+  if (referenceCount > model.maxReferences) return `该模型最多支持 ${model.maxReferences} 张参考图`;
   if (!model.supportedRatios.includes(values.ratio)) return "所选模型不支持该画幅";
   if (!model.supportedResolutions.includes(values.resolution)) return "所选模型不支持该清晰度";
   const count = Number(values.count);
