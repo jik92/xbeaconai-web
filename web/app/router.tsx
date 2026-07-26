@@ -6,6 +6,7 @@ import { AdScriptPage } from "@/features/ad-script/ad-script-page";
 import { AdminPage } from "@/features/admin/admin-page";
 import { AiGeneratePage } from "@/features/ai-generate/ai-generate-page";
 import { AssetLibrary } from "@/features/asset-library/asset-library";
+import { AiBillingPage } from "@/features/billing/ai-billing-page";
 import { MediaUnderstandPage } from "@/features/media-understand/media-understand-page";
 import { PortraitLibrary } from "@/features/portrait-library/portrait-library";
 import { ProviderFeatureGate } from "@/features/provider/provider-feature-gate";
@@ -96,6 +97,11 @@ const adminRoute = createRoute({
   path: "/admin",
   component: AdminPage,
 });
+const aiBillingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/billing/ai",
+  component: AiBillingPage,
+});
 const routeTree = rootRoute.addChildren([
   indexRoute,
   ...moduleRoutes,
@@ -103,6 +109,7 @@ const routeTree = rootRoute.addChildren([
   portraitRoute,
   productRoute,
   voiceRoute,
+  aiBillingRoute,
   adminRoute,
 ]);
 export const router = createRouter({ routeTree, defaultPreload: "intent" });

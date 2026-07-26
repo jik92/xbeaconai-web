@@ -329,6 +329,8 @@ The system uses **hairline + soft drop**. Cards float above the off-white canvas
 
 **`global-search`** — Compact Header command search. The input and clickable shortcut button open one white result panel for visible pages, tasks, and assets. Use `text-xs` result names, `text-2xs` metadata, hairline section dividers, and restrained active-row background. Support `Command+K` / `Ctrl+K`, arrow keys, Enter, Escape, and outside-click dismissal. Do not surface navigation entries hidden by the current menu preference.
 
+**`account-menu`** — The Header username opens one compact white Popover. Its summary shows the current display name, phone number, and credit balance; menu rows open the existing profile and password drawers and navigate to the unified AI billing page, while logout remains a separated destructive row. Administrator-only navigation belongs in this menu rather than the global sidebar. Use the same hairline, restrained hover surface, `text-sm` actions, and Lucide icon alignment as other shadcn-style menus.
+
 ### Buttons
 
 **`button-primary`** — Near-black ink pill. Background `{colors.primary}`, text `{colors.on-primary}`, type `font-sans text-sm font-medium` (14px / 500), padding 10px × 20px, height 40px, rounded `{rounded.pill}`.

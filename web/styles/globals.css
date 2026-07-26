@@ -711,14 +711,18 @@ select:focus-visible {
 }
 .sidebar nav a {
   height: 36px;
+  width: 100%;
   margin: 2px 0;
   padding: 0 10px;
   color: #5d6779;
   text-decoration: none;
+  border: 0;
   border-radius: 7px;
+  background: transparent;
   display: flex;
   align-items: center;
   gap: 10px;
+  text-align: left;
   @apply text-xs;
   transition: 0.15s;
 }

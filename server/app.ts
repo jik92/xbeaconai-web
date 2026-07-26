@@ -1261,6 +1261,82 @@ const ordersRoute = createRoute({
   },
 });
 app.openapi(ordersRoute, (c) => c.json({ orders: accounts.listOrders(c.get("userId")) }, 200));
+const BillingPageQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(10).max(100).default(25),
+});
+const AiRechargeRecordSchema = z
+  .object({
+    id: z.string().uuid(),
+    source: z.enum(["mock_recharge", "admin_grant"]),
+    credits: z.number().int().min(1),
+    amountCny: z.number().int().nonnegative().optional(),
+    balanceAfter: z.number().int().nonnegative(),
+    status: z.literal("succeeded"),
+    createdAt: z.string(),
+  })
+  .openapi("AiRechargeRecord");
+const AiConsumptionRecordSchema = z
+  .object({
+    id: z.string().uuid(),
+    jobId: z.string().uuid(),
+    moduleId: JobModuleSchema.optional(),
+    jobTitle: z.string().optional(),
+    type: z.enum(["charge", "refund"]),
+    creditChange: z.number().int(),
+    balanceAfter: z.number().int().nonnegative(),
+    note: z.string().optional(),
+    createdAt: z.string(),
+  })
+  .openapi("AiConsumptionRecord");
+const listAiRechargeRecordsRoute = createRoute({
+  method: "get",
+  path: "/api/billing/ai/recharges",
+  operationId: "listAiRechargeRecords",
+  request: { query: BillingPageQuerySchema },
+  responses: {
+    200: {
+      description: "Owned AI recharge records",
+      content: {
+        "application/json": {
+          schema: z.object({
+            records: z.array(AiRechargeRecordSchema),
+            total: z.number().int().nonnegative(),
+            page: z.number().int().min(1),
+            pageSize: z.number().int().min(1),
+          }),
+        },
+      },
+    },
+  },
+});
+app.openapi(listAiRechargeRecordsRoute, (c) =>
+  c.json(accounts.listAiRechargeRecords(c.get("userId"), c.req.valid("query")), 200),
+);
+const listAiConsumptionRecordsRoute = createRoute({
+  method: "get",
+  path: "/api/billing/ai/consumption",
+  operationId: "listAiConsumptionRecords",
+  request: { query: BillingPageQuerySchema },
+  responses: {
+    200: {
+      description: "Owned AI consumption and refund records",
+      content: {
+        "application/json": {
+          schema: z.object({
+            records: z.array(AiConsumptionRecordSchema),
+            total: z.number().int().nonnegative(),
+            page: z.number().int().min(1),
+            pageSize: z.number().int().min(1),
+          }),
+        },
+      },
+    },
+  },
+});
+app.openapi(listAiConsumptionRecordsRoute, (c) =>
+  c.json(accounts.listAiConsumptionRecords(c.get("userId"), c.req.valid("query")), 200),
+);
 const createOrderRoute = createRoute({
   method: "post",
   path: "/api/recharge/orders",

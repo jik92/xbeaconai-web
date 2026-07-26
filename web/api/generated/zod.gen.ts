@@ -64,6 +64,48 @@ export const zRechargeOrder = z.object({
     createdAt: z.string()
 });
 
+export const zAiRechargeRecord = z.object({
+    id: z.uuid(),
+    source: z.enum(['mock_recharge', 'admin_grant']),
+    credits: z.int().gte(1),
+    amountCny: z.int().gte(0).optional(),
+    balanceAfter: z.int().gte(0),
+    status: z.enum(['succeeded']),
+    createdAt: z.string()
+});
+
+export const zJobModuleId = z.enum([
+    'video-remix',
+    'video-create',
+    'ad-script',
+    'ai-generate',
+    'video-cut',
+    'media-understand',
+    'video-mashup',
+    'voice-clone',
+    'video-renewal',
+    'subtitle-erase',
+    'video-enhancement',
+    'video-extract',
+    'video-editor',
+    'kickart',
+    'douyin-video-import',
+    'share-content-import',
+    'portrait-asset-register'
+]);
+
+export const zAiConsumptionRecord = z.object({
+    id: z.uuid(),
+    jobId: z.uuid(),
+    moduleId: zJobModuleId.optional(),
+    jobTitle: z.string().optional(),
+    type: z.enum(['charge', 'refund']),
+    creditChange: z.int(),
+    balanceAfter: z.int().gte(0),
+    note: z.string().optional(),
+    createdAt: z.string()
+});
+
 export const zProviderId = z.enum([
     'aihubmix',
     'ark',
@@ -112,26 +154,6 @@ export const zProviderCredentialName = z.enum([
     'MEDIAKIT_API_KEY',
     'QWEN_AUDIO_API_KEY',
     'QWEN_AUDIO_WORKSPACE_ID'
-]);
-
-export const zJobModuleId = z.enum([
-    'video-remix',
-    'video-create',
-    'ad-script',
-    'ai-generate',
-    'video-cut',
-    'media-understand',
-    'video-mashup',
-    'voice-clone',
-    'video-renewal',
-    'subtitle-erase',
-    'video-enhancement',
-    'video-extract',
-    'video-editor',
-    'kickart',
-    'douyin-video-import',
-    'share-content-import',
-    'portrait-asset-register'
 ]);
 
 export const zSeedanceModelId = z.enum([
@@ -980,6 +1002,36 @@ export const zCreateRechargeOrderBody = z.object({
 export const zCreateRechargeOrderResponse = z.object({
     order: zRechargeOrder,
     user: zUserSummary
+});
+
+export const zListAiRechargeRecordsQuery = z.object({
+    page: z.int().gte(1).optional().default(1),
+    pageSize: z.int().gte(10).lte(100).optional().default(25)
+});
+
+/**
+ * Owned AI recharge records
+ */
+export const zListAiRechargeRecordsResponse = z.object({
+    records: z.array(zAiRechargeRecord),
+    total: z.int().gte(0),
+    page: z.int().gte(1),
+    pageSize: z.int().gte(1)
+});
+
+export const zListAiConsumptionRecordsQuery = z.object({
+    page: z.int().gte(1).optional().default(1),
+    pageSize: z.int().gte(10).lte(100).optional().default(25)
+});
+
+/**
+ * Owned AI consumption and refund records
+ */
+export const zListAiConsumptionRecordsResponse = z.object({
+    records: z.array(zAiConsumptionRecord),
+    total: z.int().gte(0),
+    page: z.int().gte(1),
+    pageSize: z.int().gte(1)
 });
 
 /**

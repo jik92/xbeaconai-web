@@ -8,6 +8,8 @@ import {
   artifacts,
   assetFolders,
   authSessions,
+  creditCharges,
+  creditRefunds,
   jobs,
   mediaAssets,
   migrationState,
@@ -20,6 +22,7 @@ import {
   users,
 } from "../db/schema";
 import { env } from "../env";
+import type { JobModuleId } from "../types";
 import { ConsoleSmsSender, type SmsSender } from "./sms-sender";
 
 export interface UserSummary {
@@ -66,6 +69,32 @@ export interface RechargeOrder {
   paymentMode: "mock";
   balanceAfter: number;
   createdAt: string;
+}
+export interface AiRechargeRecord {
+  id: string;
+  source: "mock_recharge" | "admin_grant";
+  credits: number;
+  amountCny?: number;
+  balanceAfter: number;
+  status: "succeeded";
+  createdAt: string;
+}
+export interface AiConsumptionRecord {
+  id: string;
+  jobId: string;
+  moduleId?: JobModuleId;
+  jobTitle?: string;
+  type: "charge" | "refund";
+  creditChange: number;
+  balanceAfter: number;
+  note?: string;
+  createdAt: string;
+}
+export interface BillingPage<T> {
+  records: T[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
 export interface MediaAsset {
   id: string;
@@ -751,6 +780,119 @@ export class AccountStore {
       .limit(50)
       .all()
       .map((row) => this.order(row));
+  }
+  listAiRechargeRecords(userId: string, input: { page: number; pageSize: number }): BillingPage<AiRechargeRecord> {
+    const rechargeTotal = Number(
+      this.db
+        .select({ count: sql<number>`count(*)` })
+        .from(rechargeOrders)
+        .where(eq(rechargeOrders.userId, userId))
+        .get()?.count ?? 0,
+    );
+    const grantTotal = Number(
+      this.db
+        .select({ count: sql<number>`count(*)` })
+        .from(adminCreditGrants)
+        .where(eq(adminCreditGrants.userId, userId))
+        .get()?.count ?? 0,
+    );
+    const total = rechargeTotal + grantTotal;
+    const offset = (input.page - 1) * input.pageSize;
+    if (offset >= total) return { records: [], total, ...input };
+    const fetchLimit = Math.min(total, input.page * input.pageSize);
+    const orders: AiRechargeRecord[] = this.db
+      .select()
+      .from(rechargeOrders)
+      .where(eq(rechargeOrders.userId, userId))
+      .orderBy(desc(rechargeOrders.createdAt), desc(rechargeOrders.id))
+      .limit(fetchLimit)
+      .all()
+      .map((row) => ({
+        id: row.id,
+        source: "mock_recharge",
+        credits: row.credits,
+        amountCny: row.amountCny,
+        balanceAfter: row.balanceAfter,
+        status: "succeeded",
+        createdAt: row.createdAt,
+      }));
+    const grants: AiRechargeRecord[] = this.db
+      .select()
+      .from(adminCreditGrants)
+      .where(eq(adminCreditGrants.userId, userId))
+      .orderBy(desc(adminCreditGrants.createdAt), desc(adminCreditGrants.id))
+      .limit(fetchLimit)
+      .all()
+      .map((row) => ({
+        id: row.id,
+        source: "admin_grant",
+        credits: row.credits,
+        balanceAfter: row.balanceAfter,
+        status: "succeeded",
+        createdAt: row.createdAt,
+      }));
+    const records = [...orders, ...grants]
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id))
+      .slice(offset, offset + input.pageSize);
+    return { records, total, ...input };
+  }
+  listAiConsumptionRecords(
+    userId: string,
+    input: { page: number; pageSize: number },
+  ): BillingPage<AiConsumptionRecord> {
+    const chargeTotal = Number(
+      this.db.select({ count: sql<number>`count(*)` }).from(creditCharges).where(eq(creditCharges.userId, userId)).get()
+        ?.count ?? 0,
+    );
+    const refundTotal = Number(
+      this.db.select({ count: sql<number>`count(*)` }).from(creditRefunds).where(eq(creditRefunds.userId, userId)).get()
+        ?.count ?? 0,
+    );
+    const total = chargeTotal + refundTotal;
+    const offset = (input.page - 1) * input.pageSize;
+    if (offset >= total) return { records: [], total, ...input };
+    const fetchLimit = Math.min(total, input.page * input.pageSize);
+    const charges: AiConsumptionRecord[] = this.db
+      .select({ charge: creditCharges, moduleId: jobs.moduleId, jobTitle: jobs.title })
+      .from(creditCharges)
+      .leftJoin(jobs, and(eq(jobs.id, creditCharges.jobId), eq(jobs.ownerUserId, userId)))
+      .where(eq(creditCharges.userId, userId))
+      .orderBy(desc(creditCharges.createdAt), desc(creditCharges.id))
+      .limit(fetchLimit)
+      .all()
+      .map(({ charge, moduleId, jobTitle }) => ({
+        id: charge.id,
+        jobId: charge.jobId,
+        moduleId: moduleId ?? undefined,
+        jobTitle: jobTitle ?? undefined,
+        type: "charge",
+        creditChange: -charge.amount,
+        balanceAfter: charge.balanceAfter,
+        createdAt: charge.createdAt,
+      }));
+    const refunds: AiConsumptionRecord[] = this.db
+      .select({ refund: creditRefunds, moduleId: jobs.moduleId, jobTitle: jobs.title })
+      .from(creditRefunds)
+      .leftJoin(jobs, and(eq(jobs.id, creditRefunds.jobId), eq(jobs.ownerUserId, userId)))
+      .where(eq(creditRefunds.userId, userId))
+      .orderBy(desc(creditRefunds.createdAt), desc(creditRefunds.id))
+      .limit(fetchLimit)
+      .all()
+      .map(({ refund, moduleId, jobTitle }) => ({
+        id: refund.id,
+        jobId: refund.jobId,
+        moduleId: moduleId ?? undefined,
+        jobTitle: jobTitle ?? undefined,
+        type: "refund",
+        creditChange: refund.amount,
+        balanceAfter: refund.balanceAfter,
+        note: refund.reason,
+        createdAt: refund.createdAt,
+      }));
+    const records = [...charges, ...refunds]
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id))
+      .slice(offset, offset + input.pageSize);
+    return { records, total, ...input };
   }
   recharge(userId: string, packageId: string, idempotencyKey: string) {
     const pack = rechargePackages.find((item) => item.id === packageId);

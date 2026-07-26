@@ -62,6 +62,30 @@ export type RechargeOrder = {
     createdAt: string;
 };
 
+export type AiRechargeRecord = {
+    id: string;
+    source: 'mock_recharge' | 'admin_grant';
+    credits: number;
+    amountCny?: number;
+    balanceAfter: number;
+    status: 'succeeded';
+    createdAt: string;
+};
+
+export type AiConsumptionRecord = {
+    id: string;
+    jobId: string;
+    moduleId?: JobModuleId;
+    jobTitle?: string;
+    type: 'charge' | 'refund';
+    creditChange: number;
+    balanceAfter: number;
+    note?: string;
+    createdAt: string;
+};
+
+export type JobModuleId = 'video-remix' | 'video-create' | 'ad-script' | 'ai-generate' | 'video-cut' | 'media-understand' | 'video-mashup' | 'voice-clone' | 'video-renewal' | 'subtitle-erase' | 'video-enhancement' | 'video-extract' | 'video-editor' | 'kickart' | 'douyin-video-import' | 'share-content-import' | 'portrait-asset-register';
+
 export type ProviderId = 'aihubmix' | 'ark' | 'volc-speech' | 'tos' | 'mediakit' | 'qwen-audio';
 
 export type AssetKind = 'media' | 'product' | 'portrait' | 'voice';
@@ -79,8 +103,6 @@ export type AssetFolder = {
 export type AiToolModuleId = 'ai-generate' | 'video-cut' | 'media-understand' | 'video-mashup' | 'voice-clone' | 'video-renewal' | 'subtitle-erase' | 'video-enhancement' | 'kickart';
 
 export type ProviderCredentialName = 'OPENAI_KEY' | 'ARK_API_KEY' | 'VOLC_SPEECH_API_KEY_ID' | 'VOLC_SPEECH_API_KEY' | 'TOS_ACCESS_KEY_ID' | 'TOS_SECRET_ACCESS_KEY' | 'MEDIAKIT_API_KEY' | 'QWEN_AUDIO_API_KEY' | 'QWEN_AUDIO_WORKSPACE_ID';
-
-export type JobModuleId = 'video-remix' | 'video-create' | 'ad-script' | 'ai-generate' | 'video-cut' | 'media-understand' | 'video-mashup' | 'voice-clone' | 'video-renewal' | 'subtitle-erase' | 'video-enhancement' | 'video-extract' | 'video-editor' | 'kickart' | 'douyin-video-import' | 'share-content-import' | 'portrait-asset-register';
 
 export type SeedanceModelId = 'doubao-seedance-2-0-260128' | 'doubao-seedance-2-0-mini-260615' | 'doubao-seedance-2-0-fast-260128';
 
@@ -978,6 +1000,54 @@ export type CreateRechargeOrderResponses = {
 };
 
 export type CreateRechargeOrderResponse = CreateRechargeOrderResponses[keyof CreateRechargeOrderResponses];
+
+export type ListAiRechargeRecordsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/api/billing/ai/recharges';
+};
+
+export type ListAiRechargeRecordsResponses = {
+    /**
+     * Owned AI recharge records
+     */
+    200: {
+        records: Array<AiRechargeRecord>;
+        total: number;
+        page: number;
+        pageSize: number;
+    };
+};
+
+export type ListAiRechargeRecordsResponse = ListAiRechargeRecordsResponses[keyof ListAiRechargeRecordsResponses];
+
+export type ListAiConsumptionRecordsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        pageSize?: number;
+    };
+    url: '/api/billing/ai/consumption';
+};
+
+export type ListAiConsumptionRecordsResponses = {
+    /**
+     * Owned AI consumption and refund records
+     */
+    200: {
+        records: Array<AiConsumptionRecord>;
+        total: number;
+        page: number;
+        pageSize: number;
+    };
+};
+
+export type ListAiConsumptionRecordsResponse = ListAiConsumptionRecordsResponses[keyof ListAiConsumptionRecordsResponses];
 
 export type GetCapabilitiesData = {
     body?: never;

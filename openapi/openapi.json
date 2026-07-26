@@ -231,6 +231,120 @@
           "createdAt"
         ]
       },
+      "AiRechargeRecord": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "mock_recharge",
+              "admin_grant"
+            ]
+          },
+          "credits": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "amountCny": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "balanceAfter": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "succeeded"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "credits",
+          "balanceAfter",
+          "status",
+          "createdAt"
+        ]
+      },
+      "AiConsumptionRecord": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "jobId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "moduleId": {
+            "$ref": "#/components/schemas/JobModuleId"
+          },
+          "jobTitle": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "charge",
+              "refund"
+            ]
+          },
+          "creditChange": {
+            "type": "integer"
+          },
+          "balanceAfter": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "note": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "jobId",
+          "type",
+          "creditChange",
+          "balanceAfter",
+          "createdAt"
+        ]
+      },
+      "JobModuleId": {
+        "type": "string",
+        "enum": [
+          "video-remix",
+          "video-create",
+          "ad-script",
+          "ai-generate",
+          "video-cut",
+          "media-understand",
+          "video-mashup",
+          "voice-clone",
+          "video-renewal",
+          "subtitle-erase",
+          "video-enhancement",
+          "video-extract",
+          "video-editor",
+          "kickart",
+          "douyin-video-import",
+          "share-content-import",
+          "portrait-asset-register"
+        ]
+      },
       "ProviderId": {
         "type": "string",
         "enum": [
@@ -312,28 +426,6 @@
           "MEDIAKIT_API_KEY",
           "QWEN_AUDIO_API_KEY",
           "QWEN_AUDIO_WORKSPACE_ID"
-        ]
-      },
-      "JobModuleId": {
-        "type": "string",
-        "enum": [
-          "video-remix",
-          "video-create",
-          "ad-script",
-          "ai-generate",
-          "video-cut",
-          "media-understand",
-          "video-mashup",
-          "voice-clone",
-          "video-renewal",
-          "subtitle-erase",
-          "video-enhancement",
-          "video-extract",
-          "video-editor",
-          "kickart",
-          "douyin-video-import",
-          "share-content-import",
-          "portrait-asset-register"
         ]
       },
       "SeedanceModelId": {
@@ -3367,6 +3459,138 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/billing/ai/recharges": {
+      "get": {
+        "operationId": "listAiRechargeRecords",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 100,
+              "default": 25
+            },
+            "required": false,
+            "name": "pageSize",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Owned AI recharge records",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "records": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AiRechargeRecord"
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "page": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "pageSize": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  },
+                  "required": [
+                    "records",
+                    "total",
+                    "page",
+                    "pageSize"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/billing/ai/consumption": {
+      "get": {
+        "operationId": "listAiConsumptionRecords",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 100,
+              "default": 25
+            },
+            "required": false,
+            "name": "pageSize",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Owned AI consumption and refund records",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "records": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AiConsumptionRecord"
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "page": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "pageSize": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  },
+                  "required": [
+                    "records",
+                    "total",
+                    "page",
+                    "pageSize"
+                  ]
                 }
               }
             }
