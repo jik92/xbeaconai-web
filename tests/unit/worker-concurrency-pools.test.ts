@@ -65,7 +65,8 @@ describe("worker concurrency pools", () => {
     expect(runtimeEnvironment).toBeLessThan(build);
     expect(deploy).toContain('upsert_env "TOS_SERVER_ENDPOINT" "tos-cn-shanghai.ivolces.com"');
     expect(deploy).toContain('upsert_env "TOS_PUBLIC_ENDPOINT" "tos-cn-shanghai.volces.com"');
-    expect(deploy).toContain('upsert_env "TOS_CORS_ORIGINS" "$DIRECT_ORIGIN"');
+    expect(deploy).toContain('upsert_env "TOS_WEB_BUCKET" "$TOS_WEB_BUCKET"');
+    expect(deploy).toContain('upsert_env "TOS_CORS_ORIGINS" "${APP_ORIGIN},${DIRECT_ORIGIN}"');
   });
 
   test("provisions build swap before running TypeScript on low-memory hosts", async () => {

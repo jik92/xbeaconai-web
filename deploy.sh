@@ -22,6 +22,8 @@ readonly BUILD_NODE_OPTIONS="${BUILD_NODE_OPTIONS:---max-old-space-size=1280}"
 readonly APP_ORIGIN="${APP_ORIGIN:-https://app.xbeaconai.com}"
 readonly API_ORIGIN="${API_ORIGIN:-https://api.xbeaconai.com}"
 readonly DIRECT_ORIGIN="${DIRECT_ORIGIN:-http://118.196.101.57:9000}"
+readonly CDN_DOMAIN="${CDN_DOMAIN:-app.xbeaconai.com}"
+readonly TOS_WEB_BUCKET="${TOS_WEB_BUCKET:-xbeaconai-web-prod}"
 readonly ENABLE_TLS="${ENABLE_TLS:-auto}"
 
 log() {
@@ -78,9 +80,11 @@ ensure_runtime_environment() {
     upsert_env "REDIS_QUEUE_NAME" "yaozuo-jobs"
     upsert_env "TOS_REGION" "cn-shanghai"
     upsert_env "TOS_BUCKET" "xbeacon-shanghai"
+    upsert_env "TOS_WEB_BUCKET" "$TOS_WEB_BUCKET"
+    upsert_env "CDN_DOMAIN" "$CDN_DOMAIN"
     upsert_env "TOS_SERVER_ENDPOINT" "tos-cn-shanghai.ivolces.com"
     upsert_env "TOS_PUBLIC_ENDPOINT" "tos-cn-shanghai.volces.com"
-    upsert_env "TOS_CORS_ORIGINS" "$DIRECT_ORIGIN"
+    upsert_env "TOS_CORS_ORIGINS" "${APP_ORIGIN},${DIRECT_ORIGIN}"
     remove_env "TOS_ENDPOINT"
     remove_env "TOS_INTERNAL_ENDPOINT"
     upsert_env "NETWORK_WORKER_CONCURRENCY" "${NETWORK_WORKER_CONCURRENCY:-40}"
@@ -184,6 +188,15 @@ build_production() {
         systemctl start "$WORKER_SERVICE_NAME"
         wait_for_worker
     fi
+}
+
+publish_web_cdn() {
+    log "发布静态前端到私有 TOS Bucket 并刷新 CDN..."
+    set -a
+    # shellcheck disable=SC1090
+    source "$ENV_FILE"
+    set +a
+    WEB_DIST_DIR="$PROJECT_DIR/dist" bun scripts/deploy-web-cdn.ts
 }
 
 wait_for_api() {
@@ -305,6 +318,8 @@ install -d -m 0755 "$WEB_ROOT"
 rsync -a --delete "$PROJECT_DIR/dist/" "$WEB_ROOT/"
 find "$WEB_ROOT" -type d -exec chmod 0755 {} +
 find "$WEB_ROOT" -type f -exec chmod 0644 {} +
+
+publish_web_cdn
 
 if tls_enabled; then
     ensure_tls_certificate
