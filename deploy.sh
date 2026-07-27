@@ -192,11 +192,13 @@ build_production() {
 
 publish_web_cdn() {
     log "发布静态前端到私有 TOS Bucket 并刷新 CDN..."
-    set -a
-    # shellcheck disable=SC1090
-    source "$ENV_FILE"
-    set +a
-    WEB_DIST_DIR="$PROJECT_DIR/dist" bun scripts/deploy-web-cdn.ts
+    ENV_FILE="$ENV_FILE" WEB_DIST_DIR="$PROJECT_DIR/dist" bash -c '
+        set -a
+        # shellcheck disable=SC1090
+        source "$ENV_FILE"
+        set +a
+        exec bun scripts/deploy-web-cdn.ts
+    '
 }
 
 wait_for_api() {
