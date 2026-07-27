@@ -192,10 +192,10 @@ build_production() {
 
 publish_web_cdn() {
     log "发布静态前端到私有 TOS Bucket 并刷新 CDN..."
-    ENV_FILE="$ENV_FILE" WEB_DIST_DIR="$PROJECT_DIR/dist" bash -c '
+    DEPLOY_ENV_PATH="$ENV_FILE" WEB_DIST_DIR="$PROJECT_DIR/dist" bash -c '
         set -a
         # shellcheck disable=SC1090
-        source "$ENV_FILE"
+        source "$DEPLOY_ENV_PATH"
         set +a
         exec bun scripts/deploy-web-cdn.ts
     '
