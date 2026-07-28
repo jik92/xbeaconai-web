@@ -7,6 +7,7 @@ import type { JobRecord } from "../../server/types";
 
 const testDataDir = mkdtempSync(join(tmpdir(), "yaozuo-remix-project-api-test-"));
 process.env.YAOZUO_DATA_DIR = testDataDir;
+process.env.BYOK_ENCRYPTION_KEY = "video-remix-project-test-key-32-characters";
 
 const appModule = await import("../../server/app");
 const honoApp = appModule.app;
@@ -14,6 +15,7 @@ const realAccounts = appModule.accounts;
 const realStore = appModule.store;
 const realQueue = appModule.queue;
 const { issueToken } = await import("../../server/accounts/auth");
+const { providerCredentials } = await import("../../server/byok/credential-store");
 
 const originalEnqueue = realQueue.enqueue.bind(realQueue);
 let token = "";
@@ -24,6 +26,8 @@ let secondProjectId = "";
 let sourceId = "";
 let productAssetId = "";
 let generatedAssetId = "";
+let submissionSourceId = "";
+let submissionProductAssetId = "";
 
 function job(input: Partial<JobRecord> & Pick<JobRecord, "id" | "ownerUserId" | "values">): JobRecord {
   const timestamp = new Date().toISOString();
@@ -74,7 +78,12 @@ async function createUser(displayName: string) {
   return { id, phone, displayName, avatarText: displayName.slice(0, 2), credits: 2480, isAdmin: false };
 }
 
-function projectRequest(projectName: string) {
+function projectRequest(
+  projectName: string,
+  input: { sourceAssetId?: string; productImageAssetId?: string; voiceAssetId?: string } = {},
+) {
+  const requestSourceId = input.sourceAssetId ?? sourceId;
+  const requestProductAssetId = input.productImageAssetId ?? productAssetId;
   return {
     projectName,
     mode: "product",
@@ -84,11 +93,11 @@ function projectRequest(projectName: string) {
       productImages: [
         {
           filename: "hat.jpg",
-          objectKey: productAssetId,
-          fileUrl: `/api/assets/${productAssetId}/content`,
-          coverUrl: `/api/assets/${productAssetId}/content`,
+          objectKey: requestProductAssetId,
+          fileUrl: `/api/assets/${requestProductAssetId}/content`,
+          coverUrl: `/api/assets/${requestProductAssetId}/content`,
           fileType: "IMAGE",
-          metaId: productAssetId,
+          metaId: requestProductAssetId,
         },
       ],
       productFormMetaList: null,
@@ -98,19 +107,42 @@ function projectRequest(projectName: string) {
     rawMaterialFiles: [
       {
         filename: "source.mp4",
-        objectKey: sourceId,
-        fileUrl: `/api/assets/${sourceId}/content`,
-        coverUrl: `/api/assets/${sourceId}/content`,
+        objectKey: requestSourceId,
+        fileUrl: `/api/assets/${requestSourceId}/content`,
+        coverUrl: `/api/assets/${requestSourceId}/content`,
         fileType: "VIDEO",
       },
     ],
-    voiceAsset: null,
+    voiceAsset: input.voiceAssetId
+      ? {
+          filename: "voice.mp3",
+          objectKey: input.voiceAssetId,
+          fileUrl: `/api/assets/${input.voiceAssetId}/content`,
+          coverUrl: `/api/assets/${input.voiceAssetId}/content`,
+          fileType: "AUDIO",
+        }
+      : null,
     portraitAssets: [],
   };
 }
 
 beforeAll(async () => {
   realQueue.enqueue = async (_jobId: string) => {};
+  const checkedAt = new Date().toISOString();
+  providerCredentials.saveChecks(
+    [
+      ["aihubmix", "AIHubMix"],
+      ["ark", "火山方舟"],
+      ["tos", "火山 TOS"],
+    ].map(([providerId, provider]) => ({
+      providerId: providerId as "aihubmix" | "ark" | "tos",
+      provider,
+      status: "available" as const,
+      message: "test verified",
+      latencyMs: 1,
+      checkedAt,
+    })),
+  );
   const user = await createUser("项目测试用户");
   userId = user.id;
   token = (await issueToken(realAccounts, user)).token;
@@ -120,6 +152,43 @@ beforeAll(async () => {
   sourceId = crypto.randomUUID();
   productAssetId = crypto.randomUUID();
   generatedAssetId = crypto.randomUUID();
+  submissionSourceId = crypto.randomUUID();
+  submissionProductAssetId = crypto.randomUUID();
+  const now = new Date().toISOString();
+  realAccounts.createAsset({
+    id: submissionSourceId,
+    ownerUserId: userId,
+    storageKey: `users/${userId}/remix-source.mp4`,
+    originalName: "remix-source.mp4",
+    mimeType: "video/mp4",
+    byteSize: 256,
+    kind: "media",
+    displayName: "二创分镜",
+    createdAt: now,
+  });
+  realAccounts.createProductAssets(
+    {
+      id: crypto.randomUUID(),
+      ownerUserId: userId,
+      name: "巴拿马草帽",
+      description: "夏季草帽",
+      sharingScope: "private",
+      createdAt: now,
+    },
+    [
+      {
+        id: submissionProductAssetId,
+        ownerUserId: userId,
+        storageKey: `users/${userId}/hat.jpg`,
+        originalName: "hat.jpg",
+        mimeType: "image/jpeg",
+        byteSize: 128,
+        kind: "product",
+        displayName: "巴拿马草帽",
+        createdAt: now,
+      },
+    ],
+  );
   const analysisEntries = JSON.stringify([
     { assetId: sourceId, name: "source.mp4", status: "succeeded", prompt: "完整的分镜提示词内容用于恢复" },
   ]);
@@ -199,6 +268,7 @@ beforeAll(async () => {
 
 afterAll(() => {
   realQueue.enqueue = originalEnqueue;
+  providerCredentials.close();
   realAccounts.close();
   realStore.close();
   rmSync(testDataDir, { recursive: true, force: true });
@@ -278,5 +348,47 @@ describe("video remix project records API", () => {
     const foreignProject = realStore.listRemixProjectRoots(otherUserId)[0];
     const response = await honoApp.request(`/api/video-remix/projects/${foreignProject?.id}`, { headers: headers() });
     expect(response.status).toBe(404);
+  });
+
+  test("reports a deleted optional voice accurately", async () => {
+    const missingVoiceId = crypto.randomUUID();
+    const response = await honoApp.request("/api/video-remix/project/generate", {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify(
+        projectRequest("失效音色项目", {
+          sourceAssetId: submissionSourceId,
+          productImageAssetId: submissionProductAssetId,
+          voiceAssetId: missingVoiceId,
+        }),
+      ),
+    });
+
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({
+      error: {
+        code: "VOICE_ASSET_NOT_AVAILABLE",
+        message: "引用的音色素材不存在或已删除",
+        retryable: false,
+      },
+    });
+  });
+
+  test("creates video analysis without an optional voice", async () => {
+    const response = await honoApp.request("/api/video-remix/project/generate", {
+      method: "POST",
+      headers: { ...headers(), "Idempotency-Key": crypto.randomUUID() },
+      body: JSON.stringify(
+        projectRequest("无音色项目", {
+          sourceAssetId: submissionSourceId,
+          productImageAssetId: submissionProductAssetId,
+        }),
+      ),
+    });
+
+    expect(response.status).toBe(202);
+    const created = (await response.json()) as JobRecord;
+    expect(created.values.workflowPhase).toBe("analysis");
+    expect(created.values.voiceAssetId).toBe("");
   });
 });

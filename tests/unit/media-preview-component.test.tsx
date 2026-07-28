@@ -98,6 +98,25 @@ describe("MediaPreview", () => {
     );
   });
 
+  test("renders the public portrait content route without treating it as an unpublished asset", () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    roots.push(root);
+    act(() => {
+      root.render(
+        <MediaPreview
+          url="http://127.0.0.1:8787/api/portraits/18/content"
+          mimeType="image/jpeg"
+          alt="通用人像"
+          previewable={false}
+        />,
+      );
+    });
+
+    expect(container.querySelector("img")?.getAttribute("src")).toBe("http://127.0.0.1:8787/api/portraits/18/content");
+  });
+
   test("resolves a protected media identifier to CDN before rendering it", async () => {
     const container = document.createElement("div");
     document.body.append(container);

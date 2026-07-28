@@ -4262,9 +4262,7 @@ app.post("/api/video-remix/project/generate", async (c) => {
   const productAssetIds = parsed.data.product.productImages.map((file) => file.metaId).filter(Boolean) as string[];
   const videoAssetIds = parsed.data.rawMaterialFiles.map((file) => file.objectKey);
   const voiceAssetId = parsed.data.voiceAsset?.objectKey;
-  const assets = [...productAssetIds, ...videoAssetIds, ...(voiceAssetId ? [voiceAssetId] : [])].map((id) =>
-    accounts.getOwnedAsset(ownerUserId, id),
-  );
+  const assets = [...productAssetIds, ...videoAssetIds].map((id) => accounts.getOwnedAsset(ownerUserId, id));
   if (!productAssetIds.length || assets.some((asset) => !asset))
     return c.json(
       { error: { code: "ASSET_NOT_AVAILABLE", message: "引用的商品或视频素材不存在", retryable: false, requestId } },
@@ -4288,7 +4286,19 @@ app.post("/api/video-remix/project/generate", async (c) => {
       { error: { code: "INVALID_VIDEO_ASSET", message: "分镜素材必须全部为视频", retryable: false, requestId } },
       422,
     );
-  const voiceAsset = voiceAssetId ? assets.at(-1) : undefined;
+  const voiceAsset = voiceAssetId ? accounts.getOwnedAsset(ownerUserId, voiceAssetId) : undefined;
+  if (voiceAssetId && !voiceAsset)
+    return c.json(
+      {
+        error: {
+          code: "VOICE_ASSET_NOT_AVAILABLE",
+          message: "引用的音色素材不存在或已删除",
+          retryable: false,
+          requestId,
+        },
+      },
+      422,
+    );
   if (voiceAssetId && !voiceAsset?.mimeType.startsWith("audio/"))
     return c.json(
       { error: { code: "INVALID_VOICE_ASSET", message: "音色素材必须是当前账号的音频", retryable: false, requestId } },

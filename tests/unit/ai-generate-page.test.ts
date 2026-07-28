@@ -22,6 +22,14 @@ describe("assistant-ui AI Generate page", () => {
     expect(promptWorkbench).not.toContain("ai-generate.css");
   });
 
+  test("keeps the composer fixed while only the message viewport scrolls", () => {
+    const page = readFileSync(resolve(root, "web/features/ai-generate/ai-generate-page.tsx"), "utf8");
+
+    expect(page).toContain('className="flex h-[calc(100dvh-56px)] min-h-0 overflow-hidden bg-surface"');
+    expect(page).toContain('className="flex min-h-0 flex-1 flex-col overflow-y-auto"');
+    expect(page).toContain('className="sticky bottom-0 mx-auto w-full max-w-4xl shrink-0');
+  });
+
   test("reuses the shared media result card for image and video artifacts", () => {
     const page = readFileSync(resolve(root, "web/features/ai-generate/ai-generate-page.tsx"), "utf8");
     const resultCard = readFileSync(resolve(root, "web/components/domain/media-result-card.tsx"), "utf8");

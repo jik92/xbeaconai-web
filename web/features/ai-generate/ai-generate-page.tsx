@@ -539,7 +539,7 @@ function AiGenerateThread() {
             AssistantMessage,
           }}
         />
-        <ThreadPrimitive.ViewportFooter className="sticky bottom-0 mx-auto w-full max-w-4xl bg-surface/95 px-4 pb-4 pt-2 backdrop-blur">
+        <ThreadPrimitive.ViewportFooter className="sticky bottom-0 mx-auto w-full max-w-4xl shrink-0 bg-surface/95 px-4 pb-4 pt-2 backdrop-blur">
           <ThreadPrimitive.ScrollToBottom asChild>
             <Button
               variant="outline"
@@ -560,7 +560,7 @@ function AiGenerateThread() {
 export function AiGeneratePage() {
   return (
     <AiGenerateProvider>
-      <div className="flex h-full min-h-0 bg-surface">
+      <div className="flex h-[calc(100dvh-56px)] min-h-0 overflow-hidden bg-surface">
         <AiGenerateThread />
       </div>
     </AiGenerateProvider>

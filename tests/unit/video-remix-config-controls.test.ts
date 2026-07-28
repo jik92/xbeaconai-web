@@ -28,6 +28,12 @@ describe("video remix configuration controls", () => {
     expect(styles).not.toContain(".remix-mode-tabs");
   });
 
+  test("keeps voice optional and lets the user clear a selected voice", () => {
+    expect(config).toContain("口播音色 <small>（选填）</small>");
+    expect(config).toContain("onClick={onRemoveVoice}");
+    expect(source).toContain("onRemoveVoice={() => setSelectedVoice(null)}");
+  });
+
   test("reuses the shared portrait picker while preserving the three-person limit", () => {
     expect(source).toContain('from "@/features/portrait-library/portrait-picker-dialog"');
     expect(source).toContain("<PortraitPickerDialog");

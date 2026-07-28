@@ -1213,8 +1213,22 @@ export function isPublicMediaUrl(url: string) {
   }
 }
 
+function isPublicPortraitMediaUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    return (
+      parsed.origin === new URL(apiBaseUrl()).origin &&
+      /^\/api\/portraits\/[1-9]\d*\/content$/.test(parsed.pathname) &&
+      !parsed.search &&
+      !parsed.hash
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function directMediaSource(url: string) {
-  return isPublicMediaUrl(url) ? url : undefined;
+  return isPublicMediaUrl(url) || isPublicPortraitMediaUrl(url) ? url : undefined;
 }
 
 export async function resolveMediaCdnUrl(url: string, original = false) {

@@ -1883,10 +1883,6 @@
 .remix-picker-grid > button > span.product {
   position: relative;
 }
-.product-picker-grid > button > span.product img {
-  padding: 8px;
-  object-fit: contain;
-}
 .remix-picker-grid > button > span.product > i {
   position: absolute;
   left: 8px;

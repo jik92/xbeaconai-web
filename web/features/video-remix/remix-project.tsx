@@ -41,6 +41,7 @@ import { AttachmentPicker, type AttachmentSelection } from "@/components/domain/
 import { AuthenticatedMedia } from "@/components/domain/authenticated-media";
 import { DashedPickerTile } from "@/components/domain/dashed-picker-tile";
 import { ImagePreview } from "@/components/domain/media-preview";
+import { ProductImage } from "@/components/domain/product-image";
 import { ProjectRecordDrawer, type ProjectRecordStatusTone } from "@/components/domain/project-record-drawer";
 import { PromptWorkbench } from "@/components/domain/prompt-workbench";
 import { Button } from "@/components/ui/button";
@@ -56,6 +57,7 @@ import {
   type RemixAnalysisEntry,
   remixMaxSources,
 } from "../../../shared/video-remix/workflow";
+import { resolveOptionalRemixVoice } from "./optional-voice";
 import { PromptToolModal } from "./prompt-tool-modal";
 import "./remix-project.css";
 
@@ -225,6 +227,7 @@ function ConfigSidebar({
   onRemoveSource,
   onPick,
   onRemovePortrait,
+  onRemoveVoice,
 }: {
   mode: "product" | "talking";
   setMode: (mode: "product" | "talking") => void;
@@ -241,6 +244,7 @@ function ConfigSidebar({
   onRemoveSource: (assetId: string) => void;
   onPick: (kind: "product" | "portrait" | "voice") => void;
   onRemovePortrait: (key: string) => void;
+  onRemoveVoice: () => void;
 }) {
   return (
     <aside className="remix-config">
@@ -271,11 +275,11 @@ function ConfigSidebar({
         icon={<Plus />}
         preview={
           selectedProduct ? (
-            <AuthenticatedMedia
+            <ProductImage
               url={selectedProduct.images[0]?.url || ""}
+              originalUrl={selectedProduct.images[0]?.originalUrl}
               mimeType={selectedProduct.images[0]?.mimeType || "image/png"}
               alt={selectedProduct.name}
-              previewable={false}
             />
           ) : undefined
         }
@@ -318,7 +322,14 @@ function ConfigSidebar({
         />
       </div>
       <div className="config-field-title">
-        <b>口播音色</b>
+        <b>
+          口播音色 <small>（选填）</small>
+        </b>
+        {selectedVoice && (
+          <Button className="ml-auto" type="button" variant="ghost" size="sm" onClick={onRemoveVoice}>
+            清除
+          </Button>
+        )}
       </div>
       <DashedPickerTile
         presentation="wide"
@@ -583,14 +594,15 @@ function ProductPickerModal({
             return (
               <Button
                 key={product.id}
-                className={isSelected ? "selected" : ""}
+                className={`h-auto min-h-0 w-full flex-col items-stretch justify-start gap-0 whitespace-normal ${isSelected ? "selected" : ""}`}
                 variant="ghost"
                 aria-pressed={isSelected}
                 onClick={() => setPendingId(product.id)}
               >
                 <span className="product">
-                  <AuthenticatedMedia
+                  <ProductImage
                     url={product.images[0]?.url || ""}
+                    originalUrl={product.images[0]?.originalUrl}
                     mimeType={product.images[0]?.mimeType || "image/png"}
                     alt={product.name}
                   />
@@ -800,13 +812,7 @@ export function RemixProject() {
   const [picker, setPicker] = useState<"product" | "portrait" | "voice" | null>(null);
   const [selectedPortraits, setSelectedPortraits] = useState<SelectedPortrait[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<LibraryProduct | null>(null);
-  const [selectedVoice, setSelectedVoice] = useState<LibraryAsset | null>(() => {
-    try {
-      return JSON.parse(localStorage.getItem("studio:selectedVoice") || "null");
-    } catch {
-      return null;
-    }
-  });
+  const [selectedVoice, setSelectedVoice] = useState<LibraryAsset | null>(null);
   const activeJobId = job && (job.status === "queued" || job.status === "processing") ? job.id : null;
   const activePromptState = promptStates[activeSourceId] ?? { prompt: "", versions: [], activeVersionId: "" };
   const prompt = activePromptState.prompt;
@@ -1027,6 +1033,17 @@ export function RemixProject() {
     setStage(1);
     setNotice("");
     try {
+      const availableVoice = selectedVoice
+        ? resolveOptionalRemixVoice(
+            selectedVoice,
+            await queryClient.fetchQuery({
+              queryKey: ["asset-library", "voice"],
+              queryFn: () => fetchLibraryAssets("voice"),
+            }),
+          )
+        : null;
+      const removedUnavailableVoice = Boolean(selectedVoice && !availableVoice);
+      if (removedUnavailableVoice) setSelectedVoice(null);
       const created = await generateRemixProject({
         projectName:
           projectName.trim() ||
@@ -1067,14 +1084,14 @@ export function RemixProject() {
             reasoningEffort: "high",
           };
         }),
-        voiceAsset: selectedVoice
+        voiceAsset: availableVoice
           ? {
-              filename: selectedVoice.originalName,
-              objectKey: selectedVoice.id,
-              fileUrl: selectedVoice.url,
-              coverUrl: selectedVoice.url,
+              filename: availableVoice.originalName,
+              objectKey: availableVoice.id,
+              fileUrl: availableVoice.url,
+              coverUrl: availableVoice.url,
               fileType: "AUDIO",
-              durationSec: selectedVoice.durationSec ?? null,
+              durationSec: availableVoice.durationSec ?? null,
             }
           : null,
         portraitAssets: selectedPortraits.map((portrait) => {
@@ -1105,6 +1122,7 @@ export function RemixProject() {
       setComposeOrder(sources.map((source) => source.id));
       setComposePreviewId(sources[0]?.id || "");
       setActiveSourceId(sources[0]?.id || "");
+      if (removedUnavailableVoice) setNotice("所选音色已删除，已按无音色继续分析");
     } catch (error) {
       setParsing(false);
       setNotice(error instanceof Error ? error.message : "解析任务提交失败");
@@ -1586,6 +1604,7 @@ export function RemixProject() {
           onRemovePortrait={(key) =>
             setSelectedPortraits((current) => current.filter((portrait) => portrait.key !== key))
           }
+          onRemoveVoice={() => setSelectedVoice(null)}
         />
         <section className="remix-workspace">
           {notice && (
@@ -2141,7 +2160,6 @@ export function RemixProject() {
           onClose={() => setPicker(null)}
           onSelect={(asset) => {
             setSelectedVoice(asset);
-            localStorage.setItem("studio:selectedVoice", JSON.stringify(asset));
             setPicker(null);
           }}
         />
