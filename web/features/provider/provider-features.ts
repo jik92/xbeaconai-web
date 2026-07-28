@@ -15,5 +15,5 @@ export function useProviderFeatures(enabled = true) {
 }
 
 export function moduleProviderAvailability(data: ReturnType<typeof useProviderFeatures>["data"], moduleId: ModuleId) {
-  return data?.modules[moduleId];
+  return data?.modules?.[moduleId];
 }

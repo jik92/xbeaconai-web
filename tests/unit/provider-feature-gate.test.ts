@@ -1,11 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { isModuleOpen } from "../../web/app/config";
+import { readFileSync } from "node:fs";
+import type { ProviderId } from "../../server/byok/credential-store";
 import {
   allProviderFeatureAvailability,
   moduleFeatureAvailability,
   moduleProviderRequirements,
 } from "../../server/byok/provider-feature-gate";
-import type { ProviderId } from "../../server/byok/credential-store";
+import { isProviderFeaturesResponse } from "../../web/api/api-client";
+import { isModuleOpen } from "../../web/app/config";
+import { moduleProviderAvailability } from "../../web/features/provider/provider-features";
 
 describe("Provider feature gate", () => {
   test("enables only modules whose required Providers have passed", () => {
@@ -41,5 +44,19 @@ describe("Provider feature gate", () => {
     expect(isModuleOpen("ai-generate")).toBe(true);
     expect(moduleProviderRequirements["ai-generate"]).toEqual(["aihubmix", "ark"]);
     expect(isModuleOpen("video-cut")).toBe(true);
+  });
+
+  test("rejects stale Provider responses without crashing module lookup", () => {
+    expect(isProviderFeaturesResponse({ modules: {}, operations: {} })).toBe(true);
+    expect(isProviderFeaturesResponse({ providers: [] })).toBe(false);
+    expect(moduleProviderAvailability({} as never, "video-remix")).toBeUndefined();
+  });
+
+  test("disables browser and intermediary caching for Provider status", () => {
+    const clientSource = readFileSync(new URL("../../web/api/api-client.ts", import.meta.url), "utf8");
+    const appSource = readFileSync(new URL("../../server/app.ts", import.meta.url), "utf8");
+
+    expect(clientSource).toContain('cache: "no-store"');
+    expect(appSource).toContain('c.header("Cache-Control", "private, no-store")');
   });
 });

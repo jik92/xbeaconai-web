@@ -143,9 +143,26 @@ export async function fetchAdminCredentials() {
 
 export async function fetchProviderFeatures() {
   configure();
-  const { data } = await getProviderFeatures({ headers: authHeaders(), throwOnError: true });
-  if (!data) throw new Error("Provider 状态加载失败");
+  const { data } = await getProviderFeatures({
+    headers: authHeaders(),
+    cache: "no-store",
+    throwOnError: true,
+  });
+  if (!isProviderFeaturesResponse(data)) throw new Error("Provider 状态响应无效");
   return data;
+}
+
+export function isProviderFeaturesResponse(
+  data: unknown,
+): data is NonNullable<Awaited<ReturnType<typeof getProviderFeatures>>["data"]> {
+  if (!data || typeof data !== "object") return false;
+  const candidate = data as { modules?: unknown; operations?: unknown };
+  return Boolean(
+    candidate.modules &&
+      typeof candidate.modules === "object" &&
+      candidate.operations &&
+      typeof candidate.operations === "object",
+  );
 }
 
 export async function fetchAdminCredentialDoctorResults() {

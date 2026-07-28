@@ -1490,7 +1490,10 @@ const providerFeaturesRoute = createRoute({
     },
   },
 });
-app.openapi(providerFeaturesRoute, (c) => c.json(allProviderFeatureAvailability(), 200));
+app.openapi(providerFeaturesRoute, (c) => {
+  c.header("Cache-Control", "private, no-store");
+  return c.json(allProviderFeatureAvailability(), 200);
+});
 
 const modelsRoute = createRoute({
   method: "get",
