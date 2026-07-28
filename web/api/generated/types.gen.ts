@@ -1837,6 +1837,36 @@ export type SaveAssetMetadataResponses = {
 
 export type SaveAssetMetadataResponse = SaveAssetMetadataResponses[keyof SaveAssetMetadataResponses];
 
+export type GetAssetAccessData = {
+    body?: never;
+    path: {
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/assets/{assetId}/access';
+};
+
+export type GetAssetAccessErrors = {
+    /**
+     * Not found
+     */
+    404: string;
+};
+
+export type GetAssetAccessError = GetAssetAccessErrors[keyof GetAssetAccessErrors];
+
+export type GetAssetAccessResponses = {
+    /**
+     * Short-lived direct TOS read authorization
+     */
+    200: {
+        url: string;
+        expiresAt: string;
+    };
+};
+
+export type GetAssetAccessResponse = GetAssetAccessResponses[keyof GetAssetAccessResponses];
+
 export type GetAssetContentData = {
     body?: never;
     path: {

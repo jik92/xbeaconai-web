@@ -1193,8 +1193,21 @@ export function watchJob(jobId: string, onChange: (job: Job) => void, onError?: 
   return () => controller.abort();
 }
 
+export function assetAccessUrlForContent(url: string) {
+  const match = /^\/api\/assets\/([0-9a-f-]{36})\/content$/i.exec(url);
+  return match ? `/api/assets/${match[1]}/access` : undefined;
+}
+
 export async function authenticatedBlobUrl(url: string) {
-  const response = await fetch(apiUrl(url), { headers: authHeaders() });
+  const accessUrl = assetAccessUrlForContent(url);
+  let response: Response;
+  if (accessUrl) {
+    const authorization = await fetch(apiUrl(accessUrl), { headers: authHeaders() });
+    if (!authorization.ok) throw new Error("结果文件读取失败");
+    const data = (await authorization.json()) as { url?: string };
+    if (!data.url) throw new Error("结果文件读取失败");
+    response = await fetch(data.url);
+  } else response = await fetch(apiUrl(url), { headers: authHeaders() });
   if (!response.ok) throw new Error("结果文件读取失败");
   return URL.createObjectURL(await response.blob());
 }

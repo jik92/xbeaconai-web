@@ -430,6 +430,10 @@ const DirectUploadInitSchema = z.object({
   headers: z.record(z.string(), z.string()),
   expiresAt: z.string(),
 });
+const AssetAccessSchema = z.object({
+  url: z.string().url(),
+  expiresAt: z.string(),
+});
 
 export const store = new SqliteJobStore();
 export const accounts = new AccountStore(env.databasePath, { smsSender: createApplicationSmsSender() });
@@ -2863,6 +2867,39 @@ const assetContentRoute = createRoute({
     404: { description: "Not found", content: { "text/plain": { schema: z.string() } } },
   },
 });
+
+const assetAccessRoute = createRoute({
+  method: "get",
+  path: "/api/assets/{assetId}/access",
+  operationId: "getAssetAccess",
+  request: { params: z.object({ assetId: z.string().uuid() }) },
+  responses: {
+    200: {
+      description: "Short-lived direct TOS read authorization",
+      content: { "application/json": { schema: AssetAccessSchema } },
+    },
+    404: { description: "Not found", content: { "text/plain": { schema: z.string() } } },
+  },
+});
+
+app.openapi(assetAccessRoute, async (c) => {
+  const asset = accounts.getOwnedAsset(c.get("userId"), c.req.valid("param").assetId);
+  if (!asset || !ossutils.configured) return c.text("Not found", 404);
+  try {
+    await ossutils.headObject(asset.storageKey);
+    const expiresSeconds = 15 * 60;
+    return c.json(
+      {
+        url: ossutils.createSignedReadUrl(asset.storageKey, expiresSeconds),
+        expiresAt: new Date(Date.now() + expiresSeconds * 1000).toISOString(),
+      },
+      200,
+    );
+  } catch {
+    return c.text("Not found", 404);
+  }
+});
+
 app.openapi(assetContentRoute, async (c) => {
   const asset = accounts.getOwnedAsset(c.get("userId"), c.req.valid("param").assetId);
   if (!asset) return new Response("Not found", { status: 404 });

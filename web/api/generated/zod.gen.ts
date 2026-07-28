@@ -1553,6 +1553,18 @@ export const zSaveAssetMetadataResponse = z.object({
     })
 });
 
+export const zGetAssetAccessPath = z.object({
+    assetId: z.uuid()
+});
+
+/**
+ * Short-lived direct TOS read authorization
+ */
+export const zGetAssetAccessResponse = z.object({
+    url: z.url(),
+    expiresAt: z.string()
+});
+
 export const zGetAssetContentPath = z.object({
     assetId: z.uuid()
 });
