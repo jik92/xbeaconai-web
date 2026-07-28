@@ -19,7 +19,7 @@ describe("portrait library data", () => {
       age: 32,
       gender: "女",
       profession: "主播",
-      display_url: "/api/portraits/18/content",
+      display_url: "http://127.0.0.1:8787/api/portraits/18/content",
     });
   });
 

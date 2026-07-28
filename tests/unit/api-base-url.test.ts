@@ -32,6 +32,10 @@ describe("API base URL", () => {
     ).toBe("https://preview.example.com");
   });
 
+  test("uses the loopback API for an opaque browser origin", () => {
+    expect(resolveApiBaseUrl(undefined, { hostname: "", origin: "null" })).toBe("http://127.0.0.1:8787");
+  });
+
   test("uses the loopback API during server-side execution", () => {
     expect(resolveApiBaseUrl(undefined)).toBe("http://127.0.0.1:8787");
   });

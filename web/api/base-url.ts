@@ -14,7 +14,10 @@ export function resolveApiBaseUrl(configured: string | undefined, location?: Bro
   const normalized = configured?.trim().replace(/\/$/, "");
   if (normalized) return normalized;
   if (!location) return "http://127.0.0.1:8787";
-  return productionApiOrigins[location.hostname] ?? location.origin;
+  return (
+    productionApiOrigins[location.hostname] ??
+    (URL.canParse(location.origin) ? location.origin : "http://127.0.0.1:8787")
+  );
 }
 
 export function apiBaseUrl() {

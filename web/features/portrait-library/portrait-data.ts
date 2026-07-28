@@ -1,6 +1,7 @@
 import type { PortraitReference } from "../../../shared/portraits/portrait-reference";
 import { parsePortraitTags } from "../../../shared/portraits/portrait-tags";
 import { fetchCustomPortraits } from "../../api/api-client";
+import { apiUrl } from "../../api/base-url";
 
 export interface PortraitRecord {
   index: number;
@@ -26,7 +27,7 @@ interface PortraitBase {
   status: "active" | "queued" | "processing" | "failed";
 }
 
-export const portraitDisplayUrl = (portraitId: number) => `/api/portraits/${portraitId}/content`;
+export const portraitDisplayUrl = (portraitId: number) => apiUrl(`/api/portraits/${portraitId}/content`);
 
 export interface GeneralPortrait extends PortraitBase, PortraitRecord {
   type: "general";
