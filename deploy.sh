@@ -74,7 +74,7 @@ ensure_runtime_environment() {
     upsert_env "API_HOST" "127.0.0.1"
     upsert_env "API_PORT" "8787"
     upsert_env "YAOZUO_DATA_DIR" "$DATA_DIR"
-    upsert_env "ALLOWED_ORIGINS" "${APP_ORIGIN},${API_ORIGIN},${DIRECT_ORIGIN}"
+    upsert_env "ALLOWED_ORIGINS" "$APP_ORIGIN"
     upsert_env "ALLOW_MOCK_FALLBACK" "true"
     upsert_env "REDIS_URL" "redis://127.0.0.1:6379"
     upsert_env "REDIS_QUEUE_NAME" "yaozuo-jobs"
@@ -84,7 +84,7 @@ ensure_runtime_environment() {
     upsert_env "CDN_DOMAIN" "$CDN_DOMAIN"
     upsert_env "TOS_SERVER_ENDPOINT" "tos-cn-shanghai.ivolces.com"
     upsert_env "TOS_PUBLIC_ENDPOINT" "tos-cn-shanghai.volces.com"
-    upsert_env "TOS_CORS_ORIGINS" "${APP_ORIGIN},${DIRECT_ORIGIN}"
+    upsert_env "TOS_CORS_ORIGINS" "$APP_ORIGIN"
     remove_env "TOS_ENDPOINT"
     remove_env "TOS_INTERNAL_ENDPOINT"
     upsert_env "NETWORK_WORKER_CONCURRENCY" "${NETWORK_WORKER_CONCURRENCY:-40}"
@@ -351,18 +351,19 @@ systemctl restart nginx
 systemctl is-active --quiet nginx
 
 log "验证公网入口..."
-curl --fail --silent --show-error -H "Host: 118.196.101.57:9000" http://127.0.0.1:9000/ >/dev/null
-curl --fail --silent --show-error -H "Host: 118.196.101.57:9000" -H "Origin: $DIRECT_ORIGIN" \
-    http://127.0.0.1:9000/api/health >/dev/null
-curl --fail --silent --show-error -H "Host: 118.196.101.57:9000" \
-    http://127.0.0.1:9000/tools/video-cut >/dev/null
-curl --fail --silent --show-error -H "Host: 118.196.101.57:9000" \
-    http://127.0.0.1:9000/tools/voice-clone >/dev/null
 if tls_enabled; then
     curl --fail --silent --show-error --resolve app.xbeaconai.com:443:127.0.0.1 \
         https://app.xbeaconai.com/ >/dev/null
     curl --fail --silent --show-error --resolve api.xbeaconai.com:443:127.0.0.1 -H "Origin: $APP_ORIGIN" \
         https://api.xbeaconai.com/api/health >/dev/null
+else
+    curl --fail --silent --show-error -H "Host: 118.196.101.57:9000" http://127.0.0.1:9000/ >/dev/null
+    curl --fail --silent --show-error -H "Host: 118.196.101.57:9000" \
+        http://127.0.0.1:9000/api/health >/dev/null
+    curl --fail --silent --show-error -H "Host: 118.196.101.57:9000" \
+        http://127.0.0.1:9000/tools/video-cut >/dev/null
+    curl --fail --silent --show-error -H "Host: 118.196.101.57:9000" \
+        http://127.0.0.1:9000/tools/voice-clone >/dev/null
 fi
 
 systemctl is-active --quiet redis-server "$API_SERVICE_NAME" "$WORKER_SERVICE_NAME" nginx
