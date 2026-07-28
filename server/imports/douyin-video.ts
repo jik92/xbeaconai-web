@@ -245,44 +245,24 @@ export async function downloadDouyinVideo(
     }
     reportProgress(onProgress, "media_capture_complete");
 
-    // Fetch + blob download with Content-Type validation
+    // Download through the browser context so its cookies are preserved, then write the bytes directly.
     const filePath = join(tempDir, "video.mp4");
 
     reportProgress(onProgress, "file_download_start");
-    const downloadPromise = page.waitForEvent("download", {
+    const response = await page.request.get(capturedVideoUrl, {
       timeout: timeoutMs,
+      headers: {
+        Referer: capturedVideoUrl,
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+      },
     });
-
-    await page.evaluate(
-      ({ url, headers: hdrs }) => {
-        return fetch(url, { headers: hdrs })
-          .then((res) => {
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const ct = res.headers.get("content-type") ?? "";
-            if (!ct.startsWith("video/") && !ct.startsWith("application/octet-stream")) {
-              throw new Error(`Unexpected Content-Type: ${ct}`);
-            }
-            return res.blob();
-          })
-          .then((blob) => {
-            const a = document.createElement("a");
-            a.href = URL.createObjectURL(blob);
-            a.download = "video.mp4";
-            a.click();
-          });
-      },
-      {
-        url: capturedVideoUrl,
-        headers: {
-          Referer: capturedVideoUrl,
-          "User-Agent":
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
-        },
-      },
-    );
-
-    const download = await downloadPromise;
-    await download.saveAs(filePath);
+    if (!response.ok()) throw new Error(`HTTP ${response.status()}`);
+    const contentType = response.headers()["content-type"] ?? "";
+    if (!contentType.startsWith("video/") && !contentType.startsWith("application/octet-stream")) {
+      throw new Error(`Unexpected Content-Type: ${contentType}`);
+    }
+    await Bun.write(filePath, await response.body());
 
     const file = Bun.file(filePath);
     const byteSize = await file.size;

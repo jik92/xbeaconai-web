@@ -22,9 +22,9 @@ import {
   type AdminCredentialDoctorResult,
   type AdminJob,
   type AdminUser,
+  downloadAttachment,
   fetchAdminCredentialDoctorResults,
   fetchAdminCredentials,
-  fetchAdminEnvKeyExport,
   fetchAdminJobs,
   fetchAdminUsers,
   grantCreditsToAdminUser,
@@ -223,15 +223,7 @@ function CredentialsPanel() {
   const exportFile = async () => {
     setExporting(true);
     try {
-      const contents = await fetchAdminEnvKeyExport();
-      const url = URL.createObjectURL(new Blob([contents], { type: "text/plain;charset=utf-8" }));
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = ".env.key";
-      document.body.append(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
+      await downloadAttachment({ kind: "admin-env" });
       toast.success("密钥已导出");
     } catch (reason) {
       toast.error(apiErrorMessage(reason, ".env.key 导出失败"));

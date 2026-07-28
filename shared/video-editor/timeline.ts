@@ -31,14 +31,20 @@ export const clipDuration = (clip: VideoEditorClip) => Math.max(0, clip.outSec -
 export const timelineDuration = (timeline: VideoEditorTimeline) =>
   timeline.clips.reduce((sum, clip) => sum + clipDuration(clip), 0);
 
-export const videoEditorAssetUrl = (assetId: string) => `/api/assets/${encodeURIComponent(assetId)}/content`;
+function isVideoEditorCdnUrl(url: string) {
+  try {
+    return new URL(url).origin === "https://files.xbeaconai.com";
+  } catch {
+    return false;
+  }
+}
 
 export function normalizeVideoEditorTimeline(timeline: VideoEditorTimeline): VideoEditorTimeline {
   return {
     ...timeline,
     sources: timeline.sources.map((source) => ({
       ...source,
-      url: source.assetId ? videoEditorAssetUrl(source.assetId) : source.url.startsWith("blob:") ? "" : source.url,
+      url: isVideoEditorCdnUrl(source.url) ? source.url : "",
     })),
   };
 }

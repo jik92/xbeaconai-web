@@ -4,7 +4,6 @@ import {
   type DragEvent,
   type KeyboardEvent,
   type ReactNode,
-  useEffect,
   useId,
   useRef,
   useState,
@@ -13,7 +12,6 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Label } from "../ui/label";
 import { AuthenticatedMedia } from "./authenticated-media";
-import { MediaPreview } from "./media-preview";
 
 export interface UploadPreviewFile {
   id?: string;
@@ -80,19 +78,9 @@ export function FileUpload({
   const dragDepth = useRef(0);
   const [dragging, setDragging] = useState(false);
   const [validationError, setValidationError] = useState("");
-  const [localUrls, setLocalUrls] = useState<string[]>([]);
   const hasFiles = files.length > 0 || uploadedFiles.length > 0;
   const visibleError = error || validationError;
   const normalizedProgress = Math.max(0, Math.min(100, Math.round(progress)));
-
-  useEffect(() => {
-    const urls = files.map((file) => URL.createObjectURL(file));
-    setLocalUrls(urls);
-    return () =>
-      urls.forEach((url) => {
-        URL.revokeObjectURL(url);
-      });
-  }, [files]);
 
   const choose = (nextFiles: File[]) => {
     const accepted = nextFiles.filter((file) => fileMatchesAccept(file, accept));
@@ -241,17 +229,13 @@ export function FileUpload({
                   </div>
                 </div>
               ))}
-              {files.map((file, index) => (
+              {files.map((file) => (
                 <div
                   key={`${file.name}-${file.size}-${file.lastModified}`}
                   className="overflow-hidden rounded-md border border-line bg-surface-muted"
                 >
                   <div className="flex aspect-video items-center justify-center overflow-hidden [&_audio]:w-[calc(100%-12px)] [&_img]:h-full [&_img]:w-full [&_img]:object-contain [&_video]:h-full [&_video]:w-full [&_video]:object-contain">
-                    {localUrls[index] && /^(image|video|audio)\//.test(file.type) ? (
-                      <MediaPreview url={localUrls[index]} mimeType={file.type} alt={file.name} authenticated={false} />
-                    ) : (
-                      <FileText className="size-7 text-muted" aria-hidden="true" />
-                    )}
+                    <FileText className="size-7 text-muted" aria-hidden="true" />
                   </div>
                   <div className="px-2 py-1.5">
                     <b className="block truncate type-label text-ink" title={file.name}>

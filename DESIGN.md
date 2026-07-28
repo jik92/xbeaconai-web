@@ -366,6 +366,8 @@ The system uses **hairline + soft drop**. Cards float above the off-white canvas
 
 **`product-card-stack`** — Stacked product preview cards. Background `{colors.surface-card}`, rounded `{rounded.xl}`, no padding (children fill the card edge-to-edge).
 
+**`product-image`** — Shared non-cropping product thumbnail used by product pickers, selected-product controls, and the product library. It fills the size supplied by its parent, keeps restrained surface padding, and always renders the complete source with `object-contain`; feature CSS must not override its fit mode. Empty, loading, and failed sources remain explicit inside the same frame. Product card Buttons must use automatic height so the shared compact Button size cannot clip the thumbnail.
+
 **`media-result-card`** — Shared generated-media result card for image and video outputs. Its border follows the media's intrinsic aspect ratio without fixed-height padding or a metadata footer; the media fills the complete frame, the hover playback target covers the full video, and download remains a compact bottom-right overlay. Audio uses the same shell with a compact preview row. Feature pages supply data and actions only; they must not rebuild image- and video-specific result cards.
 
 **`testimonial-card`** — Quote card. Background `{colors.surface-card}`, text `{colors.body}`, rounded `{rounded.xl}`, padding 32px.

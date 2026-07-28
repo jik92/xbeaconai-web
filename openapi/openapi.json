@@ -4924,6 +4924,9 @@
                         "url": {
                           "type": "string"
                         },
+                        "originalUrl": {
+                          "type": "string"
+                        },
                         "createdAt": {
                           "type": "string"
                         }
@@ -4936,6 +4939,7 @@
                         "size",
                         "kind",
                         "url",
+                        "originalUrl",
                         "createdAt"
                       ]
                     }
@@ -4995,6 +4999,9 @@
                         "url": {
                           "type": "string"
                         },
+                        "originalUrl": {
+                          "type": "string"
+                        },
                         "createdAt": {
                           "type": "string"
                         }
@@ -5007,6 +5014,7 @@
                         "size",
                         "kind",
                         "url",
+                        "originalUrl",
                         "createdAt"
                       ]
                     }
@@ -5110,22 +5118,32 @@
                       "type": "object",
                       "properties": {
                         "id": {
-                          "type": "string"
+                          "type": "string",
+                          "format": "uuid"
                         },
                         "name": {
+                          "type": "string"
+                        },
+                        "originalName": {
                           "type": "string"
                         },
                         "mimeType": {
                           "type": "string"
                         },
                         "size": {
+                          "type": "integer"
+                        },
+                        "width": {
+                          "type": "integer"
+                        },
+                        "height": {
+                          "type": "integer"
+                        },
+                        "durationSec": {
                           "type": "number"
                         },
                         "kind": {
                           "$ref": "#/components/schemas/AssetKind"
-                        },
-                        "displayName": {
-                          "type": "string"
                         },
                         "description": {
                           "type": "string"
@@ -5137,6 +5155,9 @@
                         "url": {
                           "type": "string"
                         },
+                        "originalUrl": {
+                          "type": "string"
+                        },
                         "createdAt": {
                           "type": "string"
                         }
@@ -5144,11 +5165,12 @@
                       "required": [
                         "id",
                         "name",
+                        "originalName",
                         "mimeType",
                         "size",
                         "kind",
-                        "displayName",
                         "url",
+                        "originalUrl",
                         "createdAt"
                       ]
                     }
@@ -5598,6 +5620,9 @@
                           "url": {
                             "type": "string"
                           },
+                          "originalUrl": {
+                            "type": "string"
+                          },
                           "createdAt": {
                             "type": "string"
                           }
@@ -5610,6 +5635,7 @@
                           "size",
                           "kind",
                           "url",
+                          "originalUrl",
                           "createdAt"
                         ]
                       }
@@ -5892,6 +5918,9 @@
                         "url": {
                           "type": "string"
                         },
+                        "originalUrl": {
+                          "type": "string"
+                        },
                         "createdAt": {
                           "type": "string"
                         }
@@ -5904,6 +5933,7 @@
                         "size",
                         "kind",
                         "url",
+                        "originalUrl",
                         "createdAt"
                       ]
                     }
@@ -5954,13 +5984,14 @@
                       "type": "string",
                       "format": "uri"
                     },
-                    "expiresAt": {
-                      "type": "string"
+                    "originalUrl": {
+                      "type": "string",
+                      "format": "uri"
                     }
                   },
                   "required": [
                     "url",
-                    "expiresAt"
+                    "originalUrl"
                   ]
                 }
               }
@@ -6325,6 +6356,193 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/downloads/tickets": {
+      "post": {
+        "operationId": "createDownloadTicket",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "artifact"
+                        ]
+                      },
+                      "artifactId": {
+                        "type": "string",
+                        "format": "uuid"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "artifactId"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "job-text"
+                        ]
+                      },
+                      "jobId": {
+                        "type": "string",
+                        "format": "uuid"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "jobId"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "ad-script"
+                        ]
+                      },
+                      "projectId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "variantId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "versionId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "format": {
+                        "type": "string",
+                        "enum": [
+                          "txt",
+                          "md"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "projectId",
+                      "variantId",
+                      "format"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "admin-env"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Short-lived browser attachment URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "url",
+                    "expiresAt"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Administrator required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/downloads/{token}": {
+      "get": {
+        "operationId": "redeemDownloadTicket",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "token",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Attachment body",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -12164,6 +12382,68 @@
               "text/plain": {
                 "schema": {
                   "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/artifacts/{artifactId}/access": {
+      "get": {
+        "operationId": "getArtifactAccess",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "artifactId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Owned artifact CDN media URLs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "originalUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  },
+                  "required": [
+                    "url",
+                    "originalUrl"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "TOS unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
             }

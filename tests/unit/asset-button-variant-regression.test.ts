@@ -7,8 +7,9 @@ describe("asset and account interactive button variants", () => {
     const sceneLibrary = await Bun.file("web/features/scene-library/scene-library.tsx").text();
 
     expect(assetLibrary).toMatch(
-      /<Button\s+variant="ghost"\s+className="library-asset-card flex-col items-stretch justify-start gap-0 whitespace-normal hover:bg-surface"/,
+      /<Button\s+variant="ghost"\s+className="library-asset-card h-auto w-full flex-col items-stretch justify-start gap-0 whitespace-normal p-0 hover:bg-surface"/,
     );
+    expect(assetLibrary).toContain('import { ProductImage } from "@/components/domain/product-image";');
     expect(assetLibrary).toContain(
       'variant="ghost"\n                  className="min-w-0 flex-1 flex-col items-start justify-center gap-0 whitespace-normal text-left"',
     );

@@ -15,6 +15,7 @@ import {
   createAdScriptAction,
   createAdScriptProject,
   createAiGenerateJob as createAiGenerateJobRequest,
+  createDownloadTicket,
   createJob,
   createVideoCreateProject,
   createVideoRemixComposeJob,
@@ -23,8 +24,6 @@ import {
   deleteAdminCredential,
   deleteAsset as deleteAssetRequest,
   deleteProduct as deleteProductRequest,
-  exportAdminEnvKey,
-  exportAdScriptVersion,
   generateVideoCreateShot,
   getAdminCredentialDoctorResults,
   getAdminProviderAudit,
@@ -74,6 +73,7 @@ import type {
   AdScriptInput,
   AdScriptProject,
   CreateAiGenerateJobData,
+  CreateDownloadTicketData,
   GenerateVideoCreateShotData,
   GetAdminProviderAuditResponse,
   GetProviderFeaturesResponse,
@@ -111,6 +111,7 @@ export type RemixProjectSummary = ListVideoRemixProjectsResponse["projects"][num
 export type RemixProjectDetail = GetVideoRemixProjectResponse;
 export type VideoCreateMaterialVersion = ListVideoCreateShotMaterialVersionsResponse["versions"][number];
 export type CustomPortrait = ListCustomPortraitsResponse["portraits"][number];
+export type DownloadResource = CreateDownloadTicketData["body"];
 
 const configure = () =>
   client.setConfig({
@@ -194,13 +195,6 @@ export async function uploadAdminEnvKey(file: File) {
   configure();
   const { data } = await importAdminEnvKey({ body: { file }, headers: authHeaders(), throwOnError: true });
   if (!data) throw new Error(".env.key 导入失败");
-  return data;
-}
-
-export async function fetchAdminEnvKeyExport() {
-  configure();
-  const { data } = await exportAdminEnvKey({ headers: authHeaders(), throwOnError: true });
-  if (typeof data !== "string") throw new Error(".env.key 导出失败");
   return data;
 }
 
@@ -652,20 +646,13 @@ export async function downloadAdScriptVersion(input: {
   versionId: string;
   format: "txt" | "md";
 }) {
-  configure();
-  const { data } = await exportAdScriptVersion({
-    path: { projectId: input.projectId, variantId: input.variantId },
-    query: { versionId: input.versionId, format: input.format },
-    headers: authHeaders(),
-    throwOnError: true,
+  await downloadAttachment({
+    kind: "ad-script",
+    projectId: input.projectId,
+    variantId: input.variantId,
+    versionId: input.versionId,
+    format: input.format,
   });
-  if (typeof data !== "string") throw new Error("脚本导出失败");
-  const url = URL.createObjectURL(new Blob([data], { type: input.format === "md" ? "text/markdown" : "text/plain" }));
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = `口播脚本.${input.format}`;
-  anchor.click();
-  URL.revokeObjectURL(url);
 }
 export async function submitJob(
   moduleId: ModuleId,
@@ -1210,31 +1197,79 @@ export function watchJob(jobId: string, onChange: (job: Job) => void, onError?: 
   return () => controller.abort();
 }
 
-export function assetAccessUrlForContent(url: string) {
-  const match = /^\/api\/assets\/([0-9a-f-]{36})\/content$/i.exec(url);
-  return match ? `/api/assets/${match[1]}/access` : undefined;
+export function mediaAccessUrlForContent(url: string) {
+  const assetMatch = /^\/api\/assets\/([0-9a-f-]{36})\/content$/i.exec(url);
+  if (assetMatch?.[1]) return `/api/assets/${assetMatch[1]}/access`;
+  const artifactMatch = /^\/api\/artifacts\/([0-9a-f-]{36})$/i.exec(url);
+  return artifactMatch?.[1] ? `/api/artifacts/${artifactMatch[1]}/access` : undefined;
 }
 
-export async function authenticatedBlobUrl(url: string) {
-  const accessUrl = assetAccessUrlForContent(url);
-  let response: Response;
-  if (accessUrl) {
-    const authorization = await fetch(apiUrl(accessUrl), { headers: authHeaders() });
-    if (!authorization.ok) throw new Error("结果文件读取失败");
-    const data = (await authorization.json()) as { url?: string };
-    if (!data.url) throw new Error("结果文件读取失败");
-    response = await fetch(data.url);
-  } else response = await fetch(apiUrl(url), { headers: authHeaders() });
-  if (!response.ok) throw new Error("结果文件读取失败");
-  return URL.createObjectURL(await response.blob());
+export function isPublicMediaUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    return parsed.origin === "https://files.xbeaconai.com";
+  } catch {
+    return false;
+  }
 }
-export async function downloadAuthenticated(url: string, name: string) {
-  const objectUrl = await authenticatedBlobUrl(url);
+
+export function directMediaSource(url: string) {
+  return isPublicMediaUrl(url) ? url : undefined;
+}
+
+export async function resolveMediaCdnUrl(url: string, original = false) {
+  const direct = directMediaSource(url);
+  if (direct) return direct;
+  const accessUrl = mediaAccessUrlForContent(url);
+  if (!accessUrl) throw new Error("媒体文件未提供 CDN 地址");
+  const response = await fetch(apiUrl(accessUrl), { headers: authHeaders() });
+  if (!response.ok) throw new Error("媒体文件 CDN 发布失败");
+  const data = (await response.json()) as { url?: string; originalUrl?: string };
+  const resolved = original ? data.originalUrl : data.url;
+  if (!resolved || !isPublicMediaUrl(resolved)) throw new Error("媒体接口未返回受信任的 CDN 地址");
+  return resolved;
+}
+
+export function downloadDirectUrl(url: string, name: string) {
+  if (!isPublicMediaUrl(url)) throw new Error("媒体文件未使用受信任的 CDN 地址");
   const link = document.createElement("a");
-  link.href = objectUrl;
+  link.href = url;
   link.download = name;
   link.click();
-  setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+}
+
+export async function downloadAttachment(resource: DownloadResource) {
+  configure();
+  const { data } = await createDownloadTicket({
+    body: resource,
+    headers: authHeaders(),
+    throwOnError: true,
+  });
+  if (!data) throw new Error("无法创建下载地址");
+  const link = document.createElement("a");
+  link.href = apiUrl(data.url);
+  document.body.append(link);
+  link.click();
+  link.remove();
+}
+
+export async function downloadAuthenticated(url: string, name: string) {
+  if (isPublicMediaUrl(url)) {
+    downloadDirectUrl(url, name);
+    return;
+  }
+  const artifactMatch = /^\/api\/artifacts\/([0-9a-f-]{36})$/i.exec(url);
+  try {
+    const resolved = await resolveMediaCdnUrl(url, true);
+    downloadDirectUrl(resolved, name);
+    return;
+  } catch (error) {
+    if (artifactMatch?.[1]) {
+      await downloadAttachment({ kind: "artifact", artifactId: artifactMatch[1] });
+      return;
+    }
+    throw error;
+  }
 }
 
 // ── Share content import (multi-platform) ──────────────────────────────

@@ -1445,6 +1445,7 @@ export type CompleteDirectUploadResponses = {
             description?: string;
             folderId?: string;
             url: string;
+            originalUrl: string;
             createdAt: string;
         };
     };
@@ -1465,6 +1466,7 @@ export type CompleteDirectUploadResponses = {
             description?: string;
             folderId?: string;
             url: string;
+            originalUrl: string;
             createdAt: string;
         };
     };
@@ -1514,13 +1516,17 @@ export type UploadMediaResponses = {
         asset: {
             id: string;
             name: string;
+            originalName: string;
             mimeType: string;
             size: number;
+            width?: number;
+            height?: number;
+            durationSec?: number;
             kind: AssetKind;
-            displayName: string;
             description?: string;
             folderId?: string;
             url: string;
+            originalUrl: string;
             createdAt: string;
         };
     };
@@ -1661,6 +1667,7 @@ export type ListAssetsResponses = {
             description?: string;
             folderId?: string;
             url: string;
+            originalUrl: string;
             createdAt: string;
         }>;
     };
@@ -1830,6 +1837,7 @@ export type SaveAssetMetadataResponses = {
             description?: string;
             folderId?: string;
             url: string;
+            originalUrl: string;
             createdAt: string;
         };
     };
@@ -1861,7 +1869,7 @@ export type GetAssetAccessResponses = {
      */
     200: {
         url: string;
-        expiresAt: string;
+        originalUrl: string;
     };
 };
 
@@ -2047,6 +2055,79 @@ export type ExportAdminEnvKeyResponses = {
 };
 
 export type ExportAdminEnvKeyResponse = ExportAdminEnvKeyResponses[keyof ExportAdminEnvKeyResponses];
+
+export type CreateDownloadTicketData = {
+    body: {
+        kind: 'artifact';
+        artifactId: string;
+    } | {
+        kind: 'job-text';
+        jobId: string;
+    } | {
+        kind: 'ad-script';
+        projectId: string;
+        variantId: string;
+        versionId?: string;
+        format: 'txt' | 'md';
+    } | {
+        kind: 'admin-env';
+    };
+    path?: never;
+    query?: never;
+    url: '/api/downloads/tickets';
+};
+
+export type CreateDownloadTicketErrors = {
+    /**
+     * Administrator required
+     */
+    403: ApiErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ApiErrorResponse;
+};
+
+export type CreateDownloadTicketError = CreateDownloadTicketErrors[keyof CreateDownloadTicketErrors];
+
+export type CreateDownloadTicketResponses = {
+    /**
+     * Short-lived browser attachment URL
+     */
+    201: {
+        url: string;
+        expiresAt: string;
+    };
+};
+
+export type CreateDownloadTicketResponse = CreateDownloadTicketResponses[keyof CreateDownloadTicketResponses];
+
+export type RedeemDownloadTicketData = {
+    body?: never;
+    path: {
+        token: string;
+    };
+    query?: never;
+    url: '/api/downloads/{token}';
+};
+
+export type RedeemDownloadTicketErrors = {
+    /**
+     * Not found
+     */
+    404: string;
+};
+
+export type RedeemDownloadTicketError = RedeemDownloadTicketErrors[keyof RedeemDownloadTicketErrors];
+
+export type RedeemDownloadTicketResponses = {
+    /**
+     * Attachment body
+     */
+    200: Blob | File;
+};
+
+export type RedeemDownloadTicketResponse = RedeemDownloadTicketResponses[keyof RedeemDownloadTicketResponses];
 
 export type ImportAdminEnvKeyData = {
     body: {
@@ -4188,6 +4269,40 @@ export type DownloadArtifactResponses = {
 };
 
 export type DownloadArtifactResponse = DownloadArtifactResponses[keyof DownloadArtifactResponses];
+
+export type GetArtifactAccessData = {
+    body?: never;
+    path: {
+        artifactId: string;
+    };
+    query?: never;
+    url: '/api/artifacts/{artifactId}/access';
+};
+
+export type GetArtifactAccessErrors = {
+    /**
+     * Not found
+     */
+    404: string;
+    /**
+     * TOS unavailable
+     */
+    503: ApiErrorResponse;
+};
+
+export type GetArtifactAccessError = GetArtifactAccessErrors[keyof GetArtifactAccessErrors];
+
+export type GetArtifactAccessResponses = {
+    /**
+     * Owned artifact CDN media URLs
+     */
+    200: {
+        url: string;
+        originalUrl: string;
+    };
+};
+
+export type GetArtifactAccessResponse = GetArtifactAccessResponses[keyof GetArtifactAccessResponses];
 
 export type ParseShareContentData = {
     body: {

@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { fetchAssetFolders, fetchLibraryAssets, uploadMediaFile } from "@/api/api-client";
 import { Button } from "@/components/ui/button";
 import type { AssetFolder, LibraryAsset } from "@/entities/types";
@@ -25,6 +26,7 @@ export interface AttachmentSelection {
   mimeType: string;
   size?: number;
   url?: string;
+  originalUrl?: string;
   source: "library" | "upload";
 }
 
@@ -148,6 +150,7 @@ export function AttachmentPicker({
         mimeType: asset.mimeType,
         size: asset.size,
         url: asset.url,
+        originalUrl: asset.originalUrl,
         source: "library" as const,
       }));
     if (!assets.length) return;
@@ -191,6 +194,7 @@ export function AttachmentPicker({
                 mimeType: result.asset.mimeType,
                 size: result.asset.size,
                 url: result.asset.url,
+                originalUrl: result.asset.originalUrl,
                 source: "upload" as const,
               },
             ]
@@ -215,240 +219,246 @@ export function AttachmentPicker({
         setSource(initialSource);
         setOpen(true);
       })}
-      {open && (
-        <div className="attachment-picker-layer" role="presentation" onMouseDown={close}>
-          <section
-            className={`attachment-picker-dialog ${source === "library" && previewAsset ? "has-preview" : ""}`}
-            role="dialog"
-            aria-modal="true"
-            aria-label="选择附件"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <header>
-              <h2 className="type-section-title text-ink">选择附件</h2>
-              <Button type="button" variant="ghost" size="icon-sm" aria-label="关闭" onClick={close}>
-                <X />
-              </Button>
-            </header>
-            <div className="attachment-source-tabs">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className={source === "library" ? "active" : ""}
-                onClick={() => setSource("library")}
-              >
-                <FolderOpen /> 从素材库选择
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className={source === "upload" ? "active" : ""}
-                onClick={() => setSource("upload")}
-              >
-                <Upload /> 从本地上传
-              </Button>
-            </div>
-            {source === "library" ? (
-              <div className="attachment-library-panel">
-                <div className={`attachment-directory-layout ${previewAsset ? "has-preview" : ""}`}>
-                  <aside className="attachment-folder-tree">
-                    <b>全部文件夹</b>
-                    <nav>
-                      {orderedFolders.map(({ folder, depth }) => (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          key={folder.id}
-                          className={folder.id === folderId ? "active" : ""}
-                          style={{ paddingLeft: `${10 + depth * 16}px` }}
-                          onClick={() => {
-                            setFolderId(folder.id);
-                            setSelected([]);
-                            setPreviewId("");
-                          }}
-                        >
-                          {folder.id === folderId ? <FolderOpen /> : <Folder />}
-                          <span>{folder.name}</span>
-                        </Button>
-                      ))}
-                    </nav>
-                  </aside>
-                  <section className="attachment-folder-files">
-                    <label className="attachment-search">
-                      <Search />
-                      <input
-                        value={query}
-                        onChange={(event) => setQuery(event.target.value)}
-                        placeholder="搜索当前文件夹…"
-                      />
-                    </label>
-                    <div className="attachment-breadcrumbs">
-                      {breadcrumbs.map((folder, index) => (
-                        <span key={folder.id}>
-                          {index > 0 && <ChevronRight />}
-                          <Button type="button" variant="ghost" size="sm" onClick={() => setFolderId(folder.id)}>
-                            {folder.name}
-                          </Button>
-                        </span>
-                      ))}
-                    </div>
-                    <div className="attachment-grid">
-                      {!query.trim() &&
-                        childFolders.map((folder) => (
+      {open &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div className="attachment-picker-layer" role="presentation" onMouseDown={close}>
+            <section
+              className={`attachment-picker-dialog ${source === "library" && previewAsset ? "has-preview" : ""}`}
+              role="dialog"
+              aria-modal="true"
+              aria-label="选择附件"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <header>
+                <h2 className="type-section-title text-ink">选择附件</h2>
+                <Button type="button" variant="ghost" size="icon-sm" aria-label="关闭" onClick={close}>
+                  <X />
+                </Button>
+              </header>
+              <div className="attachment-source-tabs">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className={source === "library" ? "active" : ""}
+                  onClick={() => setSource("library")}
+                >
+                  <FolderOpen /> 从素材库选择
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className={source === "upload" ? "active" : ""}
+                  onClick={() => setSource("upload")}
+                >
+                  <Upload /> 从本地上传
+                </Button>
+              </div>
+              {source === "library" ? (
+                <div className="attachment-library-panel">
+                  <div className={`attachment-directory-layout ${previewAsset ? "has-preview" : ""}`}>
+                    <aside className="attachment-folder-tree">
+                      <b>全部文件夹</b>
+                      <nav>
+                        {orderedFolders.map(({ folder, depth }) => (
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
                             key={folder.id}
-                            className="attachment-folder-card"
+                            className={folder.id === folderId ? "active" : ""}
+                            style={{ paddingLeft: `${10 + depth * 16}px` }}
                             onClick={() => {
                               setFolderId(folder.id);
                               setSelected([]);
                               setPreviewId("");
                             }}
                           >
-                            <i>
-                              <Folder />
-                            </i>
-                            <span>
-                              <b>{folder.name}</b>
-                              <small className="type-helper">文件夹</small>
-                            </span>
-                            <ChevronRight />
+                            {folder.id === folderId ? <FolderOpen /> : <Folder />}
+                            <span>{folder.name}</span>
                           </Button>
                         ))}
-                      {filtered.map((asset) => {
-                        const active = selected.includes(asset.id);
-                        return (
+                      </nav>
+                    </aside>
+                    <section className="attachment-folder-files">
+                      <label className="attachment-search">
+                        <Search />
+                        <input
+                          value={query}
+                          onChange={(event) => setQuery(event.target.value)}
+                          placeholder="搜索当前文件夹…"
+                        />
+                      </label>
+                      <div className="attachment-breadcrumbs">
+                        {breadcrumbs.map((folder, index) => (
+                          <span key={folder.id}>
+                            {index > 0 && <ChevronRight />}
+                            <Button type="button" variant="ghost" size="sm" onClick={() => setFolderId(folder.id)}>
+                              {folder.name}
+                            </Button>
+                          </span>
+                        ))}
+                      </div>
+                      <div className="attachment-grid">
+                        {!query.trim() &&
+                          childFolders.map((folder) => (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              key={folder.id}
+                              className="attachment-folder-card"
+                              onClick={() => {
+                                setFolderId(folder.id);
+                                setSelected([]);
+                                setPreviewId("");
+                              }}
+                            >
+                              <i>
+                                <Folder />
+                              </i>
+                              <span>
+                                <b>{folder.name}</b>
+                                <small className="type-helper">文件夹</small>
+                              </span>
+                              <ChevronRight />
+                            </Button>
+                          ))}
+                        {filtered.map((asset) => {
+                          const active = selected.includes(asset.id);
+                          return (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              key={asset.id}
+                              className={active ? "active" : ""}
+                              onClick={() => {
+                                setPreviewId(asset.id);
+                                setSelected((current) =>
+                                  active
+                                    ? current.filter((id) => id !== asset.id)
+                                    : multiple
+                                      ? [...current, asset.id]
+                                      : [asset.id],
+                                );
+                              }}
+                            >
+                              <i>
+                                <AssetIcon mimeType={asset.mimeType} />
+                              </i>
+                              <span>
+                                <b>{asset.name}</b>
+                                <small className="type-helper">{asset.mimeType}</small>
+                              </span>
+                              {active && <Check className="attachment-check" />}
+                            </Button>
+                          );
+                        })}
+                        {(isLoading || foldersLoading) && <p>正在加载素材库…</p>}
+                        {!isLoading && !foldersLoading && !filtered.length && !childFolders.length && (
+                          <p>当前文件夹暂无符合格式的文件，可切换到本地上传。</p>
+                        )}
+                      </div>
+                    </section>
+                    {previewAsset && (
+                      <aside className="attachment-preview-panel" aria-live="polite">
+                        <header>
+                          <span>
+                            <b>内容预览</b>
+                            <small className="type-helper">{previewAsset.mimeType}</small>
+                          </span>
                           <Button
                             type="button"
                             variant="ghost"
-                            size="sm"
-                            key={asset.id}
-                            className={active ? "active" : ""}
-                            onClick={() => {
-                              setPreviewId(asset.id);
-                              setSelected((current) =>
-                                active
-                                  ? current.filter((id) => id !== asset.id)
-                                  : multiple
-                                    ? [...current, asset.id]
-                                    : [asset.id],
-                              );
-                            }}
+                            size="icon-sm"
+                            aria-label="关闭文件预览"
+                            onClick={() => setPreviewId("")}
                           >
-                            <i>
-                              <AssetIcon mimeType={asset.mimeType} />
-                            </i>
-                            <span>
-                              <b>{asset.name}</b>
-                              <small className="type-helper">{asset.mimeType}</small>
-                            </span>
-                            {active && <Check className="attachment-check" />}
+                            <X />
                           </Button>
-                        );
-                      })}
-                      {(isLoading || foldersLoading) && <p>正在加载素材库…</p>}
-                      {!isLoading && !foldersLoading && !filtered.length && !childFolders.length && (
-                        <p>当前文件夹暂无符合格式的文件，可切换到本地上传。</p>
-                      )}
-                    </div>
-                  </section>
-                  {previewAsset && (
-                    <aside className="attachment-preview-panel" aria-live="polite">
-                      <header>
-                        <span>
-                          <b>内容预览</b>
-                          <small className="type-helper">{previewAsset.mimeType}</small>
-                        </span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label="关闭文件预览"
-                          onClick={() => setPreviewId("")}
-                        >
-                          <X />
-                        </Button>
-                      </header>
-                      <div className={`attachment-media-preview preview-${previewAsset.mimeType.split("/")[0]}`}>
-                        <AuthenticatedMedia
-                          key={previewAsset.id}
-                          url={previewAsset.url}
-                          mimeType={previewAsset.mimeType}
-                          alt={previewAsset.name}
-                        />
-                      </div>
-                      <div className="attachment-preview-meta">
-                        <b title={previewAsset.name}>{previewAsset.name}</b>
-                        <span>
-                          {previewAsset.width && previewAsset.height
-                            ? `${previewAsset.width} × ${previewAsset.height} · `
-                            : ""}
-                          {formatDuration(previewAsset.durationSec)
-                            ? `${formatDuration(previewAsset.durationSec)} · `
-                            : ""}
-                          {formatBytes(previewAsset.size)}
-                        </span>
-                        {previewAsset.description && <p>{previewAsset.description}</p>}
-                      </div>
-                    </aside>
-                  )}
+                        </header>
+                        <div className={`attachment-media-preview preview-${previewAsset.mimeType.split("/")[0]}`}>
+                          <AuthenticatedMedia
+                            key={previewAsset.id}
+                            url={previewAsset.url}
+                            originalUrl={previewAsset.originalUrl}
+                            mimeType={previewAsset.mimeType}
+                            alt={previewAsset.name}
+                            className="size-full object-contain"
+                            containerClassName="size-full"
+                          />
+                        </div>
+                        <div className="attachment-preview-meta">
+                          <b title={previewAsset.name}>{previewAsset.name}</b>
+                          <span>
+                            {previewAsset.width && previewAsset.height
+                              ? `${previewAsset.width} × ${previewAsset.height} · `
+                              : ""}
+                            {formatDuration(previewAsset.durationSec)
+                              ? `${formatDuration(previewAsset.durationSec)} · `
+                              : ""}
+                            {formatBytes(previewAsset.size)}
+                          </span>
+                          {previewAsset.description && <p>{previewAsset.description}</p>}
+                        </div>
+                      </aside>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div className="attachment-upload-panel">
-                <FileUpload
-                  label="选择本地文件"
-                  accept={accept}
-                  multiple={multiple}
-                  files={uploadFiles}
-                  uploadedFiles={uploadedFiles}
-                  uploading={uploading}
-                  progress={uploadProgress}
-                  error={error}
-                  description={`将上传到“${currentFolder?.name ?? "默认"}”，上传后可在素材库中重复使用。`}
-                  onFilesChange={(files) => void upload(files)}
-                  onClear={() => {
-                    setUploadFiles([]);
-                    setUploadedFiles([]);
-                    setUploadProgress(0);
-                    setError("");
-                  }}
-                  onRetry={uploadFiles.length ? () => void upload(uploadFiles, uploadedFiles) : undefined}
-                />
-              </div>
-            )}
-            {error && source === "library" && <p className="attachment-error">{error}</p>}
-            <footer>
-              <Button type="button" variant="outline" size="sm" onClick={close}>
-                取消
-              </Button>
-              {source === "library" && (
-                <Button type="button" variant="default" size="sm" disabled={!selected.length} onClick={chooseLibrary}>
-                  使用所选素材{selected.length ? `（${selected.length}）` : ""}
-                </Button>
+              ) : (
+                <div className="attachment-upload-panel">
+                  <FileUpload
+                    label="选择本地文件"
+                    accept={accept}
+                    multiple={multiple}
+                    files={uploadFiles}
+                    uploadedFiles={uploadedFiles}
+                    uploading={uploading}
+                    progress={uploadProgress}
+                    error={error}
+                    description={`将上传到“${currentFolder?.name ?? "默认"}”，上传后可在素材库中重复使用。`}
+                    onFilesChange={(files) => void upload(files)}
+                    onClear={() => {
+                      setUploadFiles([]);
+                      setUploadedFiles([]);
+                      setUploadProgress(0);
+                      setError("");
+                    }}
+                    onRetry={uploadFiles.length ? () => void upload(uploadFiles, uploadedFiles) : undefined}
+                  />
+                </div>
               )}
-              {source === "upload" && uploadedFiles.length > 0 && (
-                <Button
-                  type="button"
-                  variant="default"
-                  size="sm"
-                  onClick={() => {
-                    onSelect(uploadedFiles);
-                    close();
-                  }}
-                >
-                  使用已上传文件
+              {error && source === "library" && <p className="attachment-error">{error}</p>}
+              <footer>
+                <Button type="button" variant="outline" size="sm" onClick={close}>
+                  取消
                 </Button>
-              )}
-            </footer>
-          </section>
-        </div>
-      )}
+                {source === "library" && (
+                  <Button type="button" variant="default" size="sm" disabled={!selected.length} onClick={chooseLibrary}>
+                    使用所选素材{selected.length ? `（${selected.length}）` : ""}
+                  </Button>
+                )}
+                {source === "upload" && uploadedFiles.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="sm"
+                    onClick={() => {
+                      onSelect(uploadedFiles);
+                      close();
+                    }}
+                  >
+                    使用已上传文件
+                  </Button>
+                )}
+              </footer>
+            </section>
+          </div>,
+          document.body,
+        )}
     </>
   );
 }

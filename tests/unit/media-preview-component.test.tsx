@@ -35,7 +35,13 @@ function renderMedia(mimeType: string, alt = "测试媒体") {
   const root = createRoot(container);
   roots.push(root);
   act(() => {
-    root.render(<MediaPreview url="blob:test-media" mimeType={mimeType} alt={alt} authenticated={false} />);
+    root.render(
+      <MediaPreview
+        url={`https://files.xbeaconai.com/users/demo/${encodeURIComponent(alt)}`}
+        mimeType={mimeType}
+        alt={alt}
+      />,
+    );
   });
   return container;
 }
@@ -63,6 +69,74 @@ describe("MediaPreview", () => {
     expect(document.querySelector('[role="dialog"]')).toBeNull();
   });
 
+  test("renders a public image preview directly and opens the original image without a Blob conversion", () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    roots.push(root);
+    act(() => {
+      root.render(
+        <MediaPreview
+          url="https://files.xbeaconai.com/users/demo/main.jpg?x-tos-process=style/preview"
+          originalUrl="https://files.xbeaconai.com/users/demo/main.jpg"
+          mimeType="image/jpeg"
+          alt="公共商品主图"
+        />,
+      );
+    });
+
+    expect(container.querySelector("img")?.getAttribute("src")).toBe(
+      "https://files.xbeaconai.com/users/demo/main.jpg?x-tos-process=style/preview",
+    );
+
+    act(() => {
+      container.querySelector("button")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(document.querySelector('[role="dialog"] img')?.getAttribute("src")).toBe(
+      "https://files.xbeaconai.com/users/demo/main.jpg",
+    );
+  });
+
+  test("resolves a protected media identifier to CDN before rendering it", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    roots.push(root);
+    const requests: string[] = [];
+    const originalFetch = globalThis.fetch;
+    window.localStorage.setItem("yaozuo:auth-token:v1", "media-preview-test-token");
+    globalThis.fetch = (async (input) => {
+      requests.push(String(input));
+      return new Response(
+        JSON.stringify({
+          url: "https://files.xbeaconai.com/users/demo/main.jpg?x-tos-process=style/preview",
+          originalUrl: "https://files.xbeaconai.com/users/demo/main.jpg",
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }) as typeof fetch;
+    try {
+      await act(async () => {
+        root.render(
+          <MediaPreview
+            url="/api/assets/00000000-0000-4000-8000-000000000000/content"
+            mimeType="image/jpeg"
+            alt="旧素材地址"
+          />,
+        );
+      });
+
+      expect(requests).toEqual(["http://127.0.0.1:8787/api/assets/00000000-0000-4000-8000-000000000000/access"]);
+      expect(container.querySelector("img")?.getAttribute("src")).toBe(
+        "https://files.xbeaconai.com/users/demo/main.jpg?x-tos-process=style/preview",
+      );
+    } finally {
+      window.localStorage.clear();
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   test("auto-plays full-screen video and closes from the explicit close button", () => {
     const container = renderMedia("video/mp4", "成片");
     const preview = container.querySelector<HTMLElement>('[aria-label="成片视频预览"]');
@@ -72,6 +146,7 @@ describe("MediaPreview", () => {
     });
 
     const dialog = document.querySelector('[role="dialog"]');
+    expect(dialog?.parentElement).toBe(document.body);
     expect(dialog?.querySelector("video")?.autoplay).toBe(true);
 
     act(() => {

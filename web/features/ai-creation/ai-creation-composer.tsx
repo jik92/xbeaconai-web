@@ -17,7 +17,13 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { downloadAuthenticated, fetchCreationCapabilities, fetchJobs, submitJob } from "@/api/api-client";
+import {
+  downloadAttachment,
+  downloadAuthenticated,
+  fetchCreationCapabilities,
+  fetchJobs,
+  submitJob,
+} from "@/api/api-client";
 import type { Job, SeedanceModelId } from "@/api/generated/types.gen";
 import { AttachmentPicker } from "@/components/domain/attachment-picker";
 import { Button } from "@/components/ui/button";
@@ -363,17 +369,7 @@ export function AiCreationComposer() {
     const artifact = selectedTask.result?.artifacts?.[0];
     if (action === "下载") {
       if (artifact?.url) await downloadAuthenticated(artifact.url, artifact.name);
-      else {
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(
-          new Blob([artifact?.text ?? selectedTask.result?.summary ?? ""], {
-            type: artifact?.mimeType ?? "text/plain",
-          }),
-        );
-        link.download = artifact?.name ?? "ai-creation-result.txt";
-        link.click();
-        setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-      }
+      else await downloadAttachment({ kind: "job-text", jobId: selectedTask.id });
       toast.success("已开始下载");
       return;
     }

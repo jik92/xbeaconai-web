@@ -10,7 +10,7 @@ describe("compact admin page", () => {
     expect(source).toContain('aria-label="选择密钥文件"');
     expect(source).not.toContain('accept=".env.key"');
     expect(source).toContain("导出 .env.key");
-    expect(source).toContain("fetchAdminEnvKeyExport");
+    expect(source).toContain('downloadAttachment({ kind: "admin-env" })');
     expect(source).toContain("用户管理");
     expect(source).toContain("充值创作点");
     expect(source).toContain("setAdminUserStatus");

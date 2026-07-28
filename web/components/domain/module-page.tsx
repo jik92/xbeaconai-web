@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  downloadAttachment,
   downloadAuthenticated,
   fetchJob,
   fetchJobs,
@@ -1197,14 +1198,7 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
     }
     if (action.includes("下载") || action.includes("导出")) {
       if (artifact?.url) await downloadAuthenticated(artifact.url, artifact.name);
-      else {
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(
-          new Blob([artifact?.text ?? result?.summary ?? ""], { type: artifact?.mimeType ?? "text/plain" }),
-        );
-        link.download = artifact?.name ?? `${config.id}-result.txt`;
-        link.click();
-      }
+      else await downloadAttachment({ kind: "job-text", jobId: selectedTask.id });
       setActionNotice("已开始下载结果");
       return;
     }

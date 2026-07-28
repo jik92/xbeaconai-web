@@ -11,6 +11,7 @@ import {
   fetchAssetFolders,
   fetchLibraryAssets,
   fetchProducts,
+  isPublicMediaUrl,
   saveAssetMetadata,
   uploadLibraryAsset,
   uploadProduct,
@@ -18,6 +19,7 @@ import {
 import { AssetPageShell, AssetPageToolbar } from "@/components/domain/asset-page-shell";
 import { AuthenticatedMedia } from "@/components/domain/authenticated-media";
 import { FileUpload } from "@/components/domain/file-upload";
+import { ProductImage } from "@/components/domain/product-image";
 import { ToolCreatorModal } from "@/components/domain/tool-creator-modal";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
@@ -142,16 +144,16 @@ function ProductLibrary() {
           {filtered.map((product) => (
             <Button
               variant="ghost"
-              className="library-asset-card flex-col items-stretch justify-start gap-0 whitespace-normal hover:bg-surface"
+              className="library-asset-card h-auto w-full flex-col items-stretch justify-start gap-0 whitespace-normal p-0 hover:bg-surface"
               key={product.id}
               onClick={() => setSelected(product)}
             >
               <div className="library-asset-preview product">
-                <AuthenticatedMedia
+                <ProductImage
                   url={product.images[0]?.url || ""}
+                  originalUrl={product.images[0]?.originalUrl}
                   mimeType={product.images[0]?.mimeType || "image/png"}
                   alt={product.name}
-                  previewable={false}
                 />
                 <i className="product-image-count">
                   <ImageIcon /> {product.images.length} 张
@@ -250,7 +252,13 @@ function ProductLibrary() {
           <>
             <div className="product-detail-gallery">
               {selected.images.map((image) => (
-                <AuthenticatedMedia key={image.id} url={image.url} mimeType={image.mimeType} alt={selected.name} />
+                <AuthenticatedMedia
+                  key={image.id}
+                  url={image.url}
+                  originalUrl={image.originalUrl}
+                  mimeType={image.mimeType}
+                  alt={selected.name}
+                />
               ))}
             </div>
             <div className="asset-detail-copy">
@@ -283,42 +291,38 @@ function ProductLibrary() {
 
 type MediaMetadata = { width?: number; height?: number; durationSec?: number };
 
-async function inspectMediaFile(file: File): Promise<MediaMetadata> {
-  const url = URL.createObjectURL(file);
-  try {
-    if (file.type.startsWith("image/"))
-      return await new Promise<MediaMetadata>((resolve) => {
-        const image = new Image();
-        image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
-        image.onerror = () => resolve({});
-        image.src = url;
-      });
-    if (file.type.startsWith("video/") || file.name.toLowerCase().endsWith(".mp4"))
-      return await new Promise<MediaMetadata>((resolve) => {
-        const video = document.createElement("video");
-        video.preload = "metadata";
-        video.onloadedmetadata = () =>
-          resolve({
-            width: video.videoWidth || undefined,
-            height: video.videoHeight || undefined,
-            durationSec: Number.isFinite(video.duration) ? video.duration : undefined,
-          });
-        video.onerror = () => resolve({});
-        video.src = url;
-      });
-    if (file.type.startsWith("audio/"))
-      return await new Promise<MediaMetadata>((resolve) => {
-        const audio = document.createElement("audio");
-        audio.preload = "metadata";
-        audio.onloadedmetadata = () =>
-          resolve({ durationSec: Number.isFinite(audio.duration) ? audio.duration : undefined });
-        audio.onerror = () => resolve({});
-        audio.src = url;
-      });
-    return {};
-  } finally {
-    URL.revokeObjectURL(url);
-  }
+export async function inspectMediaUrl(url: string, mimeType: string): Promise<MediaMetadata> {
+  if (!isPublicMediaUrl(url)) throw new Error("素材上传完成，但未返回 CDN 地址");
+  if (mimeType.startsWith("image/"))
+    return await new Promise<MediaMetadata>((resolve) => {
+      const image = new Image();
+      image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
+      image.onerror = () => resolve({});
+      image.src = url;
+    });
+  if (mimeType.startsWith("video/"))
+    return await new Promise<MediaMetadata>((resolve) => {
+      const video = document.createElement("video");
+      video.preload = "metadata";
+      video.onloadedmetadata = () =>
+        resolve({
+          width: video.videoWidth || undefined,
+          height: video.videoHeight || undefined,
+          durationSec: Number.isFinite(video.duration) ? video.duration : undefined,
+        });
+      video.onerror = () => resolve({});
+      video.src = url;
+    });
+  if (mimeType.startsWith("audio/"))
+    return await new Promise<MediaMetadata>((resolve) => {
+      const audio = document.createElement("audio");
+      audio.preload = "metadata";
+      audio.onloadedmetadata = () =>
+        resolve({ durationSec: Number.isFinite(audio.duration) ? audio.duration : undefined });
+      audio.onerror = () => resolve({});
+      audio.src = url;
+    });
+  return {};
 }
 
 function formatDuration(durationSec?: number) {
@@ -372,6 +376,7 @@ function MediaAssetTable({
           const media = (
             <AuthenticatedMedia
               url={asset.url}
+              originalUrl={asset.originalUrl}
               mimeType={asset.mimeType}
               alt={asset.name}
               controls={asset.mimeType.startsWith("audio/")}
@@ -521,16 +526,19 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
   const upload = useMutation({
     mutationFn: async () => {
       if (!file) throw new Error("请选择上传文件");
-      const metadata = kind === "media" ? await inspectMediaFile(file) : undefined;
-      return uploadLibraryAsset(
+      const asset = await uploadLibraryAsset(
         file,
         kind,
         name.trim() || file.name.replace(/\.[^.]+$/, ""),
         description,
         kind === "media" ? selectedFolderId || folders[0]?.id : undefined,
         setUploadProgress,
-        metadata,
       );
+      if (kind !== "media") return asset;
+      const metadata = await inspectMediaUrl(asset.originalUrl, asset.mimeType);
+      return Object.values(metadata).some((value) => value !== undefined)
+        ? await saveAssetMetadata(asset.id, metadata)
+        : asset;
     },
     onMutate: () => setUploadProgress(0),
     onSuccess: (asset) => {
@@ -670,7 +678,14 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
                 </Button>
                 {previewingVoiceId === asset.id ? (
                   <div className="w-56 max-w-[40%]">
-                    <AuthenticatedMedia url={asset.url} mimeType={asset.mimeType} alt={asset.name} autoPlay controls />
+                    <AuthenticatedMedia
+                      url={asset.url}
+                      originalUrl={asset.originalUrl}
+                      mimeType={asset.mimeType}
+                      alt={asset.name}
+                      autoPlay
+                      controls
+                    />
                   </div>
                 ) : (
                   <Button size="sm" variant="outline" onClick={() => setPreviewingVoiceId(asset.id)}>
@@ -762,7 +777,12 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
         {selected && (
           <>
             <div className="asset-detail-media voice">
-              <AuthenticatedMedia url={selected.url} mimeType={selected.mimeType} alt={selected.name} />
+              <AuthenticatedMedia
+                url={selected.url}
+                originalUrl={selected.originalUrl}
+                mimeType={selected.mimeType}
+                alt={selected.name}
+              />
             </div>
             <div className="asset-detail-copy">
               <span>

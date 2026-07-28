@@ -17,6 +17,14 @@ describe("attachment picker preview", () => {
     expect(source).not.toContain("data.find((asset) => asset.id === selected.at(-1))");
   });
 
+  test("mounts the full-screen picker under document body instead of the trigger layout", async () => {
+    const source = await Bun.file(pickerPath).text();
+
+    expect(source).toContain('import { createPortal } from "react-dom";');
+    expect(source).toContain("createPortal(");
+    expect(source).toContain("document.body,");
+  });
+
   test("uses two columns by default and adds an on-demand preview column", async () => {
     const styles = await Bun.file(stylesPath).text();
 
@@ -24,5 +32,15 @@ describe("attachment picker preview", () => {
     expect(styles).toContain("grid-template-columns: 190px minmax(0, 1fr) 280px;");
     expect(styles).toContain(".attachment-picker-dialog.has-preview");
     expect(styles).toContain(".attachment-directory-layout.has-preview");
+  });
+
+  test("keeps image and video previews complete and fills the preview viewport", async () => {
+    const source = await Bun.file(pickerPath).text();
+    const styles = await Bun.file(stylesPath).text();
+
+    expect(source).toContain('className="size-full object-contain"');
+    expect(source).toContain('containerClassName="size-full"');
+    expect(styles).toContain(".attachment-media-preview img,\n.attachment-media-preview video");
+    expect(styles).toContain("object-fit: contain;");
   });
 });

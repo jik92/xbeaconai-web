@@ -73,7 +73,9 @@ import {
 } from "./byok/provider-feature-gate";
 import { AiGenerateRequestSchema, normalizeAiGenerateValues } from "./creation/ai-generate-contract";
 import { creationCapabilities, quoteCreation, validateCreationValues } from "./creation/capabilities";
+import { type DownloadResource, issueDownloadTicket, verifyDownloadTicket } from "./downloads/download-ticket";
 import { env } from "./env";
+import { buildSecurityHeaders } from "./http/security-headers";
 import { emitLog } from "./imports/import-logger";
 import { platformAdapters, ShareContentParser } from "./imports/share-content";
 
@@ -93,9 +95,11 @@ import { qianchuanStore } from "./qianchuan/store";
 import { QianchuanUpstreamError } from "./qianchuan/types";
 import { auditSdkRegistry } from "./sdk-registry";
 import { ossutils } from "./storage/ossutils";
+import { persistArtifactMedia } from "./storage/artifact-public-media";
+import { publicMediaUrls } from "./storage/public-media-url";
 import { rollbackUploadedObjects, uploadFilesStrictly } from "./storage/strict-library-upload";
 import type { JobModuleId, JobRecord } from "./types";
-import { inlineUtf8ContentDisposition } from "./uploads/content-disposition";
+import { attachmentUtf8ContentDisposition, inlineUtf8ContentDisposition } from "./uploads/content-disposition";
 import {
   directUploadExtensions,
   issueDirectUploadTicket,
@@ -410,6 +414,7 @@ const LibraryAssetSchema = z.object({
   description: z.string().optional(),
   folderId: z.string().uuid().optional(),
   url: z.string(),
+  originalUrl: z.string(),
   createdAt: z.string(),
 });
 const DirectUploadRequestSchema = z.object({
@@ -430,9 +435,9 @@ const DirectUploadInitSchema = z.object({
   headers: z.record(z.string(), z.string()),
   expiresAt: z.string(),
 });
-const AssetAccessSchema = z.object({
+const PublicMediaAccessSchema = z.object({
   url: z.string().url(),
-  expiresAt: z.string(),
+  originalUrl: z.string().url(),
 });
 
 export const store = new SqliteJobStore();
@@ -462,7 +467,10 @@ const publicApiPaths = new Set([
   "/api/auth/login",
   "/api/auth/logout",
 ]);
-const isPublicApiPath = (path: string) => publicApiPaths.has(path) || /^\/api\/portraits\/\d+\/content$/.test(path);
+const isPublicApiPath = (path: string) =>
+  publicApiPaths.has(path) ||
+  /^\/api\/portraits\/\d+\/content$/.test(path) ||
+  /^\/api\/downloads\/(?!tickets$)[^/]+$/.test(path);
 
 function referencedAssetIds(values: Record<string, string>) {
   const ids = new Set<string>();
@@ -520,14 +528,8 @@ app.use(
 
 app.use("*", async (c, next) => {
   await next();
-  c.header("X-Content-Type-Options", "nosniff");
-  c.header("Referrer-Policy", "no-referrer");
-  c.header("X-Frame-Options", "DENY");
-  c.header("Permissions-Policy", "camera=(), geolocation=(), microphone=(self)");
-  c.header(
-    "Content-Security-Policy",
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
-  );
+  for (const [name, value] of Object.entries(buildSecurityHeaders(env.publicMedia.origin)))
+    if (!c.res.headers.has(name)) c.header(name, value);
 });
 
 app.use("/api/*", async (c, next) => {
@@ -1842,21 +1844,29 @@ app.openapi(createAiGenerateJobRoute, async (c) => {
   return c.json(job, 202);
 });
 
-const libraryAssetResponse = (asset: MediaAsset) => ({
-  id: asset.id,
-  name: asset.displayName,
-  originalName: asset.originalName,
-  mimeType: asset.mimeType,
-  size: asset.byteSize,
-  width: asset.width,
-  height: asset.height,
-  durationSec: asset.durationSec,
-  kind: asset.kind,
-  description: asset.description,
-  folderId: asset.folderId,
-  url: `/api/assets/${asset.id}/content`,
-  createdAt: asset.createdAt,
-});
+const libraryAssetResponse = (asset: MediaAsset) => {
+  const urls = publicMediaUrls({
+    baseUrl: env.publicMedia.baseUrl,
+    storageKey: asset.storageKey,
+    mimeType: asset.mimeType,
+    fallbackUrl: `/api/assets/${asset.id}/content`,
+  });
+  return {
+    id: asset.id,
+    name: asset.displayName,
+    originalName: asset.originalName,
+    mimeType: asset.mimeType,
+    size: asset.byteSize,
+    width: asset.width,
+    height: asset.height,
+    durationSec: asset.durationSec,
+    kind: asset.kind,
+    description: asset.description,
+    folderId: asset.folderId,
+    ...urls,
+    createdAt: asset.createdAt,
+  };
+};
 
 async function removeAssetFiles(assets: MediaAsset[]) {
   const uploadRoot = resolve(env.dataDir, "uploads");
@@ -2126,20 +2136,7 @@ const uploadRoute = createRoute({
       description: "Uploaded media",
       content: {
         "application/json": {
-          schema: z.object({
-            asset: z.object({
-              id: z.string(),
-              name: z.string(),
-              mimeType: z.string(),
-              size: z.number(),
-              kind: AssetKindSchema,
-              displayName: z.string(),
-              description: z.string().optional(),
-              folderId: z.string().uuid().optional(),
-              url: z.string(),
-              createdAt: z.string(),
-            }),
-          }),
+          schema: z.object({ asset: LibraryAssetSchema }),
         },
       },
     },
@@ -2226,7 +2223,7 @@ app.openapi(uploadRoute, async (c) => {
     key: storageKey,
     mimeType: file.type,
   });
-  accounts.createAsset({
+  const asset: MediaAsset = {
     id,
     ownerUserId: c.get("userId"),
     storageKey,
@@ -2238,24 +2235,9 @@ app.openapi(uploadRoute, async (c) => {
     description,
     folderId: folder?.id,
     createdAt,
-  });
-  return c.json(
-    {
-      asset: {
-        id,
-        name: file.name.slice(0, 200),
-        mimeType: file.type || "application/octet-stream",
-        size: file.size,
-        kind: kind.data,
-        displayName,
-        description,
-        folderId: folder?.id,
-        url: `/api/assets/${id}/content`,
-        createdAt,
-      },
-    },
-    201,
-  );
+  };
+  accounts.createAsset(asset);
+  return c.json({ asset: libraryAssetResponse(asset) }, 201);
 });
 
 const CustomPortraitStatusSchema = z.enum(["queued", "processing", "active", "failed"]);
@@ -2447,17 +2429,7 @@ const productResponse = (product: ReturnType<AccountStore["listProducts"]>[numbe
   description: product.description,
   sharingScope: product.sharingScope,
   createdAt: product.createdAt,
-  images: product.images.map((asset) => ({
-    id: asset.id,
-    name: asset.displayName,
-    originalName: asset.originalName,
-    mimeType: asset.mimeType,
-    size: asset.byteSize,
-    kind: asset.kind,
-    description: asset.description,
-    url: `/api/assets/${asset.id}/content`,
-    createdAt: asset.createdAt,
-  })),
+  images: product.images.map(libraryAssetResponse),
 });
 
 app.get("/api/products", (c) => c.json({ products: accounts.listProducts(c.get("userId")).map(productResponse) }, 200));
@@ -2879,7 +2851,7 @@ const assetAccessRoute = createRoute({
   responses: {
     200: {
       description: "Short-lived direct TOS read authorization",
-      content: { "application/json": { schema: AssetAccessSchema } },
+      content: { "application/json": { schema: PublicMediaAccessSchema } },
     },
     404: { description: "Not found", content: { "text/plain": { schema: z.string() } } },
   },
@@ -2890,12 +2862,13 @@ app.openapi(assetAccessRoute, async (c) => {
   if (!asset || !ossutils.configured) return c.text("Not found", 404);
   try {
     await ossutils.headObject(asset.storageKey);
-    const expiresSeconds = 15 * 60;
     return c.json(
-      {
-        url: ossutils.createSignedReadUrl(asset.storageKey, expiresSeconds),
-        expiresAt: new Date(Date.now() + expiresSeconds * 1000).toISOString(),
-      },
+      publicMediaUrls({
+        baseUrl: env.publicMedia.baseUrl,
+        storageKey: asset.storageKey,
+        mimeType: asset.mimeType,
+        fallbackUrl: `/api/assets/${asset.id}/content`,
+      }),
       200,
     );
   } catch {
@@ -3146,6 +3119,161 @@ app.openapi(exportAdminEnvKeyRoute, (c) => {
   c.header("Content-Disposition", 'attachment; filename=".env.key"');
   c.header("Cache-Control", "no-store");
   return c.text(serializeEnvKey(providerCredentials.exportValues()), 200);
+});
+
+const DownloadResourceOpenApiSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("artifact"), artifactId: z.string().uuid() }),
+  z.object({ kind: z.literal("job-text"), jobId: z.string().uuid() }),
+  z.object({
+    kind: z.literal("ad-script"),
+    projectId: z.string().uuid(),
+    variantId: z.string().uuid(),
+    versionId: z.string().uuid().optional(),
+    format: z.enum(["txt", "md"]),
+  }),
+  z.object({ kind: z.literal("admin-env") }),
+]);
+const DownloadTicketResponseSchema = z.object({
+  url: z.string().startsWith("/api/downloads/"),
+  expiresAt: z.string(),
+});
+
+function ownedAdScriptExport(userId: string, resource: Extract<DownloadResource, { kind: "ad-script" }>) {
+  const aggregate = adScripts.getOwned(resource.projectId, userId);
+  const variant = aggregate?.variants.find((item) => item.id === resource.variantId);
+  const version = variant?.versions.find((item) => item.id === (resource.versionId ?? variant.currentVersionId));
+  if (!aggregate || !variant || !version) return;
+  return {
+    body:
+      resource.format === "md"
+        ? `# ${aggregate.project.input.productName}口播脚本 ${variant.ordinal}\n\n${version.script}\n\n---\n\n评分：${version.score.total}/100\n`
+        : version.script,
+    fileName: `ad-script-${variant.ordinal}.${resource.format}`,
+    mimeType: resource.format === "md" ? "text/markdown; charset=utf-8" : "text/plain; charset=utf-8",
+  };
+}
+
+function ownedJobTextExport(userId: string, jobId: string) {
+  const job = store.getOwned(jobId, userId);
+  if (!job?.result) return;
+  const artifact = job.result.artifacts.find((item) => typeof item.text === "string");
+  return {
+    body: artifact?.text ?? job.result.summary,
+    fileName: artifact?.name ?? `${job.title}.txt`,
+    mimeType: artifact?.mimeType?.startsWith("text/")
+      ? `${artifact.mimeType}; charset=utf-8`
+      : "text/plain; charset=utf-8",
+  };
+}
+
+function canIssueDownload(userId: string, resource: DownloadResource) {
+  switch (resource.kind) {
+    case "artifact":
+      return Boolean(accounts.getArtifact(userId, resource.artifactId));
+    case "job-text":
+      return Boolean(ownedJobTextExport(userId, resource.jobId));
+    case "ad-script":
+      return Boolean(ownedAdScriptExport(userId, resource));
+    case "admin-env":
+      return adminUser(userId);
+  }
+}
+
+function attachmentHeaders(fileName: string, mimeType: string) {
+  return {
+    "Content-Type": mimeType,
+    "Content-Disposition": attachmentUtf8ContentDisposition(fileName),
+    "Cache-Control": "private, no-store",
+    "Referrer-Policy": "no-referrer",
+    "X-Content-Type-Options": "nosniff",
+  };
+}
+
+const createDownloadTicketRoute = createRoute({
+  method: "post",
+  path: "/api/downloads/tickets",
+  operationId: "createDownloadTicket",
+  request: {
+    body: {
+      required: true,
+      content: { "application/json": { schema: DownloadResourceOpenApiSchema } },
+    },
+  },
+  responses: {
+    201: {
+      description: "Short-lived browser attachment URL",
+      content: { "application/json": { schema: DownloadTicketResponseSchema } },
+    },
+    403: { description: "Administrator required", content: { "application/json": { schema: ErrorSchema } } },
+    404: { description: "Resource not found", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+
+app.openapi(createDownloadTicketRoute, async (c) => {
+  const resource = c.req.valid("json") as DownloadResource;
+  const userId = c.get("userId");
+  if (resource.kind === "admin-env" && !adminUser(userId))
+    return c.json(
+      {
+        error: { code: "ADMIN_REQUIRED", message: "仅管理员可访问", retryable: false, requestId: crypto.randomUUID() },
+      },
+      403,
+    );
+  if (!canIssueDownload(userId, resource))
+    return c.json(
+      {
+        error: { code: "NOT_FOUND", message: "下载内容不存在", retryable: false, requestId: crypto.randomUUID() },
+      },
+      404,
+    );
+  const ticket = await issueDownloadTicket({ sub: userId, resource }, env.jwtSecret);
+  return c.json({ url: `/api/downloads/${ticket.token}`, expiresAt: ticket.expiresAt }, 201);
+});
+
+const redeemDownloadTicketRoute = createRoute({
+  method: "get",
+  path: "/api/downloads/{token}",
+  operationId: "redeemDownloadTicket",
+  request: { params: z.object({ token: z.string().min(1) }) },
+  responses: {
+    200: {
+      description: "Attachment body",
+      content: { "application/octet-stream": { schema: z.string().openapi({ format: "binary" }) } },
+    },
+    404: { description: "Not found", content: { "text/plain": { schema: z.string() } } },
+  },
+});
+
+app.openapi(redeemDownloadTicketRoute, async (c) => {
+  let ticket;
+  try {
+    ticket = await verifyDownloadTicket(c.req.valid("param").token, env.jwtSecret);
+  } catch {
+    return c.text("Not found", 404);
+  }
+
+  const resource = ticket.resource;
+  if (resource.kind === "artifact") {
+    const artifact = accounts.getArtifact(ticket.sub, resource.artifactId);
+    if (!artifact) return c.text("Not found", 404);
+    const file = Bun.file(resolve(env.dataDir, "results", artifact.storage_key));
+    if (!(await file.exists())) return c.text("Not found", 404);
+    return new Response(file, { headers: attachmentHeaders(artifact.name, artifact.mime_type) });
+  }
+  if (resource.kind === "job-text") {
+    const exported = ownedJobTextExport(ticket.sub, resource.jobId);
+    if (!exported) return c.text("Not found", 404);
+    return new Response(exported.body, { headers: attachmentHeaders(exported.fileName, exported.mimeType) });
+  }
+  if (resource.kind === "ad-script") {
+    const exported = ownedAdScriptExport(ticket.sub, resource);
+    if (!exported) return c.text("Not found", 404);
+    return new Response(exported.body, { headers: attachmentHeaders(exported.fileName, exported.mimeType) });
+  }
+  if (!adminUser(ticket.sub) || !providerCredentials.available) return c.text("Not found", 404);
+  return new Response(serializeEnvKey(providerCredentials.exportValues()), {
+    headers: attachmentHeaders(".env.key", "text/plain; charset=utf-8"),
+  });
 });
 
 const importAdminEnvKeyRoute = createRoute({
@@ -7313,6 +7441,73 @@ app.openapi(artifactRoute, async (c) => {
       "Content-Disposition": `inline; filename="${artifact.name.replaceAll('"', "")}"`,
     },
   });
+});
+
+const artifactAccessRoute = createRoute({
+  method: "get",
+  path: "/api/artifacts/{artifactId}/access",
+  operationId: "getArtifactAccess",
+  request: { params: z.object({ artifactId: z.string().uuid() }) },
+  responses: {
+    200: {
+      description: "Owned artifact CDN media URLs",
+      content: { "application/json": { schema: PublicMediaAccessSchema } },
+    },
+    404: { description: "Not found", content: { "text/plain": { schema: z.string() } } },
+    503: { description: "TOS unavailable", content: { "application/json": { schema: ErrorSchema } } },
+  },
+});
+
+app.openapi(artifactAccessRoute, async (c) => {
+  if (!ossutils.configured)
+    return c.json(
+      {
+        error: {
+          code: "TOS_NOT_CONFIGURED",
+          message: "TOS 未配置，生成媒体无法发布到 CDN",
+          retryable: true,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      503,
+    );
+  const userId = c.get("userId");
+  const artifactId = c.req.valid("param").artifactId;
+  const artifact = accounts.getArtifact(userId, artifactId);
+  const asset = await persistArtifactMedia(
+    { userId, artifactId },
+    {
+      getOwnedAsset: () => accounts.getOwnedAsset(userId, artifactId),
+      getArtifact: () =>
+        artifact
+          ? {
+              storageKey: artifact.storage_key,
+              name: artifact.name,
+              mimeType: artifact.mime_type,
+              jobId: artifact.job_id,
+            }
+          : undefined,
+      getDefaultFolder: () => accounts.getAssetFolder(userId, accounts.getDefaultAssetFolderId(userId)),
+      getLocalFile: async (storageKey) => {
+        const path = resolve(env.dataDir, "results", storageKey);
+        const file = Bun.file(path);
+        return { path, size: file.size, exists: await file.exists() };
+      },
+      upload: (input) => ossutils.putLibraryFile(input),
+      createAsset: (record) => accounts.createAsset(record),
+      now: () => new Date().toISOString(),
+    },
+  );
+  if (!asset) return c.text("Not found", 404);
+  return c.json(
+    publicMediaUrls({
+      baseUrl: env.publicMedia.baseUrl,
+      storageKey: asset.storageKey,
+      mimeType: asset.mimeType,
+      fallbackUrl: `/api/artifacts/${artifactId}`,
+    }),
+    200,
+  );
 });
 
 // ── Share content import (multi-platform) ──────────────────────────────

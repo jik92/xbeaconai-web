@@ -1329,6 +1329,7 @@ export const zCompleteDirectUploadResponse = z.union([
             description: z.string().optional(),
             folderId: z.uuid().optional(),
             url: z.string(),
+            originalUrl: z.string(),
             createdAt: z.string()
         })
     }),
@@ -1346,6 +1347,7 @@ export const zCompleteDirectUploadResponse = z.union([
             description: z.string().optional(),
             folderId: z.uuid().optional(),
             url: z.string(),
+            originalUrl: z.string(),
             createdAt: z.string()
         })
     })
@@ -1364,15 +1366,19 @@ export const zUploadMediaBody = z.object({
  */
 export const zUploadMediaResponse = z.object({
     asset: z.object({
-        id: z.string(),
+        id: z.uuid(),
         name: z.string(),
+        originalName: z.string(),
         mimeType: z.string(),
-        size: z.number(),
+        size: z.int(),
+        width: z.int().optional(),
+        height: z.int().optional(),
+        durationSec: z.number().optional(),
         kind: zAssetKind,
-        displayName: z.string(),
         description: z.string().optional(),
         folderId: z.uuid().optional(),
         url: z.string(),
+        originalUrl: z.string(),
         createdAt: z.string()
     })
 });
@@ -1474,6 +1480,7 @@ export const zListAssetsResponse = z.object({
         description: z.string().optional(),
         folderId: z.uuid().optional(),
         url: z.string(),
+        originalUrl: z.string(),
         createdAt: z.string()
     }))
 });
@@ -1549,6 +1556,7 @@ export const zSaveAssetMetadataResponse = z.object({
         description: z.string().optional(),
         folderId: z.uuid().optional(),
         url: z.string(),
+        originalUrl: z.string(),
         createdAt: z.string()
     })
 });
@@ -1562,7 +1570,7 @@ export const zGetAssetAccessPath = z.object({
  */
 export const zGetAssetAccessResponse = z.object({
     url: z.url(),
-    expiresAt: z.string()
+    originalUrl: z.url()
 });
 
 export const zGetAssetContentPath = z.object({
@@ -1637,6 +1645,44 @@ export const zUpdateAdminCredentialResponse = z.object({
  * Exported env key
  */
 export const zExportAdminEnvKeyResponse = z.string();
+
+export const zCreateDownloadTicketBody = z.union([
+    z.object({
+        kind: z.enum(['artifact']),
+        artifactId: z.uuid()
+    }),
+    z.object({
+        kind: z.enum(['job-text']),
+        jobId: z.uuid()
+    }),
+    z.object({
+        kind: z.enum(['ad-script']),
+        projectId: z.uuid(),
+        variantId: z.uuid(),
+        versionId: z.uuid().optional(),
+        format: z.enum(['txt', 'md'])
+    }),
+    z.object({
+        kind: z.enum(['admin-env'])
+    })
+]);
+
+/**
+ * Short-lived browser attachment URL
+ */
+export const zCreateDownloadTicketResponse = z.object({
+    url: z.string(),
+    expiresAt: z.string()
+});
+
+export const zRedeemDownloadTicketPath = z.object({
+    token: z.string().min(1)
+});
+
+/**
+ * Attachment body
+ */
+export const zRedeemDownloadTicketResponse = z.string();
 
 export const zImportAdminEnvKeyBody = z.object({
     file: z.string()
@@ -2942,6 +2988,18 @@ export const zDownloadArtifactPath = z.object({
  * Artifact binary
  */
 export const zDownloadArtifactResponse = z.string();
+
+export const zGetArtifactAccessPath = z.object({
+    artifactId: z.uuid()
+});
+
+/**
+ * Owned artifact CDN media URLs
+ */
+export const zGetArtifactAccessResponse = z.object({
+    url: z.url(),
+    originalUrl: z.url()
+});
 
 export const zParseShareContentBody = z.object({
     text: z.string().min(1).max(4096)

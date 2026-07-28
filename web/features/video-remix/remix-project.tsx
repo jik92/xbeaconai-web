@@ -352,7 +352,8 @@ function ConfigSidebar({
                 <div className="uploaded-video-preview" key={source.id}>
                   <div className="uploaded-video-player">
                     <AuthenticatedMedia
-                      url={`/api/assets/${source.id}/content`}
+                      url={source.url || `/api/assets/${source.id}/content`}
+                      originalUrl={source.originalUrl}
                       mimeType={source.mimeType}
                       alt={source.name}
                       loadingText="正在载入原始片源…"
@@ -1150,6 +1151,7 @@ export function RemixProject() {
         name: file.filename,
         mimeType: "video/mp4",
         url: `/api/assets/${file.objectKey}/content`,
+        originalUrl: `/api/assets/${file.objectKey}/content`,
         source: "library",
       }));
       const productImages: LibraryAsset[] = request.product.productImages.flatMap((image) => {
@@ -1164,6 +1166,7 @@ export function RemixProject() {
             kind: "product" as const,
             description: image.aiDescription,
             url: `/api/assets/${image.metaId}/content`,
+            originalUrl: `/api/assets/${image.metaId}/content`,
             createdAt: detail.rootJob.createdAt,
           },
         ];
@@ -1216,6 +1219,7 @@ export function RemixProject() {
               durationSec: voice.durationSec,
               kind: "voice",
               url: `/api/assets/${voice.objectKey}/content`,
+              originalUrl: `/api/assets/${voice.objectKey}/content`,
               createdAt: detail.rootJob.createdAt,
             }
           : null,

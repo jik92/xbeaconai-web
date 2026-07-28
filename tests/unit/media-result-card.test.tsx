@@ -35,7 +35,7 @@ function renderResult(mimeType: string, name: string, onDownload = mock(() => un
   act(() => {
     root.render(
       <MediaResultCard
-        url="blob:test-result"
+        url="https://files.xbeaconai.com/users/test/generated/result"
         mimeType={mimeType}
         name={name}
         authenticated={false}

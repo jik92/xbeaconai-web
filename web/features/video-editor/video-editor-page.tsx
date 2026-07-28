@@ -1,7 +1,7 @@
 import { Player, type PlayerRef } from "@remotion/player";
 import { ChevronLeft, ChevronRight, Download, Merge, Plus, Scissors, Trash2, X } from "lucide-react";
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
-import { authenticatedBlobUrl, submitJob, uploadMediaFile } from "@/api/api-client";
+import { submitJob, uploadMediaFile } from "@/api/api-client";
 import { SaveLocationPicker } from "@/components/domain/save-location-picker";
 import { Button } from "@/components/ui/button";
 import { randomUuid } from "@/lib/random-id";
@@ -12,9 +12,9 @@ import {
   timelineDuration,
   VIDEO_EDITOR_FPS,
   type VideoEditorTimeline,
-  videoEditorAssetUrl,
 } from "../../../shared/video-editor/timeline";
 import { VideoComposition } from "./video-composition";
+import { prepareVideoEditorSource } from "./video-editor-upload";
 
 const EMPTY_TIMELINE: VideoEditorTimeline = {
   version: 1,
@@ -57,45 +57,15 @@ export function VideoEditorPage() {
   const [exportOpen, setExportOpen] = useState(false);
   const [exportFolderId, setExportFolderId] = useState("");
   const [outputName, setOutputName] = useState("剪辑成片.mp4");
-  const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(timeline));
   }, [timeline]);
-  useEffect(() => {
-    let active = true;
-    const createdUrls: string[] = [];
-    setPreviewUrls({});
-    void Promise.allSettled(
-      timeline.sources.map(async (source) => {
-        const url = await authenticatedBlobUrl(videoEditorAssetUrl(source.assetId));
-        if (active) createdUrls.push(url);
-        else URL.revokeObjectURL(url);
-        return [source.id, url] as const;
-      }),
-    ).then((results) => {
-      if (!active) return;
-      const entries = results.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
-      setPreviewUrls(Object.fromEntries(entries));
-      if (entries.length !== results.length) setMessage("部分视频素材读取失败，可移除失效素材后继续剪辑");
-    });
-    return () => {
-      active = false;
-      createdUrls.forEach((url) => URL.revokeObjectURL(url));
-    };
-  }, [timeline.sources]);
   const update = (next: VideoEditorTimeline) => {
     setHistory((items) => [...items.slice(-49), timeline]);
     setFuture([]);
     setTimeline(next);
   };
   const durationInFrames = Math.max(1, Math.ceil(timelineDuration(timeline) * timeline.fps));
-  const previewTimeline = useMemo(
-    () => ({
-      ...timeline,
-      sources: timeline.sources.map((source) => ({ ...source, url: previewUrls[source.id] ?? "" })),
-    }),
-    [previewUrls, timeline],
-  );
   const selectedClip = timeline.clips.find((clip) => clip.id === selected[0]);
   const cut = () => {
     const frame = player.current?.getCurrentFrame() ?? 0;
@@ -164,27 +134,26 @@ export function VideoEditorPage() {
     try {
       let next = timeline;
       for (const file of Array.from(files)) {
-        const objectUrl = URL.createObjectURL(file);
-        const metadata = await mediaMetadata(objectUrl).finally(() => URL.revokeObjectURL(objectUrl));
-        const asset = await uploadMediaFile(file);
+        const prepared = await prepareVideoEditorSource(file, {
+          upload: uploadMediaFile,
+          readMetadata: mediaMetadata,
+        });
         const sourceId = randomUuid();
         next = {
           ...next,
-          width: next.sources.length ? next.width : metadata.width,
-          height: next.sources.length ? next.height : metadata.height,
+          width: next.sources.length ? next.width : prepared.width,
+          height: next.sources.length ? next.height : prepared.height,
           sources: [
             ...next.sources,
             {
               id: sourceId,
-              assetId: asset.id,
-              name: file.name,
-              url: videoEditorAssetUrl(asset.id),
-              durationSec: metadata.duration,
-              width: metadata.width,
-              height: metadata.height,
+              ...prepared,
             },
           ],
-          clips: [...next.clips, { id: randomUuid(), sourceId, name: file.name, inSec: 0, outSec: metadata.duration }],
+          clips: [
+            ...next.clips,
+            { id: randomUuid(), sourceId, name: file.name, inSec: 0, outSec: prepared.durationSec },
+          ],
         };
       }
       update(next);
@@ -252,7 +221,7 @@ export function VideoEditorPage() {
           <h2 className="type-section-title">视频素材</h2>
           {timeline.sources.map((source) => (
             <div className="video-editor-source-item" key={source.id}>
-              {previewUrls[source.id] ? <video src={previewUrls[source.id]} muted /> : <span>载入中</span>}
+              {source.url ? <video src={source.url} muted /> : <span>预览不可用</span>}
               <span>{source.name}</span>
               <Button
                 type="button"
@@ -275,7 +244,7 @@ export function VideoEditorPage() {
               <Player
                 ref={player}
                 component={VideoComposition}
-                inputProps={{ timeline: previewTimeline }}
+                inputProps={{ timeline }}
                 durationInFrames={durationInFrames}
                 compositionWidth={timeline.width || 1920}
                 compositionHeight={timeline.height || 1080}
@@ -447,7 +416,7 @@ export function VideoEditorPage() {
                     )
                   }
                 >
-                  {source && previewUrls[source.id] && <video src={previewUrls[source.id]} muted />}
+                  {source?.url && <video src={source.url} muted />}
                   <span>{clip.name}</span>
                 </Button>
               );

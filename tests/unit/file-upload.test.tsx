@@ -17,8 +17,6 @@ beforeAll(() => {
     HTMLElement: window.HTMLElement,
     IS_REACT_ACT_ENVIRONMENT: true,
   });
-  URL.createObjectURL = () => "blob:local-upload";
-  URL.revokeObjectURL = () => undefined;
 });
 
 afterEach(() => {
@@ -74,21 +72,37 @@ describe("FileUpload", () => {
     expect(fileMatchesAccept({ name: "notes.txt", type: "text/plain" }, "image/*,.pdf")).toBe(false);
   });
 
-  test("offers the shared full-screen interaction for a local media preview", () => {
+  test("shows pending file metadata without creating or rendering a local media preview", async () => {
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
     roots.push(root);
+    const originalCreateObjectUrl = URL.createObjectURL;
+    const originalRevokeObjectUrl = URL.revokeObjectURL;
+    let createCalls = 0;
+    URL.createObjectURL = () => {
+      createCalls += 1;
+      return "blob:forbidden-local-preview";
+    };
+    URL.revokeObjectURL = () => undefined;
 
-    act(() => {
-      root.render(
-        <FileUpload
-          files={[new File(["image"], "cover.png", { type: "image/png" })]}
-          onFilesChange={() => undefined}
-        />,
-      );
-    });
+    try {
+      await act(async () => {
+        root.render(
+          <FileUpload
+            files={[new File(["image"], "cover.png", { type: "image/png" })]}
+            onFilesChange={() => undefined}
+          />,
+        );
+      });
 
-    expect(container.querySelector('button[aria-label="全屏预览cover.png"]')).not.toBeNull();
+      expect(createCalls).toBe(0);
+      expect(container.textContent).toContain("cover.png");
+      expect(container.textContent).toContain("等待上传");
+      expect(container.querySelector("img,video,audio")).toBeNull();
+    } finally {
+      URL.createObjectURL = originalCreateObjectUrl;
+      URL.revokeObjectURL = originalRevokeObjectUrl;
+    }
   });
 });

@@ -31,6 +31,7 @@ const material: LibraryAsset = {
   description: "服装展示",
   folderId: "folder-1",
   url: "/api/assets/asset-1/content",
+  originalUrl: "/api/assets/asset-1/content",
   createdAt: "2026-07-23T00:00:00.000Z",
 };
 const product: LibraryProduct = {

@@ -85,6 +85,7 @@ export interface LibraryAsset {
   description?: string;
   folderId?: string;
   url: string;
+  originalUrl: string;
   createdAt: string;
 }
 export interface AssetFolder {

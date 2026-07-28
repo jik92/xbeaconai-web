@@ -28,13 +28,24 @@ describe("video editor timeline", () => {
     expect(validateVideoEditorTimeline({ ...timeline, clips: [{ ...timeline.clips[0]!, outSec: 11 }] })).toBe(
       "片段时间范围无效",
     ));
-  test("replaces persisted blob URLs with stable authenticated asset URLs", () => {
-    const normalized = normalizeVideoEditorTimeline({
+  test("preserves CDN sources and clears legacy browser-only sources", () => {
+    const cdnUrl = "https://files.xbeaconai.com/users/demo/source.mp4";
+    const normalizedCdn = normalizeVideoEditorTimeline({
+      ...timeline,
+      sources: [{ ...timeline.sources[0]!, url: cdnUrl }],
+    });
+    const normalizedLegacy = normalizeVideoEditorTimeline({
       ...timeline,
       sources: [{ ...timeline.sources[0]!, url: "blob:http://127.0.0.1/stale" }],
     });
-    expect(normalized.sources[0]?.url).toBe("/api/assets/asset/content");
-    expect(JSON.stringify(normalized)).not.toContain("blob:");
+    const normalizedProtected = normalizeVideoEditorTimeline({
+      ...timeline,
+      sources: [{ ...timeline.sources[0]!, url: "/api/assets/asset/content" }],
+    });
+
+    expect(normalizedCdn.sources[0]?.url).toBe(cdnUrl);
+    expect(normalizedLegacy.sources[0]?.url).toBe("");
+    expect(normalizedProtected.sources[0]?.url).toBe("");
   });
   test("removes a source together with all clips that reference it", () => {
     const removed = removeVideoEditorSource(timeline, "source");

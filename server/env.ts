@@ -72,6 +72,32 @@ export function resolveTosConfig(input: {
     throw new Error(`TOS_PUBLIC_ENDPOINT 必须是 ${expectedPublicEndpoint}`);
   return config;
 }
+export function resolvePublicMediaConfig(input: { isProduction: boolean; baseUrl?: string }) {
+  const productionOrigin = "https://files.xbeaconai.com";
+  const rawBaseUrl = input.baseUrl?.trim();
+  if (!rawBaseUrl) {
+    if (input.isProduction) throw new Error("生产启动必须配置 PUBLIC_MEDIA_BASE_URL");
+    return {
+      baseUrl: productionOrigin,
+      origin: productionOrigin,
+    };
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(rawBaseUrl);
+  } catch {
+    throw new Error("PUBLIC_MEDIA_BASE_URL 必须是有效的 HTTPS 域名根地址");
+  }
+  if (parsed.protocol !== "https:") throw new Error("PUBLIC_MEDIA_BASE_URL 必须使用 HTTPS");
+  if (parsed.username || parsed.password || parsed.pathname !== "/" || parsed.search || parsed.hash)
+    throw new Error("PUBLIC_MEDIA_BASE_URL 只能配置域名根地址");
+  if (input.isProduction && parsed.origin !== productionOrigin)
+    throw new Error(`生产 PUBLIC_MEDIA_BASE_URL 必须是 ${productionOrigin}`);
+  return {
+    baseUrl: parsed.origin,
+    origin: parsed.origin,
+  };
+}
 const workerConcurrencies = resolveWorkerConcurrencies({
   network: process.env.NETWORK_WORKER_CONCURRENCY,
   ffmpeg: process.env.FFMPEG_WORKER_CONCURRENCY,
@@ -132,6 +158,10 @@ export const env = {
     serverEndpoint: process.env.TOS_SERVER_ENDPOINT,
     publicEndpoint: process.env.TOS_PUBLIC_ENDPOINT,
     corsOrigins: process.env.TOS_CORS_ORIGINS,
+  }),
+  publicMedia: resolvePublicMediaConfig({
+    isProduction: process.env.NODE_ENV === "production",
+    baseUrl: process.env.PUBLIC_MEDIA_BASE_URL,
   }),
   jwtSecret: process.env.JWT_SECRET ?? generatedJwtSecret,
   authRateLimitMax: Number(process.env.AUTH_RATE_LIMIT_MAX ?? 12),

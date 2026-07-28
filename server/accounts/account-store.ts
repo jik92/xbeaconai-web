@@ -1318,6 +1318,6 @@ export class AccountStore {
       .from(artifacts)
       .where(and(eq(artifacts.id, id), eq(artifacts.ownerUserId, userId)))
       .get();
-    return row ? { storage_key: row.storageKey, name: row.name, mime_type: row.mimeType } : null;
+    return row ? { storage_key: row.storageKey, name: row.name, mime_type: row.mimeType, job_id: row.jobId } : null;
   }
 }

@@ -1,7 +1,8 @@
 import { AudioLines, Maximize2, X } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import ReactPlayer from "react-player";
-import { authenticatedBlobUrl } from "@/api/api-client";
+import { directMediaSource, resolveMediaCdnUrl } from "@/api/api-client";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +29,7 @@ export interface NativeMediaPreviewProps {
 
 export interface MediaPreviewProps extends Omit<NativeMediaPreviewProps, "src"> {
   url: string;
+  originalUrl?: string;
   mimeType: string;
   loadingText?: string;
   errorText?: string;
@@ -144,36 +146,37 @@ export function AudioPreview({
   );
 }
 
-function useMediaSource(url: string, authenticated: boolean) {
-  const [state, setState] = useState<{ source?: string; error: boolean }>(() => ({
-    source: authenticated ? undefined : url,
+function useMediaSource(url: string, original = false) {
+  const direct = directMediaSource(url);
+  const [state, setState] = useState<{ source?: string; error: boolean; loading: boolean }>(() => ({
+    source: direct,
     error: false,
+    loading: Boolean(url && !direct),
   }));
 
   useEffect(() => {
-    if (!authenticated) {
-      setState({ source: url, error: false });
+    const nextDirect = directMediaSource(url);
+    if (nextDirect) {
+      setState({ source: nextDirect, error: false, loading: false });
       return;
     }
-
+    if (!url) {
+      setState({ source: undefined, error: true, loading: false });
+      return;
+    }
     let active = true;
-    let current: string | undefined;
-    setState({ source: undefined, error: false });
-    void authenticatedBlobUrl(url)
-      .then((value) => {
-        current = value;
-        if (active) setState({ source: value, error: false });
-        else URL.revokeObjectURL(value);
+    setState({ source: undefined, error: false, loading: true });
+    void resolveMediaCdnUrl(url, original)
+      .then((source) => {
+        if (active) setState({ source, error: false, loading: false });
       })
       .catch(() => {
-        if (active) setState({ source: undefined, error: true });
+        if (active) setState({ source: undefined, error: true, loading: false });
       });
-
     return () => {
       active = false;
-      if (current) URL.revokeObjectURL(current);
     };
-  }, [authenticated, url]);
+  }, [original, url]);
 
   return state;
 }
@@ -242,7 +245,7 @@ function MediaLightbox({
     };
   }, [onClose]);
 
-  return (
+  const lightbox = (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-surface-dark/85 p-4 sm:p-8"
       role="dialog"
@@ -276,6 +279,8 @@ function MediaLightbox({
       })}
     </div>
   );
+
+  return typeof document === "undefined" ? lightbox : createPortal(lightbox, document.body);
 }
 
 function formatPlaybackSeconds(value: number) {
@@ -475,24 +480,31 @@ function InteractiveAudioPreview({
 
 export function MediaPreview({
   url,
+  originalUrl,
   mimeType,
   alt,
   autoPlay = false,
   controls = true,
   loadingText = "正在载入结果预览…",
   errorText = "预览不可用",
-  authenticated = true,
   previewable = true,
   className,
   containerClassName,
   onMetadata,
+  imageLoading,
+  onImageError,
 }: MediaPreviewProps) {
-  const { source, error } = useMediaSource(url, authenticated);
+  const sourceState = useMediaSource(url);
+  const source = sourceState.source;
+  const hasSeparateOriginal = Boolean(originalUrl && originalUrl !== url);
+  const originalState = useMediaSource(hasSeparateOriginal ? originalUrl || "" : "", true);
+  const lightboxSource = hasSeparateOriginal ? originalState.source : source;
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const kind = mimeType.startsWith("video/") ? "video" : mimeType.startsWith("audio/") ? "audio" : "image";
 
-  if (error) return <span>{errorText}</span>;
-  if (!source) return <span>{loadingText}</span>;
+  if (sourceState.error || (hasSeparateOriginal && originalState.error)) return <span>{errorText}</span>;
+  if (sourceState.loading || (hasSeparateOriginal && originalState.loading) || !source || !lightboxSource)
+    return <span>{loadingText}</span>;
 
   if (kind === "video" && previewable)
     return (
@@ -523,6 +535,8 @@ export function MediaPreview({
     controls,
     className,
     onMetadata,
+    imageLoading,
+    onImageError,
   });
 
   if (!previewable) return content;
@@ -552,7 +566,9 @@ export function MediaPreview({
           <Maximize2 className="size-4" aria-hidden="true" />
         </span>
       </Button>
-      {lightboxOpen && <MediaLightbox kind={kind} source={source} alt={alt} onClose={() => setLightboxOpen(false)} />}
+      {lightboxOpen && (
+        <MediaLightbox kind={kind} source={lightboxSource || source} alt={alt} onClose={() => setLightboxOpen(false)} />
+      )}
     </div>
   );
 
