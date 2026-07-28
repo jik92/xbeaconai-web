@@ -194,13 +194,13 @@ expect(await syncSystemMedia({
 - `buildMediaCdnCheckUrls` returns original, thumbnail, preview, and video URLs.
 - The live check proves thumbnail WebP/max-edge 320, preview WebP/max-edge 1280, and video Range 206.
 
-- [ ] **Step 1: Write failing URL and dimension-policy tests for `style/thumbnail`**
-- [ ] **Step 2: Verify the current checker lacks thumbnail validation**
-- [ ] **Step 3: Provision `thumbnail` with `putBucketImageStyle` and the verified
+- [x] **Step 1: Write failing URL and dimension-policy tests for `style/thumbnail`**
+- [x] **Step 2: Verify the current checker lacks thumbnail validation**
+- [x] **Step 3: Provision `thumbnail` with `putBucketImageStyle` and the verified
   `image/resize,w_320,h_320,m_lfit/quality,q_75/format,webp` process**
-- [ ] **Step 4: Add thumbnail and preview probes to `check-media-cdn.ts`**
-- [ ] **Step 5: Invoke the media CDN check during production deployment after system media synchronization**
-- [ ] **Step 6: Run `bun test tests/unit/media-cdn-config.test.ts`**
+- [x] **Step 4: Add thumbnail and preview probes to `check-media-cdn.ts`**
+- [x] **Step 5: Invoke the media CDN check during production deployment after system media synchronization**
+- [x] **Step 6: Run `bun test tests/unit/media-cdn-config.test.ts`**
 
 ### Task 8: Regenerate Contracts and Complete the Audit
 

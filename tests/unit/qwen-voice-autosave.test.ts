@@ -17,10 +17,10 @@ describe("AI tool output folder saving", () => {
     expect(mediaKit).toContain('accounts.getAssetFolder(job.ownerUserId, job.values.outputFolderId ?? "")');
     expect(mediaKit).not.toContain("accounts.getDefaultAssetFolderId(job.ownerUserId)");
     expect(mediaKit).toContain("accounts.createArtifact");
-    expect(mediaKit).toMatch(/artifactUrl = `\/api\/artifacts\/\$\{assetId\}`/);
+    expect(mediaKit).toMatch(/artifactUrl = `\/api\/artifacts\/\$\{assetId\}\/access`/);
     for (const handler of [videoCut, videoMashup]) {
       expect(handler).toContain("accounts.createArtifact");
-      expect(handler).toMatch(/artifactUrl = `\/api\/artifacts\/\$\{assetId\}`/);
+      expect(handler).toMatch(/artifactUrl = `\/api\/artifacts\/\$\{assetId\}\/access`/);
       expect(handler).toContain("if (folder)");
     }
   });

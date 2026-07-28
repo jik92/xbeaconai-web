@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { buildMediaCdnCheckUrls } from "../../scripts/check-media-cdn";
-import { MEDIA_CDN_DEFAULT_ALLOWED_REFERERS, mediaCdnDesiredConfig } from "../../scripts/setup-media-cdn";
+import {
+  MEDIA_CDN_DEFAULT_ALLOWED_REFERERS,
+  MEDIA_IMAGE_STYLES,
+  VOICE_PREVIEW_LIFECYCLE_RULE_ID,
+  mediaCdnDesiredConfig,
+  upsertVoicePreviewLifecycleRule,
+} from "../../scripts/setup-media-cdn";
 
 describe("media CDN configuration", () => {
   test("allows the production application and the approved local development IP Referer", () => {
@@ -50,7 +56,39 @@ describe("media CDN configuration", () => {
     expect("NegativeCache" in config).toBe(false);
   });
 
-  test("builds encoded original, processed image, and range-check URLs", () => {
+  test("defines bounded WebP thumbnail and preview styles", () => {
+    expect(MEDIA_IMAGE_STYLES).toEqual({
+      thumbnail: "image/resize,w_320,h_320,m_lfit/quality,q_75/format,webp",
+      preview: "image/resize,w_1280,h_1280,m_lfit/format,webp",
+    });
+  });
+
+  test("preserves unrelated lifecycle rules while enforcing voice preview expiry", () => {
+    const unrelated = {
+      ID: "archive-old-results",
+      Prefix: "results/",
+      Status: "Enabled" as const,
+      Transitions: [{ StorageClass: "IA", Days: 30 }],
+    };
+    const stale = {
+      ID: VOICE_PREVIEW_LIFECYCLE_RULE_ID,
+      Prefix: "wrong/",
+      Status: "Disabled" as const,
+      Expiration: { Days: 99 },
+    };
+
+    expect(upsertVoicePreviewLifecycleRule([unrelated, stale])).toEqual([
+      unrelated,
+      {
+        ID: VOICE_PREVIEW_LIFECYCLE_RULE_ID,
+        Prefix: "ephemeral/voice-previews/",
+        Status: "Enabled",
+        Expiration: { Days: 1 },
+      },
+    ]);
+  });
+
+  test("builds encoded original, thumbnail, preview, and range-check URLs", () => {
     expect(
       buildMediaCdnCheckUrls({
         domain: "files.xbeaconai.com",
@@ -59,6 +97,8 @@ describe("media CDN configuration", () => {
       }),
     ).toEqual({
       imageOriginal: "https://files.xbeaconai.com/users/demo/%E5%95%86%E5%93%81%20%E4%B8%BB%E5%9B%BE.jpg",
+      imageThumbnail:
+        "https://files.xbeaconai.com/users/demo/%E5%95%86%E5%93%81%20%E4%B8%BB%E5%9B%BE.jpg?x-tos-process=style/thumbnail",
       imagePreview:
         "https://files.xbeaconai.com/users/demo/%E5%95%86%E5%93%81%20%E4%B8%BB%E5%9B%BE.jpg?x-tos-process=style/preview",
       videoOriginal: "https://files.xbeaconai.com/users/demo/source%20video.mp4",

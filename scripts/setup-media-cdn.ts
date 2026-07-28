@@ -1,6 +1,32 @@
+import TosClient, { TosServerCode, TosServerError } from "@volcengine/tos-sdk";
 import { callVolcOpenApi, VolcOpenApiError } from "../server/providers/volc-openapi";
 
 export const MEDIA_CDN_DEFAULT_ALLOWED_REFERERS = ["app.xbeaconai.com", "127.0.0.1"];
+export const MEDIA_IMAGE_STYLES = {
+  thumbnail: "image/resize,w_320,h_320,m_lfit/quality,q_75/format,webp",
+  preview: "image/resize,w_1280,h_1280,m_lfit/format,webp",
+} as const;
+export const VOICE_PREVIEW_LIFECYCLE_RULE_ID = "expire-voice-previews";
+
+type MediaLifecycleRule = {
+  ID?: string;
+  Prefix?: string;
+  Status: "Enabled" | "Disabled";
+  Expiration?: { Date?: string; Days?: number };
+  [key: string]: unknown;
+};
+
+export function upsertVoicePreviewLifecycleRule<T extends MediaLifecycleRule>(rules: T[]) {
+  return [
+    ...rules.filter((rule) => rule.ID !== VOICE_PREVIEW_LIFECYCLE_RULE_ID),
+    {
+      ID: VOICE_PREVIEW_LIFECYCLE_RULE_ID,
+      Prefix: "ephemeral/voice-previews/",
+      Status: "Enabled" as const,
+      Expiration: { Days: 1 },
+    },
+  ];
+}
 
 export interface MediaCdnConfigInput {
   domain: string;
@@ -119,6 +145,79 @@ function cloudConfig(service: "CDN" | "dns") {
   };
 }
 
+function createTosClient() {
+  const tosRegion = region();
+  return new TosClient({
+    accessKeyId: required("TOS_ACCESS_KEY_ID"),
+    accessKeySecret: required("TOS_SECRET_ACCESS_KEY"),
+    region: tosRegion,
+    endpoint: process.env.TOS_SERVER_ENDPOINT?.trim() || `tos-${tosRegion}.ivolces.com`,
+    secure: true,
+    requestTimeout: 60_000,
+    connectionTimeout: 15_000,
+    maxRetryCount: 2,
+  });
+}
+
+function sameJson(left: unknown, right: unknown) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+async function readLifecycleRules(client: TosClient, bucketName: string) {
+  try {
+    return (await client.getBucketLifecycle({ bucket: bucketName })).data.Rules ?? [];
+  } catch (error) {
+    if (
+      error instanceof TosServerError &&
+      (error.statusCode === 404 || error.code === TosServerCode.NoSuchLifecycleConfiguration)
+    )
+      return [];
+    throw error;
+  }
+}
+
+export async function ensureMediaBucketOptimization(input: { apply: boolean }) {
+  const bucketName = bucket();
+  const client = createTosClient();
+  const styles: Record<string, { current: string | null; desired: string; changed: boolean }> = {};
+  for (const [styleName, desiredContent] of Object.entries(MEDIA_IMAGE_STYLES)) {
+    const current = (await client.getBucketImageStyle(bucketName, styleName)).data?.Content ?? null;
+    const changed = current !== desiredContent;
+    styles[styleName] = { current, desired: desiredContent, changed };
+    if (input.apply && changed)
+      await client.putBucketImageStyle({
+        bucket: bucketName,
+        styleName,
+        content: desiredContent,
+      });
+  }
+
+  const currentLifecycle = await readLifecycleRules(client, bucketName);
+  const desiredLifecycle = upsertVoicePreviewLifecycleRule(
+    currentLifecycle as unknown as MediaLifecycleRule[],
+  ) as Parameters<TosClient["putBucketLifecycle"]>[0]["rules"];
+  const lifecycleChanged = !sameJson(currentLifecycle, desiredLifecycle);
+  if (input.apply && lifecycleChanged)
+    await client.putBucketLifecycle({
+      bucket: bucketName,
+      rules: desiredLifecycle,
+    });
+
+  const result = {
+    mode: input.apply ? "apply" : "read-only",
+    bucket: bucketName,
+    styles,
+    voicePreviewLifecycle: {
+      changed: lifecycleChanged,
+      ruleId: VOICE_PREVIEW_LIFECYCLE_RULE_ID,
+      prefix: "ephemeral/voice-previews/",
+      expirationDays: 1,
+    },
+  };
+  console.log(JSON.stringify(result, null, 2));
+  return result;
+}
+
 async function cdn<Result>(action: string, input: Record<string, unknown>) {
   return callVolcOpenApi<Result>(cloudConfig("CDN"), action, input);
 }
@@ -182,6 +281,11 @@ async function waitForCname() {
 }
 
 async function main() {
+  const apply = process.argv.includes("--apply");
+  if (process.argv.includes("--bucket-only")) {
+    await ensureMediaBucketOptimization({ apply });
+    return;
+  }
   const input = {
     domain: domain(),
     bucket: bucket(),
@@ -193,7 +297,6 @@ async function main() {
   };
   const desired = mediaCdnDesiredConfig(input);
   const current = await listDomain();
-  const apply = process.argv.includes("--apply");
   console.log(
     JSON.stringify(
       {
@@ -207,6 +310,7 @@ async function main() {
       2,
     ),
   );
+  await ensureMediaBucketOptimization({ apply });
   if (!apply) return;
 
   const certificateId = required("MEDIA_CDN_CERT_ID");
