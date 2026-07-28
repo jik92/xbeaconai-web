@@ -1,7 +1,7 @@
+import { normalizePortraitReference } from "../../shared/portraits/portrait-reference";
 import type { AccountStore } from "../accounts/account-store";
 import type { CustomPortraitStore } from "../portraits/custom-portrait-store";
 import { resolvePortraitReference } from "../portraits/portrait-resolver";
-import { normalizePortraitReference } from "../../shared/portraits/portrait-reference";
 import {
   buildVideoCreateShotGenerationPrompt,
   createFallbackVideoCreateShotPlan,
@@ -77,7 +77,7 @@ export function resolveVideoCreateShotGenerationDraft(input: {
       mimeType: product.mimeType,
       role: videoCreateReferenceRole("image"),
       category: "商品",
-      url: `/api/assets/${product.id}/content`,
+      url: `/api/assets/${product.id}/access`,
     });
   }
   const voiceId = aggregate.project.input.voiceAssetId;
@@ -92,7 +92,7 @@ export function resolveVideoCreateShotGenerationDraft(input: {
       name: voice.displayName,
       mimeType: voice.mimeType,
       role: videoCreateReferenceRole("audio"),
-      url: `/api/assets/${voice.id}/content`,
+      url: `/api/assets/${voice.id}/access`,
     });
   }
   const duration = Math.min(15, Math.max(4, Math.round(shot.durationSec)));

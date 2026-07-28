@@ -48,8 +48,9 @@ import { Button } from "@/components/ui/button";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import type { ApiJobResult, LibraryAsset, LibraryProduct } from "@/entities/types";
 import type { CreationModelCapability } from "@/features/ai-creation/ai-creation-composer";
-import { fetchPortraits, type Portrait, portraitDisplayUrl } from "@/features/portrait-library/portrait-data";
+import { fetchPortraits, type Portrait } from "@/features/portrait-library/portrait-data";
 import { PortraitPickerDialog } from "@/features/portrait-library/portrait-picker-dialog";
+import { systemPortraitMedia } from "../../../shared/media/system-media";
 import type { RemixPromptTool } from "../../../shared/video-remix/prompt-tools";
 import {
   moveRemixSource,
@@ -73,7 +74,9 @@ interface SelectedPortrait {
   name: string;
   profession: string;
   source_url: string;
+  thumbnail_url: string;
   display_url: string;
+  original_url: string;
   index?: number;
   description?: string;
   gender?: string;
@@ -87,7 +90,9 @@ function toSelectedPortrait(portrait: Portrait): SelectedPortrait {
     name: portrait.name,
     profession: portrait.profession,
     source_url: portrait.source_url,
+    thumbnail_url: portrait.thumbnail_url,
     display_url: portrait.display_url,
+    original_url: portrait.original_url,
     ...(portrait.type === "general" ? { index: portrait.index } : {}),
     description: portrait.description,
     gender: portrait.gender,
@@ -276,7 +281,7 @@ function ConfigSidebar({
         preview={
           selectedProduct ? (
             <ProductImage
-              url={selectedProduct.images[0]?.url || ""}
+              url={selectedProduct.images[0]?.thumbnailUrl || ""}
               originalUrl={selectedProduct.images[0]?.originalUrl}
               mimeType={selectedProduct.images[0]?.mimeType || "image/png"}
               alt={selectedProduct.name}
@@ -292,17 +297,7 @@ function ConfigSidebar({
       <div className="portrait-cards-row">
         {selectedPortraits.map((portrait) => (
           <div className="remix-portrait-card" key={portrait.key}>
-            {portrait.reference.type === "custom" ? (
-              <AuthenticatedMedia
-                className="config-portrait"
-                url={portrait.display_url}
-                mimeType="image/jpeg"
-                alt={portrait.name}
-                previewable={false}
-              />
-            ) : (
-              <ImagePreview className="config-portrait" src={portrait.display_url} alt={portrait.name} />
-            )}
+            <ImagePreview className="config-portrait" src={portrait.thumbnail_url} alt={portrait.name} />
             <Button
               type="button"
               className="portrait-card-remove"
@@ -363,7 +358,7 @@ function ConfigSidebar({
                 <div className="uploaded-video-preview" key={source.id}>
                   <div className="uploaded-video-player">
                     <AuthenticatedMedia
-                      url={source.url || `/api/assets/${source.id}/content`}
+                      url={source.url || `/api/assets/${source.id}/access`}
                       originalUrl={source.originalUrl}
                       mimeType={source.mimeType}
                       alt={source.name}
@@ -601,7 +596,7 @@ function ProductPickerModal({
               >
                 <span className="product">
                   <ProductImage
-                    url={product.images[0]?.url || ""}
+                    url={product.images[0]?.thumbnailUrl || ""}
                     originalUrl={product.images[0]?.originalUrl}
                     mimeType={product.images[0]?.mimeType || "image/png"}
                     alt={product.name}
@@ -1072,7 +1067,7 @@ export function RemixProject() {
         },
         demand: description,
         rawMaterialFiles: sources.map((source) => {
-          const videoUrl = `/api/assets/${source.id}/content`;
+          const videoUrl = `/api/assets/${source.id}/access`;
           return {
             filename: source.name,
             objectKey: source.id,
@@ -1168,8 +1163,8 @@ export function RemixProject() {
         id: file.objectKey,
         name: file.filename,
         mimeType: "video/mp4",
-        url: `/api/assets/${file.objectKey}/content`,
-        originalUrl: `/api/assets/${file.objectKey}/content`,
+        url: `/api/assets/${file.objectKey}/access`,
+        originalUrl: `/api/assets/${file.objectKey}/access`,
         source: "library",
       }));
       const productImages: LibraryAsset[] = request.product.productImages.flatMap((image) => {
@@ -1183,8 +1178,9 @@ export function RemixProject() {
             size: 0,
             kind: "product" as const,
             description: image.aiDescription,
-            url: `/api/assets/${image.metaId}/content`,
-            originalUrl: `/api/assets/${image.metaId}/content`,
+            thumbnailUrl: `/api/assets/${image.metaId}/access`,
+            url: `/api/assets/${image.metaId}/access`,
+            originalUrl: `/api/assets/${image.metaId}/access`,
             createdAt: detail.rootJob.createdAt,
           },
         ];
@@ -1205,19 +1201,18 @@ export function RemixProject() {
       for (const portrait of request.portraitAssets ?? []) {
         const portraitFile = portrait.fileInfo[0];
         if (!portraitFile) continue;
+        const portraitId =
+          portrait.reference?.type === "general" ? portrait.reference.portraitId : Number(portrait.id) || 0;
+        const generalMedia = portrait.reference?.type === "custom" ? undefined : systemPortraitMedia(portraitId);
         restoredPortraits.push({
-          key:
-            portrait.reference?.type === "custom"
-              ? `custom:${portrait.reference.assetId}`
-              : `general:${portrait.reference?.portraitId ?? (Number(portrait.id) || 0)}`,
+          key: portrait.reference?.type === "custom" ? `custom:${portrait.reference.assetId}` : `general:${portraitId}`,
           reference: portrait.reference ?? { type: "general", portraitId: Number(portrait.id) || 0 },
           name: portrait.assetName,
           profession: portrait.occupation || "",
           source_url: portraitFile.fileUrl,
-          display_url:
-            portrait.reference?.type === "custom"
-              ? portraitFile.fileUrl
-              : portraitDisplayUrl(portrait.reference?.portraitId ?? (Number(portrait.id) || 0)),
+          thumbnail_url: generalMedia?.thumbnailUrl ?? portraitFile.fileUrl,
+          display_url: generalMedia?.url ?? portraitFile.fileUrl,
+          original_url: generalMedia?.originalUrl ?? portraitFile.fileUrl,
           ...(portrait.reference?.type === "custom" ? {} : { index: Number(portrait.id) || 0 }),
           description: portrait.description ?? undefined,
           gender: portrait.gender ?? undefined,
@@ -1236,8 +1231,9 @@ export function RemixProject() {
               size: 0,
               durationSec: voice.durationSec,
               kind: "voice",
-              url: `/api/assets/${voice.objectKey}/content`,
-              originalUrl: `/api/assets/${voice.objectKey}/content`,
+              thumbnailUrl: `/api/assets/${voice.objectKey}/access`,
+              url: `/api/assets/${voice.objectKey}/access`,
+              originalUrl: `/api/assets/${voice.objectKey}/access`,
               createdAt: detail.rootJob.createdAt,
             }
           : null,
@@ -1653,7 +1649,7 @@ export function RemixProject() {
                   >
                     <span className="source-mini">
                       <AuthenticatedMedia
-                        url={`/api/assets/${selectedShotAssets[source.id] ?? source.id}/content`}
+                        url={`/api/assets/${selectedShotAssets[source.id] ?? source.id}/access`}
                         mimeType="video/mp4"
                         alt={`${source.name}${selectedShotAssets[source.id] && selectedShotAssets[source.id] !== source.id ? "生成版本" : "原片"}`}
                         controls={false}
@@ -2001,7 +1997,7 @@ export function RemixProject() {
                         >
                           {isReady ? (
                             <AuthenticatedMedia
-                              url={`/api/assets/${selectedShotAssets[source.id]}/content`}
+                              url={`/api/assets/${selectedShotAssets[source.id]}/access`}
                               mimeType="video/mp4"
                               alt={`${source.name}生成版本`}
                               controls={false}

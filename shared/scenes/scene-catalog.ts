@@ -1,3 +1,5 @@
+import { systemSceneMedia } from "../media/system-media";
+
 export interface SceneCatalogEntry {
   id: number;
   name: string;
@@ -8,11 +10,14 @@ export interface SceneCatalogEntry {
   style: string;
   lighting: string;
   applicableCategories: readonly string[];
+  localPath: string;
+  thumbnailUrl: string;
   imageUrl: string;
+  originalUrl: string;
   sourceUrl: string;
 }
 
-export const sceneCatalog: readonly SceneCatalogEntry[] = [
+const sourceSceneCatalog = [
   {
     id: 1,
     name: "纯灰背景",
@@ -671,4 +676,15 @@ export const sceneCatalog: readonly SceneCatalogEntry[] = [
     sourceUrl:
       "https://omni-tos.fifay.cn/prod/GT/material/10000002/10000002/2026-07-23/94ae23e3a954ea677b6fb89fe071dfad.jpeg",
   },
-];
+] as const;
+
+export const sceneCatalog: readonly SceneCatalogEntry[] = sourceSceneCatalog.map((scene) => {
+  const media = systemSceneMedia(scene.id);
+  return {
+    ...scene,
+    localPath: scene.imageUrl,
+    thumbnailUrl: media.thumbnailUrl,
+    imageUrl: media.url,
+    originalUrl: media.originalUrl,
+  };
+});

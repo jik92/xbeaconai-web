@@ -6,8 +6,8 @@ import { probeMedia } from "../../server/media/ffmpeg";
 import { VolcSpeechError, volcSpeech } from "../../server/providers/volc-speech";
 import { ossutils } from "../../server/storage/ossutils";
 import type { JobRecord, JobResult, StageProvenance } from "../../server/types";
-import { isVoicePresetId } from "../../shared/voice/preset-voices";
 import { isVoicePresetStyle, voicePresetStyleInstruction } from "../../shared/voice/preset-styles";
+import { isVoicePresetId } from "../../shared/voice/preset-voices";
 import type { JobHandlerContext, WorkerJobHandler } from "./types";
 
 const languageMap: Record<string, number> = { 普通话: 0, 粤语: 0, English: 1, 多语言: 0 };
@@ -161,7 +161,7 @@ async function executeSynthesis(job: JobRecord, context: JobHandlerContext) {
           id: artifactId,
           name,
           mimeType: "audio/mpeg",
-          url: `/api/artifacts/${artifactId}`,
+          url: `/api/artifacts/${artifactId}/access`,
           executionMode: "real",
           lineage: [stage],
         },
@@ -351,7 +351,7 @@ export const voiceCloneJob: WorkerJobHandler = {
               id: artifactId,
               name,
               mimeType: audioType.mimeType,
-              url: `/api/artifacts/${artifactId}`,
+              url: `/api/artifacts/${artifactId}/access`,
               executionMode: "real",
               lineage: provenance,
             },

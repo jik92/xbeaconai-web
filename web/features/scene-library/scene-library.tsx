@@ -93,7 +93,7 @@ export function SceneLibrary() {
               <div className="relative overflow-hidden bg-surface-muted">
                 <img
                   className="block h-auto w-full object-contain transition duration-300 group-hover:scale-[1.02]"
-                  src={scene.imageUrl}
+                  src={scene.thumbnailUrl}
                   alt={scene.name}
                   loading="lazy"
                 />
@@ -153,7 +153,7 @@ export function SceneLibrary() {
             <footer className="flex h-13 flex-none items-center justify-end border-t border-line px-4">
               <a
                 className="inline-flex h-8 items-center justify-center gap-2 rounded-md bg-primary px-3 type-label text-on-primary shadow-sm transition-colors hover:bg-primary/90 [&_svg]:size-4"
-                href={selected.imageUrl}
+                href={selected.originalUrl}
                 download={`${selected.name}.jpg`}
               >
                 <Download />

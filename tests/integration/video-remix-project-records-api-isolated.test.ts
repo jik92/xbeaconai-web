@@ -94,8 +94,8 @@ function projectRequest(
         {
           filename: "hat.jpg",
           objectKey: requestProductAssetId,
-          fileUrl: `/api/assets/${requestProductAssetId}/content`,
-          coverUrl: `/api/assets/${requestProductAssetId}/content`,
+          fileUrl: `/api/assets/${requestProductAssetId}/access`,
+          coverUrl: `/api/assets/${requestProductAssetId}/access`,
           fileType: "IMAGE",
           metaId: requestProductAssetId,
         },
@@ -108,8 +108,8 @@ function projectRequest(
       {
         filename: "source.mp4",
         objectKey: requestSourceId,
-        fileUrl: `/api/assets/${requestSourceId}/content`,
-        coverUrl: `/api/assets/${requestSourceId}/content`,
+        fileUrl: `/api/assets/${requestSourceId}/access`,
+        coverUrl: `/api/assets/${requestSourceId}/access`,
         fileType: "VIDEO",
       },
     ],
@@ -117,8 +117,8 @@ function projectRequest(
       ? {
           filename: "voice.mp3",
           objectKey: input.voiceAssetId,
-          fileUrl: `/api/assets/${input.voiceAssetId}/content`,
-          coverUrl: `/api/assets/${input.voiceAssetId}/content`,
+          fileUrl: `/api/assets/${input.voiceAssetId}/access`,
+          coverUrl: `/api/assets/${input.voiceAssetId}/access`,
           fileType: "AUDIO",
         }
       : null,
@@ -228,7 +228,7 @@ beforeAll(async () => {
             id: generatedAssetId,
             name: "generated.mp4",
             mimeType: "video/mp4",
-            url: `/api/assets/${generatedAssetId}/content`,
+            url: `/api/assets/${generatedAssetId}/access`,
             executionMode: "real",
             lineage: [],
           },

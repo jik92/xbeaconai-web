@@ -102,7 +102,7 @@ export const videoCutJob: WorkerJobHandler = {
             folderId: folder.id,
             createdAt: new Date().toISOString(),
           });
-          artifactUrl = `/api/assets/${assetId}/content`;
+          artifactUrl = `/api/assets/${assetId}/access`;
         } else {
           const artifactName = `${job.id}-${fileName}`;
           await Bun.write(resolve(env.dataDir, "results", artifactName), file);
@@ -115,7 +115,7 @@ export const videoCutJob: WorkerJobHandler = {
             mimeType: "video/mp4",
             createdAt: new Date().toISOString(),
           });
-          artifactUrl = `/api/artifacts/${assetId}`;
+          artifactUrl = `/api/artifacts/${assetId}/access`;
         }
         artifacts.push({
           id: assetId,

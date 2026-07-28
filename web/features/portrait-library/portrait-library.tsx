@@ -206,11 +206,10 @@ export function PortraitLibrary() {
                   >
                     <div className="portrait-image">
                       <MediaPreview
-                        url={item.display_url}
+                        url={item.thumbnail_url}
                         mimeType="image/jpeg"
                         alt={item.name}
                         imageLoading="lazy"
-                        authenticated={item.type === "custom"}
                         previewable={false}
                       />
                       <span>{item.type === "general" ? `NO. ${String(item.index).padStart(4, "0")}` : "自建"}</span>
@@ -247,9 +246,9 @@ export function PortraitLibrary() {
             <div className="detail-photo">
               <MediaPreview
                 url={selected.display_url}
+                originalUrl={selected.original_url}
                 mimeType="image/jpeg"
                 alt={selected.name}
-                authenticated={selected.type === "custom"}
               />
               <span>
                 {selected.status === "active" ? <Check /> : <LoaderCircle className="animate-spin" />}

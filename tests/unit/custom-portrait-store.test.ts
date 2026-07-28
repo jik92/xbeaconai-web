@@ -101,7 +101,7 @@ describe("custom portrait persistence", () => {
       name: "中国 22岁 男 牙医",
       gender: "男",
       arkAssetUri: "asset://asset-custom-1",
-      imageUrl: `/api/assets/${assetId}/content`,
+      imageUrl: `/api/assets/${assetId}/access`,
     });
 
     portraits.close();

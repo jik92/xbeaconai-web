@@ -146,16 +146,15 @@ export function PortraitPickerDialog({
                   {portrait.type === "custom" ? (
                     <MediaPreview
                       className="aspect-[3/4] w-full object-cover"
-                      url={portrait.display_url}
+                      url={portrait.thumbnail_url}
                       mimeType="image/jpeg"
                       alt={portrait.name}
-                      authenticated
                       previewable={false}
                     />
                   ) : (
                     <ImagePreview
                       className="aspect-[3/4] w-full object-cover"
-                      src={portrait.display_url}
+                      src={portrait.thumbnail_url}
                       alt={portrait.name}
                     />
                   )}
@@ -193,17 +192,16 @@ export function PortraitPickerDialog({
                   <MediaPreview
                     className="h-11 w-9 rounded-md border border-surface object-cover"
                     key={portrait.key}
-                    url={portrait.display_url}
+                    url={portrait.thumbnail_url}
                     mimeType="image/jpeg"
                     alt=""
-                    authenticated
                     previewable={false}
                   />
                 ) : (
                   <ImagePreview
                     className="h-11 w-9 rounded-md border border-surface object-cover"
                     key={portrait.key}
-                    src={portrait.display_url}
+                    src={portrait.thumbnail_url}
                     alt=""
                   />
                 ),

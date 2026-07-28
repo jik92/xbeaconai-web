@@ -34,7 +34,7 @@
 - Images: `thumbnailUrl` uses `style/thumbnail`, `url` uses `style/preview`, and `originalUrl` has no processing query.
 - Audio/video: all three fields equal the original URL.
 
-- [ ] **Step 1: Write the failing URL contract tests**
+- [x] **Step 1: Write the failing URL contract tests**
 
 ```ts
 expect(publicMediaUrls({
@@ -49,10 +49,10 @@ expect(publicMediaUrls({
 });
 ```
 
-- [ ] **Step 2: Run `bun test tests/unit/public-media-url.test.ts` and verify the missing `thumbnailUrl` failure**
-- [ ] **Step 3: Add `thumbnailUrl` without duplicating object-key encoding**
-- [ ] **Step 4: Add `thumbnailUrl` to API schemas and `LibraryAsset`**
-- [ ] **Step 5: Run `bun test tests/unit/public-media-url.test.ts tests/integration/asset-public-media-api-isolated.test.ts`**
+- [x] **Step 2: Run `bun test tests/unit/public-media-url.test.ts` and verify the missing `thumbnailUrl` failure**
+- [x] **Step 3: Add `thumbnailUrl` without duplicating object-key encoding**
+- [x] **Step 4: Add `thumbnailUrl` to API schemas and `LibraryAsset`**
+- [x] **Step 5: Run `bun test tests/unit/public-media-url.test.ts tests/integration/asset-public-media-api-isolated.test.ts`**
 
 ### Task 2: System Portrait and Scene CDN Catalog
 
@@ -72,7 +72,7 @@ expect(publicMediaUrls({
 - `Portrait` gains `thumbnail_url` and `original_url`; upstream `source_url` remains for provider requests but is never rendered.
 - `SceneCatalogEntry` gains `thumbnailUrl` and `originalUrl`; `sourceUrl` remains provider-only.
 
-- [ ] **Step 1: Write failing literal URL tests for portrait 3 and scene 9**
+- [x] **Step 1: Write failing literal URL tests for portrait 3 and scene 9**
 
 ```ts
 expect(systemPortraitMedia(3)).toEqual({
@@ -83,11 +83,11 @@ expect(systemPortraitMedia(3)).toEqual({
 });
 ```
 
-- [ ] **Step 2: Run the three targeted tests and verify they fail on API/local scene URLs**
-- [ ] **Step 3: Implement the shared system-media URL builder**
-- [ ] **Step 4: Map portrait and scene browser fields to CDN variants**
-- [ ] **Step 5: Use thumbnails in grids, previews in detail panels, and originals for full-screen/download**
-- [ ] **Step 6: Run the three targeted tests and confirm all catalog records resolve to the CDN**
+- [x] **Step 2: Run the three targeted tests and verify they fail on API/local scene URLs**
+- [x] **Step 3: Implement the shared system-media URL builder**
+- [x] **Step 4: Map portrait and scene browser fields to CDN variants**
+- [x] **Step 5: Use thumbnails in grids, previews in detail panels, and originals for full-screen/download**
+- [x] **Step 6: Run the three targeted tests and confirm all catalog records resolve to the CDN**
 
 ### Task 3: Idempotent System Media Synchronization
 
@@ -103,7 +103,7 @@ expect(systemPortraitMedia(3)).toEqual({
 - Check mode reports all missing keys and exits non-zero.
 - Apply mode uploads only missing objects, verifies every key, and never overwrites existing objects.
 
-- [ ] **Step 1: Write a failing test with one existing and two missing manifest entries**
+- [x] **Step 1: Write a failing test with one existing and two missing manifest entries**
 
 ```ts
 expect(await syncSystemMedia({
@@ -115,11 +115,11 @@ expect(await syncSystemMedia({
 })).toEqual({ checked: 3, uploaded: 2, missing: [] });
 ```
 
-- [ ] **Step 2: Verify the test fails because the synchronization module does not exist**
-- [ ] **Step 3: Implement bounded-concurrency check/apply behavior and MIME validation**
-- [ ] **Step 4: Add `media:system:sync` and `media:system:check` scripts**
-- [ ] **Step 5: Make `deploy.sh` apply the idempotent synchronization before the production build**
-- [ ] **Step 6: Run `bun test tests/unit/system-media-sync.test.ts`**
+- [x] **Step 2: Verify the test fails because the synchronization module does not exist**
+- [x] **Step 3: Implement bounded-concurrency check/apply behavior and MIME validation**
+- [x] **Step 4: Add `media:system:sync` and `media:system:check` scripts**
+- [x] **Step 5: Make `deploy.sh` apply the idempotent synchronization before the production build**
+- [x] **Step 6: Run `bun test tests/unit/system-media-sync.test.ts`**
 
 ### Task 4: Remove Browser Blob and Data Media
 
@@ -136,12 +136,12 @@ expect(await syncSystemMedia({
 - Voice preview API returns `{ url: string, mimeType: "audio/mpeg" }`.
 - Voice preview storage key is `ephemeral/voice-previews/{userId}/{sha256}.mp3`.
 
-- [ ] **Step 1: Keep the current Blob policy test red and add a failing voice preview test that rejects `audioBase64`**
-- [ ] **Step 2: Run both tests and record the Object URL and Data URL failures**
-- [ ] **Step 3: Remove `loadLocalVideoDuration`; validate uploaded assets using server-probed duration**
-- [ ] **Step 4: Hash the owner/settings/text, upload synthesis bytes with `putLibraryBytes`, and return `publicMediaUrls(...).originalUrl`**
-- [ ] **Step 5: Play `result.url` directly and reject non-CDN responses**
-- [ ] **Step 6: Run both targeted tests and the voice API contract test**
+- [x] **Step 1: Keep the current Blob policy test red and add a failing voice preview test that rejects `audioBase64`**
+- [x] **Step 2: Run both tests and record the Object URL and Data URL failures**
+- [x] **Step 3: Remove `loadLocalVideoDuration`; validate uploaded assets using server-probed duration**
+- [x] **Step 4: Hash the owner/settings/text, upload synthesis bytes with `putLibraryBytes`, and return `publicMediaUrls(...).originalUrl`**
+- [x] **Step 5: Play `result.url` directly and reject non-CDN responses**
+- [x] **Step 6: Run both targeted tests and the voice API contract test**
 
 ### Task 5: Admin Provider Audit Media Through CDN
 
@@ -158,12 +158,12 @@ expect(await syncSystemMedia({
 - Local media artifacts reuse `persistArtifactMedia` under their owning user before returning URLs.
 - Non-media audit artifacts remain attachment-only and are not passed to `MediaPreview`.
 
-- [ ] **Step 1: Write an integration test that expects an audit image URL on `files.xbeaconai.com`**
-- [ ] **Step 2: Verify the test fails on the current `/api/admin/provider-audits/.../assets/...` binary URL**
-- [ ] **Step 3: Add an admin-only CDN access route using the artifact owner and shared persistence helper**
-- [ ] **Step 4: Return CDN variants from audit detail and pass `originalUrl` into `MediaPreview`**
-- [ ] **Step 5: Remove the browser binary preview contract**
-- [ ] **Step 6: Run the three targeted audit tests**
+- [x] **Step 1: Write an integration test that expects an audit image URL on `files.xbeaconai.com`**
+- [x] **Step 2: Verify the test fails on the current `/api/admin/provider-audits/.../assets/...` binary URL**
+- [x] **Step 3: Add an admin-only CDN access route using the artifact owner and shared persistence helper**
+- [x] **Step 4: Return CDN variants from audit detail and pass `originalUrl` into `MediaPreview`**
+- [x] **Step 5: Remove the browser binary preview contract**
+- [x] **Step 6: Run the three targeted audit tests**
 
 ### Task 6: Enforce Browser Media CDN Sources
 
@@ -177,10 +177,10 @@ expect(await syncSystemMedia({
 - `directMediaSource` accepts only exact `files.xbeaconai.com` media URLs.
 - The policy scanner rejects `blob:`, `URL.createObjectURL`, media Data URLs, browser-visible third-party media hosts, and native media sources using `/api/.../content`.
 
-- [ ] **Step 1: Add the policy scanner and verify it fails on remaining portrait/API/third-party/Data URL sources**
-- [ ] **Step 2: Remove `isPublicPortraitMediaUrl` and API media direct-source exceptions**
-- [ ] **Step 3: Convert each reported browser caller to CDN metadata or a static UI CDN path**
-- [ ] **Step 4: Re-run the policy tests until no browser media exceptions remain**
+- [x] **Step 1: Add the policy scanner and verify it fails on remaining portrait/API/third-party/Data URL sources**
+- [x] **Step 2: Remove `isPublicPortraitMediaUrl` and API media direct-source exceptions**
+- [x] **Step 3: Convert each reported browser caller to CDN metadata or a static UI CDN path**
+- [x] **Step 4: Re-run the policy tests until no browser media exceptions remain**
 
 ### Task 7: Thumbnail Style and Production CDN Verification
 
@@ -194,12 +194,13 @@ expect(await syncSystemMedia({
 - `buildMediaCdnCheckUrls` returns original, thumbnail, preview, and video URLs.
 - The live check proves thumbnail WebP/max-edge 320, preview WebP/max-edge 1280, and video Range 206.
 
-- [ ] **Step 1: Write failing URL and dimension-policy tests for `style/thumbnail`**
-- [ ] **Step 2: Verify the current checker lacks thumbnail validation**
-- [ ] **Step 3: Add thumbnail style provisioning/checking using the supported TOS image-style control plane**
-- [ ] **Step 4: Add thumbnail and preview probes to `check-media-cdn.ts`**
-- [ ] **Step 5: Invoke the media CDN check during production deployment after system media synchronization**
-- [ ] **Step 6: Run `bun test tests/unit/media-cdn-config.test.ts`**
+- [x] **Step 1: Write failing URL and dimension-policy tests for `style/thumbnail`**
+- [x] **Step 2: Verify the current checker lacks thumbnail validation**
+- [x] **Step 3: Provision `thumbnail` with `putBucketImageStyle` and the verified
+  `image/resize,w_320,h_320,m_lfit/quality,q_75/format,webp` process**
+- [x] **Step 4: Add thumbnail and preview probes to `check-media-cdn.ts`**
+- [x] **Step 5: Invoke the media CDN check during production deployment after system media synchronization**
+- [x] **Step 6: Run `bun test tests/unit/media-cdn-config.test.ts`**
 
 ### Task 8: Regenerate Contracts and Complete the Audit
 
@@ -219,4 +220,3 @@ expect(await syncSystemMedia({
 - [ ] **Step 5: Run `bun run build`**
 - [ ] **Step 6: Run `git diff --check` and inspect every changed file**
 - [ ] **Step 7: On production credentials, apply system-media synchronization and run the live CDN checker without running E2E**
-

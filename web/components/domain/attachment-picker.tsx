@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { fetchAssetFolders, fetchLibraryAssets, uploadMediaFile } from "@/api/api-client";
+import { deleteLibraryAsset, fetchAssetFolders, fetchLibraryAssets, uploadMediaFile } from "@/api/api-client";
 import { Button } from "@/components/ui/button";
 import type { AssetFolder, LibraryAsset } from "@/entities/types";
 import { AuthenticatedMedia } from "./authenticated-media";
@@ -26,6 +26,7 @@ export interface AttachmentSelection {
   mimeType: string;
   size?: number;
   durationSec?: number;
+  thumbnailUrl?: string;
   url?: string;
   originalUrl?: string;
   source: "library" | "upload";
@@ -55,22 +56,6 @@ function constraintReason(
   if (rule.maxDurationSec && asset.durationSec !== undefined && asset.durationSec > rule.maxDurationSec)
     return `视频时长不能超过 ${rule.maxDurationSec} 秒（当前 ${asset.durationSec.toFixed(2)} 秒）`;
   return undefined;
-}
-
-function loadLocalVideoDuration(file: File): Promise<number | undefined> {
-  if (!file.type.startsWith("video/")) return Promise.resolve(undefined);
-  return new Promise((resolveDuration) => {
-    const url = URL.createObjectURL(file);
-    const video = document.createElement("video");
-    const done = (duration?: number) => {
-      URL.revokeObjectURL(url);
-      resolveDuration(Number.isFinite(duration) && (duration ?? 0) > 0 ? duration : undefined);
-    };
-    video.preload = "metadata";
-    video.onloadedmetadata = () => done(video.duration);
-    video.onerror = () => done();
-    video.src = url;
-  });
 }
 
 function accepts(asset: LibraryAsset, accept: string) {
@@ -221,6 +206,7 @@ export function AttachmentPicker({
         mimeType: asset.mimeType,
         size: asset.size,
         durationSec: asset.durationSec,
+        thumbnailUrl: asset.thumbnailUrl,
         url: asset.url,
         originalUrl: asset.originalUrl,
         source: "library" as const,
@@ -232,21 +218,13 @@ export function AttachmentPicker({
   const upload = async (files: File[], retainedUploads: AttachmentSelection[] = []) => {
     if (!files.length) return;
     const candidateFiles = multiple ? files : files.slice(0, 1);
-    const inspected = await Promise.all(
-      candidateFiles.map(async (file) => ({
-        file,
-        durationSec: await loadLocalVideoDuration(file),
-      })),
-    );
-    const rejected = inspected.find(({ file, durationSec }) =>
-      constraintReason({ mimeType: file.type, size: file.size, durationSec }, constraints),
+    const rejected = candidateFiles.find((file) =>
+      constraintReason({ mimeType: file.type, size: file.size, durationSec: undefined }, constraints),
     );
     if (rejected) {
       setError(
-        constraintReason(
-          { mimeType: rejected.file.type, size: rejected.file.size, durationSec: rejected.durationSec },
-          constraints,
-        ) ?? "文件不符合引用要求",
+        constraintReason({ mimeType: rejected.type, size: rejected.size, durationSec: undefined }, constraints) ??
+          "文件不符合引用要求",
       );
       return;
     }
@@ -260,7 +238,7 @@ export function AttachmentPicker({
     setError("");
     try {
       const results = await Promise.all(
-        pendingFiles.map(async (file, index) => {
+        pendingFiles.map(async (file, index): Promise<{ file: File; asset?: LibraryAsset; error?: string }> => {
           try {
             const asset = await uploadMediaFile(file, folderId || undefined, (progress) => {
               fileProgress[index] = progress;
@@ -270,6 +248,11 @@ export function AttachmentPicker({
               );
               setUploadProgress(Math.round(weightedProgress / totalBytes));
             });
+            const rejection = constraintReason(asset, constraints);
+            if (rejection) {
+              await deleteLibraryAsset(asset.id);
+              return { file, error: rejection };
+            }
             return { file, asset };
           } catch (reason) {
             return { file, error: reason instanceof Error ? reason.message : "附件上传失败" };
@@ -285,6 +268,7 @@ export function AttachmentPicker({
                 mimeType: result.asset.mimeType,
                 size: result.asset.size,
                 durationSec: result.asset.durationSec,
+                thumbnailUrl: result.asset.thumbnailUrl,
                 url: result.asset.url,
                 originalUrl: result.asset.originalUrl,
                 source: "upload" as const,
@@ -476,7 +460,7 @@ export function AttachmentPicker({
                             >
                               <i className="size-12 overflow-hidden rounded-md bg-surface-muted [&_img]:size-full [&_img]:object-cover [&_video]:size-full [&_video]:object-cover">
                                 <AuthenticatedMedia
-                                  url={asset.url}
+                                  url={asset.mimeType.startsWith("image/") ? asset.thumbnailUrl : asset.url}
                                   mimeType={asset.mimeType}
                                   alt={asset.name}
                                   controls={false}

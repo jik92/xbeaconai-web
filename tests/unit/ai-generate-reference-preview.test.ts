@@ -8,8 +8,8 @@ describe("AI creation reference preview", () => {
     const source = await Bun.file(previewPath).text();
 
     expect(source).toContain("AuthenticatedMedia");
-    expect(source).toContain("reference.url ?? `/api/assets/${reference.id}/content`");
+    expect(source).toContain("reference.url ?? `/api/assets/$" + "{reference.id}/access`");
     expect(source).toContain("onRemove?.(reference.id)");
-    expect(source).toContain("aria-label={`移除 ${reference.name}`}");
+    expect(source).toContain("aria-label={`移除 $" + "{reference.name}`}");
   });
 });

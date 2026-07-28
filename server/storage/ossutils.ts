@@ -346,6 +346,18 @@ export class OssUtils {
     });
   }
 
+  async putLibraryBytesIfAbsent(input: { bytes: Uint8Array; key: string; mimeType: string }) {
+    await this.ready().putObject({
+      bucket: env.tos.bucket,
+      key: input.key.replace(/^\/+/, ""),
+      body: Buffer.from(input.bytes),
+      acl: TosClient.ACLType.ACLPrivate,
+      contentType: input.mimeType,
+      serverSideEncryption: "AES256",
+      forbidOverwrite: true,
+    });
+  }
+
   async downloadLibraryFile(key: string, filePath: string) {
     await this.ready().downloadFile({
       bucket: env.tos.bucket,
@@ -418,6 +430,17 @@ export class OssUtils {
 
   headObject(key: string) {
     return this.ready().headObject({ bucket: env.tos.bucket, key });
+  }
+  async objectExists(key: string) {
+    try {
+      await this.headObject(key);
+      return true;
+    } catch (error) {
+      const statusCode =
+        error && typeof error === "object" && "statusCode" in error ? Number(error.statusCode) : undefined;
+      if (statusCode === 404) return false;
+      throw error;
+    }
   }
   async markCleanupReady(key: string) {
     await this.ready().putObjectTagging({

@@ -84,6 +84,7 @@ export interface LibraryAsset {
   kind: AssetKind;
   description?: string;
   folderId?: string;
+  thumbnailUrl: string;
   url: string;
   originalUrl: string;
   createdAt: string;

@@ -42,7 +42,7 @@ export function resolvePortraitReference(input: {
     name: asset.displayName,
     description: asset.description,
     gender: portrait.gender ?? parsePortraitTags(asset.displayName)?.gender,
-    imageUrl: `/api/assets/${asset.id}/content`,
+    imageUrl: `/api/assets/${asset.id}/access`,
     arkAssetUri: `asset://${portrait.arkAssetId}`,
     mimeType: asset.mimeType,
   };

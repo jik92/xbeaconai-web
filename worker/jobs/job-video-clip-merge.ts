@@ -107,7 +107,7 @@ export const videoClipMergeJob: WorkerJobHandler = {
               id: assetId,
               name: fileName,
               mimeType: "video/mp4",
-              url: `/api/assets/${assetId}/content`,
+              url: `/api/assets/${assetId}/access`,
               executionMode: "local",
               lineage: [stage],
             },

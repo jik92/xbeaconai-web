@@ -8,9 +8,11 @@ describe("public media URLs", () => {
         baseUrl: "https://files.xbeaconai.com/",
         storageKey: "users/u 1/商品 主图.jpg",
         mimeType: "image/jpeg",
-        fallbackUrl: "/api/assets/123/content",
+        fallbackUrl: "/api/assets/123/access",
       }),
     ).toEqual({
+      thumbnailUrl:
+        "https://files.xbeaconai.com/users/u%201/%E5%95%86%E5%93%81%20%E4%B8%BB%E5%9B%BE.jpg?x-tos-process=style/thumbnail",
       url: "https://files.xbeaconai.com/users/u%201/%E5%95%86%E5%93%81%20%E4%B8%BB%E5%9B%BE.jpg?x-tos-process=style/preview",
       originalUrl: "https://files.xbeaconai.com/users/u%201/%E5%95%86%E5%93%81%20%E4%B8%BB%E5%9B%BE.jpg",
     });
@@ -23,9 +25,10 @@ describe("public media URLs", () => {
           baseUrl: "https://files.xbeaconai.com",
           storageKey: "users/demo/media.mp4",
           mimeType,
-          fallbackUrl: "/api/assets/123/content",
+          fallbackUrl: "/api/assets/123/access",
         }),
       ).toEqual({
+        thumbnailUrl: "https://files.xbeaconai.com/users/demo/media.mp4",
         url: "https://files.xbeaconai.com/users/demo/media.mp4",
         originalUrl: "https://files.xbeaconai.com/users/demo/media.mp4",
       });
@@ -37,11 +40,12 @@ describe("public media URLs", () => {
       publicMediaUrls({
         storageKey: "users/demo/image.png",
         mimeType: "image/png",
-        fallbackUrl: "/api/assets/123/content",
+        fallbackUrl: "/api/assets/123/access",
       }),
     ).toEqual({
-      url: "/api/assets/123/content",
-      originalUrl: "/api/assets/123/content",
+      thumbnailUrl: "/api/assets/123/access",
+      url: "/api/assets/123/access",
+      originalUrl: "/api/assets/123/access",
     });
   });
 });

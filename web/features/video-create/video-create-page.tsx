@@ -352,7 +352,14 @@ function ProductImages({
   onRemove: (id: string) => void;
 }) {
   const visible = ids.map(
-    (id) => assets.find((asset) => asset.id === id) ?? { id, name: "商品图片", mimeType: "image/png" },
+    (id) =>
+      assets.find((asset) => asset.id === id) ?? {
+        id,
+        name: "商品图片",
+        mimeType: "image/png",
+        thumbnailUrl: undefined,
+        url: undefined,
+      },
   );
   return (
     <div className="flex flex-wrap gap-2">
@@ -361,7 +368,11 @@ function ProductImages({
           className="relative h-20 w-16 overflow-hidden rounded-lg border border-line bg-surface-muted [&_img]:h-full [&_img]:w-full [&_img]:object-cover"
           key={asset.id}
         >
-          <AuthenticatedMedia url={`/api/assets/${asset.id}/content`} mimeType={asset.mimeType} alt={asset.name} />
+          <AuthenticatedMedia
+            url={asset.thumbnailUrl ?? asset.url ?? `/api/assets/${asset.id}/access`}
+            mimeType={asset.mimeType}
+            alt={asset.name}
+          />
           <Button
             className="absolute right-1 top-1 size-6 rounded-full bg-ink/75 p-0 text-on-primary hover:bg-ink"
             size="icon-sm"
@@ -734,16 +745,7 @@ export function VideoCreatePage() {
               </div>
               {selectedPortrait ? (
                 <div className="flex items-center gap-2 rounded-lg border border-line p-2 [&_img]:h-12 [&_img]:w-9 [&_img]:rounded-md [&_img]:object-cover">
-                  {selectedPortrait.type === "custom" ? (
-                    <AuthenticatedMedia
-                      url={selectedPortrait.display_url}
-                      mimeType="image/jpeg"
-                      alt={selectedPortrait.name}
-                      previewable={false}
-                    />
-                  ) : (
-                    <ImagePreview src={selectedPortrait.display_url} alt={selectedPortrait.name} />
-                  )}
+                  <ImagePreview src={selectedPortrait.thumbnail_url} alt={selectedPortrait.name} />
                   <span className="min-w-0 flex-1 truncate type-helper text-muted">{selectedPortrait.name}</span>
                   <Button
                     variant="ghost"
@@ -1293,7 +1295,7 @@ export function VideoCreatePage() {
               {project.project.finalArtifactId && (
                 <div className="m-3 grid grid-cols-[112px_1fr] gap-4 rounded-xl border border-line bg-canvas-soft p-3 [&_img]:h-36 [&_img]:w-28 [&_img]:rounded-lg [&_img]:object-cover [&_video]:h-36 [&_video]:w-28 [&_video]:rounded-lg [&_video]:object-cover">
                   <AuthenticatedMedia
-                    url={`/api/artifacts/${project.project.finalArtifactId}`}
+                    url={`/api/artifacts/${project.project.finalArtifactId}/access`}
                     mimeType="video/mp4"
                     alt="最终成片"
                   />
@@ -1303,7 +1305,7 @@ export function VideoCreatePage() {
                       size="sm"
                       onClick={() =>
                         void downloadAuthenticated(
-                          `/api/artifacts/${project.project.finalArtifactId}`,
+                          `/api/artifacts/${project.project.finalArtifactId}/access`,
                           `${project.project.title}.mp4`,
                         )
                       }
@@ -1410,8 +1412,8 @@ export function VideoCreatePage() {
                             <AuthenticatedMedia
                               url={
                                 shot.status === "replaced"
-                                  ? `/api/assets/${shot.videoAssetId}/content`
-                                  : `/api/artifacts/${shot.videoAssetId}`
+                                  ? `/api/assets/${shot.videoAssetId}/access`
+                                  : `/api/artifacts/${shot.videoAssetId}/access`
                               }
                               mimeType="video/mp4"
                               alt={`分镜 ${shot.ordinal}`}
@@ -1526,7 +1528,7 @@ export function VideoCreatePage() {
                         {shot.audioArtifactId ? (
                           <div className="w-full space-y-2 [&_audio]:h-9 [&_audio]:w-full">
                             <AuthenticatedMedia
-                              url={`/api/artifacts/${shot.audioArtifactId}`}
+                              url={`/api/artifacts/${shot.audioArtifactId}/access`}
                               mimeType="audio/wav"
                               alt={`分镜 ${shot.ordinal} 配音`}
                             />

@@ -150,7 +150,7 @@ function ProductLibrary() {
             >
               <div className="library-asset-preview product">
                 <ProductImage
-                  url={product.images[0]?.url || ""}
+                  url={product.images[0]?.thumbnailUrl || ""}
                   originalUrl={product.images[0]?.originalUrl}
                   mimeType={product.images[0]?.mimeType || "image/png"}
                   alt={product.name}
@@ -375,12 +375,14 @@ function MediaAssetTable({
           const previewSize = fitMediaPreviewSize(asset.width ?? metadata?.width, asset.height ?? metadata?.height);
           const media = (
             <AuthenticatedMedia
-              url={asset.url}
+              url={asset.mimeType.startsWith("image/") ? asset.thumbnailUrl : asset.url}
               originalUrl={asset.originalUrl}
               mimeType={asset.mimeType}
               alt={asset.name}
               controls={asset.mimeType.startsWith("audio/")}
-              onMetadata={(next) => onMetadataRef.current(asset.id, next)}
+              onMetadata={
+                asset.mimeType.startsWith("image/") ? undefined : (next) => onMetadataRef.current(asset.id, next)
+              }
             />
           );
           return (

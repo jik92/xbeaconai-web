@@ -837,15 +837,6 @@ export const zShareParseResult = z.object({
 
 export const zShareImportJob = zJob.and(z.record(z.string(), z.unknown()));
 
-export const zGetPortraitContentPath = z.object({
-    portraitId: z.int().gte(1)
-});
-
-/**
- * Inline portrait image
- */
-export const zGetPortraitContentResponse = z.string();
-
 /**
  * Service health
  */
@@ -1332,6 +1323,7 @@ export const zCompleteDirectUploadResponse = z.union([
             kind: zAssetKind,
             description: z.string().optional(),
             folderId: z.uuid().optional(),
+            thumbnailUrl: z.string(),
             url: z.string(),
             originalUrl: z.string(),
             createdAt: z.string()
@@ -1350,6 +1342,7 @@ export const zCompleteDirectUploadResponse = z.union([
             kind: zAssetKind,
             description: z.string().optional(),
             folderId: z.uuid().optional(),
+            thumbnailUrl: z.string(),
             url: z.string(),
             originalUrl: z.string(),
             createdAt: z.string()
@@ -1381,6 +1374,7 @@ export const zUploadMediaResponse = z.object({
         kind: zAssetKind,
         description: z.string().optional(),
         folderId: z.uuid().optional(),
+        thumbnailUrl: z.string(),
         url: z.string(),
         originalUrl: z.string(),
         createdAt: z.string()
@@ -1398,7 +1392,9 @@ export const zListCustomPortraitsResponse = z.object({
         name: z.string(),
         description: z.string().optional(),
         gender: z.enum(['男', '女']).optional(),
+        thumbnailUrl: z.url(),
         imageUrl: z.string(),
+        originalUrl: z.url(),
         status: z.enum([
             'queued',
             'processing',
@@ -1426,7 +1422,9 @@ export const zRegisterCustomPortraitResponse = z.union([
             name: z.string(),
             description: z.string().optional(),
             gender: z.enum(['男', '女']).optional(),
+            thumbnailUrl: z.url(),
             imageUrl: z.string(),
+            originalUrl: z.url(),
             status: z.enum([
                 'queued',
                 'processing',
@@ -1447,7 +1445,9 @@ export const zRegisterCustomPortraitResponse = z.union([
             name: z.string(),
             description: z.string().optional(),
             gender: z.enum(['男', '女']).optional(),
+            thumbnailUrl: z.url(),
             imageUrl: z.string(),
+            originalUrl: z.url(),
             status: z.enum([
                 'queued',
                 'processing',
@@ -1483,6 +1483,7 @@ export const zListAssetsResponse = z.object({
         kind: zAssetKind,
         description: z.string().optional(),
         folderId: z.uuid().optional(),
+        thumbnailUrl: z.string(),
         url: z.string(),
         originalUrl: z.string(),
         createdAt: z.string()
@@ -1559,6 +1560,7 @@ export const zSaveAssetMetadataResponse = z.object({
         kind: zAssetKind,
         description: z.string().optional(),
         folderId: z.uuid().optional(),
+        thumbnailUrl: z.string(),
         url: z.string(),
         originalUrl: z.string(),
         createdAt: z.string()
@@ -1573,18 +1575,10 @@ export const zGetAssetAccessPath = z.object({
  * Short-lived direct TOS read authorization
  */
 export const zGetAssetAccessResponse = z.object({
+    thumbnailUrl: z.url(),
     url: z.url(),
     originalUrl: z.url()
 });
-
-export const zGetAssetContentPath = z.object({
-    assetId: z.uuid()
-});
-
-/**
- * Asset binary
- */
-export const zGetAssetContentResponse = z.string();
 
 /**
  * Masked provider credentials
@@ -1829,22 +1823,14 @@ export const zGetAdminProviderAuditResponse = z.object({
         id: z.string(),
         name: z.string(),
         mimeType: z.string(),
+        thumbnailUrl: z.string(),
         url: z.string(),
+        originalUrl: z.string(),
         available: z.boolean()
     })),
     createdAt: z.string(),
     updatedAt: z.string()
 });
-
-export const zPreviewAdminProviderAuditAssetPath = z.object({
-    auditId: z.uuid(),
-    assetId: z.string()
-});
-
-/**
- * Generated material binary
- */
-export const zPreviewAdminProviderAuditAssetResponse = z.string();
 
 export const zListAdminUsersQuery = z.object({
     page: z.int().gte(1).optional().default(1),
@@ -2902,7 +2888,7 @@ export const zPreviewVideoCreateVoiceBody = z.object({
  * Voice preview
  */
 export const zPreviewVideoCreateVoiceResponse = z.object({
-    audioBase64: z.string(),
+    url: z.url(),
     mimeType: z.enum(['audio/mpeg'])
 });
 
@@ -2984,15 +2970,6 @@ export const zWatchJobEventsPath = z.object({
  */
 export const zWatchJobEventsResponse = z.string();
 
-export const zDownloadArtifactPath = z.object({
-    artifactId: z.uuid()
-});
-
-/**
- * Artifact binary
- */
-export const zDownloadArtifactResponse = z.string();
-
 export const zGetArtifactAccessPath = z.object({
     artifactId: z.uuid()
 });
@@ -3001,6 +2978,7 @@ export const zGetArtifactAccessPath = z.object({
  * Owned artifact CDN media URLs
  */
 export const zGetArtifactAccessResponse = z.object({
+    thumbnailUrl: z.url(),
     url: z.url(),
     originalUrl: z.url()
 });

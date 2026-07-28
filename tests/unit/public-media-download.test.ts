@@ -5,7 +5,7 @@ import {
   downloadAuthenticated,
   downloadDirectUrl,
   isPublicMediaUrl,
-  mediaAccessUrlForContent,
+  mediaAccessUrl,
 } from "../../web/api/api-client";
 
 const window = new Window();
@@ -42,10 +42,10 @@ describe("public media download", () => {
       "https://files.xbeaconai.com/users/demo/image.jpg",
     );
     expect(directMediaSource("/api/assets/00000000-0000-4000-8000-000000000000/content")).toBeUndefined();
-    expect(mediaAccessUrlForContent("/api/assets/00000000-0000-4000-8000-000000000000/content")).toBe(
+    expect(mediaAccessUrl("/api/assets/00000000-0000-4000-8000-000000000000/access")).toBe(
       "/api/assets/00000000-0000-4000-8000-000000000000/access",
     );
-    expect(mediaAccessUrlForContent("/api/artifacts/00000000-0000-4000-8000-000000000001")).toBe(
+    expect(mediaAccessUrl("/api/artifacts/00000000-0000-4000-8000-000000000001/access")).toBe(
       "/api/artifacts/00000000-0000-4000-8000-000000000001/access",
     );
   });
@@ -96,7 +96,7 @@ describe("public media download", () => {
       clicked = { href: this.href, download: this.download };
     };
 
-    await downloadAuthenticated("/api/assets/00000000-0000-4000-8000-000000000001/content", "image.jpg");
+    await downloadAuthenticated("/api/assets/00000000-0000-4000-8000-000000000001/access", "image.jpg");
 
     expect(clicked).toEqual({
       href: "https://files.xbeaconai.com/users/demo/image.jpg",

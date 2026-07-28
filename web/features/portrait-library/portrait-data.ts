@@ -1,7 +1,7 @@
+import { systemPortraitMedia } from "../../../shared/media/system-media";
 import type { PortraitReference } from "../../../shared/portraits/portrait-reference";
 import { parsePortraitTags } from "../../../shared/portraits/portrait-tags";
 import { fetchCustomPortraits } from "../../api/api-client";
-import { apiUrl } from "../../api/base-url";
 
 export interface PortraitRecord {
   index: number;
@@ -23,11 +23,11 @@ interface PortraitBase {
   age: number;
   gender: string;
   profession: string;
+  thumbnail_url: string;
   display_url: string;
+  original_url: string;
   status: "active" | "queued" | "processing" | "failed";
 }
-
-export const portraitDisplayUrl = (portraitId: number) => apiUrl(`/api/portraits/${portraitId}/content`);
 
 export interface GeneralPortrait extends PortraitBase, PortraitRecord {
   type: "general";
@@ -47,6 +47,7 @@ export type Portrait = GeneralPortrait | CustomPortrait;
 
 export function parsePortrait(record: PortraitRecord): GeneralPortrait {
   const tags = parsePortraitTags(record.name);
+  const media = systemPortraitMedia(record.index);
   return {
     ...record,
     key: `general:${record.index}`,
@@ -55,7 +56,9 @@ export function parsePortrait(record: PortraitRecord): GeneralPortrait {
     age: tags?.age ?? 0,
     gender: tags?.gender ?? "未知",
     profession: tags?.profession ?? record.name,
-    display_url: portraitDisplayUrl(record.index),
+    thumbnail_url: media.thumbnailUrl,
+    display_url: media.url,
+    original_url: media.originalUrl,
     status: "active",
   };
 }
@@ -72,8 +75,10 @@ export function parseCustomPortrait(portrait: CustomPortraitResponse): CustomPor
     jobId: portrait.jobId,
     name: portrait.name,
     description: portrait.description ?? "自建虚拟人像",
-    source_url: portrait.imageUrl,
+    source_url: portrait.originalUrl,
+    thumbnail_url: portrait.thumbnailUrl,
     display_url: portrait.imageUrl,
+    original_url: portrait.originalUrl,
     age: tags?.age ?? 0,
     gender: portrait.gender ?? tags?.gender ?? "未知",
     profession: tags?.profession ?? "自建人像",

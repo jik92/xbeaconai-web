@@ -2548,55 +2548,6 @@
     "parameters": {}
   },
   "paths": {
-    "/api/portraits/{portraitId}/content": {
-      "get": {
-        "operationId": "getPortraitContent",
-        "parameters": [
-          {
-            "schema": {
-              "type": "integer",
-              "minimum": 1
-            },
-            "required": true,
-            "name": "portraitId",
-            "in": "path"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Inline portrait image",
-            "content": {
-              "application/octet-stream": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Portrait not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "Portrait source unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/health": {
       "get": {
         "operationId": "getHealth",
@@ -4939,6 +4890,9 @@
                           "type": "string",
                           "format": "uuid"
                         },
+                        "thumbnailUrl": {
+                          "type": "string"
+                        },
                         "url": {
                           "type": "string"
                         },
@@ -4956,6 +4910,7 @@
                         "mimeType",
                         "size",
                         "kind",
+                        "thumbnailUrl",
                         "url",
                         "originalUrl",
                         "createdAt"
@@ -5014,6 +4969,9 @@
                           "type": "string",
                           "format": "uuid"
                         },
+                        "thumbnailUrl": {
+                          "type": "string"
+                        },
                         "url": {
                           "type": "string"
                         },
@@ -5031,6 +4989,7 @@
                         "mimeType",
                         "size",
                         "kind",
+                        "thumbnailUrl",
                         "url",
                         "originalUrl",
                         "createdAt"
@@ -5170,6 +5129,9 @@
                           "type": "string",
                           "format": "uuid"
                         },
+                        "thumbnailUrl": {
+                          "type": "string"
+                        },
                         "url": {
                           "type": "string"
                         },
@@ -5187,6 +5149,7 @@
                         "mimeType",
                         "size",
                         "kind",
+                        "thumbnailUrl",
                         "url",
                         "originalUrl",
                         "createdAt"
@@ -5286,8 +5249,16 @@
                               "女"
                             ]
                           },
+                          "thumbnailUrl": {
+                            "type": "string",
+                            "format": "uri"
+                          },
                           "imageUrl": {
                             "type": "string"
+                          },
+                          "originalUrl": {
+                            "type": "string",
+                            "format": "uri"
                           },
                           "status": {
                             "type": "string",
@@ -5315,7 +5286,9 @@
                           "type",
                           "assetId",
                           "name",
+                          "thumbnailUrl",
                           "imageUrl",
+                          "originalUrl",
                           "status",
                           "createdAt",
                           "updatedAt"
@@ -5399,8 +5372,16 @@
                             "女"
                           ]
                         },
+                        "thumbnailUrl": {
+                          "type": "string",
+                          "format": "uri"
+                        },
                         "imageUrl": {
                           "type": "string"
+                        },
+                        "originalUrl": {
+                          "type": "string",
+                          "format": "uri"
                         },
                         "status": {
                           "type": "string",
@@ -5428,7 +5409,9 @@
                         "type",
                         "assetId",
                         "name",
+                        "thumbnailUrl",
                         "imageUrl",
+                        "originalUrl",
                         "status",
                         "createdAt",
                         "updatedAt"
@@ -5479,8 +5462,16 @@
                             "女"
                           ]
                         },
+                        "thumbnailUrl": {
+                          "type": "string",
+                          "format": "uri"
+                        },
                         "imageUrl": {
                           "type": "string"
+                        },
+                        "originalUrl": {
+                          "type": "string",
+                          "format": "uri"
                         },
                         "status": {
                           "type": "string",
@@ -5508,7 +5499,9 @@
                         "type",
                         "assetId",
                         "name",
+                        "thumbnailUrl",
                         "imageUrl",
+                        "originalUrl",
                         "status",
                         "createdAt",
                         "updatedAt"
@@ -5635,6 +5628,9 @@
                             "type": "string",
                             "format": "uuid"
                           },
+                          "thumbnailUrl": {
+                            "type": "string"
+                          },
                           "url": {
                             "type": "string"
                           },
@@ -5652,6 +5648,7 @@
                           "mimeType",
                           "size",
                           "kind",
+                          "thumbnailUrl",
                           "url",
                           "originalUrl",
                           "createdAt"
@@ -5933,6 +5930,9 @@
                           "type": "string",
                           "format": "uuid"
                         },
+                        "thumbnailUrl": {
+                          "type": "string"
+                        },
                         "url": {
                           "type": "string"
                         },
@@ -5950,6 +5950,7 @@
                         "mimeType",
                         "size",
                         "kind",
+                        "thumbnailUrl",
                         "url",
                         "originalUrl",
                         "createdAt"
@@ -5998,6 +5999,10 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "thumbnailUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    },
                     "url": {
                       "type": "string",
                       "format": "uri"
@@ -6008,48 +6013,10 @@
                     }
                   },
                   "required": [
+                    "thumbnailUrl",
                     "url",
                     "originalUrl"
                   ]
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/assets/{assetId}/content": {
-      "get": {
-        "operationId": "getAssetContent",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "assetId",
-            "in": "path"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Asset binary",
-            "content": {
-              "application/octet-stream": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
                 }
               }
             }
@@ -7148,7 +7115,13 @@
                           "mimeType": {
                             "type": "string"
                           },
+                          "thumbnailUrl": {
+                            "type": "string"
+                          },
                           "url": {
+                            "type": "string"
+                          },
+                          "originalUrl": {
                             "type": "string"
                           },
                           "available": {
@@ -7159,7 +7132,9 @@
                           "id",
                           "name",
                           "mimeType",
+                          "thumbnailUrl",
                           "url",
+                          "originalUrl",
                           "available"
                         ]
                       }
@@ -7207,63 +7182,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/admin/provider-audits/{auditId}/assets/{assetId}": {
-      "get": {
-        "operationId": "previewAdminProviderAuditAsset",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "auditId",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string"
-            },
-            "required": true,
-            "name": "assetId",
-            "in": "path"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Generated material binary",
-            "content": {
-              "application/octet-stream": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Admin required",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Material not found",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string"
                 }
               }
             }
@@ -11930,8 +11848,9 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "audioBase64": {
-                      "type": "string"
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
                     },
                     "mimeType": {
                       "type": "string",
@@ -11941,7 +11860,7 @@
                     }
                   },
                   "required": [
-                    "audioBase64",
+                    "url",
                     "mimeType"
                   ]
                 }
@@ -12368,45 +12287,6 @@
         }
       }
     },
-    "/api/artifacts/{artifactId}": {
-      "get": {
-        "operationId": "downloadArtifact",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "artifactId",
-            "in": "path"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Artifact binary",
-            "content": {
-              "application/octet-stream": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/artifacts/{artifactId}/access": {
       "get": {
         "operationId": "getArtifactAccess",
@@ -12429,6 +12309,10 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "thumbnailUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    },
                     "url": {
                       "type": "string",
                       "format": "uri"
@@ -12439,6 +12323,7 @@
                     }
                   },
                   "required": [
+                    "thumbnailUrl",
                     "url",
                     "originalUrl"
                   ]

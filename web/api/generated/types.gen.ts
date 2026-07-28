@@ -485,37 +485,6 @@ export type ShareImportJob = Job & {
     [key: string]: unknown;
 };
 
-export type GetPortraitContentData = {
-    body?: never;
-    path: {
-        portraitId: number;
-    };
-    query?: never;
-    url: '/api/portraits/{portraitId}/content';
-};
-
-export type GetPortraitContentErrors = {
-    /**
-     * Portrait not found
-     */
-    404: ApiErrorResponse;
-    /**
-     * Portrait source unavailable
-     */
-    502: ApiErrorResponse;
-};
-
-export type GetPortraitContentError = GetPortraitContentErrors[keyof GetPortraitContentErrors];
-
-export type GetPortraitContentResponses = {
-    /**
-     * Inline portrait image
-     */
-    200: Blob | File;
-};
-
-export type GetPortraitContentResponse = GetPortraitContentResponses[keyof GetPortraitContentResponses];
-
 export type GetHealthData = {
     body?: never;
     path?: never;
@@ -1448,6 +1417,7 @@ export type CompleteDirectUploadResponses = {
             kind: AssetKind;
             description?: string;
             folderId?: string;
+            thumbnailUrl: string;
             url: string;
             originalUrl: string;
             createdAt: string;
@@ -1469,6 +1439,7 @@ export type CompleteDirectUploadResponses = {
             kind: AssetKind;
             description?: string;
             folderId?: string;
+            thumbnailUrl: string;
             url: string;
             originalUrl: string;
             createdAt: string;
@@ -1529,6 +1500,7 @@ export type UploadMediaResponses = {
             kind: AssetKind;
             description?: string;
             folderId?: string;
+            thumbnailUrl: string;
             url: string;
             originalUrl: string;
             createdAt: string;
@@ -1557,7 +1529,9 @@ export type ListCustomPortraitsResponses = {
             name: string;
             description?: string;
             gender?: '男' | '女';
+            thumbnailUrl: string;
             imageUrl: string;
+            originalUrl: string;
             status: 'queued' | 'processing' | 'active' | 'failed';
             errorCode?: string;
             errorMessage?: string;
@@ -1612,7 +1586,9 @@ export type RegisterCustomPortraitResponses = {
             name: string;
             description?: string;
             gender?: '男' | '女';
+            thumbnailUrl: string;
             imageUrl: string;
+            originalUrl: string;
             status: 'queued' | 'processing' | 'active' | 'failed';
             errorCode?: string;
             errorMessage?: string;
@@ -1631,7 +1607,9 @@ export type RegisterCustomPortraitResponses = {
             name: string;
             description?: string;
             gender?: '男' | '女';
+            thumbnailUrl: string;
             imageUrl: string;
+            originalUrl: string;
             status: 'queued' | 'processing' | 'active' | 'failed';
             errorCode?: string;
             errorMessage?: string;
@@ -1670,6 +1648,7 @@ export type ListAssetsResponses = {
             kind: AssetKind;
             description?: string;
             folderId?: string;
+            thumbnailUrl: string;
             url: string;
             originalUrl: string;
             createdAt: string;
@@ -1840,6 +1819,7 @@ export type SaveAssetMetadataResponses = {
             kind: AssetKind;
             description?: string;
             folderId?: string;
+            thumbnailUrl: string;
             url: string;
             originalUrl: string;
             createdAt: string;
@@ -1872,39 +1852,13 @@ export type GetAssetAccessResponses = {
      * Short-lived direct TOS read authorization
      */
     200: {
+        thumbnailUrl: string;
         url: string;
         originalUrl: string;
     };
 };
 
 export type GetAssetAccessResponse = GetAssetAccessResponses[keyof GetAssetAccessResponses];
-
-export type GetAssetContentData = {
-    body?: never;
-    path: {
-        assetId: string;
-    };
-    query?: never;
-    url: '/api/assets/{assetId}/content';
-};
-
-export type GetAssetContentErrors = {
-    /**
-     * Not found
-     */
-    404: string;
-};
-
-export type GetAssetContentError = GetAssetContentErrors[keyof GetAssetContentErrors];
-
-export type GetAssetContentResponses = {
-    /**
-     * Asset binary
-     */
-    200: Blob | File;
-};
-
-export type GetAssetContentResponse = GetAssetContentResponses[keyof GetAssetContentResponses];
 
 export type ListAdminCredentialsData = {
     body?: never;
@@ -2357,7 +2311,9 @@ export type GetAdminProviderAuditResponses = {
             id: string;
             name: string;
             mimeType: string;
+            thumbnailUrl: string;
             url: string;
+            originalUrl: string;
             available: boolean;
         }>;
         createdAt: string;
@@ -2366,38 +2322,6 @@ export type GetAdminProviderAuditResponses = {
 };
 
 export type GetAdminProviderAuditResponse = GetAdminProviderAuditResponses[keyof GetAdminProviderAuditResponses];
-
-export type PreviewAdminProviderAuditAssetData = {
-    body?: never;
-    path: {
-        auditId: string;
-        assetId: string;
-    };
-    query?: never;
-    url: '/api/admin/provider-audits/{auditId}/assets/{assetId}';
-};
-
-export type PreviewAdminProviderAuditAssetErrors = {
-    /**
-     * Admin required
-     */
-    403: ApiErrorResponse;
-    /**
-     * Material not found
-     */
-    404: string;
-};
-
-export type PreviewAdminProviderAuditAssetError = PreviewAdminProviderAuditAssetErrors[keyof PreviewAdminProviderAuditAssetErrors];
-
-export type PreviewAdminProviderAuditAssetResponses = {
-    /**
-     * Generated material binary
-     */
-    200: Blob | File;
-};
-
-export type PreviewAdminProviderAuditAssetResponse = PreviewAdminProviderAuditAssetResponses[keyof PreviewAdminProviderAuditAssetResponses];
 
 export type ListAdminUsersData = {
     body?: never;
@@ -4012,7 +3936,7 @@ export type PreviewVideoCreateVoiceResponses = {
      * Voice preview
      */
     200: {
-        audioBase64: string;
+        url: string;
         mimeType: 'audio/mpeg';
     };
 };
@@ -4247,33 +4171,6 @@ export type WatchJobEventsResponses = {
 
 export type WatchJobEventsResponse = WatchJobEventsResponses[keyof WatchJobEventsResponses];
 
-export type DownloadArtifactData = {
-    body?: never;
-    path: {
-        artifactId: string;
-    };
-    query?: never;
-    url: '/api/artifacts/{artifactId}';
-};
-
-export type DownloadArtifactErrors = {
-    /**
-     * Not found
-     */
-    404: string;
-};
-
-export type DownloadArtifactError = DownloadArtifactErrors[keyof DownloadArtifactErrors];
-
-export type DownloadArtifactResponses = {
-    /**
-     * Artifact binary
-     */
-    200: Blob | File;
-};
-
-export type DownloadArtifactResponse = DownloadArtifactResponses[keyof DownloadArtifactResponses];
-
 export type GetArtifactAccessData = {
     body?: never;
     path: {
@@ -4301,6 +4198,7 @@ export type GetArtifactAccessResponses = {
      * Owned artifact CDN media URLs
      */
     200: {
+        thumbnailUrl: string;
         url: string;
         originalUrl: string;
     };

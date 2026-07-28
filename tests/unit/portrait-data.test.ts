@@ -19,7 +19,9 @@ describe("portrait library data", () => {
       age: 32,
       gender: "女",
       profession: "主播",
-      display_url: "http://127.0.0.1:8787/api/portraits/18/content",
+      thumbnail_url: "https://files.xbeaconai.com/system/portraits/18.png?x-tos-process=style/thumbnail",
+      display_url: "https://files.xbeaconai.com/system/portraits/18.png?x-tos-process=style/preview",
+      original_url: "https://files.xbeaconai.com/system/portraits/18.png",
     });
   });
 
@@ -42,7 +44,9 @@ describe("portrait library data", () => {
         name: "小林",
         gender: "女",
         description: "自然亲切的生活方式博主",
-        imageUrl: "/api/assets/portrait/content",
+        thumbnailUrl: "https://files.xbeaconai.com/users/demo/portrait.png?x-tos-process=style/thumbnail",
+        imageUrl: "https://files.xbeaconai.com/users/demo/portrait.png?x-tos-process=style/preview",
+        originalUrl: "https://files.xbeaconai.com/users/demo/portrait.png",
         status: "active",
         createdAt: "2026-07-26T00:00:00.000Z",
         updatedAt: "2026-07-26T00:00:00.000Z",
@@ -52,6 +56,8 @@ describe("portrait library data", () => {
       gender: "女",
       description: "自然亲切的生活方式博主",
       profession: "自建人像",
+      thumbnail_url: "https://files.xbeaconai.com/users/demo/portrait.png?x-tos-process=style/thumbnail",
+      original_url: "https://files.xbeaconai.com/users/demo/portrait.png",
     });
   });
 

@@ -134,6 +134,7 @@ export function AuditDetail({ detail, loading }: { detail?: AdminProviderAuditDe
                 {asset.available && asset.url && asset.mimeType ? (
                   <MediaPreview
                     url={asset.url}
+                    originalUrl={asset.originalUrl}
                     mimeType={asset.mimeType}
                     alt={asset.name}
                     className="max-h-64 w-full rounded-lg bg-surface-dark object-contain"

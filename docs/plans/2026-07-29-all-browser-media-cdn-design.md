@@ -82,4 +82,3 @@ API 媒体对象统一返回 `thumbnailUrl`、`url` 和 `originalUrl`。视频�
   视频 Range 返回 206、缓存键包含图片处理参数。
 - 按 API 契约流程重新生成 OpenAPI 和 SDK，并运行相关测试、`make ci`、`bun run typecheck` 和
   `bun run build`；默认不运行 E2E。
-

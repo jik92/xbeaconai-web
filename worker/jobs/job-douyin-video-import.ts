@@ -1,11 +1,11 @@
 import { cleanupDownloadDir, DouyinDownloadError } from "../../server/imports/douyin-video";
 import {
   emitLog,
+  type ImportStage,
   logFailure,
   sanitizeError,
   stageComplete,
   stageStart,
-  type ImportStage,
 } from "../../server/imports/import-logger";
 import { platformAdapters, ShareContentParser } from "../../server/imports/share-content";
 import { probeMedia } from "../../server/media/ffmpeg";
@@ -230,7 +230,7 @@ export const douyinVideoImportJob: WorkerJobHandler = {
             id: assetId,
             name: `${sanitizedName}.mp4`,
             mimeType: "video/mp4",
-            url: `/api/assets/${assetId}/content`,
+            url: `/api/assets/${assetId}/access`,
             executionMode: "real",
             lineage: plan,
           },

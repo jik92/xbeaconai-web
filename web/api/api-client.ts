@@ -1205,11 +1205,11 @@ export function watchJob(jobId: string, onChange: (job: Job) => void, onError?: 
   return () => controller.abort();
 }
 
-export function mediaAccessUrlForContent(url: string) {
-  const assetMatch = /^\/api\/assets\/([0-9a-f-]{36})\/content$/i.exec(url);
-  if (assetMatch?.[1]) return `/api/assets/${assetMatch[1]}/access`;
-  const artifactMatch = /^\/api\/artifacts\/([0-9a-f-]{36})$/i.exec(url);
-  return artifactMatch?.[1] ? `/api/artifacts/${artifactMatch[1]}/access` : undefined;
+export function mediaAccessUrl(url: string) {
+  const assetMatch = /^\/api\/assets\/([0-9a-f-]{36})\/access$/i.exec(url);
+  if (assetMatch?.[1]) return url;
+  const artifactMatch = /^\/api\/artifacts\/([0-9a-f-]{36})\/access$/i.exec(url);
+  return artifactMatch?.[1] ? url : undefined;
 }
 
 export function isPublicMediaUrl(url: string) {
@@ -1221,28 +1221,14 @@ export function isPublicMediaUrl(url: string) {
   }
 }
 
-function isPublicPortraitMediaUrl(url: string) {
-  try {
-    const parsed = new URL(url);
-    return (
-      parsed.origin === new URL(apiBaseUrl()).origin &&
-      /^\/api\/portraits\/[1-9]\d*\/content$/.test(parsed.pathname) &&
-      !parsed.search &&
-      !parsed.hash
-    );
-  } catch {
-    return false;
-  }
-}
-
 export function directMediaSource(url: string) {
-  return isPublicMediaUrl(url) || isPublicPortraitMediaUrl(url) ? url : undefined;
+  return isPublicMediaUrl(url) ? url : undefined;
 }
 
 export async function resolveMediaCdnUrl(url: string, original = false) {
   const direct = directMediaSource(url);
   if (direct) return direct;
-  const accessUrl = mediaAccessUrlForContent(url);
+  const accessUrl = mediaAccessUrl(url);
   if (!accessUrl) throw new Error("媒体文件未提供 CDN 地址");
   const response = await fetch(apiUrl(accessUrl), { headers: authHeaders() });
   if (!response.ok) throw new Error("媒体文件 CDN 发布失败");
@@ -1280,7 +1266,7 @@ export async function downloadAuthenticated(url: string, name: string) {
     downloadDirectUrl(url, name);
     return;
   }
-  const artifactMatch = /^\/api\/artifacts\/([0-9a-f-]{36})$/i.exec(url);
+  const artifactMatch = /^\/api\/artifacts\/([0-9a-f-]{36})\/access$/i.exec(url);
   try {
     const resolved = await resolveMediaCdnUrl(url, true);
     downloadDirectUrl(resolved, name);

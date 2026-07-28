@@ -1,4 +1,3 @@
-import { Buffer } from "node:buffer";
 import { mkdirSync, readFileSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { dirname, extname, isAbsolute, relative, resolve } from "node:path";
@@ -85,7 +84,6 @@ import { stopAllAdminJobs } from "./jobs/admin-job-control";
 import { BullJobQueue } from "./jobs/bull-job-queue";
 import { InsufficientCreditsError, SqliteJobStore } from "./jobs/sqlite-job-store";
 import { isSeedanceModelId, seedanceModelIds, videoModels } from "./models/video-models";
-import { getPortraitById } from "./portraits/catalog";
 import { type CustomPortraitRecord, CustomPortraitStore } from "./portraits/custom-portrait-store";
 import { resolvePortraitReference } from "./portraits/portrait-resolver";
 import { volcSpeech } from "./providers/volc-speech";
@@ -94,12 +92,12 @@ import { consumeQianchuanOauthState, createQianchuanOauthState } from "./qianchu
 import { qianchuanStore } from "./qianchuan/store";
 import { QianchuanUpstreamError } from "./qianchuan/types";
 import { auditSdkRegistry } from "./sdk-registry";
-import { ossutils } from "./storage/ossutils";
 import { persistArtifactMedia } from "./storage/artifact-public-media";
+import { ossutils } from "./storage/ossutils";
 import { publicMediaUrls } from "./storage/public-media-url";
 import { rollbackUploadedObjects, uploadFilesStrictly } from "./storage/strict-library-upload";
 import type { JobModuleId, JobRecord } from "./types";
-import { attachmentUtf8ContentDisposition, inlineUtf8ContentDisposition } from "./uploads/content-disposition";
+import { attachmentUtf8ContentDisposition } from "./uploads/content-disposition";
 import {
   directUploadExtensions,
   issueDirectUploadTicket,
@@ -142,6 +140,7 @@ import {
   videoCreateMinimumStoryboardCount,
   videoCreateShotNarration,
 } from "./video-create/video-create-store";
+import { voicePreviewStorageKey } from "./video-create/voice-preview";
 import { groupRemixChildren, summarizeRemixProject } from "./video-remix/project-records";
 import { preflightQwenVoiceSample, QwenVoiceSamplePreflightError } from "./voice/qwen-voice-sample-preflight";
 import { validateQwenVoiceCloneValues } from "./voice/validate-qwen-voice-clone";
@@ -413,6 +412,7 @@ const LibraryAssetSchema = z.object({
   kind: AssetKindSchema,
   description: z.string().optional(),
   folderId: z.string().uuid().optional(),
+  thumbnailUrl: z.string(),
   url: z.string(),
   originalUrl: z.string(),
   createdAt: z.string(),
@@ -436,6 +436,7 @@ const DirectUploadInitSchema = z.object({
   expiresAt: z.string(),
 });
 const PublicMediaAccessSchema = z.object({
+  thumbnailUrl: z.string().url(),
   url: z.string().url(),
   originalUrl: z.string().url(),
 });
@@ -468,9 +469,7 @@ const publicApiPaths = new Set([
   "/api/auth/logout",
 ]);
 const isPublicApiPath = (path: string) =>
-  publicApiPaths.has(path) ||
-  /^\/api\/portraits\/\d+\/content$/.test(path) ||
-  /^\/api\/downloads\/(?!tickets$)[^/]+$/.test(path);
+  publicApiPaths.has(path) || /^\/api\/downloads\/(?!tickets$)[^/]+$/.test(path);
 
 function referencedAssetIds(values: Record<string, string>) {
   const ids = new Set<string>();
@@ -563,98 +562,6 @@ app.use("/api/*", async (c, next) => {
   c.set("userId", identity.user.id);
   c.set("sessionId", identity.sessionId);
   await next();
-});
-
-const portraitContentRoute = createRoute({
-  method: "get",
-  path: "/api/portraits/{portraitId}/content",
-  operationId: "getPortraitContent",
-  request: { params: z.object({ portraitId: z.coerce.number().int().min(1) }) },
-  responses: {
-    200: {
-      description: "Inline portrait image",
-      content: { "application/octet-stream": { schema: z.string().openapi({ format: "binary" }) } },
-    },
-    404: { description: "Portrait not found", content: { "application/json": { schema: ErrorSchema } } },
-    502: { description: "Portrait source unavailable", content: { "application/json": { schema: ErrorSchema } } },
-  },
-});
-
-function imageMimeType(bytes: Uint8Array) {
-  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
-  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return "image/png";
-  const signature = new TextDecoder().decode(bytes.subarray(0, 12));
-  if (signature.startsWith("GIF87a") || signature.startsWith("GIF89a")) return "image/gif";
-  if (signature.startsWith("RIFF") && signature.slice(8, 12) === "WEBP") return "image/webp";
-  if (signature.slice(4, 12) === "ftypavif" || signature.slice(4, 12) === "ftypavis") return "image/avif";
-  return undefined;
-}
-
-app.openapi(portraitContentRoute, async (c) => {
-  const requestId = crypto.randomUUID();
-  const portrait = getPortraitById(c.req.valid("param").portraitId);
-  if (!portrait)
-    return c.json(
-      {
-        error: {
-          code: "PORTRAIT_NOT_FOUND",
-          message: "人像不存在",
-          retryable: false,
-          requestId,
-        },
-      },
-      404,
-    );
-  try {
-    const upstream = await fetch(portrait.source_url, { signal: AbortSignal.timeout(15_000) });
-    const declaredMimeType = upstream.headers.get("Content-Type")?.split(";", 1)[0]?.trim().toLowerCase();
-    if (!upstream.ok || !declaredMimeType?.startsWith("image/"))
-      return c.json(
-        {
-          error: {
-            code: "PORTRAIT_SOURCE_INVALID",
-            message: "人像图片源不可用",
-            retryable: upstream.status >= 500,
-            requestId,
-          },
-        },
-        502,
-      );
-    const bytes = new Uint8Array(await upstream.arrayBuffer());
-    const mimeType = imageMimeType(bytes);
-    if (!mimeType)
-      return c.json(
-        {
-          error: {
-            code: "PORTRAIT_SOURCE_INVALID",
-            message: "人像图片源不可用",
-            retryable: false,
-            requestId,
-          },
-        },
-        502,
-      );
-    return new Response(bytes, {
-      status: 200,
-      headers: {
-        "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
-        "Content-Disposition": "inline",
-        "Content-Type": mimeType,
-      },
-    });
-  } catch {
-    return c.json(
-      {
-        error: {
-          code: "PORTRAIT_SOURCE_UNAVAILABLE",
-          message: "人像图片加载失败",
-          retryable: true,
-          requestId,
-        },
-      },
-      502,
-    );
-  }
 });
 
 function providerGuard(moduleId: ModuleId): MiddlewareHandler<AppEnv> {
@@ -1861,7 +1768,7 @@ const libraryAssetResponse = (asset: MediaAsset) => {
     baseUrl: env.publicMedia.baseUrl,
     storageKey: asset.storageKey,
     mimeType: asset.mimeType,
-    fallbackUrl: `/api/assets/${asset.id}/content`,
+    fallbackUrl: `/api/assets/${asset.id}/access`,
   });
   return {
     id: asset.id,
@@ -1879,6 +1786,34 @@ const libraryAssetResponse = (asset: MediaAsset) => {
     createdAt: asset.createdAt,
   };
 };
+
+async function persistOwnedArtifactMedia(userId: string, artifactId: string) {
+  const artifact = accounts.getArtifact(userId, artifactId);
+  return persistArtifactMedia(
+    { userId, artifactId },
+    {
+      getOwnedAsset: () => accounts.getOwnedAsset(userId, artifactId),
+      getArtifact: () =>
+        artifact
+          ? {
+              storageKey: artifact.storage_key,
+              name: artifact.name,
+              mimeType: artifact.mime_type,
+              jobId: artifact.job_id,
+            }
+          : undefined,
+      getDefaultFolder: () => accounts.getAssetFolder(userId, accounts.getDefaultAssetFolderId(userId)),
+      getLocalFile: async (storageKey) => {
+        const path = resolve(env.dataDir, "results", storageKey);
+        const file = Bun.file(path);
+        return { path, size: file.size, exists: await file.exists() };
+      },
+      upload: (input) => ossutils.putLibraryFile(input),
+      createAsset: (record) => accounts.createAsset(record),
+      now: () => new Date().toISOString(),
+    },
+  );
+}
 
 async function removeAssetFiles(assets: MediaAsset[]) {
   const uploadRoot = resolve(env.dataDir, "uploads");
@@ -2260,7 +2195,9 @@ const CustomPortraitSchema = z.object({
   name: z.string(),
   description: z.string().optional(),
   gender: z.enum(["男", "女"]).optional(),
+  thumbnailUrl: z.string().url(),
   imageUrl: z.string(),
+  originalUrl: z.string().url(),
   status: CustomPortraitStatusSchema,
   errorCode: z.string().optional(),
   errorMessage: z.string().optional(),
@@ -2271,6 +2208,12 @@ const CustomPortraitSchema = z.object({
 function customPortraitResponse(record: CustomPortraitRecord) {
   const asset = accounts.getOwnedAsset(record.ownerUserId, record.assetId);
   if (!asset || asset.kind !== "portrait") return undefined;
+  const media = publicMediaUrls({
+    baseUrl: env.publicMedia.baseUrl,
+    storageKey: asset.storageKey,
+    mimeType: asset.mimeType,
+    fallbackUrl: `/api/assets/${asset.id}/access`,
+  });
   return {
     type: "custom" as const,
     assetId: record.assetId,
@@ -2278,7 +2221,9 @@ function customPortraitResponse(record: CustomPortraitRecord) {
     name: asset.displayName,
     description: asset.description,
     gender: record.gender,
-    imageUrl: `/api/assets/${asset.id}/content`,
+    thumbnailUrl: media.thumbnailUrl,
+    imageUrl: media.url,
+    originalUrl: media.originalUrl,
     status: record.status,
     errorCode: record.errorCode,
     errorMessage: record.errorMessage,
@@ -2841,20 +2786,6 @@ app.openapi(assetMetadataRoute, (c) => {
   return c.json({ asset: libraryAssetResponse(asset) }, 200);
 });
 
-const assetContentRoute = createRoute({
-  method: "get",
-  path: "/api/assets/{assetId}/content",
-  operationId: "getAssetContent",
-  request: { params: z.object({ assetId: z.string().uuid() }) },
-  responses: {
-    200: {
-      description: "Asset binary",
-      content: { "application/octet-stream": { schema: z.string().openapi({ format: "binary" }) } },
-    },
-    404: { description: "Not found", content: { "text/plain": { schema: z.string() } } },
-  },
-});
-
 const assetAccessRoute = createRoute({
   method: "get",
   path: "/api/assets/{assetId}/access",
@@ -2879,24 +2810,12 @@ app.openapi(assetAccessRoute, async (c) => {
         baseUrl: env.publicMedia.baseUrl,
         storageKey: asset.storageKey,
         mimeType: asset.mimeType,
-        fallbackUrl: `/api/assets/${asset.id}/content`,
+        fallbackUrl: `/api/assets/${asset.id}/access`,
       }),
       200,
     );
   } catch {
     return c.text("Not found", 404);
-  }
-});
-
-app.openapi(assetContentRoute, async (c) => {
-  const asset = accounts.getOwnedAsset(c.get("userId"), c.req.valid("param").assetId);
-  if (!asset) return new Response("Not found", { status: 404 });
-  if (!ossutils.configured) return new Response("Not found", { status: 404 });
-  try {
-    await ossutils.headObject(asset.storageKey);
-    return Response.redirect(ossutils.createSignedReadUrl(asset.storageKey), 302);
-  } catch {
-    return new Response("Not found", { status: 404 });
   }
 });
 
@@ -2968,7 +2887,9 @@ const AdminProviderAuditAssetSchema = z.object({
   id: z.string(),
   name: z.string(),
   mimeType: z.string(),
+  thumbnailUrl: z.string(),
   url: z.string(),
+  originalUrl: z.string(),
   available: z.boolean(),
 });
 const AdminProviderAuditDetailSchema = AdminProviderAuditSchema.extend({
@@ -3459,31 +3380,29 @@ app.openapi(listAdminProviderAuditsRoute, (c) => {
 function adminProviderAuditAsset(auditId: string, assetId: string) {
   const audit = providerAudits.get(auditId);
   if (!audit?.assetIds.includes(assetId)) return undefined;
+  const asset = accounts.getOwnedAsset(audit.ownerUserId, assetId);
+  if (asset)
+    return {
+      id: assetId,
+      ownerUserId: audit.ownerUserId,
+      name: asset.displayName || asset.originalName,
+      mimeType: asset.mimeType,
+      asset,
+    };
   const artifact = accounts.getArtifact(audit.ownerUserId, assetId);
   if (artifact)
     return {
       id: assetId,
+      ownerUserId: audit.ownerUserId,
       name: artifact.name,
       mimeType: artifact.mime_type,
-      storageKey: artifact.storage_key,
-      storageArea: "results" as const,
-    };
-  const asset = accounts.getOwnedAsset(audit.ownerUserId, assetId);
-  if (!asset)
-    return {
-      id: assetId,
-      name: assetId,
-      mimeType: "",
-      storageKey: undefined,
-      storageArea: undefined,
-      available: false as const,
+      artifact,
     };
   return {
     id: assetId,
-    name: asset.displayName || asset.originalName,
-    mimeType: asset.mimeType,
-    storageKey: asset.storageKey,
-    storageArea: "uploads" as const,
+    ownerUserId: audit.ownerUserId,
+    name: assetId,
+    mimeType: "",
   };
 }
 
@@ -3501,67 +3420,40 @@ const getAdminProviderAuditRoute = createRoute({
     404: { description: "Audit not found", content: { "application/json": { schema: ErrorSchema } } },
   },
 });
-app.openapi(getAdminProviderAuditRoute, (c) => {
+app.openapi(getAdminProviderAuditRoute, async (c) => {
   const requestId = crypto.randomUUID();
   if (!adminUser(c.get("userId")))
     return c.json({ error: { code: "ADMIN_REQUIRED", message: "仅管理员可访问", retryable: false, requestId } }, 403);
   const audit = providerAudits.get(c.req.valid("param").auditId);
   if (!audit)
     return c.json({ error: { code: "AUDIT_NOT_FOUND", message: "审计记录不存在", retryable: false, requestId } }, 404);
-  const assets = audit.assetIds.map((assetId) => {
-    const asset = adminProviderAuditAsset(audit.id, assetId);
-    return {
-      id: assetId,
-      name: asset?.name ?? assetId,
-      mimeType: asset?.mimeType ?? "",
-      url: asset?.storageKey ? `/api/admin/provider-audits/${audit.id}/assets/${assetId}` : "",
-      available: Boolean(asset?.storageKey),
-    };
-  });
+  const assets = await Promise.all(
+    audit.assetIds.map(async (assetId) => {
+      const source = adminProviderAuditAsset(audit.id, assetId);
+      const isMedia = /^(image|video|audio)\//.test(source?.mimeType ?? "");
+      const asset =
+        source?.asset ??
+        (source?.artifact && isMedia && ossutils.configured
+          ? await persistOwnedArtifactMedia(source.ownerUserId, assetId)
+          : undefined);
+      const urls = asset
+        ? publicMediaUrls({
+            baseUrl: env.publicMedia.baseUrl,
+            storageKey: asset.storageKey,
+            mimeType: asset.mimeType,
+            fallbackUrl: "",
+          })
+        : { thumbnailUrl: "", url: "", originalUrl: "" };
+      return {
+        id: assetId,
+        name: source?.name ?? assetId,
+        mimeType: source?.mimeType ?? "",
+        ...urls,
+        available: Boolean(asset && isMedia),
+      };
+    }),
+  );
   return c.json({ ...audit, assets }, 200);
-});
-
-const previewAdminProviderAuditAssetRoute = createRoute({
-  method: "get",
-  path: "/api/admin/provider-audits/{auditId}/assets/{assetId}",
-  operationId: "previewAdminProviderAuditAsset",
-  request: { params: z.object({ auditId: z.string().uuid(), assetId: z.string() }) },
-  responses: {
-    200: {
-      description: "Generated material binary",
-      content: { "application/octet-stream": { schema: z.string().openapi({ format: "binary" }) } },
-    },
-    403: { description: "Admin required", content: { "application/json": { schema: ErrorSchema } } },
-    404: { description: "Material not found", content: { "text/plain": { schema: z.string() } } },
-  },
-});
-app.openapi(previewAdminProviderAuditAssetRoute, async (c) => {
-  if (!adminUser(c.get("userId")))
-    return c.json(
-      {
-        error: { code: "ADMIN_REQUIRED", message: "仅管理员可访问", retryable: false, requestId: crypto.randomUUID() },
-      },
-      403,
-    );
-  const asset = adminProviderAuditAsset(c.req.valid("param").auditId, c.req.valid("param").assetId);
-  if (!asset?.storageKey || !asset.storageArea) return new Response("Not found", { status: 404 });
-  const file = Bun.file(resolve(env.dataDir, asset.storageArea, asset.storageKey));
-  if (!(await file.exists())) {
-    if (asset.storageArea !== "uploads" || !ossutils.configured) return new Response("Not found", { status: 404 });
-    try {
-      await ossutils.headObject(asset.storageKey);
-      return Response.redirect(ossutils.createSignedReadUrl(asset.storageKey), 302);
-    } catch {
-      return new Response("Not found", { status: 404 });
-    }
-  }
-  return new Response(file, {
-    headers: {
-      "Content-Type": asset.mimeType || "application/octet-stream",
-      "Content-Disposition": inlineUtf8ContentDisposition(asset.name),
-      "Cache-Control": "private, max-age=300",
-    },
-  });
 });
 
 const listAdminUsersRoute = createRoute({
@@ -6003,7 +5895,7 @@ function getVideoCreateShotGenerationDraft(projectId: string, shotId: string, ow
       mimeType: product.mimeType,
       role: videoCreateReferenceRole("image"),
       category: "商品",
-      url: `/api/assets/${product.id}/content`,
+      url: `/api/assets/${product.id}/access`,
     });
   }
   const voiceId = aggregate.project.input.voiceAssetId;
@@ -6018,7 +5910,7 @@ function getVideoCreateShotGenerationDraft(projectId: string, shotId: string, ow
       name: voice.displayName,
       mimeType: voice.mimeType,
       role: videoCreateReferenceRole("audio"),
-      url: `/api/assets/${voice.id}/content`,
+      url: `/api/assets/${voice.id}/access`,
     });
   }
   const duration = Math.min(15, Math.max(4, Math.round(shot.durationSec)));
@@ -6754,7 +6646,7 @@ const previewVideoCreateVoiceRoute = createRoute({
       description: "Voice preview",
       content: {
         "application/json": {
-          schema: z.object({ audioBase64: z.string(), mimeType: z.literal("audio/mpeg") }),
+          schema: z.object({ url: z.string().url(), mimeType: z.literal("audio/mpeg") }),
         },
       },
     },
@@ -6776,18 +6668,42 @@ app.openapi(previewVideoCreateVoiceRoute, async (c) => {
       422,
     );
   const { voiceSettings, text } = c.req.valid("json");
-  const result = await volcSpeech.synthesize({
-    requestId: crypto.randomUUID(),
-    resourceId: env.volcSpeech.presetTtsResourceId,
-    speaker: voiceSettings.presetVoiceId,
+  const storageKey = voicePreviewStorageKey({
+    ownerUserId: c.get("userId"),
+    voiceSettings,
     text,
-    model: "seed-tts-2.0-expressive",
-    speechRate: videoCreateVoiceSpeechRate(voiceSettings.speed),
-    explicitLanguage: "zh",
-    contextText: videoCreateVoiceContextText(voiceSettings.style),
-    toneFidelity: false,
   });
-  return c.json({ audioBase64: Buffer.from(result.bytes).toString("base64"), mimeType: "audio/mpeg" as const }, 200);
+  if (!(await ossutils.objectExists(storageKey))) {
+    const result = await volcSpeech.synthesize({
+      requestId: crypto.randomUUID(),
+      resourceId: env.volcSpeech.presetTtsResourceId,
+      speaker: voiceSettings.presetVoiceId,
+      text,
+      model: "seed-tts-2.0-expressive",
+      speechRate: videoCreateVoiceSpeechRate(voiceSettings.speed),
+      explicitLanguage: "zh",
+      contextText: videoCreateVoiceContextText(voiceSettings.style),
+      toneFidelity: false,
+    });
+    try {
+      await ossutils.putLibraryBytesIfAbsent({
+        bytes: result.bytes,
+        key: storageKey,
+        mimeType: "audio/mpeg",
+      });
+    } catch (error) {
+      const statusCode =
+        error && typeof error === "object" && "statusCode" in error ? Number(error.statusCode) : undefined;
+      if (statusCode !== 409 && statusCode !== 412) throw error;
+    }
+  }
+  const url = publicMediaUrls({
+    baseUrl: env.publicMedia.baseUrl,
+    storageKey,
+    mimeType: "audio/mpeg",
+    fallbackUrl: "",
+  }).originalUrl;
+  return c.json({ url, mimeType: "audio/mpeg" as const }, 200);
 });
 
 const batchGenerateVideoCreateAudioRoute = createRoute({
@@ -7439,32 +7355,6 @@ app.openapi(eventsRoute, (c) => {
   });
 });
 
-const artifactRoute = createRoute({
-  method: "get",
-  path: "/api/artifacts/{artifactId}",
-  operationId: "downloadArtifact",
-  request: { params: z.object({ artifactId: z.string().uuid() }) },
-  responses: {
-    200: {
-      description: "Artifact binary",
-      content: { "application/octet-stream": { schema: z.string().openapi({ format: "binary" }) } },
-    },
-    404: { description: "Not found", content: { "text/plain": { schema: z.string() } } },
-  },
-});
-app.openapi(artifactRoute, async (c) => {
-  const artifact = accounts.getArtifact(c.get("userId"), c.req.valid("param").artifactId);
-  if (!artifact) return new Response("Not found", { status: 404 });
-  const file = Bun.file(resolve(env.dataDir, "results", artifact.storage_key));
-  if (!(await file.exists())) return new Response("Not found", { status: 404 });
-  return new Response(file, {
-    headers: {
-      "Content-Type": artifact.mime_type || "application/octet-stream",
-      "Content-Disposition": `inline; filename="${artifact.name.replaceAll('"', "")}"`,
-    },
-  });
-});
-
 const artifactAccessRoute = createRoute({
   method: "get",
   path: "/api/artifacts/{artifactId}/access",
@@ -7495,38 +7385,14 @@ app.openapi(artifactAccessRoute, async (c) => {
     );
   const userId = c.get("userId");
   const artifactId = c.req.valid("param").artifactId;
-  const artifact = accounts.getArtifact(userId, artifactId);
-  const asset = await persistArtifactMedia(
-    { userId, artifactId },
-    {
-      getOwnedAsset: () => accounts.getOwnedAsset(userId, artifactId),
-      getArtifact: () =>
-        artifact
-          ? {
-              storageKey: artifact.storage_key,
-              name: artifact.name,
-              mimeType: artifact.mime_type,
-              jobId: artifact.job_id,
-            }
-          : undefined,
-      getDefaultFolder: () => accounts.getAssetFolder(userId, accounts.getDefaultAssetFolderId(userId)),
-      getLocalFile: async (storageKey) => {
-        const path = resolve(env.dataDir, "results", storageKey);
-        const file = Bun.file(path);
-        return { path, size: file.size, exists: await file.exists() };
-      },
-      upload: (input) => ossutils.putLibraryFile(input),
-      createAsset: (record) => accounts.createAsset(record),
-      now: () => new Date().toISOString(),
-    },
-  );
+  const asset = await persistOwnedArtifactMedia(userId, artifactId);
   if (!asset) return c.text("Not found", 404);
   return c.json(
     publicMediaUrls({
       baseUrl: env.publicMedia.baseUrl,
       storageKey: asset.storageKey,
       mimeType: asset.mimeType,
-      fallbackUrl: `/api/artifacts/${artifactId}`,
+      fallbackUrl: `/api/artifacts/${artifactId}/access`,
     }),
     200,
   );
