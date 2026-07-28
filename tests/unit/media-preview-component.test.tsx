@@ -98,7 +98,7 @@ describe("MediaPreview", () => {
     );
   });
 
-  test("renders the public portrait content route without treating it as an unpublished asset", () => {
+  test("renders a system portrait directly from the media CDN", () => {
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
@@ -106,7 +106,7 @@ describe("MediaPreview", () => {
     act(() => {
       root.render(
         <MediaPreview
-          url="http://127.0.0.1:8787/api/portraits/18/content"
+          url="https://files.xbeaconai.com/system/portraits/18.png?x-tos-process=style/thumbnail"
           mimeType="image/jpeg"
           alt="通用人像"
           previewable={false}
@@ -114,7 +114,9 @@ describe("MediaPreview", () => {
       );
     });
 
-    expect(container.querySelector("img")?.getAttribute("src")).toBe("http://127.0.0.1:8787/api/portraits/18/content");
+    expect(container.querySelector("img")?.getAttribute("src")).toBe(
+      "https://files.xbeaconai.com/system/portraits/18.png?x-tos-process=style/thumbnail",
+    );
   });
 
   test("resolves a protected media identifier to CDN before rendering it", async () => {
@@ -139,9 +141,9 @@ describe("MediaPreview", () => {
       await act(async () => {
         root.render(
           <MediaPreview
-            url="/api/assets/00000000-0000-4000-8000-000000000000/content"
+            url="/api/assets/00000000-0000-4000-8000-000000000000/access"
             mimeType="image/jpeg"
-            alt="旧素材地址"
+            alt="受保护素材"
           />,
         );
       });

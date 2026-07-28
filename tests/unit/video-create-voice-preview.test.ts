@@ -4,7 +4,7 @@ import { voicePreviewStorageKey } from "../../server/video-create/voice-preview"
 describe("video create voice preview", () => {
   test("uses a stable user-scoped ephemeral MP3 key", () => {
     const settings = {
-      presetVoiceId: "zh_female_shuangkuaisisi_moon_bigtts" as const,
+      presetVoiceId: "zh_female_vv_uranus_bigtts" as const,
       speed: "normal" as const,
       style: "marketing" as const,
     };

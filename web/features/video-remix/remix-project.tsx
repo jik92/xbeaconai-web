@@ -281,7 +281,7 @@ function ConfigSidebar({
         preview={
           selectedProduct ? (
             <ProductImage
-              url={selectedProduct.images[0]?.url || ""}
+              url={selectedProduct.images[0]?.thumbnailUrl || ""}
               originalUrl={selectedProduct.images[0]?.originalUrl}
               mimeType={selectedProduct.images[0]?.mimeType || "image/png"}
               alt={selectedProduct.name}
@@ -358,7 +358,7 @@ function ConfigSidebar({
                 <div className="uploaded-video-preview" key={source.id}>
                   <div className="uploaded-video-player">
                     <AuthenticatedMedia
-                      url={source.url || `/api/assets/${source.id}/content`}
+                      url={source.url || `/api/assets/${source.id}/access`}
                       originalUrl={source.originalUrl}
                       mimeType={source.mimeType}
                       alt={source.name}
@@ -596,7 +596,7 @@ function ProductPickerModal({
               >
                 <span className="product">
                   <ProductImage
-                    url={product.images[0]?.url || ""}
+                    url={product.images[0]?.thumbnailUrl || ""}
                     originalUrl={product.images[0]?.originalUrl}
                     mimeType={product.images[0]?.mimeType || "image/png"}
                     alt={product.name}
@@ -1067,7 +1067,7 @@ export function RemixProject() {
         },
         demand: description,
         rawMaterialFiles: sources.map((source) => {
-          const videoUrl = `/api/assets/${source.id}/content`;
+          const videoUrl = `/api/assets/${source.id}/access`;
           return {
             filename: source.name,
             objectKey: source.id,
@@ -1163,8 +1163,8 @@ export function RemixProject() {
         id: file.objectKey,
         name: file.filename,
         mimeType: "video/mp4",
-        url: `/api/assets/${file.objectKey}/content`,
-        originalUrl: `/api/assets/${file.objectKey}/content`,
+        url: `/api/assets/${file.objectKey}/access`,
+        originalUrl: `/api/assets/${file.objectKey}/access`,
         source: "library",
       }));
       const productImages: LibraryAsset[] = request.product.productImages.flatMap((image) => {
@@ -1178,8 +1178,9 @@ export function RemixProject() {
             size: 0,
             kind: "product" as const,
             description: image.aiDescription,
-            url: `/api/assets/${image.metaId}/content`,
-            originalUrl: `/api/assets/${image.metaId}/content`,
+            thumbnailUrl: `/api/assets/${image.metaId}/access`,
+            url: `/api/assets/${image.metaId}/access`,
+            originalUrl: `/api/assets/${image.metaId}/access`,
             createdAt: detail.rootJob.createdAt,
           },
         ];
@@ -1200,7 +1201,8 @@ export function RemixProject() {
       for (const portrait of request.portraitAssets ?? []) {
         const portraitFile = portrait.fileInfo[0];
         if (!portraitFile) continue;
-        const portraitId = portrait.reference?.portraitId ?? (Number(portrait.id) || 0);
+        const portraitId =
+          portrait.reference?.type === "general" ? portrait.reference.portraitId : Number(portrait.id) || 0;
         const generalMedia = portrait.reference?.type === "custom" ? undefined : systemPortraitMedia(portraitId);
         restoredPortraits.push({
           key: portrait.reference?.type === "custom" ? `custom:${portrait.reference.assetId}` : `general:${portraitId}`,
@@ -1229,8 +1231,9 @@ export function RemixProject() {
               size: 0,
               durationSec: voice.durationSec,
               kind: "voice",
-              url: `/api/assets/${voice.objectKey}/content`,
-              originalUrl: `/api/assets/${voice.objectKey}/content`,
+              thumbnailUrl: `/api/assets/${voice.objectKey}/access`,
+              url: `/api/assets/${voice.objectKey}/access`,
+              originalUrl: `/api/assets/${voice.objectKey}/access`,
               createdAt: detail.rootJob.createdAt,
             }
           : null,
@@ -1646,7 +1649,7 @@ export function RemixProject() {
                   >
                     <span className="source-mini">
                       <AuthenticatedMedia
-                        url={`/api/assets/${selectedShotAssets[source.id] ?? source.id}/content`}
+                        url={`/api/assets/${selectedShotAssets[source.id] ?? source.id}/access`}
                         mimeType="video/mp4"
                         alt={`${source.name}${selectedShotAssets[source.id] && selectedShotAssets[source.id] !== source.id ? "生成版本" : "原片"}`}
                         controls={false}
@@ -1994,7 +1997,7 @@ export function RemixProject() {
                         >
                           {isReady ? (
                             <AuthenticatedMedia
-                              url={`/api/assets/${selectedShotAssets[source.id]}/content`}
+                              url={`/api/assets/${selectedShotAssets[source.id]}/access`}
                               mimeType="video/mp4"
                               alt={`${source.name}生成版本`}
                               controls={false}

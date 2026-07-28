@@ -90,7 +90,7 @@ test("shows a video frame before loading playback controls", async ({ page }) =>
   await expect(preview.locator("video")).toHaveCSS("object-fit", "contain");
 });
 
-test("keeps an authenticated preview mounted when the material table rerenders", async ({ page }) => {
+test("keeps a CDN preview mounted when the material table rerenders", async ({ page }) => {
   await page.route("**/api/uploads/direct", (route) =>
     route.fulfill({
       status: 503,
@@ -100,7 +100,7 @@ test("keeps an authenticated preview mounted when the material table rerenders",
   );
   let previewRequests = 0;
   page.on("request", (request) => {
-    if (/\/api\/assets\/[^/]+\/content(?:\?|$)/.test(request.url())) previewRequests += 1;
+    if (new URL(request.url()).hostname === "files.xbeaconai.com") previewRequests += 1;
   });
 
   await page.getByRole("button", { name: "上传素材" }).click();

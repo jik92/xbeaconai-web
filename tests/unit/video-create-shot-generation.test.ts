@@ -244,7 +244,7 @@ describe("video create shot generation review", () => {
         mimeType: "image/png",
         role: "reference_image",
         category: "商品",
-        url: "/api/assets/1/content",
+        url: "/api/assets/1/access",
       },
       {
         source: "asset",
@@ -254,7 +254,7 @@ describe("video create shot generation review", () => {
         mimeType: "image/jpeg",
         role: "reference_image",
         category: "商品",
-        url: "/api/assets/2/content",
+        url: "/api/assets/2/access",
       },
     ]);
 

@@ -177,10 +177,10 @@ expect(await syncSystemMedia({
 - `directMediaSource` accepts only exact `files.xbeaconai.com` media URLs.
 - The policy scanner rejects `blob:`, `URL.createObjectURL`, media Data URLs, browser-visible third-party media hosts, and native media sources using `/api/.../content`.
 
-- [ ] **Step 1: Add the policy scanner and verify it fails on remaining portrait/API/third-party/Data URL sources**
-- [ ] **Step 2: Remove `isPublicPortraitMediaUrl` and API media direct-source exceptions**
-- [ ] **Step 3: Convert each reported browser caller to CDN metadata or a static UI CDN path**
-- [ ] **Step 4: Re-run the policy tests until no browser media exceptions remain**
+- [x] **Step 1: Add the policy scanner and verify it fails on remaining portrait/API/third-party/Data URL sources**
+- [x] **Step 2: Remove `isPublicPortraitMediaUrl` and API media direct-source exceptions**
+- [x] **Step 3: Convert each reported browser caller to CDN metadata or a static UI CDN path**
+- [x] **Step 4: Re-run the policy tests until no browser media exceptions remain**
 
 ### Task 7: Thumbnail Style and Production CDN Verification
 

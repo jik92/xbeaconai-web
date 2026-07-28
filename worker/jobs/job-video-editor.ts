@@ -101,7 +101,7 @@ export const videoEditorJob: WorkerJobHandler = {
           id: assetId,
           name,
           mimeType: "video/mp4",
-          url: `/api/assets/${assetId}/content`,
+          url: `/api/assets/${assetId}/access`,
           executionMode: "local",
           lineage: plan,
         },

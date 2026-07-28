@@ -156,7 +156,7 @@ export const qwenVoiceCloneJob: WorkerJobHandler = {
           folderId: folder.id,
           createdAt: new Date().toISOString(),
         });
-        artifactUrl = `/api/assets/${artifactId}/content`;
+        artifactUrl = `/api/assets/${artifactId}/access`;
         outputFolderId = folder.id;
       } else {
         accounts.createArtifact({
@@ -168,7 +168,7 @@ export const qwenVoiceCloneJob: WorkerJobHandler = {
           mimeType: "audio/wav",
           createdAt: new Date().toISOString(),
         });
-        artifactUrl = `/api/artifacts/${artifactId}`;
+        artifactUrl = `/api/artifacts/${artifactId}/access`;
       }
       const values = {
         ...job.values,

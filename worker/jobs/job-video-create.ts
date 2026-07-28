@@ -67,7 +67,7 @@ function artifactResult(
     kind: "video-create",
     title: job.title,
     summary: artifact ? "一键成片阶段产物已生成" : "一键成片文本阶段已完成",
-    artifacts: artifact ? [{ ...artifact, url: `/api/artifacts/${artifact.id}`, lineage }] : [],
+    artifacts: artifact ? [{ ...artifact, url: `/api/artifacts/${artifact.id}/access`, lineage }] : [],
     data: { values: job.values, generatedAt: new Date().toISOString(), mock: false },
   };
 }

@@ -248,7 +248,7 @@ export function createAiGenerateJob(dependencies: AiGenerateDependencies = {}): 
                 id: artifactId,
                 name,
                 mimeType: response.mimeType,
-                url: `/api/artifacts/${artifactId}`,
+                url: `/api/artifacts/${artifactId}/access`,
                 executionMode: "real",
                 lineage: [completedStage],
               },
@@ -367,7 +367,7 @@ export function createAiGenerateJob(dependencies: AiGenerateDependencies = {}): 
               id: artifactId,
               name,
               mimeType,
-              url: `/api/artifacts/${artifactId}`,
+              url: `/api/artifacts/${artifactId}/access`,
               executionMode: "real",
               lineage: [],
             });

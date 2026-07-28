@@ -26,6 +26,7 @@ export interface AttachmentSelection {
   mimeType: string;
   size?: number;
   durationSec?: number;
+  thumbnailUrl?: string;
   url?: string;
   originalUrl?: string;
   source: "library" | "upload";
@@ -205,6 +206,7 @@ export function AttachmentPicker({
         mimeType: asset.mimeType,
         size: asset.size,
         durationSec: asset.durationSec,
+        thumbnailUrl: asset.thumbnailUrl,
         url: asset.url,
         originalUrl: asset.originalUrl,
         source: "library" as const,
@@ -266,6 +268,7 @@ export function AttachmentPicker({
                 mimeType: result.asset.mimeType,
                 size: result.asset.size,
                 durationSec: result.asset.durationSec,
+                thumbnailUrl: result.asset.thumbnailUrl,
                 url: result.asset.url,
                 originalUrl: result.asset.originalUrl,
                 source: "upload" as const,
@@ -457,7 +460,7 @@ export function AttachmentPicker({
                             >
                               <i className="size-12 overflow-hidden rounded-md bg-surface-muted [&_img]:size-full [&_img]:object-cover [&_video]:size-full [&_video]:object-cover">
                                 <AuthenticatedMedia
-                                  url={asset.url}
+                                  url={asset.mimeType.startsWith("image/") ? asset.thumbnailUrl : asset.url}
                                   mimeType={asset.mimeType}
                                   alt={asset.name}
                                   controls={false}

@@ -17,8 +17,8 @@ const sourceLabels: Record<VideoCreateMaterialVersion["source"], string> = {
 function versionUrl(version: VideoCreateMaterialVersion) {
   if (!version.contentId || !version.storageKind) return "";
   return version.storageKind === "artifact"
-    ? `/api/artifacts/${version.contentId}`
-    : `/api/assets/${version.contentId}/content`;
+    ? `/api/artifacts/${version.contentId}/access`
+    : `/api/assets/${version.contentId}/access`;
 }
 
 function formatDate(value?: string | null) {

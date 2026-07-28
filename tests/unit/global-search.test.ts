@@ -30,8 +30,9 @@ const material: LibraryAsset = {
   kind: "media",
   description: "服装展示",
   folderId: "folder-1",
-  url: "/api/assets/asset-1/content",
-  originalUrl: "/api/assets/asset-1/content",
+  thumbnailUrl: "https://files.xbeaconai.com/users/demo/asset-1.mp4",
+  url: "https://files.xbeaconai.com/users/demo/asset-1.mp4",
+  originalUrl: "https://files.xbeaconai.com/users/demo/asset-1.mp4",
   createdAt: "2026-07-23T00:00:00.000Z",
 };
 const product: LibraryProduct = {
@@ -53,7 +54,9 @@ const portrait = {
   name: "都市女性",
   description: "夏季穿搭模特",
   source_url: "/portraits/8.png",
-  display_url: "/api/portraits/8/content",
+  thumbnail_url: "https://files.xbeaconai.com/system/portraits/8.png?x-tos-process=style/thumbnail",
+  display_url: "https://files.xbeaconai.com/system/portraits/8.png?x-tos-process=style/preview",
+  original_url: "https://files.xbeaconai.com/system/portraits/8.png",
   file: "8.png",
   age: 28,
   gender: "女",

@@ -84,7 +84,6 @@ import { stopAllAdminJobs } from "./jobs/admin-job-control";
 import { BullJobQueue } from "./jobs/bull-job-queue";
 import { InsufficientCreditsError, SqliteJobStore } from "./jobs/sqlite-job-store";
 import { isSeedanceModelId, seedanceModelIds, videoModels } from "./models/video-models";
-import { getPortraitById } from "./portraits/catalog";
 import { type CustomPortraitRecord, CustomPortraitStore } from "./portraits/custom-portrait-store";
 import { resolvePortraitReference } from "./portraits/portrait-resolver";
 import { volcSpeech } from "./providers/volc-speech";
@@ -470,9 +469,7 @@ const publicApiPaths = new Set([
   "/api/auth/logout",
 ]);
 const isPublicApiPath = (path: string) =>
-  publicApiPaths.has(path) ||
-  /^\/api\/portraits\/\d+\/content$/.test(path) ||
-  /^\/api\/downloads\/(?!tickets$)[^/]+$/.test(path);
+  publicApiPaths.has(path) || /^\/api\/downloads\/(?!tickets$)[^/]+$/.test(path);
 
 function referencedAssetIds(values: Record<string, string>) {
   const ids = new Set<string>();
@@ -565,98 +562,6 @@ app.use("/api/*", async (c, next) => {
   c.set("userId", identity.user.id);
   c.set("sessionId", identity.sessionId);
   await next();
-});
-
-const portraitContentRoute = createRoute({
-  method: "get",
-  path: "/api/portraits/{portraitId}/content",
-  operationId: "getPortraitContent",
-  request: { params: z.object({ portraitId: z.coerce.number().int().min(1) }) },
-  responses: {
-    200: {
-      description: "Inline portrait image",
-      content: { "application/octet-stream": { schema: z.string().openapi({ format: "binary" }) } },
-    },
-    404: { description: "Portrait not found", content: { "application/json": { schema: ErrorSchema } } },
-    502: { description: "Portrait source unavailable", content: { "application/json": { schema: ErrorSchema } } },
-  },
-});
-
-function imageMimeType(bytes: Uint8Array) {
-  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
-  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return "image/png";
-  const signature = new TextDecoder().decode(bytes.subarray(0, 12));
-  if (signature.startsWith("GIF87a") || signature.startsWith("GIF89a")) return "image/gif";
-  if (signature.startsWith("RIFF") && signature.slice(8, 12) === "WEBP") return "image/webp";
-  if (signature.slice(4, 12) === "ftypavif" || signature.slice(4, 12) === "ftypavis") return "image/avif";
-  return undefined;
-}
-
-app.openapi(portraitContentRoute, async (c) => {
-  const requestId = crypto.randomUUID();
-  const portrait = getPortraitById(c.req.valid("param").portraitId);
-  if (!portrait)
-    return c.json(
-      {
-        error: {
-          code: "PORTRAIT_NOT_FOUND",
-          message: "人像不存在",
-          retryable: false,
-          requestId,
-        },
-      },
-      404,
-    );
-  try {
-    const upstream = await fetch(portrait.source_url, { signal: AbortSignal.timeout(15_000) });
-    const declaredMimeType = upstream.headers.get("Content-Type")?.split(";", 1)[0]?.trim().toLowerCase();
-    if (!upstream.ok || !declaredMimeType?.startsWith("image/"))
-      return c.json(
-        {
-          error: {
-            code: "PORTRAIT_SOURCE_INVALID",
-            message: "人像图片源不可用",
-            retryable: upstream.status >= 500,
-            requestId,
-          },
-        },
-        502,
-      );
-    const bytes = new Uint8Array(await upstream.arrayBuffer());
-    const mimeType = imageMimeType(bytes);
-    if (!mimeType)
-      return c.json(
-        {
-          error: {
-            code: "PORTRAIT_SOURCE_INVALID",
-            message: "人像图片源不可用",
-            retryable: false,
-            requestId,
-          },
-        },
-        502,
-      );
-    return new Response(bytes, {
-      status: 200,
-      headers: {
-        "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
-        "Content-Disposition": "inline",
-        "Content-Type": mimeType,
-      },
-    });
-  } catch {
-    return c.json(
-      {
-        error: {
-          code: "PORTRAIT_SOURCE_UNAVAILABLE",
-          message: "人像图片加载失败",
-          retryable: true,
-          requestId,
-        },
-      },
-      502,
-    );
-  }
 });
 
 function providerGuard(moduleId: ModuleId): MiddlewareHandler<AppEnv> {
@@ -1863,7 +1768,7 @@ const libraryAssetResponse = (asset: MediaAsset) => {
     baseUrl: env.publicMedia.baseUrl,
     storageKey: asset.storageKey,
     mimeType: asset.mimeType,
-    fallbackUrl: `/api/assets/${asset.id}/content`,
+    fallbackUrl: `/api/assets/${asset.id}/access`,
   });
   return {
     id: asset.id,
@@ -2307,7 +2212,7 @@ function customPortraitResponse(record: CustomPortraitRecord) {
     baseUrl: env.publicMedia.baseUrl,
     storageKey: asset.storageKey,
     mimeType: asset.mimeType,
-    fallbackUrl: `/api/assets/${asset.id}/content`,
+    fallbackUrl: `/api/assets/${asset.id}/access`,
   });
   return {
     type: "custom" as const,
@@ -2881,20 +2786,6 @@ app.openapi(assetMetadataRoute, (c) => {
   return c.json({ asset: libraryAssetResponse(asset) }, 200);
 });
 
-const assetContentRoute = createRoute({
-  method: "get",
-  path: "/api/assets/{assetId}/content",
-  operationId: "getAssetContent",
-  request: { params: z.object({ assetId: z.string().uuid() }) },
-  responses: {
-    200: {
-      description: "Asset binary",
-      content: { "application/octet-stream": { schema: z.string().openapi({ format: "binary" }) } },
-    },
-    404: { description: "Not found", content: { "text/plain": { schema: z.string() } } },
-  },
-});
-
 const assetAccessRoute = createRoute({
   method: "get",
   path: "/api/assets/{assetId}/access",
@@ -2919,24 +2810,12 @@ app.openapi(assetAccessRoute, async (c) => {
         baseUrl: env.publicMedia.baseUrl,
         storageKey: asset.storageKey,
         mimeType: asset.mimeType,
-        fallbackUrl: `/api/assets/${asset.id}/content`,
+        fallbackUrl: `/api/assets/${asset.id}/access`,
       }),
       200,
     );
   } catch {
     return c.text("Not found", 404);
-  }
-});
-
-app.openapi(assetContentRoute, async (c) => {
-  const asset = accounts.getOwnedAsset(c.get("userId"), c.req.valid("param").assetId);
-  if (!asset) return new Response("Not found", { status: 404 });
-  if (!ossutils.configured) return new Response("Not found", { status: 404 });
-  try {
-    await ossutils.headObject(asset.storageKey);
-    return Response.redirect(ossutils.createSignedReadUrl(asset.storageKey), 302);
-  } catch {
-    return new Response("Not found", { status: 404 });
   }
 });
 
@@ -6016,7 +5895,7 @@ function getVideoCreateShotGenerationDraft(projectId: string, shotId: string, ow
       mimeType: product.mimeType,
       role: videoCreateReferenceRole("image"),
       category: "商品",
-      url: `/api/assets/${product.id}/content`,
+      url: `/api/assets/${product.id}/access`,
     });
   }
   const voiceId = aggregate.project.input.voiceAssetId;
@@ -6031,7 +5910,7 @@ function getVideoCreateShotGenerationDraft(projectId: string, shotId: string, ow
       name: voice.displayName,
       mimeType: voice.mimeType,
       role: videoCreateReferenceRole("audio"),
-      url: `/api/assets/${voice.id}/content`,
+      url: `/api/assets/${voice.id}/access`,
     });
   }
   const duration = Math.min(15, Math.max(4, Math.round(shot.durationSec)));
@@ -7476,32 +7355,6 @@ app.openapi(eventsRoute, (c) => {
   });
 });
 
-const artifactRoute = createRoute({
-  method: "get",
-  path: "/api/artifacts/{artifactId}",
-  operationId: "downloadArtifact",
-  request: { params: z.object({ artifactId: z.string().uuid() }) },
-  responses: {
-    200: {
-      description: "Artifact binary",
-      content: { "application/octet-stream": { schema: z.string().openapi({ format: "binary" }) } },
-    },
-    404: { description: "Not found", content: { "text/plain": { schema: z.string() } } },
-  },
-});
-app.openapi(artifactRoute, async (c) => {
-  const artifact = accounts.getArtifact(c.get("userId"), c.req.valid("param").artifactId);
-  if (!artifact) return new Response("Not found", { status: 404 });
-  const file = Bun.file(resolve(env.dataDir, "results", artifact.storage_key));
-  if (!(await file.exists())) return new Response("Not found", { status: 404 });
-  return new Response(file, {
-    headers: {
-      "Content-Type": artifact.mime_type || "application/octet-stream",
-      "Content-Disposition": `inline; filename="${artifact.name.replaceAll('"', "")}"`,
-    },
-  });
-});
-
 const artifactAccessRoute = createRoute({
   method: "get",
   path: "/api/artifacts/{artifactId}/access",
@@ -7539,7 +7392,7 @@ app.openapi(artifactAccessRoute, async (c) => {
       baseUrl: env.publicMedia.baseUrl,
       storageKey: asset.storageKey,
       mimeType: asset.mimeType,
-      fallbackUrl: `/api/artifacts/${artifactId}`,
+      fallbackUrl: `/api/artifacts/${artifactId}/access`,
     }),
     200,
   );

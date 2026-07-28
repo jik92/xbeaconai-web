@@ -103,49 +103,9 @@ describe("douyin API integration (isolated DB)", () => {
     return { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
   }
 
-  test("portrait image proxy serves a known catalog image inline without authentication", async () => {
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = Object.assign(
-      async () =>
-        new Response(new Uint8Array([255, 216, 255, 224]), {
-          status: 200,
-          headers: { "Content-Type": "image/png", "Content-Disposition": "attachment" },
-        }),
-      { preconnect: originalFetch.preconnect },
-    );
-    try {
-      const response = await honoApp.request("/api/portraits/1/content");
-      expect(response.status).toBe(200);
-      expect(response.headers.get("Content-Type")).toBe("image/jpeg");
-      expect(response.headers.get("Content-Disposition")).toBe("inline");
-      expect(response.headers.get("Cache-Control")).toContain("public");
-      expect(new Uint8Array(await response.arrayBuffer())).toEqual(new Uint8Array([255, 216, 255, 224]));
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
-  });
-
-  test("portrait image proxy rejects unknown catalog IDs", async () => {
-    const response = await honoApp.request("/api/portraits/999999/content");
+  test("does not retain the legacy portrait binary proxy", async () => {
+    const response = await honoApp.request("/api/portraits/1/content", { headers: authHeaders() });
     expect(response.status).toBe(404);
-  });
-
-  test("portrait image proxy rejects a non-image upstream response", async () => {
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = Object.assign(
-      async () =>
-        new Response("<html>upstream error</html>", { status: 200, headers: { "Content-Type": "text/html" } }),
-      { preconnect: originalFetch.preconnect },
-    );
-    try {
-      const response = await honoApp.request("/api/portraits/1/content");
-      expect(response.status).toBe(502);
-      expect((await response.json()) as object).toMatchObject({
-        error: { code: "PORTRAIT_SOURCE_INVALID", retryable: false },
-      });
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
   });
 
   test("tool output folder API keeps module defaults independent and owner-scoped", async () => {

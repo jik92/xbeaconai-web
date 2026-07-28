@@ -217,7 +217,7 @@ export const videoExtractJob: WorkerJobHandler = {
           id: assetId,
           name: safeName,
           mimeType: "video/mp4",
-          url: `/api/assets/${assetId}/content`,
+          url: `/api/assets/${assetId}/access`,
           executionMode: "local",
           lineage: plan,
         },

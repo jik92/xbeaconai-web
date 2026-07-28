@@ -45,7 +45,7 @@ describe("portrait library data", () => {
         gender: "女",
         description: "自然亲切的生活方式博主",
         thumbnailUrl: "https://files.xbeaconai.com/users/demo/portrait.png?x-tos-process=style/thumbnail",
-        imageUrl: "/api/assets/portrait/content",
+        imageUrl: "https://files.xbeaconai.com/users/demo/portrait.png?x-tos-process=style/preview",
         originalUrl: "https://files.xbeaconai.com/users/demo/portrait.png",
         status: "active",
         createdAt: "2026-07-26T00:00:00.000Z",

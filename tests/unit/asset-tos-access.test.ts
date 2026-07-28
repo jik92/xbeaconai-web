@@ -1,15 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import { mediaAccessUrlForContent } from "../../web/api/api-client";
+import { mediaAccessUrl } from "../../web/api/api-client";
 
 describe("asset TOS access", () => {
-  test("resolves legacy owned media identifiers through CDN authorization routes", () => {
-    expect(mediaAccessUrlForContent("/api/assets/123e4567-e89b-12d3-a456-426614174000/content")).toBe(
+  test("accepts only explicit CDN authorization routes as protected media identifiers", () => {
+    expect(mediaAccessUrl("/api/assets/123e4567-e89b-12d3-a456-426614174000/access")).toBe(
       "/api/assets/123e4567-e89b-12d3-a456-426614174000/access",
     );
-    expect(mediaAccessUrlForContent("/api/artifacts/123e4567-e89b-12d3-a456-426614174000")).toBe(
+    expect(mediaAccessUrl("/api/artifacts/123e4567-e89b-12d3-a456-426614174000/access")).toBe(
       "/api/artifacts/123e4567-e89b-12d3-a456-426614174000/access",
     );
-    expect(mediaAccessUrlForContent("/api/portraits/123e4567-e89b-12d3-a456-426614174000/content")).toBeUndefined();
+    expect(mediaAccessUrl("/api/assets/123e4567-e89b-12d3-a456-426614174000/content")).toBeUndefined();
+    expect(mediaAccessUrl("/api/artifacts/123e4567-e89b-12d3-a456-426614174000")).toBeUndefined();
   });
 
   test("publishes protected access routes that return CDN media fields", async () => {

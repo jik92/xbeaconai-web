@@ -177,7 +177,7 @@ function createMediaKitJob(config: MediaKitJobConfig): WorkerJobHandler {
             folderId: folder.id,
             createdAt: new Date().toISOString(),
           });
-          artifactUrl = `/api/assets/${assetId}/content`;
+          artifactUrl = `/api/assets/${assetId}/access`;
         } else {
           const artifactName = `${job.id}-${fileName}`;
           await Bun.write(resolve(env.dataDir, "results", artifactName), bytes);
@@ -190,7 +190,7 @@ function createMediaKitJob(config: MediaKitJobConfig): WorkerJobHandler {
             mimeType: "video/mp4",
             createdAt: new Date().toISOString(),
           });
-          artifactUrl = `/api/artifacts/${assetId}`;
+          artifactUrl = `/api/artifacts/${assetId}/access`;
         }
         stage.completedAt = new Date().toISOString();
         context.change(job.id, {

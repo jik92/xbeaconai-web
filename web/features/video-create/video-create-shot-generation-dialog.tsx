@@ -187,7 +187,7 @@ export function VideoCreateShotGenerationDialog({
         mimeType: asset.mimeType,
         role: referenceRole(asset.mimeType),
         ...(kind === "image" ? { category: "商品" as const } : {}),
-        url: asset.url ?? `/api/assets/${asset.id}/content`,
+        url: asset.url ?? `/api/assets/${asset.id}/access`,
       };
       next.push(attachment);
     }

@@ -837,15 +837,6 @@ export const zShareParseResult = z.object({
 
 export const zShareImportJob = zJob.and(z.record(z.string(), z.unknown()));
 
-export const zGetPortraitContentPath = z.object({
-    portraitId: z.int().gte(1)
-});
-
-/**
- * Inline portrait image
- */
-export const zGetPortraitContentResponse = z.string();
-
 /**
  * Service health
  */
@@ -1588,15 +1579,6 @@ export const zGetAssetAccessResponse = z.object({
     url: z.url(),
     originalUrl: z.url()
 });
-
-export const zGetAssetContentPath = z.object({
-    assetId: z.uuid()
-});
-
-/**
- * Asset binary
- */
-export const zGetAssetContentResponse = z.string();
 
 /**
  * Masked provider credentials
@@ -2987,15 +2969,6 @@ export const zWatchJobEventsPath = z.object({
  * Server-sent job updates
  */
 export const zWatchJobEventsResponse = z.string();
-
-export const zDownloadArtifactPath = z.object({
-    artifactId: z.uuid()
-});
-
-/**
- * Artifact binary
- */
-export const zDownloadArtifactResponse = z.string();
 
 export const zGetArtifactAccessPath = z.object({
     artifactId: z.uuid()

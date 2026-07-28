@@ -42,7 +42,7 @@ async function ensureMockMedia(kind: "video" | "audio" | "image"): Promise<Artif
     mockMedia.set(kind, pending);
   }
   await pending;
-  return { id: crypto.randomUUID(), name, mimeType, url: `/api/artifacts/${name}`, executionMode: "mock" };
+  return { id: crypto.randomUUID(), name, mimeType, url: `/api/artifacts/${name}/access`, executionMode: "mock" };
 }
 
 function overallMode(provenance: StageProvenance[], artifacts: ArtifactDraft[]): JobRecord["overallExecutionMode"] {
@@ -276,7 +276,7 @@ export const genericCreationJob: WorkerJobHandler = {
             id: crypto.randomUUID(),
             name,
             mimeType: "image/png",
-            url: `/api/artifacts/${name}`,
+            url: `/api/artifacts/${name}/access`,
             executionMode: "real",
           });
         } else if (stage.executionMode === "real" && stage.implementation === "aihubmix-audio") {
@@ -290,7 +290,7 @@ export const genericCreationJob: WorkerJobHandler = {
             id: crypto.randomUUID(),
             name,
             mimeType: "audio/wav",
-            url: `/api/artifacts/${name}`,
+            url: `/api/artifacts/${name}/access`,
             executionMode: "real",
           });
         } else if (stage.implementation === "ark-seedance-video") {
@@ -308,7 +308,7 @@ export const genericCreationJob: WorkerJobHandler = {
             id: crypto.randomUUID(),
             name,
             mimeType: "video/mp4",
-            url: `/api/artifacts/${name}`,
+            url: `/api/artifacts/${name}/access`,
             executionMode: response.executionMode,
           });
         } else await wait(stage.executionMode === "mock" ? 350 : 120);
@@ -369,7 +369,7 @@ export const genericCreationJob: WorkerJobHandler = {
           mimeType: artifact.mimeType,
           createdAt: new Date().toISOString(),
         });
-        artifact.url = `/api/artifacts/${artifact.id}`;
+        artifact.url = `/api/artifacts/${artifact.id}/access`;
       }
     const artifactMode = overallMode(provenance, finalArtifacts);
     const result: JobResult = {

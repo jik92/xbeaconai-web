@@ -25,7 +25,7 @@ export function AiGenerateReferencePreview({
           >
             <div className="size-12 shrink-0 overflow-hidden bg-surface [&_img]:size-full [&_img]:object-cover [&_video]:size-full [&_video]:object-cover">
               <AuthenticatedMedia
-                url={reference.url ?? `/api/assets/${reference.id}/content`}
+                url={reference.url ?? `/api/assets/${reference.id}/access`}
                 mimeType={reference.mimeType}
                 alt={reference.name}
                 controls={false}

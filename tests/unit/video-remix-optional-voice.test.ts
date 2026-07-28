@@ -10,8 +10,9 @@ function voice(id: string): LibraryAsset {
     mimeType: "audio/mpeg",
     size: 1,
     kind: "voice",
-    url: `/api/assets/${id}/content`,
-    originalUrl: `/api/assets/${id}/content`,
+    thumbnailUrl: `https://files.xbeaconai.com/users/demo/${id}.mp3`,
+    url: `/api/assets/${id}/access`,
+    originalUrl: `/api/assets/${id}/access`,
     createdAt: new Date(0).toISOString(),
   };
 }

@@ -485,37 +485,6 @@ export type ShareImportJob = Job & {
     [key: string]: unknown;
 };
 
-export type GetPortraitContentData = {
-    body?: never;
-    path: {
-        portraitId: number;
-    };
-    query?: never;
-    url: '/api/portraits/{portraitId}/content';
-};
-
-export type GetPortraitContentErrors = {
-    /**
-     * Portrait not found
-     */
-    404: ApiErrorResponse;
-    /**
-     * Portrait source unavailable
-     */
-    502: ApiErrorResponse;
-};
-
-export type GetPortraitContentError = GetPortraitContentErrors[keyof GetPortraitContentErrors];
-
-export type GetPortraitContentResponses = {
-    /**
-     * Inline portrait image
-     */
-    200: Blob | File;
-};
-
-export type GetPortraitContentResponse = GetPortraitContentResponses[keyof GetPortraitContentResponses];
-
 export type GetHealthData = {
     body?: never;
     path?: never;
@@ -1890,33 +1859,6 @@ export type GetAssetAccessResponses = {
 };
 
 export type GetAssetAccessResponse = GetAssetAccessResponses[keyof GetAssetAccessResponses];
-
-export type GetAssetContentData = {
-    body?: never;
-    path: {
-        assetId: string;
-    };
-    query?: never;
-    url: '/api/assets/{assetId}/content';
-};
-
-export type GetAssetContentErrors = {
-    /**
-     * Not found
-     */
-    404: string;
-};
-
-export type GetAssetContentError = GetAssetContentErrors[keyof GetAssetContentErrors];
-
-export type GetAssetContentResponses = {
-    /**
-     * Asset binary
-     */
-    200: Blob | File;
-};
-
-export type GetAssetContentResponse = GetAssetContentResponses[keyof GetAssetContentResponses];
 
 export type ListAdminCredentialsData = {
     body?: never;
@@ -4228,33 +4170,6 @@ export type WatchJobEventsResponses = {
 };
 
 export type WatchJobEventsResponse = WatchJobEventsResponses[keyof WatchJobEventsResponses];
-
-export type DownloadArtifactData = {
-    body?: never;
-    path: {
-        artifactId: string;
-    };
-    query?: never;
-    url: '/api/artifacts/{artifactId}';
-};
-
-export type DownloadArtifactErrors = {
-    /**
-     * Not found
-     */
-    404: string;
-};
-
-export type DownloadArtifactError = DownloadArtifactErrors[keyof DownloadArtifactErrors];
-
-export type DownloadArtifactResponses = {
-    /**
-     * Artifact binary
-     */
-    200: Blob | File;
-};
-
-export type DownloadArtifactResponse = DownloadArtifactResponses[keyof DownloadArtifactResponses];
 
 export type GetArtifactAccessData = {
     body?: never;
