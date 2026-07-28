@@ -90,8 +90,8 @@ export const APP_CONFIG = {
       voices: true,
     },
     delivery: {
-      "qianchuan-merchants": true,
-      "qianchuan-pc": true,
+      "qianchuan-merchants": false,
+      "qianchuan-pc": false,
     },
   },
 } as const satisfies PublicAppConfig;
