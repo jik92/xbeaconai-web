@@ -15,6 +15,10 @@ export function buildMediaCdnCheckUrls(input: { domain: string; imageKey: string
   };
 }
 
+export function tosContinuationToken(continuationToken: string | undefined) {
+  return continuationToken ? { continuationToken } : {};
+}
+
 function required(name: string) {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`${name} 未配置`);
@@ -75,7 +79,7 @@ async function findExistingVideoKey() {
   do {
     const page = await client.listObjectsType2({
       bucket,
-      continuationToken,
+      ...tosContinuationToken(continuationToken),
       maxKeys: 1_000,
       listOnlyOnce: true,
     });

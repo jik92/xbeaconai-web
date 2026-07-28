@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { buildMediaCdnCheckUrls } from "../../scripts/check-media-cdn";
+import { buildMediaCdnCheckUrls, tosContinuationToken } from "../../scripts/check-media-cdn";
 import {
   MEDIA_CDN_DEFAULT_ALLOWED_REFERERS,
   MEDIA_IMAGE_STYLES,
@@ -110,5 +110,10 @@ describe("media CDN configuration", () => {
         "https://files.xbeaconai.com/users/demo/%E5%95%86%E5%93%81%20%E4%B8%BB%E5%9B%BE.jpg?x-tos-process=style/preview",
       videoOriginal: "https://files.xbeaconai.com/users/demo/source%20video.mp4",
     });
+  });
+
+  test("omits an empty TOS continuation token from signed CDN probe requests", () => {
+    expect(tosContinuationToken(undefined)).toEqual({});
+    expect(tosContinuationToken("next-page")).toEqual({ continuationToken: "next-page" });
   });
 });
