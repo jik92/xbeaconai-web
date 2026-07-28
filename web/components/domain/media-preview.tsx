@@ -25,6 +25,7 @@ export interface NativeMediaPreviewProps {
   onTimeChange?: (currentTime: number) => void;
   onDurationChange?: (duration: number) => void;
   muted?: boolean;
+  restoreAudioOnPlay?: boolean;
 }
 
 export interface MediaPreviewProps extends Omit<NativeMediaPreviewProps, "src"> {
@@ -35,6 +36,7 @@ export interface MediaPreviewProps extends Omit<NativeMediaPreviewProps, "src"> 
   errorText?: string;
   authenticated?: boolean;
   previewable?: boolean;
+  withAudioControls?: boolean;
   containerClassName?: string;
 }
 
@@ -66,6 +68,7 @@ export function VideoPreview({
   onTimeChange,
   onDurationChange,
   muted,
+  restoreAudioOnPlay = false,
 }: NativeMediaPreviewProps) {
   const ref = useRef<HTMLVideoElement>(null);
 
@@ -86,10 +89,48 @@ export function VideoPreview({
       onReady={() => {
         if (ref.current && initialTime > 0) ref.current.currentTime = initialTime;
       }}
+      onPlay={() => {
+        if (!restoreAudioOnPlay || !ref.current) return;
+        ref.current.muted = false;
+        ref.current.volume = 1;
+      }}
       onTimeUpdate={(event) => onTimeChange?.(event.currentTarget.currentTime)}
       onDurationChange={(event) => {
         const duration = event.currentTarget.duration;
         if (Number.isFinite(duration)) onDurationChange?.(duration);
+      }}
+      onLoadedMetadata={(event) => {
+        const video = event.currentTarget;
+        onMetadata?.({
+          width: video.videoWidth || undefined,
+          height: video.videoHeight || undefined,
+          durationSec: Number.isFinite(video.duration) ? video.duration : undefined,
+        });
+      }}
+    />
+  );
+}
+
+function AudibleVideoPreview({
+  src,
+  alt,
+  className,
+  onMetadata,
+}: Pick<NativeMediaPreviewProps, "src" | "alt" | "className" | "onMetadata">) {
+  return (
+    <video
+      className={cn(className, "bg-surface-dark object-contain")}
+      src={src}
+      aria-label={alt}
+      controls
+      muted={false}
+      playsInline
+      preload="metadata"
+      data-audible-preview="true"
+      style={{ objectFit: "contain" }}
+      onPlay={(event) => {
+        event.currentTarget.muted = false;
+        event.currentTarget.volume = 1;
       }}
       onLoadedMetadata={(event) => {
         const video = event.currentTarget;
@@ -341,6 +382,10 @@ function InteractiveVideoPreview({
             data-playback-state={hoverPlaying ? "playing" : "paused"}
             onMouseEnter={() => setHoverPlaying(true)}
             onMouseLeave={() => setHoverPlaying(false)}
+            onClick={() => {
+              setHoverPlaying(false);
+              setLightboxOpen(true);
+            }}
             onDoubleClick={() => {
               setHoverPlaying(false);
               setLightboxOpen(true);
@@ -488,6 +533,7 @@ export function MediaPreview({
   loadingText = "正在载入结果预览…",
   errorText = "预览不可用",
   previewable = true,
+  withAudioControls = false,
   className,
   containerClassName,
   onMetadata,
@@ -505,6 +551,9 @@ export function MediaPreview({
   if (sourceState.error || (hasSeparateOriginal && originalState.error)) return <span>{errorText}</span>;
   if (sourceState.loading || (hasSeparateOriginal && originalState.loading) || !source || !lightboxSource)
     return <span>{loadingText}</span>;
+
+  if (kind === "video" && previewable && withAudioControls)
+    return <AudibleVideoPreview src={source} alt={alt} className={className} onMetadata={onMetadata} />;
 
   if (kind === "video" && previewable)
     return (

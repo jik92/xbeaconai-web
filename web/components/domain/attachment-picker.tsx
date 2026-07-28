@@ -25,9 +25,52 @@ export interface AttachmentSelection {
   name: string;
   mimeType: string;
   size?: number;
+  durationSec?: number;
   url?: string;
   originalUrl?: string;
   source: "library" | "upload";
+}
+
+type AttachmentMediaKind = "image" | "video";
+
+export type AttachmentPickerConstraints = {
+  summary: string[];
+  byKind?: Partial<Record<AttachmentMediaKind, { maxBytes?: number; maxDurationSec?: number; maxCount?: number }>>;
+};
+
+function attachmentMediaKind(mimeType: string): AttachmentMediaKind | undefined {
+  if (mimeType.startsWith("image/")) return "image";
+  if (mimeType.startsWith("video/")) return "video";
+  return undefined;
+}
+
+function constraintReason(
+  asset: Pick<LibraryAsset, "mimeType" | "size" | "durationSec">,
+  constraints?: AttachmentPickerConstraints,
+) {
+  const kind = attachmentMediaKind(asset.mimeType);
+  const rule = kind ? constraints?.byKind?.[kind] : undefined;
+  if (!rule) return undefined;
+  if (rule.maxBytes && asset.size > rule.maxBytes) return `素材大小超过限制（最多 ${formatBytes(rule.maxBytes)}）`;
+  if (rule.maxDurationSec && asset.durationSec !== undefined && asset.durationSec > rule.maxDurationSec)
+    return `视频时长不能超过 ${rule.maxDurationSec} 秒（当前 ${asset.durationSec.toFixed(2)} 秒）`;
+  return undefined;
+}
+
+function loadLocalVideoDuration(file: File): Promise<number | undefined> {
+  if (!file.type.startsWith("video/")) return Promise.resolve(undefined);
+  return new Promise((resolveDuration) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    const done = (duration?: number) => {
+      URL.revokeObjectURL(url);
+      resolveDuration(Number.isFinite(duration) && (duration ?? 0) > 0 ? duration : undefined);
+    };
+    video.preload = "metadata";
+    video.onloadedmetadata = () => done(video.duration);
+    video.onerror = () => done();
+    video.src = url;
+  });
 }
 
 function accepts(asset: LibraryAsset, accept: string) {
@@ -36,6 +79,14 @@ function accepts(asset: LibraryAsset, accept: string) {
     const rule = raw.trim();
     if (rule.endsWith("/*")) return asset.mimeType.startsWith(rule.slice(0, -1));
     return rule === asset.mimeType;
+  });
+}
+
+function acceptsMediaType(accept: string, mediaType: "image" | "video") {
+  if (!accept || accept === "*/*") return true;
+  return accept.split(",").some((raw) => {
+    const rule = raw.trim();
+    return rule === `${mediaType}/*` || rule.startsWith(`${mediaType}/`);
   });
 }
 
@@ -62,18 +113,23 @@ export function AttachmentPicker({
   accept = "image/*,video/*,audio/*",
   multiple = false,
   initialSource = "library",
+  showMediaTypeFilters = false,
+  constraints,
   trigger,
   onSelect,
 }: {
   accept?: string;
   multiple?: boolean;
   initialSource?: "library" | "upload";
+  showMediaTypeFilters?: boolean;
+  constraints?: AttachmentPickerConstraints;
   trigger: (open: () => void) => ReactNode;
   onSelect: (assets: AttachmentSelection[]) => void;
 }) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [source, setSource] = useState<"library" | "upload">("library");
+  const [mediaFilter, setMediaFilter] = useState<"image" | "video">("image");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [previewId, setPreviewId] = useState("");
@@ -130,9 +186,24 @@ export function AttachmentPicker({
         (!keyword || `${asset.name} ${asset.originalName} ${asset.description ?? ""}`.toLowerCase().includes(keyword)),
     );
   }, [accept, data, query]);
+  const availableMediaFilters = (["image", "video"] as const).filter((kind) => acceptsMediaType(accept, kind));
+  const effectiveMediaFilter = availableMediaFilters.includes(mediaFilter)
+    ? mediaFilter
+    : (availableMediaFilters[0] ?? "image");
+  const filteredByMediaType = useMemo(
+    () => filtered.filter((asset) => asset.mimeType.startsWith(`${effectiveMediaFilter}/`)),
+    [effectiveMediaFilter, filtered],
+  );
+  const mediaFilters = [
+    { id: "image", label: "图片" },
+    { id: "video", label: "视频" },
+  ] as const;
+  const canFilterMediaTypes =
+    showMediaTypeFilters && acceptsMediaType(accept, "image") && acceptsMediaType(accept, "video");
   const previewAsset = data.find((asset) => asset.id === previewId);
   const close = () => {
     setOpen(false);
+    setMediaFilter("image");
     setSelected([]);
     setPreviewId("");
     setUploadFiles([]);
@@ -149,6 +220,7 @@ export function AttachmentPicker({
         name: asset.name,
         mimeType: asset.mimeType,
         size: asset.size,
+        durationSec: asset.durationSec,
         url: asset.url,
         originalUrl: asset.originalUrl,
         source: "library" as const,
@@ -159,7 +231,26 @@ export function AttachmentPicker({
   };
   const upload = async (files: File[], retainedUploads: AttachmentSelection[] = []) => {
     if (!files.length) return;
-    const pendingFiles = multiple ? files : files.slice(0, 1);
+    const candidateFiles = multiple ? files : files.slice(0, 1);
+    const inspected = await Promise.all(
+      candidateFiles.map(async (file) => ({
+        file,
+        durationSec: await loadLocalVideoDuration(file),
+      })),
+    );
+    const rejected = inspected.find(({ file, durationSec }) =>
+      constraintReason({ mimeType: file.type, size: file.size, durationSec }, constraints),
+    );
+    if (rejected) {
+      setError(
+        constraintReason(
+          { mimeType: rejected.file.type, size: rejected.file.size, durationSec: rejected.durationSec },
+          constraints,
+        ) ?? "文件不符合引用要求",
+      );
+      return;
+    }
+    const pendingFiles = candidateFiles;
     const totalBytes = pendingFiles.reduce((total, file) => total + Math.max(file.size, 1), 0);
     const fileProgress = pendingFiles.map(() => 0);
     setUploadFiles(pendingFiles);
@@ -193,6 +284,7 @@ export function AttachmentPicker({
                 name: result.file.name,
                 mimeType: result.asset.mimeType,
                 size: result.asset.size,
+                durationSec: result.asset.durationSec,
                 url: result.asset.url,
                 originalUrl: result.asset.originalUrl,
                 source: "upload" as const,
@@ -217,10 +309,10 @@ export function AttachmentPicker({
     <>
       {trigger(() => {
         setSource(initialSource);
+        setMediaFilter("image");
         setOpen(true);
       })}
       {open &&
-        typeof document !== "undefined" &&
         createPortal(
           <div className="attachment-picker-layer" role="presentation" onMouseDown={close}>
             <section
@@ -256,6 +348,21 @@ export function AttachmentPicker({
                   <Upload /> 从本地上传
                 </Button>
               </div>
+              {constraints?.summary.length ? (
+                <div
+                  className="mx-4 mb-3 rounded-lg border border-line bg-surface-muted px-3 py-2"
+                  aria-label="素材规则"
+                >
+                  <b className="type-label text-ink">素材规则</b>
+                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                    {constraints.summary.map((item) => (
+                      <span className="type-helper text-muted" key={item}>
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               {source === "library" ? (
                 <div className="attachment-library-panel">
                   <div className={`attachment-directory-layout ${previewAsset ? "has-preview" : ""}`}>
@@ -283,14 +390,32 @@ export function AttachmentPicker({
                       </nav>
                     </aside>
                     <section className="attachment-folder-files">
-                      <label className="attachment-search">
-                        <Search />
-                        <input
-                          value={query}
-                          onChange={(event) => setQuery(event.target.value)}
-                          placeholder="搜索当前文件夹…"
-                        />
-                      </label>
+                      <div className="attachment-library-toolbar">
+                        <label className="attachment-search">
+                          <Search />
+                          <input
+                            value={query}
+                            onChange={(event) => setQuery(event.target.value)}
+                            placeholder="搜索当前文件夹…"
+                          />
+                        </label>
+                        {canFilterMediaTypes && (
+                          <div className="attachment-media-filters" aria-label="筛选素材类型">
+                            {mediaFilters.map((filter) => (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                key={filter.id}
+                                className={effectiveMediaFilter === filter.id ? "active" : ""}
+                                onClick={() => setMediaFilter(filter.id)}
+                              >
+                                {filter.label}
+                              </Button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                       <div className="attachment-breadcrumbs">
                         {breadcrumbs.map((folder, index) => (
                           <span key={folder.id}>
@@ -326,8 +451,9 @@ export function AttachmentPicker({
                               <ChevronRight />
                             </Button>
                           ))}
-                        {filtered.map((asset) => {
+                        {filteredByMediaType.map((asset) => {
                           const active = selected.includes(asset.id);
+                          const reason = constraintReason(asset, constraints);
                           return (
                             <Button
                               type="button"
@@ -335,6 +461,8 @@ export function AttachmentPicker({
                               size="sm"
                               key={asset.id}
                               className={active ? "active" : ""}
+                              disabled={Boolean(reason)}
+                              title={reason}
                               onClick={() => {
                                 setPreviewId(asset.id);
                                 setSelected((current) =>
@@ -346,19 +474,30 @@ export function AttachmentPicker({
                                 );
                               }}
                             >
-                              <i>
-                                <AssetIcon mimeType={asset.mimeType} />
+                              <i className="size-12 overflow-hidden rounded-md bg-surface-muted [&_img]:size-full [&_img]:object-cover [&_video]:size-full [&_video]:object-cover">
+                                <AuthenticatedMedia
+                                  url={asset.url}
+                                  mimeType={asset.mimeType}
+                                  alt={asset.name}
+                                  controls={false}
+                                  previewable={false}
+                                  className="size-full"
+                                />
                               </i>
                               <span>
                                 <b>{asset.name}</b>
-                                <small className="type-helper">{asset.mimeType}</small>
+                                <small className="type-helper">
+                                  {asset.mimeType} · {formatBytes(asset.size)}
+                                  {formatDuration(asset.durationSec) ? ` · ${formatDuration(asset.durationSec)}` : ""}
+                                  {reason ? ` · ${reason}` : ""}
+                                </small>
                               </span>
                               {active && <Check className="attachment-check" />}
                             </Button>
                           );
                         })}
                         {(isLoading || foldersLoading) && <p>正在加载素材库…</p>}
-                        {!isLoading && !foldersLoading && !filtered.length && !childFolders.length && (
+                        {!isLoading && !foldersLoading && !filteredByMediaType.length && !childFolders.length && (
                           <p>当前文件夹暂无符合格式的文件，可切换到本地上传。</p>
                         )}
                       </div>
@@ -387,6 +526,7 @@ export function AttachmentPicker({
                             originalUrl={previewAsset.originalUrl}
                             mimeType={previewAsset.mimeType}
                             alt={previewAsset.name}
+                            withAudioControls
                             className="size-full object-contain"
                             containerClassName="size-full"
                           />
@@ -419,7 +559,7 @@ export function AttachmentPicker({
                     uploading={uploading}
                     progress={uploadProgress}
                     error={error}
-                    description={`将上传到“${currentFolder?.name ?? "默认"}”，上传后可在素材库中重复使用。`}
+                    description={`${constraints?.summary.join("；") ?? ""}${constraints?.summary.length ? "。" : ""}将上传到“${currentFolder?.name ?? "默认"}”，上传后可在素材库中重复使用。`}
                     onFilesChange={(files) => void upload(files)}
                     onClear={() => {
                       setUploadFiles([]);

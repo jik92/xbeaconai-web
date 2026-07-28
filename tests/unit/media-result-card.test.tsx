@@ -74,9 +74,17 @@ describe("MediaResultCard", () => {
         ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     expect(onDownload).toHaveBeenCalledTimes(1);
-    expect(container.querySelector('button[aria-label="下载生成图片"]')?.className).toContain(
-      "absolute bottom-2 right-2",
-    );
+    const download = container.querySelector('button[aria-label="下载生成图片"]')?.className;
+    expect(download).toContain("absolute bottom-2");
+    expect(download).toContain("right-2");
+  });
+
+  test("places a video volume control to the right of the download action", () => {
+    const { container } = renderResult("video/mp4", "生成视频");
+
+    expect(container.querySelector('input[aria-label="调整生成视频音量"]')).not.toBeNull();
+    expect(container.querySelector('button[aria-label="下载生成视频"]')?.className).toContain("right-28");
+    expect(container.querySelector('input[aria-label="调整生成视频音量"]')?.getAttribute("type")).toBe("range");
   });
 
   test("updates the complete frame to the media intrinsic aspect ratio", () => {

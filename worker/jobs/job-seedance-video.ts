@@ -14,6 +14,7 @@ import { materializeRemoteAsset } from "./video-remix-assets";
 
 const wait = (ms: number) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
 export const SEEDANCE_DURATION_TOLERANCE_SECONDS = 1;
+export const SEEDANCE_REFERENCE_VIDEO_MAX_DURATION_SECONDS = 15.2;
 type SeedanceRatio = "16:9" | "9:16" | "1:1";
 
 export class SeedanceFlowError extends Error {
@@ -44,6 +45,18 @@ export function assertSeedanceDuration(requestedDurationSec: number, actualDurat
       true,
     );
   return actualDurationSec;
+}
+
+export function assertSeedanceReferenceVideoDuration(durationSec: number) {
+  if (!Number.isFinite(durationSec) || durationSec <= 0)
+    throw new SeedanceFlowError("REFERENCE_VIDEO_DURATION_INVALID", "参考视频未返回有效时长", false);
+  if (durationSec > SEEDANCE_REFERENCE_VIDEO_MAX_DURATION_SECONDS)
+    throw new SeedanceFlowError(
+      "REFERENCE_VIDEO_TOO_LONG",
+      `参考视频时长不能超过 ${SEEDANCE_REFERENCE_VIDEO_MAX_DURATION_SECONDS} 秒，当前为 ${durationSec.toFixed(2)} 秒`,
+      false,
+    );
+  return durationSec;
 }
 
 function referenceKind(mimeType: string): SeedanceReferenceKind | undefined {
@@ -141,8 +154,11 @@ export class SeedanceVideoJob {
         if (file.size !== asset.byteSize)
           throw new SeedanceFlowError("ASSET_SIZE_MISMATCH", "素材文件大小与记录不一致", false);
         const probe = await probeMedia(path);
-        if (kind === "video" && !probe.streams.some((stream) => stream.codec_type === "video"))
-          throw new SeedanceFlowError("INVALID_VIDEO_REFERENCE", "视频参考无法解码", false);
+        if (kind === "video") {
+          if (!probe.streams.some((stream) => stream.codec_type === "video"))
+            throw new SeedanceFlowError("INVALID_VIDEO_REFERENCE", "视频参考无法解码", false);
+          assertSeedanceReferenceVideoDuration(mediaDurationSec(probe));
+        }
         if (kind === "audio" && !probe.streams.some((stream) => stream.codec_type === "audio"))
           throw new SeedanceFlowError("INVALID_AUDIO_REFERENCE", "音频参考无法解码", false);
         if (kind === "image" && !probe.streams.some((stream) => stream.codec_type === "video"))

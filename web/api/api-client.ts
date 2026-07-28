@@ -674,13 +674,21 @@ export async function submitJob(
 }
 export async function submitAiGenerateJob(body: CreateAiGenerateJobData["body"], idempotencyKey = randomUuid()) {
   configure();
-  const { data } = await createAiGenerateJobRequest({
-    body,
-    headers: { ...authHeaders(), "Idempotency-Key": idempotencyKey },
-    throwOnError: true,
-  });
-  if (!data) throw new Error("AI 创作任务创建失败");
-  return data;
+  try {
+    const { data } = await createAiGenerateJobRequest({
+      body,
+      headers: { ...authHeaders(), "Idempotency-Key": idempotencyKey },
+      throwOnError: true,
+    });
+    if (!data) throw new Error("AI 创作任务创建失败");
+    return data;
+  } catch (reason) {
+    const message =
+      reason && typeof reason === "object" && "error" in reason
+        ? (reason as { error?: { message?: string } }).error?.message
+        : undefined;
+    throw new Error(message || (reason instanceof Error ? reason.message : "AI 创作任务创建失败"));
+  }
 }
 export async function checkQwenVoiceSample(assetId: string) {
   configure();

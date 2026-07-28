@@ -2,7 +2,6 @@ import {
   ActionBarPrimitive,
   type AppendMessage,
   AssistantRuntimeProvider,
-  AttachmentPrimitive,
   ComposerPrimitive,
   MessagePartPrimitive,
   MessagePrimitive,
@@ -16,7 +15,18 @@ import {
   useExternalStoreRuntime,
 } from "@assistant-ui/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, Image, Library, LoaderCircle, RefreshCw, Send, Sparkles, Video, X } from "lucide-react";
+import {
+  ArrowDown,
+  Image,
+  Library,
+  LoaderCircle,
+  MessageSquare,
+  Plus,
+  RefreshCw,
+  Send,
+  Sparkles,
+  Video,
+} from "lucide-react";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { downloadAuthenticated, fetchCreationCapabilities, fetchJobs, submitAiGenerateJob } from "@/api/api-client";
@@ -24,28 +34,47 @@ import type { Job } from "@/api/generated/types.gen";
 import { AttachmentPicker, type AttachmentSelection } from "@/components/domain/attachment-picker";
 import { MediaResultCard } from "@/components/domain/media-result-card";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { randomUuid } from "@/lib/random-id";
 import type { CreationModelCapability } from "../ai-creation/ai-creation-composer";
 import {
   type AiGenerateDraft,
+  type AiGenerateConversation,
   type AiGenerateKind,
   type AiGenerateReference,
   type AiGenerateResultData,
   buildAiGenerateRequest,
+  buildProfessionalPrompt,
   countEffectiveReferences,
+  groupAiGenerateConversations,
   jobsToThreadMessages,
+  parseProfessionalPrompt,
   parseJobReferences,
+  referenceAccept,
   referencesFromAppendMessage,
+  resolveReferenceMode,
   resolveAssetMentions,
+  seedanceReferenceConstraints,
+  supportsMediaReference,
   validateModelReferenceCount,
 } from "./ai-generate-runtime";
+import { AiGenerateReferencePreview } from "./ai-generate-reference-preview";
 
 type RuntimeContextValue = {
   jobs: Job[];
+  conversations: AiGenerateConversation[];
+  activeConversation?: Pick<AiGenerateConversation, "id" | "name">;
+  selectConversation: (conversation: Pick<AiGenerateConversation, "id" | "name">) => void;
+  createConversation: (name: string) => void;
   draft: AiGenerateDraft;
   models: CreationModelCapability[];
   setDraft: React.Dispatch<React.SetStateAction<AiGenerateDraft>>;
+  submitVariant: (source: Job) => Promise<void>;
+  restoreRequest?: Job;
+  restoreRevision: (source: Job) => void;
+  clearRestoreRequest: () => void;
 };
 
 const RuntimeContext = createContext<RuntimeContextValue | null>(null);
@@ -125,7 +154,46 @@ function AiGenerateProvider({ children }: { children: React.ReactNode }) {
   });
   const models = capabilities?.models ?? [];
   const [draft, setDraft] = useState<AiGenerateDraft>(initialDraft);
-  const messages = useMemo(() => jobsToThreadMessages(jobs), [jobs]);
+  const [draftsByConversation, setDraftsByConversation] = useState<Record<string, AiGenerateDraft>>({});
+  const [createdConversations, setCreatedConversations] = useState<Pick<AiGenerateConversation, "id" | "name">[]>([]);
+  const [activeConversation, setActiveConversation] = useState<Pick<AiGenerateConversation, "id" | "name">>();
+  const [restoreRequest, setRestoreRequest] = useState<Job>();
+  const conversations = useMemo(() => {
+    const persisted = groupAiGenerateConversations(jobs);
+    const persistedIds = new Set(persisted.map((conversation) => conversation.id));
+    const pending = createdConversations
+      .filter((conversation) => !persistedIds.has(conversation.id))
+      .map((conversation) => ({ ...conversation, jobs: [] }));
+    return [...pending, ...persisted];
+  }, [createdConversations, jobs]);
+  const activeConversationId = activeConversation?.id;
+  const activeJobs = useMemo(
+    () =>
+      activeConversationId === "unclassified"
+        ? jobs.filter((job) => !job.values.conversationId)
+        : jobs.filter((job) => job.values.conversationId === activeConversationId),
+    [activeConversationId, jobs],
+  );
+  const messages = useMemo(() => jobsToThreadMessages(activeJobs), [activeJobs]);
+
+  useEffect(() => {
+    if (activeConversation || !conversations.length) return;
+    const latest = conversations[0];
+    if (latest) setActiveConversation({ id: latest.id, name: latest.name });
+  }, [activeConversation, conversations]);
+
+  const selectConversation = (conversation: Pick<AiGenerateConversation, "id" | "name">) => {
+    if (activeConversation) setDraftsByConversation((current) => ({ ...current, [activeConversation.id]: draft }));
+    setActiveConversation(conversation);
+    setDraft(draftsByConversation[conversation.id] ?? initialDraft());
+    setRestoreRequest(undefined);
+  };
+
+  const createConversation = (name: string) => {
+    const conversation = { id: randomUuid(), name: name.trim() };
+    setCreatedConversations((current) => [conversation, ...current]);
+    selectConversation(conversation);
+  };
 
   useEffect(() => {
     const available = models.filter((model) => model.kind === draft.kind && model.enabled);
@@ -148,39 +216,91 @@ function AiGenerateProvider({ children }: { children: React.ReactNode }) {
     }));
   }, [draft.kind, draft.modelId, models]);
 
+  const submitDraft = async (nextDraft: AiGenerateDraft, clearDraft: boolean) => {
+    if (!activeConversation) throw new Error("请先新建产品对话");
+    const resolved = resolveAssetMentions(nextDraft.prompt, nextDraft.references);
+    if (resolved.unresolved.length) throw new Error(`${resolved.unresolved[0]} 未关联到当前素材`);
+    const resolvedDraft = { ...nextDraft, references: resolved.references };
+    const model = models.find((item) => item.id === resolvedDraft.modelId && item.kind === resolvedDraft.kind);
+    if (!model?.enabled) throw new Error(model?.disabledReason ?? "所选模型当前不可用");
+    const requestDraft = {
+      ...resolvedDraft,
+      conversationId: activeConversation?.id,
+      conversationName: activeConversation?.name,
+      referenceMode: resolveReferenceMode(resolvedDraft.kind, resolvedDraft.referenceMode, model.referenceModes),
+    };
+    if (requestDraft.kind === "video" && !requestDraft.referenceMode) throw new Error("所选视频模型未提供参考模式");
+    const referenceError = validateModelReferenceCount(
+      model,
+      countEffectiveReferences(resolved.references.length, requestDraft.parentJobId, requestDraft.revisionMode),
+    );
+    if (referenceError) throw new Error(referenceError);
+    const title = `${requestDraft.kind === "image" ? "图片" : "视频"}创作 · ${new Date().toLocaleTimeString()}`;
+    await submitAiGenerateJob(buildAiGenerateRequest(requestDraft, title), randomUuid());
+    if (clearDraft)
+      setDraft((current) => ({ ...current, prompt: "", references: [], parentJobId: undefined, revisionMode: "new" }));
+    await queryClient.invalidateQueries({ queryKey: ["api-tasks", "ai-generate"] });
+  };
   const submit = async (
     prompt: string,
     references: AiGenerateReference[],
     parentJobId?: string,
     mode = draft.revisionMode,
   ) => {
-    const resolved = resolveAssetMentions(prompt, references);
-    if (resolved.unresolved.length) throw new Error(`${resolved.unresolved[0]} 未关联到当前素材`);
-    const nextDraft = {
-      ...draft,
-      prompt,
-      references: resolved.references,
-      parentJobId,
-      revisionMode: mode,
-    };
-    const model = models.find((item) => item.id === nextDraft.modelId && item.kind === nextDraft.kind);
-    if (!model?.enabled) throw new Error(model?.disabledReason ?? "所选模型当前不可用");
-    const referenceError = validateModelReferenceCount(
-      model,
-      countEffectiveReferences(resolved.references.length, parentJobId, mode),
+    await submitDraft(
+      {
+        ...draft,
+        prompt,
+        references,
+        parentJobId,
+        revisionMode: mode,
+      },
+      true,
     );
-    if (referenceError) throw new Error(referenceError);
-    const title = `${nextDraft.kind === "image" ? "图片" : "视频"}创作 · ${new Date().toLocaleTimeString()}`;
-    await submitAiGenerateJob(buildAiGenerateRequest(nextDraft, title), randomUuid());
-    setDraft((current) => ({ ...current, prompt: "", references: [], parentJobId: undefined, revisionMode: "new" }));
-    await queryClient.invalidateQueries({ queryKey: ["api-tasks", "ai-generate"] });
+  };
+  const submitVariant = async (source: Job) =>
+    submitDraft(
+      {
+        ...draft,
+        kind: source.values.kind === "video" ? "video" : "image",
+        prompt: source.values.prompt ?? source.title,
+        modelId: source.values.modelId ?? draft.modelId,
+        ratio: source.values.ratio ?? draft.ratio,
+        resolution: source.values.resolution ?? draft.resolution,
+        duration: Number(source.values.duration || draft.duration),
+        count: Number(source.values.count || draft.count),
+        references: parseJobReferences(source),
+        conversationId: source.values.conversationId,
+        conversationName: source.values.conversationName,
+        parentJobId: source.id,
+        revisionMode: "variant",
+      },
+      false,
+    );
+  const restoreRevision = (source: Job) => {
+    setDraft((current) => ({
+      ...current,
+      kind: source.values.kind === "video" ? "video" : "image",
+      modelId: source.values.modelId ?? current.modelId,
+      ratio: source.values.ratio ?? current.ratio,
+      resolution: source.values.resolution ?? current.resolution,
+      duration: Number(source.values.duration || current.duration),
+      count: Number(source.values.count || current.count),
+      references: parseJobReferences(source),
+      conversationId: source.values.conversationId,
+      conversationName: source.values.conversationName,
+      // “继续修改”只复用原始文本与参考素材；任务尚未成功时不能作为服务端谱系父任务。
+      parentJobId: source.status === "succeeded" ? source.id : undefined,
+      revisionMode: source.status === "succeeded" ? "edit" : "new",
+    }));
+    setRestoreRequest(source);
   };
 
   const runtime = useExternalStoreRuntime<ThreadMessageLike>({
     messages,
     convertMessage: (message) => message,
     isLoading,
-    isRunning: jobs.some((job) => job.status === "queued" || job.status === "processing"),
+    isRunning: activeJobs.some((job) => job.status === "queued" || job.status === "processing"),
     onNew: async (message) => {
       try {
         const messageReferences = referencesFromAppendMessage(message);
@@ -213,7 +333,22 @@ function AiGenerateProvider({ children }: { children: React.ReactNode }) {
   });
 
   return (
-    <RuntimeContext.Provider value={{ jobs, draft, models, setDraft }}>
+    <RuntimeContext.Provider
+      value={{
+        jobs,
+        conversations,
+        activeConversation,
+        selectConversation,
+        createConversation,
+        draft,
+        models,
+        setDraft,
+        submitVariant,
+        restoreRequest,
+        restoreRevision,
+        clearRestoreRequest: () => setRestoreRequest(undefined),
+      }}
+    >
       <AssistantRuntimeProvider runtime={runtime}>{children}</AssistantRuntimeProvider>
     </RuntimeContext.Provider>
   );
@@ -266,39 +401,48 @@ function ResultPart({ data }: { data: AiGenerateResultData }) {
 }
 
 function UserMessage() {
+  const references = useAuiState(
+    (state) => (state.message.metadata?.custom as { references?: AiGenerateReference[] } | undefined)?.references ?? [],
+  );
   return (
     <MessagePrimitive.Root className="mx-auto grid w-full max-w-4xl justify-items-end px-4 py-3">
       <div className="max-w-2xl rounded-2xl bg-primary px-4 py-3 type-body text-on-primary">
         <MessagePrimitive.Parts />
+        <div className="mt-3 border-t border-on-primary/20 pt-3">
+          <AiGenerateReferencePreview references={references} removable={false} />
+        </div>
       </div>
     </MessagePrimitive.Root>
   );
 }
 
 function AssistantMessage() {
-  const { jobs, setDraft } = useAiGenerateContext();
-  const aui = useAui();
-  const jobId = useAuiState((state) => state.message.metadata.custom?.jobId as string | undefined);
+  const { jobs, restoreRevision, submitVariant } = useAiGenerateContext();
+  const jobId = useAuiState((state) => {
+    const metadataJobId = state.message.metadata.custom?.jobId;
+    if (typeof metadataJobId === "string") return metadataJobId;
+    const result = state.message.content.find((part) => part.type === "data" && part.name === "ai-generate-result");
+    return result?.type === "data" ? (result.data as AiGenerateResultData).jobId : undefined;
+  });
   const source = jobs.find((job) => job.id === jobId);
-  const revise = (mode: "edit" | "variant") => {
-    if (!source) return;
-    setDraft((current) => ({
-      ...current,
-      kind: source.values.kind === "video" ? "video" : "image",
-      modelId: source.values.modelId ?? current.modelId,
-      ratio: source.values.ratio ?? current.ratio,
-      resolution: source.values.resolution ?? current.resolution,
-      duration: Number(source.values.duration || current.duration),
-      count: Number(source.values.count || current.count),
-      references: parseJobReferences(source),
-      parentJobId: source.id,
-      revisionMode: mode,
-    }));
-    aui
-      .composer()
-      .setText(
-        mode === "variant" ? `${source.values.prompt ?? source.title}\n生成一个构图和风格不同的变体` : "继续修改：",
-      );
+  const restoreSource = () => {
+    if (!source) {
+      toast.error("找不到对应的创作任务");
+      return;
+    }
+    restoreRevision(source);
+  };
+  const createVariant = async () => {
+    if (!source) {
+      toast.error("找不到对应的创作任务");
+      return;
+    }
+    try {
+      await submitVariant(source);
+      toast.success("已提交新的创作变体");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "创建变体失败");
+    }
   };
   return (
     <MessagePrimitive.Root className="mx-auto w-full max-w-4xl px-4 py-3">
@@ -315,11 +459,11 @@ function AssistantMessage() {
         }}
       </MessagePrimitive.Parts>
       <ActionBarPrimitive.Root className="mt-2 flex gap-1">
-        <Button size="sm" variant="ghost" onClick={() => revise("edit")}>
+        <Button size="sm" variant="ghost" onClick={restoreSource}>
           <RefreshCw />
           继续修改
         </Button>
-        <Button size="sm" variant="ghost" onClick={() => revise("variant")}>
+        <Button size="sm" variant="ghost" onClick={() => void createVariant()}>
           <Sparkles />
           创建变体
         </Button>
@@ -328,23 +472,11 @@ function AssistantMessage() {
   );
 }
 
-function ComposerAttachment() {
-  return (
-    <AttachmentPrimitive.Root className="flex max-w-44 items-center gap-2 rounded-lg border border-line bg-surface-muted px-2 py-1.5">
-      <AttachmentPrimitive.unstable_Thumb className="flex size-8 items-center justify-center rounded-md bg-surface type-helper" />
-      <span className="min-w-0 flex-1 truncate type-helper text-ink">
-        <AttachmentPrimitive.Name />
-      </span>
-      <AttachmentPrimitive.Remove className="rounded-full p-1 text-muted hover:bg-surface" aria-label="移除素材">
-        <X className="size-3" />
-      </AttachmentPrimitive.Remove>
-    </AttachmentPrimitive.Root>
-  );
-}
-
 function AiGenerateComposer() {
-  const { draft, models, setDraft } = useAiGenerateContext();
+  const { draft, models, setDraft, restoreRequest, clearRestoreRequest } = useAiGenerateContext();
   const aui = useAui();
+  const [composerMode, setComposerMode] = useState<"concise" | "professional">("concise");
+  const [professionalFields, setProfessionalFields] = useState({ script: "", environment: "", emphasis: "" });
   const attachments = useAuiState((state) => state.composer.attachments);
   const attachedReferences = attachments.flatMap(
     (attachment) =>
@@ -366,6 +498,69 @@ function AiGenerateComposer() {
   });
   const filteredModels = models.filter((model) => model.kind === draft.kind);
   const model = filteredModels.find((item) => item.id === draft.modelId);
+  const professionalPrompt = buildProfessionalPrompt(professionalFields);
+  const acceptedReferenceKinds = model?.acceptedReferenceKinds ?? [];
+  const accept = referenceAccept(model);
+  const canAttachReferences = Boolean(accept) && Boolean(model?.enabled);
+  const referenceCapabilityKey = acceptedReferenceKinds.join(",");
+  useEffect(() => {
+    if (!model) return;
+    const composer = aui.composer();
+    const attachments = composer.getState().attachments;
+    const compatibleAttachments = attachments.filter((attachment) => {
+      const unsupported = attachment.content?.some(
+        (part) =>
+          part.type === "data" &&
+          part.name === "ai-generate-reference" &&
+          !supportsMediaReference(model, (part.data as AiGenerateReference).mimeType),
+      );
+      return !unsupported;
+    });
+    const removedCount = attachments.length - compatibleAttachments.length;
+    if (!removedCount) return;
+    void (async () => {
+      await composer.clearAttachments();
+      for (const attachment of compatibleAttachments)
+        await composer.addAttachment({
+          id: attachment.id,
+          type: attachment.type,
+          name: attachment.name,
+          contentType: attachment.contentType,
+          content: attachment.content ?? [],
+        });
+      toast.warning(`已移除 ${removedCount} 个新模型不支持的参考素材`);
+    })();
+  }, [aui, model, referenceCapabilityKey]);
+  useEffect(() => {
+    if (!restoreRequest) return;
+    const composer = aui.composer();
+    const references = parseJobReferences(restoreRequest);
+    const restoredPrompt = restoreRequest.values.prompt ?? restoreRequest.title;
+    const professionalFields = parseProfessionalPrompt(restoredPrompt);
+    void (async () => {
+      try {
+        setComposerMode(professionalFields ? "professional" : "concise");
+        if (professionalFields) setProfessionalFields(professionalFields);
+        await composer.clearAttachments();
+        for (const reference of references)
+          await composer.addAttachment({
+            id: reference.id,
+            type: referenceKind(reference.mimeType),
+            name: `@${reference.label} · ${reference.name}`,
+            contentType: reference.mimeType,
+            content: [{ type: "data", name: "ai-generate-reference", data: reference }],
+          });
+        composer.setText(restoredPrompt);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "回填创作内容失败");
+      } finally {
+        clearRestoreRequest();
+      }
+    })();
+  }, [aui, clearRestoreRequest, restoreRequest]);
+  useEffect(() => {
+    if (composerMode === "professional") aui.composer().setText(professionalPrompt);
+  }, [aui, composerMode, professionalPrompt]);
   const referenceError = model
     ? validateModelReferenceCount(
         model,
@@ -393,6 +588,29 @@ function AiGenerateComposer() {
         content: [{ type: "data", name: "ai-generate-reference", data: reference }],
       });
   };
+  const removeReference = async (referenceId: string) => {
+    const composer = aui.composer();
+    const remaining = composer
+      .getState()
+      .attachments.filter(
+        (attachment) =>
+          !attachment.content?.some(
+            (part) =>
+              part.type === "data" &&
+              part.name === "ai-generate-reference" &&
+              (part.data as AiGenerateReference).id === referenceId,
+          ),
+      );
+    await composer.clearAttachments();
+    for (const attachment of remaining)
+      await composer.addAttachment({
+        id: attachment.id,
+        type: attachment.type,
+        name: attachment.name,
+        contentType: attachment.contentType,
+        content: attachment.content ?? [],
+      });
+  };
   const switchKind = (kind: AiGenerateKind) =>
     setDraft((current) => ({
       ...current,
@@ -405,39 +623,82 @@ function AiGenerateComposer() {
     }));
   return (
     <ComposerPrimitive.Root className="rounded-2xl border border-line bg-surface p-3 shadow-sm">
-      <div className="mb-2 flex flex-wrap gap-2">
-        <ComposerPrimitive.Attachments>{() => <ComposerAttachment />}</ComposerPrimitive.Attachments>
-      </div>
-      <ComposerPrimitive.Unstable_TriggerPopoverRoot>
-        <ComposerPrimitive.Input
-          rows={2}
-          placeholder="描述要生成或修改的内容，输入 @引用已添加的素材"
-          className="max-h-40 min-h-16 w-full resize-none bg-transparent px-1 py-2 type-body text-ink outline-none placeholder:text-muted"
-        />
-        <ComposerPrimitive.Unstable_TriggerPopover
-          char="@"
-          adapter={mention.adapter}
-          className="absolute bottom-full left-3 z-30 mb-2 w-72 overflow-hidden rounded-lg border border-line bg-surface p-1 shadow-sm"
-          aria-label="引用素材"
+      <div className="mb-3 flex items-center gap-1">
+        <Button
+          size="sm"
+          variant={composerMode === "concise" ? "default" : "ghost"}
+          onClick={() => setComposerMode("concise")}
         >
-          <ComposerPrimitive.Unstable_TriggerPopover.Directive {...mention.directive} />
-          <ComposerPrimitive.Unstable_TriggerPopoverItems>
-            {(items) =>
-              items.map((item, index) => (
-                <ComposerPrimitive.Unstable_TriggerPopoverItem
-                  item={item}
-                  index={index}
-                  key={item.id}
-                  className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left type-body text-ink hover:bg-surface-muted data-highlighted:bg-surface-muted"
-                >
-                  <span>@{item.label}</span>
-                  <small className="truncate type-helper text-muted">{item.description}</small>
-                </ComposerPrimitive.Unstable_TriggerPopoverItem>
-              ))
-            }
-          </ComposerPrimitive.Unstable_TriggerPopoverItems>
-        </ComposerPrimitive.Unstable_TriggerPopover>
-      </ComposerPrimitive.Unstable_TriggerPopoverRoot>
+          简洁版
+        </Button>
+        <Button
+          size="sm"
+          variant={composerMode === "professional" ? "default" : "ghost"}
+          onClick={() => setComposerMode("professional")}
+        >
+          专业版
+        </Button>
+      </div>
+      <div className="mb-2">
+        <AiGenerateReferencePreview
+          references={attachedReferences}
+          removable
+          onRemove={(id) => void removeReference(id)}
+        />
+      </div>
+      {composerMode === "professional" ? (
+        <div className="mb-3 overflow-hidden rounded-xl border border-line">
+          {(
+            [
+              ["script", "脚本", "描述视频主题、核心内容、故事结构或脚本要点"],
+              ["environment", "环境与运镜", "填写场景环境、画面风格、镜头语言与运镜方式"],
+              ["emphasis", "强调点", "填写需要重点突出的产品功能、卖点或记忆点"],
+            ] as const
+          ).map(([key, label, placeholder]) => (
+            <label className="grid grid-cols-[132px_minmax(0,1fr)] border-b border-line last:border-b-0" key={key}>
+              <span className="flex items-center border-r border-line px-3 type-body-strong text-ink">{label}</span>
+              <textarea
+                value={professionalFields[key]}
+                placeholder={placeholder}
+                rows={2}
+                className="min-h-18 resize-y bg-transparent px-3 py-2 type-body text-ink outline-none placeholder:text-muted"
+                onChange={(event) => setProfessionalFields((current) => ({ ...current, [key]: event.target.value }))}
+              />
+            </label>
+          ))}
+        </div>
+      ) : (
+        <ComposerPrimitive.Unstable_TriggerPopoverRoot>
+          <ComposerPrimitive.Input
+            rows={2}
+            placeholder="描述要生成或修改的内容，输入 @引用已添加的素材"
+            className="max-h-40 min-h-16 w-full resize-none bg-transparent px-1 py-2 type-body text-ink outline-none placeholder:text-muted"
+          />
+          <ComposerPrimitive.Unstable_TriggerPopover
+            char="@"
+            adapter={mention.adapter}
+            className="absolute bottom-full left-3 z-30 mb-2 w-72 overflow-hidden rounded-lg border border-line bg-surface p-1 shadow-sm"
+            aria-label="引用素材"
+          >
+            <ComposerPrimitive.Unstable_TriggerPopover.Directive {...mention.directive} />
+            <ComposerPrimitive.Unstable_TriggerPopoverItems>
+              {(items) =>
+                items.map((item, index) => (
+                  <ComposerPrimitive.Unstable_TriggerPopoverItem
+                    item={item}
+                    index={index}
+                    key={item.id}
+                    className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left type-body text-ink hover:bg-surface-muted data-highlighted:bg-surface-muted"
+                  >
+                    <span>@{item.label}</span>
+                    <small className="truncate type-helper text-muted">{item.description}</small>
+                  </ComposerPrimitive.Unstable_TriggerPopoverItem>
+                ))
+              }
+            </ComposerPrimitive.Unstable_TriggerPopoverItems>
+          </ComposerPrimitive.Unstable_TriggerPopover>
+        </ComposerPrimitive.Unstable_TriggerPopoverRoot>
+      )}
       <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
         <div className="flex rounded-md border border-line p-0.5">
           <Button size="sm" variant={draft.kind === "image" ? "default" : "ghost"} onClick={() => switchKind("image")}>
@@ -496,15 +757,26 @@ function AiGenerateComposer() {
             ))}
           </NativeSelect>
         )}
-        <AttachmentPicker
-          multiple
-          onSelect={(assets) => void addAssets(assets)}
-          trigger={(open) => (
-            <Button size="sm" variant="outline" onClick={open}>
-              <Library />@ 引用素材
-            </Button>
-          )}
-        />
+        {accept && (
+          <AttachmentPicker
+            accept={accept}
+            constraints={seedanceReferenceConstraints(model)}
+            multiple
+            showMediaTypeFilters
+            onSelect={(assets) => void addAssets(assets)}
+            trigger={(open) => (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!canAttachReferences}
+                title={model?.disabledReason}
+                onClick={open}
+              >
+                <Library /> 添加参考素材
+              </Button>
+            )}
+          />
+        )}
         <ComposerPrimitive.Send asChild>
           <Button
             className="ml-auto rounded-full"
@@ -518,6 +790,76 @@ function AiGenerateComposer() {
         </ComposerPrimitive.Send>
       </div>
     </ComposerPrimitive.Root>
+  );
+}
+
+function AiGenerateConversationRail() {
+  const { activeConversation, conversations, createConversation, selectConversation } = useAiGenerateContext();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const validName = name.trim().length > 0 && name.trim().length <= 80;
+
+  const submit = () => {
+    if (!validName) return;
+    createConversation(name);
+    setName("");
+    setOpen(false);
+  };
+
+  return (
+    <>
+      <aside
+        aria-label="产品对话"
+        className="flex h-full min-h-0 w-56 shrink-0 flex-col overflow-hidden border-r border-line bg-surface-muted/30 p-3"
+      >
+        <Button className="w-full" size="sm" onClick={() => setOpen(true)}>
+          <Plus /> 新建对话
+        </Button>
+        <div className="mt-4 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
+          {conversations.map((conversation) => {
+            const selected = activeConversation?.id === conversation.id;
+            return (
+              <Button
+                key={conversation.id}
+                variant={selected ? "default" : "ghost"}
+                className="h-auto w-full justify-start gap-2 px-3 py-2 text-left"
+                onClick={() => selectConversation(conversation)}
+              >
+                <MessageSquare className="size-4 shrink-0" />
+                <span className="truncate">{conversation.name}</span>
+                <span className="ml-auto type-helper text-muted">{conversation.jobs.length}</span>
+              </Button>
+            );
+          })}
+        </div>
+      </aside>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>新建对话</DialogTitle>
+          </DialogHeader>
+          <Input
+            autoFocus
+            aria-label="产品名称"
+            maxLength={80}
+            placeholder="产品名称"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") submit();
+            }}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              取消
+            </Button>
+            <Button disabled={!validName} onClick={submit}>
+              创建
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -561,6 +903,7 @@ export function AiGeneratePage() {
   return (
     <AiGenerateProvider>
       <div className="flex h-[calc(100dvh-56px)] min-h-0 overflow-hidden bg-surface">
+        <AiGenerateConversationRail />
         <AiGenerateThread />
       </div>
     </AiGenerateProvider>

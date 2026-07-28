@@ -3487,6 +3487,29 @@ td small {
   display: flex;
   flex-direction: column;
 }
+.attachment-library-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.attachment-library-toolbar > :first-child {
+  flex: 1;
+}
+.attachment-media-filters {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.attachment-media-filters button {
+  height: 30px;
+  padding-inline: 9px;
+}
+.attachment-media-filters button.active {
+  background: var(--surface-strong);
+  @apply text-primary;
+}
 .attachment-breadcrumbs {
   min-height: 34px;
   display: flex;

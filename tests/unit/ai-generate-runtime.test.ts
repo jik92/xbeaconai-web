@@ -4,10 +4,17 @@ import {
   type AiGenerateDraft,
   type AiGenerateReference,
   buildAiGenerateRequest,
+  buildProfessionalPrompt,
   countEffectiveReferences,
+  groupAiGenerateConversations,
   jobsToThreadMessages,
+  referenceAccept,
   referencesFromAppendMessage,
+  resolveReferenceMode,
   resolveAssetMentions,
+  parseProfessionalPrompt,
+  seedanceReferenceConstraints,
+  supportsMediaReference,
   validateModelReferenceCount,
 } from "../../web/features/ai-generate/ai-generate-runtime";
 
@@ -30,6 +37,42 @@ test("counts a parent result as the implicit reference only when no explicit ref
   expect(countEffectiveReferences(0, "parent-job", "variant")).toBe(1);
   expect(countEffectiveReferences(2, "parent-job", "edit")).toBe(2);
   expect(countEffectiveReferences(0, "parent-job", "new")).toBe(0);
+});
+
+test("maps a model reference capability to image and video attachment constraints", () => {
+  expect(referenceAccept({ acceptedReferenceKinds: ["image", "video"] })).toBe("image/*,video/*");
+  expect(referenceAccept({ acceptedReferenceKinds: ["image"] })).toBe("image/*");
+  expect(referenceAccept({ acceptedReferenceKinds: [] })).toBe("");
+  expect(supportsMediaReference({ acceptedReferenceKinds: ["video"] }, "video/mp4")).toBe(true);
+  expect(supportsMediaReference({ acceptedReferenceKinds: ["video"] }, "image/png")).toBe(false);
+});
+
+test("publishes the visible Seedance limits for each supported reference type", () => {
+  expect(seedanceReferenceConstraints({ acceptedReferenceKinds: ["image", "video"] })).toEqual(
+    expect.objectContaining({ summary: expect.arrayContaining([expect.stringContaining("15.2")]) }),
+  );
+  expect(seedanceReferenceConstraints({ acceptedReferenceKinds: ["image"] })?.summary.join(" ")).not.toContain("15.2");
+});
+
+test("combines every professional field into the prompt sent to Seedance", () => {
+  expect(buildProfessionalPrompt({ script: "商品环绕展示", environment: "摄影棚慢推镜", emphasis: "突出材质" })).toBe(
+    "脚本：商品环绕展示\n环境与运镜：摄影棚慢推镜\n强调点：突出材质",
+  );
+});
+
+test("identifies and restores professional prompts without changing concise prompts", () => {
+  expect(parseProfessionalPrompt("脚本：商品环绕展示\n环境与运镜：摄影棚慢推镜\n强调点：突出材质")).toEqual({
+    script: "商品环绕展示",
+    environment: "摄影棚慢推镜",
+    emphasis: "突出材质",
+  });
+  expect(parseProfessionalPrompt("一句简洁描述")).toBeUndefined();
+});
+
+test("restores a valid video reference mode when an older task did not persist one", () => {
+  expect(resolveReferenceMode("video", "", ["omni"])).toBe("omni");
+  expect(resolveReferenceMode("video", "omni", ["omni"])).toBe("omni");
+  expect(resolveReferenceMode("image", "omni", [])).toBe("");
 });
 
 function job(patch: Partial<Job> = {}): Job {
@@ -141,6 +184,8 @@ describe("AI Generate assistant runtime", () => {
       seed: "",
       referenceMode: "",
       references: [reference],
+      conversationId: "44444444-4444-4444-8444-444444444444",
+      conversationName: "桑蚕丝女裤",
       parentJobId: "33333333-3333-4333-8333-333333333333",
       revisionMode: "edit",
     };
@@ -155,8 +200,55 @@ describe("AI Generate assistant runtime", () => {
       count: 1,
       referenceAssetIds: [reference.id],
       parentJobId: "33333333-3333-4333-8333-333333333333",
+      conversationId: "44444444-4444-4444-8444-444444444444",
+      conversationName: "桑蚕丝女裤",
       revisionMode: "edit",
     });
+  });
+
+  test("does not submit the virtual unclassified conversation as a UUID", () => {
+    const request = buildAiGenerateRequest(
+      {
+        kind: "image",
+        prompt: "为旧任务创建变体",
+        modelId: "gpt-image-1-mini",
+        ratio: "1:1",
+        resolution: "1k",
+        count: 1,
+        duration: 5,
+        seed: "",
+        referenceMode: "",
+        references: [],
+        conversationId: "unclassified",
+        conversationName: "未分类",
+        revisionMode: "variant",
+      },
+      "图片创作",
+    );
+
+    expect(request).not.toHaveProperty("conversationId");
+    expect(request).not.toHaveProperty("conversationName");
+  });
+
+  test("groups named products separately and keeps legacy tasks unclassified", () => {
+    const named = job({
+      id: "named-job",
+      createdAt: "2026-07-27T08:00:00.000Z",
+      values: {
+        ...job().values,
+        conversationId: "44444444-4444-4444-8444-444444444444",
+        conversationName: "桑蚕丝女裤",
+      },
+    });
+
+    expect(groupAiGenerateConversations([job(), named])).toEqual([
+      expect.objectContaining({
+        id: "44444444-4444-4444-8444-444444444444",
+        name: "桑蚕丝女裤",
+        jobs: [named],
+      }),
+      expect.objectContaining({ id: "unclassified", name: "未分类", jobs: [job()] }),
+    ]);
   });
 
   test("maps each persisted job to stable user and assistant messages", () => {

@@ -119,21 +119,25 @@ try {
     for (const scenario of scenarios) {
       const startedAt = new Date().toISOString();
       try {
-        const values = {
-          type: "视频",
-          prompt: `Create a stable studio product shot for ${scenario.id}.`,
-          ratio: "16:9",
-          generateAudio: String(scenario.generateAudio),
-          references: `assets:${JSON.stringify(scenario.assets)}`,
-        };
+        const prompt = [
+          `脚本：Create a stable studio product shot for ${scenario.id}.`,
+          "环境与运镜：明亮摄影棚，缓慢环绕运镜，保持主体稳定。",
+          "强调点：突出产品材质、轮廓和细节。",
+        ].join("\n");
         const response = await request("/api/ai-generate/jobs", {
           method: "POST",
           headers: { ...auth, "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
           body: JSON.stringify({
             title: `${model}-${scenario.id}`,
-            values,
-            videoModel: model,
-            allowMockFallback: false,
+            kind: "video",
+            prompt,
+            modelId: model,
+            ratio: "16:9",
+            resolution: "720p",
+            duration: 5,
+            referenceMode: "omni",
+            referenceAssetIds: scenario.assets.map((asset) => asset.id),
+            revisionMode: "new",
           }),
         });
         if (response.status !== 202) throw new Error(`CREATE_JOB_${response.status}:${await response.text()}`);

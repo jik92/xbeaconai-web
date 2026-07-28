@@ -1298,6 +1298,8 @@ export type CreateAiGenerateJobData = {
         ratio: string;
         resolution: string;
         referenceAssetIds: Array<string>;
+        conversationId?: string;
+        conversationName?: string;
         parentJobId?: string;
         revisionMode: 'new' | 'edit' | 'variant';
         kind: 'image';
@@ -1309,6 +1311,8 @@ export type CreateAiGenerateJobData = {
         ratio: string;
         resolution: string;
         referenceAssetIds: Array<string>;
+        conversationId?: string;
+        conversationName?: string;
         parentJobId?: string;
         revisionMode: 'new' | 'edit' | 'variant';
         kind: 'video';

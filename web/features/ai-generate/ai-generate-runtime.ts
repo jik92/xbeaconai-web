@@ -1,5 +1,6 @@
 import type { AppendMessage, ThreadMessageLike } from "@assistant-ui/react";
 import type { CreateAiGenerateJobData, Job } from "@/api/generated/types.gen";
+import type { AttachmentPickerConstraints } from "@/components/domain/attachment-picker";
 
 export type AiGenerateKind = "image" | "video";
 export type AiGenerateRevisionMode = "new" | "edit" | "variant";
@@ -25,6 +26,8 @@ export interface AiGenerateDraft {
   seed: string;
   referenceMode: string;
   references: AiGenerateReference[];
+  conversationId?: string;
+  conversationName?: string;
   parentJobId?: string;
   revisionMode: AiGenerateRevisionMode;
 }
@@ -37,6 +40,85 @@ export interface AiGenerateResultData {
   executionMode: Job["overallExecutionMode"];
   error?: Job["error"];
   artifacts: NonNullable<Job["result"]>["artifacts"];
+}
+
+export const UNCLASSIFIED_CONVERSATION_ID = "unclassified";
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export interface AiGenerateConversation {
+  id: string;
+  name: string;
+  jobs: Job[];
+}
+
+type ReferenceCapability = {
+  acceptedReferenceKinds?: string[];
+};
+
+function supportedMediaKinds(model?: ReferenceCapability) {
+  return (model?.acceptedReferenceKinds ?? []).filter(
+    (kind): kind is "image" | "video" => kind === "image" || kind === "video",
+  );
+}
+
+export function referenceAccept(model?: ReferenceCapability) {
+  return supportedMediaKinds(model)
+    .map((kind) => `${kind}/*`)
+    .join(",");
+}
+
+export function seedanceReferenceConstraints(model?: ReferenceCapability): AttachmentPickerConstraints | undefined {
+  const kinds = supportedMediaKinds(model);
+  if (!kinds.length) return undefined;
+  const image = kinds.includes("image");
+  const video = kinds.includes("video");
+  return {
+    summary: [
+      ...(image ? ["图片：PNG、JPG、WEBP、GIF · ≤10MB · 最多9个"] : []),
+      ...(video ? ["视频：MP4、MOV、WebM · ≤200MB · ≤15.2秒 · 最多3个"] : []),
+      "参考素材总数最多12个",
+    ],
+    byKind: {
+      ...(image ? { image: { maxBytes: 10 * 1024 * 1024, maxCount: 9 } } : {}),
+      ...(video ? { video: { maxBytes: 200 * 1024 * 1024, maxDurationSec: 15.2, maxCount: 3 } } : {}),
+    },
+  };
+}
+
+export function supportsMediaReference(model: ReferenceCapability | undefined, mimeType: string) {
+  return supportedMediaKinds(model).includes(mimeType.split("/", 1)[0] as "image" | "video");
+}
+
+export function resolveReferenceMode(kind: AiGenerateKind, referenceMode: string, supportedModes: string[]) {
+  return kind === "video" ? referenceMode || supportedModes[0] || "" : "";
+}
+
+export function buildProfessionalPrompt(input: { script: string; environment: string; emphasis: string }) {
+  return [
+    input.script.trim() ? `脚本：${input.script.trim()}` : "",
+    input.environment.trim() ? `环境与运镜：${input.environment.trim()}` : "",
+    input.emphasis.trim() ? `强调点：${input.emphasis.trim()}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+export function parseProfessionalPrompt(prompt: string) {
+  const fields = { script: "", environment: "", emphasis: "" };
+  let found = false;
+  for (const line of prompt.split("\n")) {
+    if (line.startsWith("脚本：")) {
+      fields.script = line.slice(3).trim();
+      found = true;
+    } else if (line.startsWith("环境与运镜：")) {
+      fields.environment = line.slice(6).trim();
+      found = true;
+    } else if (line.startsWith("强调点：")) {
+      fields.emphasis = line.slice(4).trim();
+      found = true;
+    }
+  }
+  return found ? fields : undefined;
 }
 
 export function validateModelReferenceCount(
@@ -80,6 +162,13 @@ export function resolveAssetMentions(text: string, references: AiGenerateReferen
 }
 
 export function buildAiGenerateRequest(draft: AiGenerateDraft, title: string): CreateAiGenerateJobData["body"] {
+  const conversation =
+    draft.conversationId && uuidPattern.test(draft.conversationId)
+      ? {
+          conversationId: draft.conversationId,
+          ...(draft.conversationName ? { conversationName: draft.conversationName } : {}),
+        }
+      : {};
   const common = {
     kind: draft.kind,
     title,
@@ -89,6 +178,7 @@ export function buildAiGenerateRequest(draft: AiGenerateDraft, title: string): C
     resolution: draft.resolution,
     referenceAssetIds: draft.references.map((reference) => reference.id),
     revisionMode: draft.revisionMode,
+    ...conversation,
     ...(draft.parentJobId ? { parentJobId: draft.parentJobId } : {}),
   };
   return draft.kind === "image"
@@ -99,6 +189,22 @@ export function buildAiGenerateRequest(draft: AiGenerateDraft, title: string): C
         duration: draft.duration,
         referenceMode: draft.referenceMode,
       };
+}
+
+export function groupAiGenerateConversations(jobs: Job[]): AiGenerateConversation[] {
+  const groups = new Map<string, AiGenerateConversation>();
+  for (const job of jobs) {
+    const id = job.values.conversationId || UNCLASSIFIED_CONVERSATION_ID;
+    const name = job.values.conversationName || "未分类";
+    const group = groups.get(id) ?? { id, name, jobs: [] };
+    group.jobs.push(job);
+    groups.set(id, group);
+  }
+  return [...groups.values()].sort((left, right) => {
+    const leftLatest = left.jobs.reduce((latest, job) => (job.createdAt > latest ? job.createdAt : latest), "");
+    const rightLatest = right.jobs.reduce((latest, job) => (job.createdAt > latest ? job.createdAt : latest), "");
+    return rightLatest.localeCompare(leftLatest);
+  });
 }
 
 export function parseJobReferences(job: Job): AiGenerateReference[] {

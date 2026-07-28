@@ -10,6 +10,8 @@ const commonRequestShape = {
   ratio: z.string().trim().min(1).max(20),
   resolution: z.string().trim().min(1).max(20),
   referenceAssetIds: referenceAssetIdsSchema,
+  conversationId: z.string().uuid().optional(),
+  conversationName: z.string().trim().min(1).max(80).optional(),
   parentJobId: z.string().uuid().optional(),
   revisionMode: revisionModeSchema,
 };
@@ -43,6 +45,8 @@ export function normalizeAiGenerateValues(request: AiGenerateRequest): Record<st
     ratio: request.ratio,
     resolution: request.resolution,
     referenceAssetIds: JSON.stringify(request.referenceAssetIds),
+    ...(request.conversationId ? { conversationId: request.conversationId } : {}),
+    ...(request.conversationName ? { conversationName: request.conversationName } : {}),
     revisionMode: request.revisionMode,
     ...(request.parentJobId ? { parentJobId: request.parentJobId } : {}),
     ...(request.kind === "image"
@@ -66,6 +70,8 @@ export function parseAiGenerateJobValues(values: Record<string, string>): AiGene
     ratio: values.ratio,
     resolution: values.resolution,
     referenceAssetIds,
+    conversationId: values.conversationId || undefined,
+    conversationName: values.conversationName || undefined,
     parentJobId: values.parentJobId || undefined,
     revisionMode: values.revisionMode,
     ...(values.kind === "image"

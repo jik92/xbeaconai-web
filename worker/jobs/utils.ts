@@ -14,5 +14,14 @@ export function assetIdsFromValues(values: Record<string, string>) {
         /* request validation reports malformed values separately */
       }
   }
+  try {
+    const referenceAssetIds = JSON.parse(values.referenceAssetIds ?? "[]") as unknown;
+    if (Array.isArray(referenceAssetIds))
+      for (const id of referenceAssetIds) {
+        if (typeof id === "string" && !id.startsWith("library-")) ids.add(id);
+      }
+  } catch {
+    /* AI Generate persists this field as JSON; its request parser reports malformed values separately. */
+  }
   return [...ids];
 }

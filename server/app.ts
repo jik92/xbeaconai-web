@@ -1751,6 +1751,18 @@ app.openapi(createAiGenerateJobRoute, async (c) => {
         },
         422,
       );
+    if (body.kind === "video" && kind === "video" && (asset.durationSec ?? 0) > 15.2)
+      return c.json(
+        {
+          error: {
+            code: "REFERENCE_VIDEO_TOO_LONG",
+            message: `Seedance 参考视频时长不能超过 15.2 秒，当前素材为 ${asset.durationSec?.toFixed(2)} 秒`,
+            retryable: false,
+            requestId: crypto.randomUUID(),
+          },
+        },
+        422,
+      );
     const referenceNumber = (referenceCounts.get(kind) ?? 0) + 1;
     referenceCounts.set(kind, referenceNumber);
     referenceMetadata.push({

@@ -1,5 +1,5 @@
-import { Download } from "lucide-react";
-import { useState } from "react";
+import { Download, Volume2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { MediaPreview } from "./media-preview";
@@ -24,11 +24,21 @@ export function MediaResultCard({
   const kind = mimeType.startsWith("video/") ? "video" : mimeType.startsWith("audio/") ? "audio" : "image";
   const visualMedia = kind === "image" || kind === "video";
   const [aspectRatio, setAspectRatio] = useState<number>();
+  const [volume, setVolume] = useState(1);
+  const cardRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const video = cardRef.current?.querySelector<HTMLVideoElement>("video");
+    if (!video) return;
+    video.muted = volume === 0;
+    video.volume = volume;
+  }, [volume]);
 
   return (
     <article
       className={cn("relative self-start overflow-hidden rounded-xl border border-line bg-surface", className)}
       data-media-result-kind={kind}
+      ref={cardRef}
     >
       <div
         className={cn(
@@ -55,12 +65,30 @@ export function MediaResultCard({
         <Button
           size="icon-sm"
           variant="outline"
-          className="absolute bottom-2 right-2 z-[3] rounded-full bg-surface/90 shadow-sm backdrop-blur hover:bg-surface"
+          className={cn(
+            "absolute bottom-2 z-[3] rounded-full bg-surface/90 shadow-sm backdrop-blur hover:bg-surface",
+            kind === "video" ? "right-28" : "right-2",
+          )}
           aria-label={`下载${name}`}
           onClick={onDownload}
         >
           <Download />
         </Button>
+      )}
+      {kind === "video" && (
+        <label className="absolute bottom-2 right-2 z-[3] flex h-8 items-center gap-1 rounded-full border border-line bg-surface/90 px-2 shadow-sm backdrop-blur">
+          <Volume2 className="size-4 text-ink" aria-hidden="true" />
+          <input
+            aria-label={`调整${name}音量`}
+            className="w-14 accent-ink"
+            max="1"
+            min="0"
+            step="0.05"
+            type="range"
+            value={volume}
+            onChange={(event) => setVolume(Number(event.target.value))}
+          />
+        </label>
       )}
     </article>
   );

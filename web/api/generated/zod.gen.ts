@@ -1254,6 +1254,8 @@ export const zCreateAiGenerateJobBody = z.union([
         ratio: z.string().min(1).max(20),
         resolution: z.string().min(1).max(20),
         referenceAssetIds: z.array(z.uuid()).max(12),
+        conversationId: z.uuid().optional(),
+        conversationName: z.string().min(1).max(80).optional(),
         parentJobId: z.uuid().optional(),
         revisionMode: z.enum([
             'new',
@@ -1270,6 +1272,8 @@ export const zCreateAiGenerateJobBody = z.union([
         ratio: z.string().min(1).max(20),
         resolution: z.string().min(1).max(20),
         referenceAssetIds: z.array(z.uuid()).max(12),
+        conversationId: z.uuid().optional(),
+        conversationName: z.string().min(1).max(80).optional(),
         parentJobId: z.uuid().optional(),
         revisionMode: z.enum([
             'new',
