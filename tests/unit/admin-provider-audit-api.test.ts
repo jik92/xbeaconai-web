@@ -8,7 +8,7 @@ type Operation = {
 };
 
 describe("admin provider generation audit API contract", () => {
-  test("publishes administrator-only list, detail, and generated material preview operations", async () => {
+  test("publishes administrator-only list and CDN-backed generated material detail", async () => {
     const spec = (await Bun.file(resolve(import.meta.dir, "../../openapi/openapi.json")).json()) as {
       paths: Record<string, Record<string, Operation>>;
     };
@@ -32,7 +32,9 @@ describe("admin provider generation audit API contract", () => {
     expect(list?.responses).toHaveProperty("403");
     expect(detail?.operationId).toBe("getAdminProviderAudit");
     expect(detail?.responses).toHaveProperty("404");
-    expect(asset?.operationId).toBe("previewAdminProviderAuditAsset");
-    expect(asset?.responses?.["200"]?.content).toHaveProperty("application/octet-stream");
+    expect(asset).toBeUndefined();
+    expect(JSON.stringify(detail?.responses?.["200"])).toContain('"thumbnailUrl"');
+    expect(JSON.stringify(detail?.responses?.["200"])).toContain('"originalUrl"');
+    expect(JSON.stringify(detail?.responses?.["200"])).not.toContain("application/octet-stream");
   });
 });

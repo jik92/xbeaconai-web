@@ -158,12 +158,12 @@ expect(await syncSystemMedia({
 - Local media artifacts reuse `persistArtifactMedia` under their owning user before returning URLs.
 - Non-media audit artifacts remain attachment-only and are not passed to `MediaPreview`.
 
-- [ ] **Step 1: Write an integration test that expects an audit image URL on `files.xbeaconai.com`**
-- [ ] **Step 2: Verify the test fails on the current `/api/admin/provider-audits/.../assets/...` binary URL**
-- [ ] **Step 3: Add an admin-only CDN access route using the artifact owner and shared persistence helper**
-- [ ] **Step 4: Return CDN variants from audit detail and pass `originalUrl` into `MediaPreview`**
-- [ ] **Step 5: Remove the browser binary preview contract**
-- [ ] **Step 6: Run the three targeted audit tests**
+- [x] **Step 1: Write an integration test that expects an audit image URL on `files.xbeaconai.com`**
+- [x] **Step 2: Verify the test fails on the current `/api/admin/provider-audits/.../assets/...` binary URL**
+- [x] **Step 3: Add an admin-only CDN access route using the artifact owner and shared persistence helper**
+- [x] **Step 4: Return CDN variants from audit detail and pass `originalUrl` into `MediaPreview`**
+- [x] **Step 5: Remove the browser binary preview contract**
+- [x] **Step 6: Run the three targeted audit tests**
 
 ### Task 6: Enforce Browser Media CDN Sources
 

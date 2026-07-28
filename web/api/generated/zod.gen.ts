@@ -1841,22 +1841,14 @@ export const zGetAdminProviderAuditResponse = z.object({
         id: z.string(),
         name: z.string(),
         mimeType: z.string(),
+        thumbnailUrl: z.string(),
         url: z.string(),
+        originalUrl: z.string(),
         available: z.boolean()
     })),
     createdAt: z.string(),
     updatedAt: z.string()
 });
-
-export const zPreviewAdminProviderAuditAssetPath = z.object({
-    auditId: z.uuid(),
-    assetId: z.string()
-});
-
-/**
- * Generated material binary
- */
-export const zPreviewAdminProviderAuditAssetResponse = z.string();
 
 export const zListAdminUsersQuery = z.object({
     page: z.int().gte(1).optional().default(1),

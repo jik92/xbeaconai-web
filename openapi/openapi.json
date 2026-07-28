@@ -7203,7 +7203,13 @@
                           "mimeType": {
                             "type": "string"
                           },
+                          "thumbnailUrl": {
+                            "type": "string"
+                          },
                           "url": {
+                            "type": "string"
+                          },
+                          "originalUrl": {
                             "type": "string"
                           },
                           "available": {
@@ -7214,7 +7220,9 @@
                           "id",
                           "name",
                           "mimeType",
+                          "thumbnailUrl",
                           "url",
+                          "originalUrl",
                           "available"
                         ]
                       }
@@ -7262,63 +7270,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/admin/provider-audits/{auditId}/assets/{assetId}": {
-      "get": {
-        "operationId": "previewAdminProviderAuditAsset",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "auditId",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string"
-            },
-            "required": true,
-            "name": "assetId",
-            "in": "path"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Generated material binary",
-            "content": {
-              "application/octet-stream": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Admin required",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Material not found",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string"
                 }
               }
             }

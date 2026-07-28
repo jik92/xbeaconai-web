@@ -2369,7 +2369,9 @@ export type GetAdminProviderAuditResponses = {
             id: string;
             name: string;
             mimeType: string;
+            thumbnailUrl: string;
             url: string;
+            originalUrl: string;
             available: boolean;
         }>;
         createdAt: string;
@@ -2378,38 +2380,6 @@ export type GetAdminProviderAuditResponses = {
 };
 
 export type GetAdminProviderAuditResponse = GetAdminProviderAuditResponses[keyof GetAdminProviderAuditResponses];
-
-export type PreviewAdminProviderAuditAssetData = {
-    body?: never;
-    path: {
-        auditId: string;
-        assetId: string;
-    };
-    query?: never;
-    url: '/api/admin/provider-audits/{auditId}/assets/{assetId}';
-};
-
-export type PreviewAdminProviderAuditAssetErrors = {
-    /**
-     * Admin required
-     */
-    403: ApiErrorResponse;
-    /**
-     * Material not found
-     */
-    404: string;
-};
-
-export type PreviewAdminProviderAuditAssetError = PreviewAdminProviderAuditAssetErrors[keyof PreviewAdminProviderAuditAssetErrors];
-
-export type PreviewAdminProviderAuditAssetResponses = {
-    /**
-     * Generated material binary
-     */
-    200: Blob | File;
-};
-
-export type PreviewAdminProviderAuditAssetResponse = PreviewAdminProviderAuditAssetResponses[keyof PreviewAdminProviderAuditAssetResponses];
 
 export type ListAdminUsersData = {
     body?: never;

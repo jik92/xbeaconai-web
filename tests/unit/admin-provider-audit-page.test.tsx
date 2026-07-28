@@ -32,7 +32,17 @@ const detail: AdminProviderAuditDetail = {
   requestPayload: { prompt: "蓝色连衣裙商品视频" },
   responsePayload: { status: "done" },
   assetIds: ["asset-result-1"],
-  assets: [{ id: "asset-result-1", name: "result.mp4", mimeType: "video/mp4", url: "", available: false }],
+  assets: [
+    {
+      id: "asset-result-1",
+      name: "result.mp4",
+      mimeType: "video/mp4",
+      thumbnailUrl: "https://files.xbeaconai.com/users/demo/result.mp4",
+      url: "https://files.xbeaconai.com/users/demo/result.mp4",
+      originalUrl: "https://files.xbeaconai.com/users/demo/result.mp4",
+      available: true,
+    },
+  ],
   createdAt: audit.submittedAt,
   updatedAt: "2026-07-26T03:00:04.000Z",
 };
@@ -73,14 +83,14 @@ describe("admin provider audit panel", () => {
     });
   });
 
-  test("shows user, original request, response, time, and unavailable material result in the read-only detail", () => {
+  test("shows user, original request, response, time, and CDN material result in the read-only detail", () => {
     const html = renderToStaticMarkup(<AuditDetail detail={detail} loading={false} />);
 
     expect(html).toContain("13800000131");
     expect(html).toContain("蓝色连衣裙商品视频");
     expect(html).toContain("&quot;status&quot;: &quot;done&quot;");
     expect(html).toContain("result.mp4");
-    expect(html).toContain("预览不可用");
+    expect(html).toContain("https://files.xbeaconai.com/users/demo/result.mp4");
     expect(html).toContain("第三方任务 ID");
   });
 });
