@@ -62,6 +62,14 @@ remove_env() {
     rm -f "$temporary"
 }
 
+run_with_runtime_environment() (
+    set -a
+    # shellcheck disable=SC1090
+    source "$ENV_FILE"
+    set +a
+    "$@"
+)
+
 ensure_runtime_environment() {
     install -d -m 0700 "$DATA_DIR"
     if [[ ! -f "$ENV_FILE" ]]; then
@@ -307,13 +315,13 @@ ensure_runtime_environment
 configure_tos_browser_access
 
 log "校准媒体 Bucket 图片样式和临时语音生命周期..."
-bun run setup:media:bucket
+run_with_runtime_environment bun run setup:media:bucket
 
 log "同步系统人像与场景素材到媒体 CDN..."
-bun run media:system:sync
+run_with_runtime_environment bun run media:system:sync
 
 log "实测媒体 CDN 缩略图、预览图、防盗链与视频 Range..."
-bun run check:media:cdn
+run_with_runtime_environment bun run check:media:cdn
 
 ensure_playwright_runtime
 

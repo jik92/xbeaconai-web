@@ -76,6 +76,14 @@ describe("worker concurrency pools", () => {
     expect(deploy).not.toContain("https://*.xbeaconai.com");
   });
 
+  test("loads the protected runtime environment for every deployment-time TOS command", async () => {
+    const deploy = await Bun.file("deploy.sh").text();
+    expect(deploy).toContain("run_with_runtime_environment() (");
+    expect(deploy).toContain("run_with_runtime_environment bun run setup:media:bucket");
+    expect(deploy).toContain("run_with_runtime_environment bun run media:system:sync");
+    expect(deploy).toContain("run_with_runtime_environment bun run check:media:cdn");
+  });
+
   test("provisions build swap before running TypeScript on low-memory hosts", async () => {
     const deploy = await Bun.file("deploy.sh").text();
     expect(deploy).toContain(`readonly BUILD_SWAP_SIZE_MB="\${BUILD_SWAP_SIZE_MB:-2048}"`);
