@@ -11,6 +11,8 @@ describe("public media URLs", () => {
         fallbackUrl: "/api/assets/123/content",
       }),
     ).toEqual({
+      thumbnailUrl:
+        "https://files.xbeaconai.com/users/u%201/%E5%95%86%E5%93%81%20%E4%B8%BB%E5%9B%BE.jpg?x-tos-process=style/thumbnail",
       url: "https://files.xbeaconai.com/users/u%201/%E5%95%86%E5%93%81%20%E4%B8%BB%E5%9B%BE.jpg?x-tos-process=style/preview",
       originalUrl: "https://files.xbeaconai.com/users/u%201/%E5%95%86%E5%93%81%20%E4%B8%BB%E5%9B%BE.jpg",
     });
@@ -26,6 +28,7 @@ describe("public media URLs", () => {
           fallbackUrl: "/api/assets/123/content",
         }),
       ).toEqual({
+        thumbnailUrl: "https://files.xbeaconai.com/users/demo/media.mp4",
         url: "https://files.xbeaconai.com/users/demo/media.mp4",
         originalUrl: "https://files.xbeaconai.com/users/demo/media.mp4",
       });
@@ -40,6 +43,7 @@ describe("public media URLs", () => {
         fallbackUrl: "/api/assets/123/content",
       }),
     ).toEqual({
+      thumbnailUrl: "/api/assets/123/content",
       url: "/api/assets/123/content",
       originalUrl: "/api/assets/123/content",
     });

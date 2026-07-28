@@ -413,6 +413,7 @@ const LibraryAssetSchema = z.object({
   kind: AssetKindSchema,
   description: z.string().optional(),
   folderId: z.string().uuid().optional(),
+  thumbnailUrl: z.string(),
   url: z.string(),
   originalUrl: z.string(),
   createdAt: z.string(),
@@ -436,6 +437,7 @@ const DirectUploadInitSchema = z.object({
   expiresAt: z.string(),
 });
 const PublicMediaAccessSchema = z.object({
+  thumbnailUrl: z.string().url(),
   url: z.string().url(),
   originalUrl: z.string().url(),
 });

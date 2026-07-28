@@ -34,7 +34,7 @@
 - Images: `thumbnailUrl` uses `style/thumbnail`, `url` uses `style/preview`, and `originalUrl` has no processing query.
 - Audio/video: all three fields equal the original URL.
 
-- [ ] **Step 1: Write the failing URL contract tests**
+- [x] **Step 1: Write the failing URL contract tests**
 
 ```ts
 expect(publicMediaUrls({
@@ -49,10 +49,10 @@ expect(publicMediaUrls({
 });
 ```
 
-- [ ] **Step 2: Run `bun test tests/unit/public-media-url.test.ts` and verify the missing `thumbnailUrl` failure**
-- [ ] **Step 3: Add `thumbnailUrl` without duplicating object-key encoding**
-- [ ] **Step 4: Add `thumbnailUrl` to API schemas and `LibraryAsset`**
-- [ ] **Step 5: Run `bun test tests/unit/public-media-url.test.ts tests/integration/asset-public-media-api-isolated.test.ts`**
+- [x] **Step 2: Run `bun test tests/unit/public-media-url.test.ts` and verify the missing `thumbnailUrl` failure**
+- [x] **Step 3: Add `thumbnailUrl` without duplicating object-key encoding**
+- [x] **Step 4: Add `thumbnailUrl` to API schemas and `LibraryAsset`**
+- [x] **Step 5: Run `bun test tests/unit/public-media-url.test.ts tests/integration/asset-public-media-api-isolated.test.ts`**
 
 ### Task 2: System Portrait and Scene CDN Catalog
 
@@ -196,7 +196,8 @@ expect(await syncSystemMedia({
 
 - [ ] **Step 1: Write failing URL and dimension-policy tests for `style/thumbnail`**
 - [ ] **Step 2: Verify the current checker lacks thumbnail validation**
-- [ ] **Step 3: Add thumbnail style provisioning/checking using the supported TOS image-style control plane**
+- [ ] **Step 3: Provision `thumbnail` with `putBucketImageStyle` and the verified
+  `image/resize,w_320,h_320,m_lfit/quality,q_75/format,webp` process**
 - [ ] **Step 4: Add thumbnail and preview probes to `check-media-cdn.ts`**
 - [ ] **Step 5: Invoke the media CDN check during production deployment after system media synchronization**
 - [ ] **Step 6: Run `bun test tests/unit/media-cdn-config.test.ts`**
@@ -219,4 +220,3 @@ expect(await syncSystemMedia({
 - [ ] **Step 5: Run `bun run build`**
 - [ ] **Step 6: Run `git diff --check` and inspect every changed file**
 - [ ] **Step 7: On production credentials, apply system-media synchronization and run the live CDN checker without running E2E**
-
