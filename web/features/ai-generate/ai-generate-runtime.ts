@@ -1,4 +1,4 @@
-import type { ThreadMessageLike } from "@assistant-ui/react";
+import type { AppendMessage, ThreadMessageLike } from "@assistant-ui/react";
 import type { CreateAiGenerateJobData, Job } from "@/api/generated/types.gen";
 
 export type AiGenerateKind = "image" | "video";
@@ -56,6 +56,16 @@ export function countEffectiveReferences(
   revisionMode: AiGenerateRevisionMode,
 ) {
   return explicitCount || (parentJobId && revisionMode !== "new" ? 1 : 0);
+}
+
+export function referencesFromAppendMessage(message: AppendMessage): AiGenerateReference[] {
+  const attachmentParts =
+    "attachments" in message ? (message.attachments ?? []).flatMap((attachment) => attachment.content ?? []) : [];
+  const references = [...message.content, ...attachmentParts].flatMap((part) => {
+    if (part.type !== "data" || part.name !== "ai-generate-reference") return [];
+    return [part.data as unknown as AiGenerateReference];
+  });
+  return [...new Map(references.map((reference) => [reference.id, reference])).values()];
 }
 
 const mentionPattern = /@(图片|视频|音频|人像)\d+/g;

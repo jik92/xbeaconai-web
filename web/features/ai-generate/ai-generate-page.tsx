@@ -36,6 +36,7 @@ import {
   countEffectiveReferences,
   jobsToThreadMessages,
   parseJobReferences,
+  referencesFromAppendMessage,
   resolveAssetMentions,
   validateModelReferenceCount,
 } from "./ai-generate-runtime";
@@ -75,13 +76,6 @@ function textFromMessage(message: AppendMessage) {
     .filter((part): part is Extract<(typeof message.content)[number], { type: "text" }> => part.type === "text")
     .map((part) => part.text)
     .join("\n");
-}
-
-function referencesFromMessage(message: AppendMessage) {
-  return message.content.flatMap((part) => {
-    if (part.type !== "data" || part.name !== "ai-generate-reference") return [];
-    return [part.data as unknown as AiGenerateReference];
-  });
 }
 
 function referenceKind(mimeType: string) {
@@ -189,7 +183,7 @@ function AiGenerateProvider({ children }: { children: React.ReactNode }) {
     isRunning: jobs.some((job) => job.status === "queued" || job.status === "processing"),
     onNew: async (message) => {
       try {
-        const messageReferences = referencesFromMessage(message);
+        const messageReferences = referencesFromAppendMessage(message);
         await submit(
           textFromMessage(message),
           messageReferences.length ? messageReferences : draft.references,
@@ -205,7 +199,7 @@ function AiGenerateProvider({ children }: { children: React.ReactNode }) {
       const source = jobs.find((job) => job.id === sourceJobId);
       await submit(
         textFromMessage(message),
-        source ? parseJobReferences(source) : referencesFromMessage(message),
+        source ? parseJobReferences(source) : referencesFromAppendMessage(message),
         sourceJobId,
         "edit",
       );

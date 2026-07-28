@@ -6,6 +6,7 @@ import {
   buildAiGenerateRequest,
   countEffectiveReferences,
   jobsToThreadMessages,
+  referencesFromAppendMessage,
   resolveAssetMentions,
   validateModelReferenceCount,
 } from "../../web/features/ai-generate/ai-generate-runtime";
@@ -78,6 +79,49 @@ function job(patch: Partial<Job> = {}): Job {
 }
 
 describe("AI Generate assistant runtime", () => {
+  test("submits selected attachment references from the assistant-ui message", () => {
+    const message = {
+      role: "user",
+      content: [{ type: "text", text: "给我一个跳舞的小狗带着这个帽子" }],
+      attachments: [
+        {
+          id: reference.id,
+          type: "图片",
+          name: `@${reference.label} · ${reference.name}`,
+          contentType: reference.mimeType,
+          status: { type: "complete" },
+          content: [{ type: "data", name: "ai-generate-reference", data: reference }],
+        },
+      ],
+      createdAt: new Date(),
+      parentId: null,
+      sourceId: null,
+      runConfig: undefined,
+      metadata: { custom: {} },
+    } as Parameters<typeof referencesFromAppendMessage>[0];
+
+    const extracted = referencesFromAppendMessage(message);
+    expect(extracted).toEqual([reference]);
+    expect(
+      buildAiGenerateRequest(
+        {
+          kind: "video",
+          prompt: "给我一个跳舞的小狗带着这个帽子",
+          modelId: "doubao-seedance-2-0-mini-260615",
+          ratio: "9:16",
+          resolution: "720p",
+          count: 1,
+          duration: 5,
+          seed: "",
+          referenceMode: "omni",
+          references: extracted,
+          revisionMode: "new",
+        },
+        "视频创作",
+      ).referenceAssetIds,
+    ).toEqual([reference.id]);
+  });
+
   test("resolves exact @ asset labels and reports unresolved mentions", () => {
     expect(resolveAssetMentions("让 @图片1 跟随 @视频1 的动作", [reference])).toEqual({
       references: [reference],
