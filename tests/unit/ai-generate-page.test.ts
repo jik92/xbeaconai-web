@@ -22,6 +22,18 @@ describe("assistant-ui AI Generate page", () => {
     expect(promptWorkbench).not.toContain("ai-generate.css");
   });
 
+  test("reuses the shared media result card for image and video artifacts", () => {
+    const page = readFileSync(resolve(root, "web/features/ai-generate/ai-generate-page.tsx"), "utf8");
+    const resultCard = readFileSync(resolve(root, "web/components/domain/media-result-card.tsx"), "utf8");
+
+    expect(page).toContain('import { MediaResultCard } from "@/components/domain/media-result-card"');
+    expect(page).toContain("<MediaResultCard");
+    expect(page).not.toContain("<MediaPreview");
+    expect(resultCard).toContain("<MediaPreview");
+    expect(resultCard).toContain('kind === "image" || kind === "video"');
+    expect(resultCard).toContain("data-media-result-kind={kind}");
+  });
+
   test("submits real tasks and preserves revision lineage", () => {
     const page = readFileSync(resolve(root, "web/features/ai-generate/ai-generate-page.tsx"), "utf8");
     const apiClient = readFileSync(resolve(root, "web/api/api-client.ts"), "utf8");

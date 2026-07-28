@@ -366,6 +366,8 @@ The system uses **hairline + soft drop**. Cards float above the off-white canvas
 
 **`product-card-stack`** — Stacked product preview cards. Background `{colors.surface-card}`, rounded `{rounded.xl}`, no padding (children fill the card edge-to-edge).
 
+**`media-result-card`** — Shared generated-media result card for image and video outputs. Its border follows the media's intrinsic aspect ratio without fixed-height padding or a metadata footer; the media fills the complete frame, the hover playback target covers the full video, and download remains a compact bottom-right overlay. Audio uses the same shell with a compact preview row. Feature pages supply data and actions only; they must not rebuild image- and video-specific result cards.
+
 **`testimonial-card`** — Quote card. Background `{colors.surface-card}`, text `{colors.body}`, rounded `{rounded.xl}`, padding 32px.
 
 **`data-table`** — One shared shadcn-style table appearance across the system. Use a 40px sticky `surface-muted` header with 12px medium `ink` labels, one structural hairline below the header, 56px rows, and compact cell padding. Content rows have no horizontal dividers and use only restrained hover feedback. The component has no outer card border, radius, shadow, owned background, page-specific visual variant, or horizontal scrollbar. Columns share the available width proportionally; long content stays on one line and truncates. Pages control layout and background only; compose filters and actions with shadcn `h-8` controls and Tailwind spacing utilities.

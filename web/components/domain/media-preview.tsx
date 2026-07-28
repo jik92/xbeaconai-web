@@ -33,6 +33,7 @@ export interface MediaPreviewProps extends Omit<NativeMediaPreviewProps, "src"> 
   errorText?: string;
   authenticated?: boolean;
   previewable?: boolean;
+  containerClassName?: string;
 }
 
 export function ImagePreview({ src, alt, className, imageLoading, onMetadata, onImageError }: NativeMediaPreviewProps) {
@@ -285,11 +286,13 @@ function InteractiveVideoPreview({
   source,
   alt,
   className,
+  containerClassName,
   onMetadata,
 }: {
   source: string;
   alt: string;
   className?: string;
+  containerClassName?: string;
   onMetadata?: (metadata: MediaMetadata) => void;
 }) {
   const [hoverPlaying, setHoverPlaying] = useState(false);
@@ -302,7 +305,12 @@ function InteractiveVideoPreview({
   };
 
   return (
-    <div className="group/video-preview relative flex h-full w-full max-h-full max-w-full overflow-hidden">
+    <div
+      className={cn(
+        "group/video-preview relative flex h-full w-full max-h-full max-w-full overflow-hidden",
+        containerClassName,
+      )}
+    >
       {!lightboxOpen && (
         <>
           <VideoPreview
@@ -322,7 +330,8 @@ function InteractiveVideoPreview({
           />
           <Button
             type="button"
-            className="absolute inset-0 z-[1] cursor-default bg-transparent"
+            variant="ghost"
+            className="absolute inset-0 z-[1] h-full w-full cursor-default rounded-none p-0 hover:bg-transparent"
             aria-label={`${alt}视频预览`}
             data-playback-state={hoverPlaying ? "playing" : "paused"}
             onMouseEnter={() => setHoverPlaying(true)}
@@ -369,11 +378,13 @@ function InteractiveAudioPreview({
   source,
   alt,
   className,
+  containerClassName,
   onMetadata,
 }: {
   source: string;
   alt: string;
   className?: string;
+  containerClassName?: string;
   onMetadata?: (metadata: MediaMetadata) => void;
 }) {
   const [hoverPlaying, setHoverPlaying] = useState(false);
@@ -386,6 +397,7 @@ function InteractiveAudioPreview({
     <div
       className={cn(
         "relative flex h-9 min-h-9 w-full min-w-40 items-center gap-2 overflow-hidden rounded-md border border-line bg-surface px-2",
+        containerClassName,
         className,
       )}
     >
@@ -408,7 +420,8 @@ function InteractiveAudioPreview({
           />
           <Button
             type="button"
-            className="absolute inset-0 z-[1] cursor-default bg-transparent"
+            variant="ghost"
+            className="absolute inset-0 z-[1] h-full w-full cursor-default rounded-none p-0 hover:bg-transparent"
             aria-label={`${alt}音频预览`}
             data-playback-state={hoverPlaying ? "playing" : "paused"}
             onMouseEnter={() => setHoverPlaying(true)}
@@ -471,6 +484,7 @@ export function MediaPreview({
   authenticated = true,
   previewable = true,
   className,
+  containerClassName,
   onMetadata,
 }: MediaPreviewProps) {
   const { source, error } = useMediaSource(url, authenticated);
@@ -481,9 +495,25 @@ export function MediaPreview({
   if (!source) return <span>{loadingText}</span>;
 
   if (kind === "video" && previewable)
-    return <InteractiveVideoPreview source={source} alt={alt} className={className} onMetadata={onMetadata} />;
+    return (
+      <InteractiveVideoPreview
+        source={source}
+        alt={alt}
+        className={className}
+        containerClassName={containerClassName}
+        onMetadata={onMetadata}
+      />
+    );
   if (kind === "audio" && previewable)
-    return <InteractiveAudioPreview source={source} alt={alt} className={className} onMetadata={onMetadata} />;
+    return (
+      <InteractiveAudioPreview
+        source={source}
+        alt={alt}
+        className={className}
+        containerClassName={containerClassName}
+        onMetadata={onMetadata}
+      />
+    );
 
   let content: ReactNode = renderNativeMedia({
     kind,
@@ -498,14 +528,21 @@ export function MediaPreview({
   if (!previewable) return content;
 
   content = (
-    <div className={cn("group/media-preview relative inline-flex max-h-full max-w-full", kind === "audio" && "w-full")}>
+    <div
+      className={cn(
+        "group/media-preview relative inline-flex max-h-full max-w-full",
+        kind === "audio" && "w-full",
+        containerClassName,
+      )}
+    >
       {content}
       <Button
         type="button"
+        variant="ghost"
         className={cn(
           "absolute inline-flex text-on-primary opacity-0 transition-opacity focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-dark group-hover/media-preview:opacity-100",
           kind === "image"
-            ? "inset-0 items-start justify-end rounded-[inherit] p-2"
+            ? "inset-0 h-full w-full items-start justify-end rounded-[inherit] p-2 hover:bg-transparent"
             : "right-2 top-2 size-8 items-center justify-center rounded-full bg-surface-dark/55 hover:bg-surface-dark/70",
         )}
         aria-label={`全屏预览${alt}`}

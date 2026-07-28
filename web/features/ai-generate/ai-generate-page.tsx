@@ -16,13 +16,13 @@ import {
   useExternalStoreRuntime,
 } from "@assistant-ui/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, Download, Image, Library, LoaderCircle, RefreshCw, Send, Sparkles, Video, X } from "lucide-react";
+import { ArrowDown, Image, Library, LoaderCircle, RefreshCw, Send, Sparkles, Video, X } from "lucide-react";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { downloadAuthenticated, fetchCreationCapabilities, fetchJobs, submitAiGenerateJob } from "@/api/api-client";
 import type { Job } from "@/api/generated/types.gen";
 import { AttachmentPicker, type AttachmentSelection } from "@/components/domain/attachment-picker";
-import { MediaPreview } from "@/components/domain/media-preview";
+import { MediaResultCard } from "@/components/domain/media-result-card";
 import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/native-select";
 import { randomUuid } from "@/lib/random-id";
@@ -244,38 +244,29 @@ function ResultPart({ data }: { data: AiGenerateResultData }) {
     );
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      {data.artifacts.map((artifact) => (
-        <article className="overflow-hidden rounded-xl border border-line bg-surface" key={artifact.id}>
-          {artifact.url && /^(image|video|audio)\//.test(artifact.mimeType) ? (
-            <MediaPreview
-              url={artifact.url}
-              mimeType={artifact.mimeType}
-              alt={artifact.name}
-              authenticated
-              className="h-64 w-full object-contain"
-            />
-          ) : (
+      {data.artifacts.map((artifact) =>
+        artifact.url && /^(image|video|audio)\//.test(artifact.mimeType) ? (
+          <MediaResultCard
+            key={artifact.id}
+            url={artifact.url}
+            mimeType={artifact.mimeType}
+            name={artifact.name}
+            authenticated
+            onDownload={() => {
+              if (artifact.url) void downloadAuthenticated(artifact.url, artifact.name);
+            }}
+          />
+        ) : (
+          <article className="overflow-hidden rounded-xl border border-line bg-surface" key={artifact.id}>
             <pre className="max-h-64 overflow-auto whitespace-pre-wrap p-4 type-helper">{artifact.text}</pre>
-          )}
-          <footer className="flex items-center justify-between border-t border-line px-3 py-2">
-            <span className="truncate type-helper text-muted">
-              {artifact.name} · {artifact.executionMode}
-            </span>
-            {artifact.url && (
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                aria-label="下载"
-                onClick={() => {
-                  if (artifact.url) void downloadAuthenticated(artifact.url, artifact.name);
-                }}
-              >
-                <Download />
-              </Button>
-            )}
-          </footer>
-        </article>
-      ))}
+            <footer className="flex min-h-12 items-center border-t border-line px-3 py-2">
+              <span className="truncate type-helper text-muted">
+                {artifact.name} · {artifact.executionMode}
+              </span>
+            </footer>
+          </article>
+        ),
+      )}
     </div>
   );
 }
