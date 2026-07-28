@@ -305,6 +305,9 @@ ensure_runtime_environment
 
 configure_tos_browser_access
 
+log "同步系统人像与场景素材到媒体 CDN..."
+bun run media:system:sync
+
 ensure_playwright_runtime
 
 log "构建生产版本..."

@@ -1,6 +1,6 @@
+import { systemPortraitMedia } from "../../../shared/media/system-media";
 import type { PortraitReference } from "../../../shared/portraits/portrait-reference";
 import { parsePortraitTags } from "../../../shared/portraits/portrait-tags";
-import { systemPortraitMedia } from "../../../shared/media/system-media";
 import { fetchCustomPortraits } from "../../api/api-client";
 
 export interface PortraitRecord {

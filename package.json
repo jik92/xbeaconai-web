@@ -39,6 +39,8 @@
     "setup:web:cdn": "bun scripts/setup-web-cdn.ts",
     "setup:media:cdn": "bun scripts/setup-media-cdn.ts",
     "check:media:cdn": "bun scripts/check-media-cdn.ts",
+    "media:system:sync": "bun scripts/sync-system-media.ts --apply",
+    "media:system:check": "bun scripts/sync-system-media.ts",
     "setup:tos:browser": "bun scripts/configure-tos-browser-access.ts --production --verify-live",
     "build": "tsc -b && vite build",
     "typecheck": "tsc --noEmit",

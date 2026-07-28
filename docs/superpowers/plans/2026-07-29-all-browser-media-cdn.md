@@ -103,7 +103,7 @@ expect(systemPortraitMedia(3)).toEqual({
 - Check mode reports all missing keys and exits non-zero.
 - Apply mode uploads only missing objects, verifies every key, and never overwrites existing objects.
 
-- [ ] **Step 1: Write a failing test with one existing and two missing manifest entries**
+- [x] **Step 1: Write a failing test with one existing and two missing manifest entries**
 
 ```ts
 expect(await syncSystemMedia({
@@ -115,11 +115,11 @@ expect(await syncSystemMedia({
 })).toEqual({ checked: 3, uploaded: 2, missing: [] });
 ```
 
-- [ ] **Step 2: Verify the test fails because the synchronization module does not exist**
-- [ ] **Step 3: Implement bounded-concurrency check/apply behavior and MIME validation**
-- [ ] **Step 4: Add `media:system:sync` and `media:system:check` scripts**
-- [ ] **Step 5: Make `deploy.sh` apply the idempotent synchronization before the production build**
-- [ ] **Step 6: Run `bun test tests/unit/system-media-sync.test.ts`**
+- [x] **Step 2: Verify the test fails because the synchronization module does not exist**
+- [x] **Step 3: Implement bounded-concurrency check/apply behavior and MIME validation**
+- [x] **Step 4: Add `media:system:sync` and `media:system:check` scripts**
+- [x] **Step 5: Make `deploy.sh` apply the idempotent synchronization before the production build**
+- [x] **Step 6: Run `bun test tests/unit/system-media-sync.test.ts`**
 
 ### Task 4: Remove Browser Blob and Data Media
 

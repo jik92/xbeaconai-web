@@ -1201,13 +1201,9 @@ export function RemixProject() {
         const portraitFile = portrait.fileInfo[0];
         if (!portraitFile) continue;
         const portraitId = portrait.reference?.portraitId ?? (Number(portrait.id) || 0);
-        const generalMedia =
-          portrait.reference?.type === "custom" ? undefined : systemPortraitMedia(portraitId);
+        const generalMedia = portrait.reference?.type === "custom" ? undefined : systemPortraitMedia(portraitId);
         restoredPortraits.push({
-          key:
-            portrait.reference?.type === "custom"
-              ? `custom:${portrait.reference.assetId}`
-              : `general:${portraitId}`,
+          key: portrait.reference?.type === "custom" ? `custom:${portrait.reference.assetId}` : `general:${portraitId}`,
           reference: portrait.reference ?? { type: "general", portraitId: Number(portrait.id) || 0 },
           name: portrait.assetName,
           profession: portrait.occupation || "",
