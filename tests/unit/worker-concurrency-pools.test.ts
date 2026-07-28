@@ -80,6 +80,7 @@ describe("worker concurrency pools", () => {
     const deploy = await Bun.file("deploy.sh").text();
     expect(deploy).toContain("run_with_runtime_environment() {");
     expect(deploy).toContain('DEPLOY_ENV_PATH="$ENV_FILE" bash -c');
+    expect(deploy).toContain("export NODE_ENV=production");
     expect(deploy).toContain('exec "$@"');
     expect(deploy).toContain("run_with_runtime_environment bun run setup:media:bucket");
     expect(deploy).toContain("run_with_runtime_environment bun run media:system:sync");

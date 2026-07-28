@@ -68,6 +68,7 @@ run_with_runtime_environment() {
         # shellcheck disable=SC1090
         source "$DEPLOY_ENV_PATH"
         set +a
+        export NODE_ENV=production
         exec "$@"
     ' -- "$@"
 }
