@@ -11,3 +11,4 @@ test-results
 *.tsbuildinfo
 /task_records/
 /logs/
+.worktrees/
