@@ -201,6 +201,17 @@ publish_web_cdn() {
     '
 }
 
+configure_tos_browser_access() {
+    log "校准生产素材 Bucket 的浏览器 CORS..."
+    DEPLOY_ENV_PATH="$ENV_FILE" bash -c '
+        set -a
+        # shellcheck disable=SC1090
+        source "$DEPLOY_ENV_PATH"
+        set +a
+        exec bun scripts/configure-tos-browser-access.ts --production
+    '
+}
+
 wait_for_api() {
     local attempt
     for attempt in $(seq 1 30); do
@@ -289,6 +300,8 @@ bun install --frozen-lockfile --registry="$NPM_REGISTRY"
 
 log "写入生产运行环境..."
 ensure_runtime_environment
+
+configure_tos_browser_access
 
 ensure_playwright_runtime
 

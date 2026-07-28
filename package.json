@@ -37,6 +37,7 @@
     "byok:migrate-env-key": "bun scripts/migrate-env-key.ts",
     "deploy:web:cdn": "bun scripts/deploy-web-cdn.ts",
     "setup:web:cdn": "bun scripts/setup-web-cdn.ts",
+    "setup:tos:browser": "bun scripts/configure-tos-browser-access.ts --production --verify-live",
     "build": "tsc -b && vite build",
     "typecheck": "tsc --noEmit",
     "lint": "biome lint .",

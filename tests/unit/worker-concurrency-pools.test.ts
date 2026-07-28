@@ -63,6 +63,7 @@ describe("worker concurrency pools", () => {
     const build = deploy.lastIndexOf("\nbuild_production\n");
     expect(runtimeEnvironment).toBeGreaterThan(deploy.indexOf("bun install --frozen-lockfile"));
     expect(runtimeEnvironment).toBeLessThan(build);
+    expect(deploy.lastIndexOf("\nconfigure_tos_browser_access\n")).toBeLessThan(build);
     expect(deploy).toContain('upsert_env "TOS_SERVER_ENDPOINT" "tos-cn-shanghai.ivolces.com"');
     expect(deploy).toContain('upsert_env "TOS_PUBLIC_ENDPOINT" "tos-cn-shanghai.volces.com"');
     expect(deploy).toContain('upsert_env "TOS_WEB_BUCKET" "$TOS_WEB_BUCKET"');
