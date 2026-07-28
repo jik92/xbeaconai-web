@@ -3,9 +3,10 @@ import { buildMediaCdnCheckUrls } from "../../scripts/check-media-cdn";
 import {
   MEDIA_CDN_DEFAULT_ALLOWED_REFERERS,
   MEDIA_IMAGE_STYLES,
-  VOICE_PREVIEW_LIFECYCLE_RULE_ID,
   mediaCdnDesiredConfig,
+  tosJsonPayloadHeaders,
   upsertVoicePreviewLifecycleRule,
+  VOICE_PREVIEW_LIFECYCLE_RULE_ID,
 } from "../../scripts/setup-media-cdn";
 
 describe("media CDN configuration", () => {
@@ -60,6 +61,12 @@ describe("media CDN configuration", () => {
     expect(MEDIA_IMAGE_STYLES).toEqual({
       thumbnail: "image/resize,w_320,h_320,m_lfit/quality,q_75/format,webp",
       preview: "image/resize,w_1280,h_1280,m_lfit/format,webp",
+    });
+  });
+
+  test("signs TOS bucket JSON mutations with the serialized payload hash", () => {
+    expect(tosJsonPayloadHeaders({ Content: "image/resize,w_320/format,webp" })).toEqual({
+      "x-tos-content-sha256": "db7af8195c1531613761daf4da2b9d2cab7c4f161c38b995eb1fc2ec8ce0cf73",
     });
   });
 

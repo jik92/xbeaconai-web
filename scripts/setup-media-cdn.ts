@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import TosClient, { TosServerCode, TosServerError } from "@volcengine/tos-sdk";
 import { callVolcOpenApi, VolcOpenApiError } from "../server/providers/volc-openapi";
 
@@ -147,7 +148,7 @@ function cloudConfig(service: "CDN" | "dns") {
 
 function createTosClient() {
   const tosRegion = region();
-  return new TosClient({
+  return new MediaTosClient({
     accessKeyId: required("TOS_ACCESS_KEY_ID"),
     accessKeySecret: required("TOS_SECRET_ACCESS_KEY"),
     region: tosRegion,
@@ -163,7 +164,31 @@ function sameJson(left: unknown, right: unknown) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-async function readLifecycleRules(client: TosClient, bucketName: string) {
+export function tosJsonPayloadHeaders(body: unknown) {
+  return {
+    "x-tos-content-sha256": createHash("sha256").update(JSON.stringify(body)).digest("hex"),
+  };
+}
+
+class MediaTosClient extends TosClient {
+  putBucketImageStyleWithSignedPayload(input: { bucket: string; styleName: string; content: string }) {
+    const body = { Content: input.content };
+    return this.fetchBucket(
+      input.bucket,
+      "PUT",
+      { imageStyle: "", styleName: input.styleName },
+      tosJsonPayloadHeaders(body),
+      body,
+    );
+  }
+
+  putBucketLifecycleWithSignedPayload(input: Parameters<TosClient["putBucketLifecycle"]>[0]) {
+    const body = { Rules: input.rules };
+    return this.fetchBucket(input.bucket, "PUT", { lifecycle: "" }, tosJsonPayloadHeaders(body), body);
+  }
+}
+
+async function readLifecycleRules(client: MediaTosClient, bucketName: string) {
   try {
     return (await client.getBucketLifecycle({ bucket: bucketName })).data.Rules ?? [];
   } catch (error) {
@@ -185,7 +210,7 @@ export async function ensureMediaBucketOptimization(input: { apply: boolean }) {
     const changed = current !== desiredContent;
     styles[styleName] = { current, desired: desiredContent, changed };
     if (input.apply && changed)
-      await client.putBucketImageStyle({
+      await client.putBucketImageStyleWithSignedPayload({
         bucket: bucketName,
         styleName,
         content: desiredContent,
@@ -198,7 +223,7 @@ export async function ensureMediaBucketOptimization(input: { apply: boolean }) {
   ) as Parameters<TosClient["putBucketLifecycle"]>[0]["rules"];
   const lifecycleChanged = !sameJson(currentLifecycle, desiredLifecycle);
   if (input.apply && lifecycleChanged)
-    await client.putBucketLifecycle({
+    await client.putBucketLifecycleWithSignedPayload({
       bucket: bucketName,
       rules: desiredLifecycle,
     });
