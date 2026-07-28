@@ -431,6 +431,17 @@ export class OssUtils {
   headObject(key: string) {
     return this.ready().headObject({ bucket: env.tos.bucket, key });
   }
+  async objectExists(key: string) {
+    try {
+      await this.headObject(key);
+      return true;
+    } catch (error) {
+      const statusCode =
+        error && typeof error === "object" && "statusCode" in error ? Number(error.statusCode) : undefined;
+      if (statusCode === 404) return false;
+      throw error;
+    }
+  }
   async markCleanupReady(key: string) {
     await this.ready().putObjectTagging({
       bucket: env.tos.bucket,

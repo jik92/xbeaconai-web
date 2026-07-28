@@ -1448,6 +1448,7 @@ export type CompleteDirectUploadResponses = {
             kind: AssetKind;
             description?: string;
             folderId?: string;
+            thumbnailUrl: string;
             url: string;
             originalUrl: string;
             createdAt: string;
@@ -1469,6 +1470,7 @@ export type CompleteDirectUploadResponses = {
             kind: AssetKind;
             description?: string;
             folderId?: string;
+            thumbnailUrl: string;
             url: string;
             originalUrl: string;
             createdAt: string;
@@ -1529,6 +1531,7 @@ export type UploadMediaResponses = {
             kind: AssetKind;
             description?: string;
             folderId?: string;
+            thumbnailUrl: string;
             url: string;
             originalUrl: string;
             createdAt: string;
@@ -1557,7 +1560,9 @@ export type ListCustomPortraitsResponses = {
             name: string;
             description?: string;
             gender?: '男' | '女';
+            thumbnailUrl: string;
             imageUrl: string;
+            originalUrl: string;
             status: 'queued' | 'processing' | 'active' | 'failed';
             errorCode?: string;
             errorMessage?: string;
@@ -1612,7 +1617,9 @@ export type RegisterCustomPortraitResponses = {
             name: string;
             description?: string;
             gender?: '男' | '女';
+            thumbnailUrl: string;
             imageUrl: string;
+            originalUrl: string;
             status: 'queued' | 'processing' | 'active' | 'failed';
             errorCode?: string;
             errorMessage?: string;
@@ -1631,7 +1638,9 @@ export type RegisterCustomPortraitResponses = {
             name: string;
             description?: string;
             gender?: '男' | '女';
+            thumbnailUrl: string;
             imageUrl: string;
+            originalUrl: string;
             status: 'queued' | 'processing' | 'active' | 'failed';
             errorCode?: string;
             errorMessage?: string;
@@ -1670,6 +1679,7 @@ export type ListAssetsResponses = {
             kind: AssetKind;
             description?: string;
             folderId?: string;
+            thumbnailUrl: string;
             url: string;
             originalUrl: string;
             createdAt: string;
@@ -1840,6 +1850,7 @@ export type SaveAssetMetadataResponses = {
             kind: AssetKind;
             description?: string;
             folderId?: string;
+            thumbnailUrl: string;
             url: string;
             originalUrl: string;
             createdAt: string;
@@ -1872,6 +1883,7 @@ export type GetAssetAccessResponses = {
      * Short-lived direct TOS read authorization
      */
     200: {
+        thumbnailUrl: string;
         url: string;
         originalUrl: string;
     };
@@ -4012,7 +4024,7 @@ export type PreviewVideoCreateVoiceResponses = {
      * Voice preview
      */
     200: {
-        audioBase64: string;
+        url: string;
         mimeType: 'audio/mpeg';
     };
 };
@@ -4301,6 +4313,7 @@ export type GetArtifactAccessResponses = {
      * Owned artifact CDN media URLs
      */
     200: {
+        thumbnailUrl: string;
         url: string;
         originalUrl: string;
     };

@@ -4939,6 +4939,9 @@
                           "type": "string",
                           "format": "uuid"
                         },
+                        "thumbnailUrl": {
+                          "type": "string"
+                        },
                         "url": {
                           "type": "string"
                         },
@@ -4956,6 +4959,7 @@
                         "mimeType",
                         "size",
                         "kind",
+                        "thumbnailUrl",
                         "url",
                         "originalUrl",
                         "createdAt"
@@ -5014,6 +5018,9 @@
                           "type": "string",
                           "format": "uuid"
                         },
+                        "thumbnailUrl": {
+                          "type": "string"
+                        },
                         "url": {
                           "type": "string"
                         },
@@ -5031,6 +5038,7 @@
                         "mimeType",
                         "size",
                         "kind",
+                        "thumbnailUrl",
                         "url",
                         "originalUrl",
                         "createdAt"
@@ -5170,6 +5178,9 @@
                           "type": "string",
                           "format": "uuid"
                         },
+                        "thumbnailUrl": {
+                          "type": "string"
+                        },
                         "url": {
                           "type": "string"
                         },
@@ -5187,6 +5198,7 @@
                         "mimeType",
                         "size",
                         "kind",
+                        "thumbnailUrl",
                         "url",
                         "originalUrl",
                         "createdAt"
@@ -5286,8 +5298,16 @@
                               "女"
                             ]
                           },
+                          "thumbnailUrl": {
+                            "type": "string",
+                            "format": "uri"
+                          },
                           "imageUrl": {
                             "type": "string"
+                          },
+                          "originalUrl": {
+                            "type": "string",
+                            "format": "uri"
                           },
                           "status": {
                             "type": "string",
@@ -5315,7 +5335,9 @@
                           "type",
                           "assetId",
                           "name",
+                          "thumbnailUrl",
                           "imageUrl",
+                          "originalUrl",
                           "status",
                           "createdAt",
                           "updatedAt"
@@ -5399,8 +5421,16 @@
                             "女"
                           ]
                         },
+                        "thumbnailUrl": {
+                          "type": "string",
+                          "format": "uri"
+                        },
                         "imageUrl": {
                           "type": "string"
+                        },
+                        "originalUrl": {
+                          "type": "string",
+                          "format": "uri"
                         },
                         "status": {
                           "type": "string",
@@ -5428,7 +5458,9 @@
                         "type",
                         "assetId",
                         "name",
+                        "thumbnailUrl",
                         "imageUrl",
+                        "originalUrl",
                         "status",
                         "createdAt",
                         "updatedAt"
@@ -5479,8 +5511,16 @@
                             "女"
                           ]
                         },
+                        "thumbnailUrl": {
+                          "type": "string",
+                          "format": "uri"
+                        },
                         "imageUrl": {
                           "type": "string"
+                        },
+                        "originalUrl": {
+                          "type": "string",
+                          "format": "uri"
                         },
                         "status": {
                           "type": "string",
@@ -5508,7 +5548,9 @@
                         "type",
                         "assetId",
                         "name",
+                        "thumbnailUrl",
                         "imageUrl",
+                        "originalUrl",
                         "status",
                         "createdAt",
                         "updatedAt"
@@ -5635,6 +5677,9 @@
                             "type": "string",
                             "format": "uuid"
                           },
+                          "thumbnailUrl": {
+                            "type": "string"
+                          },
                           "url": {
                             "type": "string"
                           },
@@ -5652,6 +5697,7 @@
                           "mimeType",
                           "size",
                           "kind",
+                          "thumbnailUrl",
                           "url",
                           "originalUrl",
                           "createdAt"
@@ -5933,6 +5979,9 @@
                           "type": "string",
                           "format": "uuid"
                         },
+                        "thumbnailUrl": {
+                          "type": "string"
+                        },
                         "url": {
                           "type": "string"
                         },
@@ -5950,6 +5999,7 @@
                         "mimeType",
                         "size",
                         "kind",
+                        "thumbnailUrl",
                         "url",
                         "originalUrl",
                         "createdAt"
@@ -5998,6 +6048,10 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "thumbnailUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    },
                     "url": {
                       "type": "string",
                       "format": "uri"
@@ -6008,6 +6062,7 @@
                     }
                   },
                   "required": [
+                    "thumbnailUrl",
                     "url",
                     "originalUrl"
                   ]
@@ -11930,8 +11985,9 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "audioBase64": {
-                      "type": "string"
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
                     },
                     "mimeType": {
                       "type": "string",
@@ -11941,7 +11997,7 @@
                     }
                   },
                   "required": [
-                    "audioBase64",
+                    "url",
                     "mimeType"
                   ]
                 }
@@ -12429,6 +12485,10 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "thumbnailUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    },
                     "url": {
                       "type": "string",
                       "format": "uri"
@@ -12439,6 +12499,7 @@
                     }
                   },
                   "required": [
+                    "thumbnailUrl",
                     "url",
                     "originalUrl"
                   ]

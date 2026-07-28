@@ -1,6 +1,6 @@
 import { Check, LoaderCircle, Play, Volume2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { previewVideoCreatePresetVoice } from "@/api/api-client";
+import { directMediaSource, previewVideoCreatePresetVoice } from "@/api/api-client";
 import type { VideoCreateInput } from "@/api/generated/types.gen";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -36,7 +36,9 @@ export function VideoCreateVoiceSettingsDialog(props: {
     setError("");
     try {
       const result = await previewVideoCreatePresetVoice({ ...draft, presetVoiceId });
-      await new Audio(`data:${result.mimeType};base64,${result.audioBase64}`).play();
+      const source = directMediaSource(result.url);
+      if (!source) throw new Error("音色试听未返回有效的 CDN 地址");
+      await new Audio(source).play();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "音色试听失败");
     } finally {

@@ -136,12 +136,12 @@ expect(await syncSystemMedia({
 - Voice preview API returns `{ url: string, mimeType: "audio/mpeg" }`.
 - Voice preview storage key is `ephemeral/voice-previews/{userId}/{sha256}.mp3`.
 
-- [ ] **Step 1: Keep the current Blob policy test red and add a failing voice preview test that rejects `audioBase64`**
-- [ ] **Step 2: Run both tests and record the Object URL and Data URL failures**
-- [ ] **Step 3: Remove `loadLocalVideoDuration`; validate uploaded assets using server-probed duration**
-- [ ] **Step 4: Hash the owner/settings/text, upload synthesis bytes with `putLibraryBytes`, and return `publicMediaUrls(...).originalUrl`**
-- [ ] **Step 5: Play `result.url` directly and reject non-CDN responses**
-- [ ] **Step 6: Run both targeted tests and the voice API contract test**
+- [x] **Step 1: Keep the current Blob policy test red and add a failing voice preview test that rejects `audioBase64`**
+- [x] **Step 2: Run both tests and record the Object URL and Data URL failures**
+- [x] **Step 3: Remove `loadLocalVideoDuration`; validate uploaded assets using server-probed duration**
+- [x] **Step 4: Hash the owner/settings/text, upload synthesis bytes with `putLibraryBytes`, and return `publicMediaUrls(...).originalUrl`**
+- [x] **Step 5: Play `result.url` directly and reject non-CDN responses**
+- [x] **Step 6: Run both targeted tests and the voice API contract test**
 
 ### Task 5: Admin Provider Audit Media Through CDN
 

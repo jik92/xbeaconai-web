@@ -1332,6 +1332,7 @@ export const zCompleteDirectUploadResponse = z.union([
             kind: zAssetKind,
             description: z.string().optional(),
             folderId: z.uuid().optional(),
+            thumbnailUrl: z.string(),
             url: z.string(),
             originalUrl: z.string(),
             createdAt: z.string()
@@ -1350,6 +1351,7 @@ export const zCompleteDirectUploadResponse = z.union([
             kind: zAssetKind,
             description: z.string().optional(),
             folderId: z.uuid().optional(),
+            thumbnailUrl: z.string(),
             url: z.string(),
             originalUrl: z.string(),
             createdAt: z.string()
@@ -1381,6 +1383,7 @@ export const zUploadMediaResponse = z.object({
         kind: zAssetKind,
         description: z.string().optional(),
         folderId: z.uuid().optional(),
+        thumbnailUrl: z.string(),
         url: z.string(),
         originalUrl: z.string(),
         createdAt: z.string()
@@ -1398,7 +1401,9 @@ export const zListCustomPortraitsResponse = z.object({
         name: z.string(),
         description: z.string().optional(),
         gender: z.enum(['男', '女']).optional(),
+        thumbnailUrl: z.url(),
         imageUrl: z.string(),
+        originalUrl: z.url(),
         status: z.enum([
             'queued',
             'processing',
@@ -1426,7 +1431,9 @@ export const zRegisterCustomPortraitResponse = z.union([
             name: z.string(),
             description: z.string().optional(),
             gender: z.enum(['男', '女']).optional(),
+            thumbnailUrl: z.url(),
             imageUrl: z.string(),
+            originalUrl: z.url(),
             status: z.enum([
                 'queued',
                 'processing',
@@ -1447,7 +1454,9 @@ export const zRegisterCustomPortraitResponse = z.union([
             name: z.string(),
             description: z.string().optional(),
             gender: z.enum(['男', '女']).optional(),
+            thumbnailUrl: z.url(),
             imageUrl: z.string(),
+            originalUrl: z.url(),
             status: z.enum([
                 'queued',
                 'processing',
@@ -1483,6 +1492,7 @@ export const zListAssetsResponse = z.object({
         kind: zAssetKind,
         description: z.string().optional(),
         folderId: z.uuid().optional(),
+        thumbnailUrl: z.string(),
         url: z.string(),
         originalUrl: z.string(),
         createdAt: z.string()
@@ -1559,6 +1569,7 @@ export const zSaveAssetMetadataResponse = z.object({
         kind: zAssetKind,
         description: z.string().optional(),
         folderId: z.uuid().optional(),
+        thumbnailUrl: z.string(),
         url: z.string(),
         originalUrl: z.string(),
         createdAt: z.string()
@@ -1573,6 +1584,7 @@ export const zGetAssetAccessPath = z.object({
  * Short-lived direct TOS read authorization
  */
 export const zGetAssetAccessResponse = z.object({
+    thumbnailUrl: z.url(),
     url: z.url(),
     originalUrl: z.url()
 });
@@ -2902,7 +2914,7 @@ export const zPreviewVideoCreateVoiceBody = z.object({
  * Voice preview
  */
 export const zPreviewVideoCreateVoiceResponse = z.object({
-    audioBase64: z.string(),
+    url: z.url(),
     mimeType: z.enum(['audio/mpeg'])
 });
 
@@ -3001,6 +3013,7 @@ export const zGetArtifactAccessPath = z.object({
  * Owned artifact CDN media URLs
  */
 export const zGetArtifactAccessResponse = z.object({
+    thumbnailUrl: z.url(),
     url: z.url(),
     originalUrl: z.url()
 });

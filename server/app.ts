@@ -1,4 +1,3 @@
-import { Buffer } from "node:buffer";
 import { mkdirSync, readFileSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { dirname, extname, isAbsolute, relative, resolve } from "node:path";
@@ -94,8 +93,8 @@ import { consumeQianchuanOauthState, createQianchuanOauthState } from "./qianchu
 import { qianchuanStore } from "./qianchuan/store";
 import { QianchuanUpstreamError } from "./qianchuan/types";
 import { auditSdkRegistry } from "./sdk-registry";
-import { ossutils } from "./storage/ossutils";
 import { persistArtifactMedia } from "./storage/artifact-public-media";
+import { ossutils } from "./storage/ossutils";
 import { publicMediaUrls } from "./storage/public-media-url";
 import { rollbackUploadedObjects, uploadFilesStrictly } from "./storage/strict-library-upload";
 import type { JobModuleId, JobRecord } from "./types";
@@ -142,6 +141,7 @@ import {
   videoCreateMinimumStoryboardCount,
   videoCreateShotNarration,
 } from "./video-create/video-create-store";
+import { voicePreviewStorageKey } from "./video-create/voice-preview";
 import { groupRemixChildren, summarizeRemixProject } from "./video-remix/project-records";
 import { preflightQwenVoiceSample, QwenVoiceSamplePreflightError } from "./voice/qwen-voice-sample-preflight";
 import { validateQwenVoiceCloneValues } from "./voice/validate-qwen-voice-clone";
@@ -6766,7 +6766,7 @@ const previewVideoCreateVoiceRoute = createRoute({
       description: "Voice preview",
       content: {
         "application/json": {
-          schema: z.object({ audioBase64: z.string(), mimeType: z.literal("audio/mpeg") }),
+          schema: z.object({ url: z.string().url(), mimeType: z.literal("audio/mpeg") }),
         },
       },
     },
@@ -6788,18 +6788,42 @@ app.openapi(previewVideoCreateVoiceRoute, async (c) => {
       422,
     );
   const { voiceSettings, text } = c.req.valid("json");
-  const result = await volcSpeech.synthesize({
-    requestId: crypto.randomUUID(),
-    resourceId: env.volcSpeech.presetTtsResourceId,
-    speaker: voiceSettings.presetVoiceId,
+  const storageKey = voicePreviewStorageKey({
+    ownerUserId: c.get("userId"),
+    voiceSettings,
     text,
-    model: "seed-tts-2.0-expressive",
-    speechRate: videoCreateVoiceSpeechRate(voiceSettings.speed),
-    explicitLanguage: "zh",
-    contextText: videoCreateVoiceContextText(voiceSettings.style),
-    toneFidelity: false,
   });
-  return c.json({ audioBase64: Buffer.from(result.bytes).toString("base64"), mimeType: "audio/mpeg" as const }, 200);
+  if (!(await ossutils.objectExists(storageKey))) {
+    const result = await volcSpeech.synthesize({
+      requestId: crypto.randomUUID(),
+      resourceId: env.volcSpeech.presetTtsResourceId,
+      speaker: voiceSettings.presetVoiceId,
+      text,
+      model: "seed-tts-2.0-expressive",
+      speechRate: videoCreateVoiceSpeechRate(voiceSettings.speed),
+      explicitLanguage: "zh",
+      contextText: videoCreateVoiceContextText(voiceSettings.style),
+      toneFidelity: false,
+    });
+    try {
+      await ossutils.putLibraryBytesIfAbsent({
+        bytes: result.bytes,
+        key: storageKey,
+        mimeType: "audio/mpeg",
+      });
+    } catch (error) {
+      const statusCode =
+        error && typeof error === "object" && "statusCode" in error ? Number(error.statusCode) : undefined;
+      if (statusCode !== 409 && statusCode !== 412) throw error;
+    }
+  }
+  const url = publicMediaUrls({
+    baseUrl: env.publicMedia.baseUrl,
+    storageKey,
+    mimeType: "audio/mpeg",
+    fallbackUrl: "",
+  }).originalUrl;
+  return c.json({ url, mimeType: "audio/mpeg" as const }, 200);
 });
 
 const batchGenerateVideoCreateAudioRoute = createRoute({
