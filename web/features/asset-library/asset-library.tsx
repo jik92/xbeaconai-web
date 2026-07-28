@@ -385,10 +385,7 @@ function MediaAssetTable({
               {asset.mimeType.startsWith("audio/") ? (
                 media
               ) : (
-                <div
-                  className="media-table-preview-content"
-                  style={resolveMediaPreviewContentSize(asset.mimeType, previewSize)}
-                >
+                <div className="media-table-preview-content" style={resolveMediaPreviewContentSize(previewSize)}>
                   {media}
                 </div>
               )}

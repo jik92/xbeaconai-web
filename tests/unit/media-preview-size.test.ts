@@ -9,15 +9,15 @@ describe("asset media preview sizing", () => {
     expect(fitMediaPreviewSize(720, 1280)).toEqual({ width: 40.5, height: 72 });
   });
 
-  test("keeps the interactive video frame at full 16:9 size while the video itself uses contain", () => {
-    expect(resolveMediaPreviewContentSize("video/mp4", { width: 40.5, height: 72 })).toEqual({
-      width: "100%",
-      height: "100%",
+  test("keeps a portrait video's interactive frame at its fitted 9:16 ratio", () => {
+    expect(resolveMediaPreviewContentSize({ width: 40.5, height: 72 })).toEqual({
+      width: 40.5,
+      height: 72,
     });
   });
 
   test("keeps the fitted dimensions for an image preview", () => {
-    expect(resolveMediaPreviewContentSize("image/png", { width: 40.5, height: 72 })).toEqual({
+    expect(resolveMediaPreviewContentSize({ width: 40.5, height: 72 })).toEqual({
       width: 40.5,
       height: 72,
     });
@@ -33,5 +33,6 @@ describe("asset media preview sizing", () => {
 
   test("falls back to intrinsic media sizing when metadata is missing", () => {
     expect(fitMediaPreviewSize(undefined, undefined)).toBeUndefined();
+    expect(resolveMediaPreviewContentSize()).toEqual({ width: "100%", height: "100%" });
   });
 });

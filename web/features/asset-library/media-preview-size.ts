@@ -10,11 +10,7 @@ export interface MediaPreviewContentSize {
 
 const fullPreviewSize: MediaPreviewContentSize = { width: "100%", height: "100%" };
 
-export function resolveMediaPreviewContentSize(
-  mimeType: string,
-  fittedSize?: MediaPreviewSize,
-): MediaPreviewContentSize {
-  if (mimeType.startsWith("video/")) return fullPreviewSize;
+export function resolveMediaPreviewContentSize(fittedSize?: MediaPreviewSize): MediaPreviewContentSize {
   return fittedSize ?? fullPreviewSize;
 }
 
