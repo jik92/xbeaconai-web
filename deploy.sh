@@ -25,6 +25,7 @@ readonly DIRECT_ORIGIN="${DIRECT_ORIGIN:-http://118.196.101.57:9000}"
 readonly CDN_DOMAIN="${CDN_DOMAIN:-app.xbeaconai.com}"
 readonly TOS_WEB_BUCKET="${TOS_WEB_BUCKET:-xbeaconai-web-prod}"
 readonly PUBLIC_MEDIA_BASE_URL="${PUBLIC_MEDIA_BASE_URL:-https://files.xbeaconai.com}"
+readonly LOCAL_TOS_ORIGINS="${LOCAL_TOS_ORIGINS:-http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:4173,http://localhost:4173}"
 readonly ENABLE_TLS="${ENABLE_TLS:-auto}"
 
 log() {
@@ -85,7 +86,7 @@ ensure_runtime_environment() {
     upsert_env "CDN_DOMAIN" "$CDN_DOMAIN"
     upsert_env "TOS_SERVER_ENDPOINT" "tos-cn-shanghai.ivolces.com"
     upsert_env "TOS_PUBLIC_ENDPOINT" "tos-cn-shanghai.volces.com"
-    upsert_env "TOS_CORS_ORIGINS" "$APP_ORIGIN"
+    upsert_env "TOS_CORS_ORIGINS" "${APP_ORIGIN},${LOCAL_TOS_ORIGINS}"
     upsert_env "PUBLIC_MEDIA_BASE_URL" "$PUBLIC_MEDIA_BASE_URL"
     remove_env "TOS_ENDPOINT"
     remove_env "TOS_INTERNAL_ENDPOINT"

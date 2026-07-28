@@ -69,8 +69,11 @@ describe("worker concurrency pools", () => {
     expect(deploy).toContain('upsert_env "TOS_WEB_BUCKET" "$TOS_WEB_BUCKET"');
     expect(deploy).toContain('upsert_env "PUBLIC_MEDIA_BASE_URL" "$PUBLIC_MEDIA_BASE_URL"');
     expect(deploy).toContain('upsert_env "ALLOWED_ORIGINS" "$APP_ORIGIN"');
-    expect(deploy).toContain('upsert_env "TOS_CORS_ORIGINS" "$APP_ORIGIN"');
-    expect(deploy).not.toContain("$" + "{APP_ORIGIN},$" + "{DIRECT_ORIGIN}");
+    expect(deploy).toContain(
+      'readonly LOCAL_TOS_ORIGINS="${LOCAL_TOS_ORIGINS:-http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:4173,http://localhost:4173}"',
+    );
+    expect(deploy).toContain('upsert_env "TOS_CORS_ORIGINS" "${APP_ORIGIN},${LOCAL_TOS_ORIGINS}"');
+    expect(deploy).not.toContain("https://*.xbeaconai.com");
   });
 
   test("provisions build swap before running TypeScript on low-memory hosts", async () => {
