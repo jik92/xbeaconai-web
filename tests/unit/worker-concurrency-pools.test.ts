@@ -78,7 +78,9 @@ describe("worker concurrency pools", () => {
 
   test("loads the protected runtime environment for every deployment-time TOS command", async () => {
     const deploy = await Bun.file("deploy.sh").text();
-    expect(deploy).toContain("run_with_runtime_environment() (");
+    expect(deploy).toContain("run_with_runtime_environment() {");
+    expect(deploy).toContain('DEPLOY_ENV_PATH="$ENV_FILE" bash -c');
+    expect(deploy).toContain('exec "$@"');
     expect(deploy).toContain("run_with_runtime_environment bun run setup:media:bucket");
     expect(deploy).toContain("run_with_runtime_environment bun run media:system:sync");
     expect(deploy).toContain("run_with_runtime_environment bun run check:media:cdn");

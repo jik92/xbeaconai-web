@@ -62,13 +62,15 @@ remove_env() {
     rm -f "$temporary"
 }
 
-run_with_runtime_environment() (
-    set -a
-    # shellcheck disable=SC1090
-    source "$ENV_FILE"
-    set +a
-    "$@"
-)
+run_with_runtime_environment() {
+    DEPLOY_ENV_PATH="$ENV_FILE" bash -c '
+        set -a
+        # shellcheck disable=SC1090
+        source "$DEPLOY_ENV_PATH"
+        set +a
+        exec "$@"
+    ' -- "$@"
+}
 
 ensure_runtime_environment() {
     install -d -m 0700 "$DATA_DIR"
