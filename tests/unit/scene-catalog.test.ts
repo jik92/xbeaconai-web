@@ -3,12 +3,20 @@ import { createHash } from "node:crypto";
 import { sceneCatalog } from "../../shared/scenes/scene-catalog";
 
 describe("scene catalog", () => {
-  test("contains 47 unique scenes with locally imported images", async () => {
+  test("contains 47 unique scenes with CDN variants and locally imported synchronization sources", async () => {
     expect(sceneCatalog).toHaveLength(47);
     expect(new Set(sceneCatalog.map((scene) => scene.id)).size).toBe(47);
     expect(new Set(sceneCatalog.map((scene) => scene.imageUrl)).size).toBe(47);
 
-    const files = sceneCatalog.map((scene) => Bun.file(`public${scene.imageUrl}`));
+    expect(
+      sceneCatalog.every(
+        (scene) =>
+          scene.thumbnailUrl.startsWith("https://files.xbeaconai.com/system/scenes/") &&
+          scene.imageUrl.startsWith("https://files.xbeaconai.com/system/scenes/") &&
+          scene.originalUrl.startsWith("https://files.xbeaconai.com/system/scenes/"),
+      ),
+    ).toBe(true);
+    const files = sceneCatalog.map((scene) => Bun.file(`public${scene.localPath}`));
     expect((await Promise.all(files.map((file) => file.exists()))).every(Boolean)).toBe(true);
     expect(files.every((file) => file.type === "image/jpeg")).toBe(true);
   });

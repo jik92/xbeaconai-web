@@ -72,7 +72,7 @@ expect(publicMediaUrls({
 - `Portrait` gains `thumbnail_url` and `original_url`; upstream `source_url` remains for provider requests but is never rendered.
 - `SceneCatalogEntry` gains `thumbnailUrl` and `originalUrl`; `sourceUrl` remains provider-only.
 
-- [ ] **Step 1: Write failing literal URL tests for portrait 3 and scene 9**
+- [x] **Step 1: Write failing literal URL tests for portrait 3 and scene 9**
 
 ```ts
 expect(systemPortraitMedia(3)).toEqual({
@@ -83,11 +83,11 @@ expect(systemPortraitMedia(3)).toEqual({
 });
 ```
 
-- [ ] **Step 2: Run the three targeted tests and verify they fail on API/local scene URLs**
-- [ ] **Step 3: Implement the shared system-media URL builder**
-- [ ] **Step 4: Map portrait and scene browser fields to CDN variants**
-- [ ] **Step 5: Use thumbnails in grids, previews in detail panels, and originals for full-screen/download**
-- [ ] **Step 6: Run the three targeted tests and confirm all catalog records resolve to the CDN**
+- [x] **Step 2: Run the three targeted tests and verify they fail on API/local scene URLs**
+- [x] **Step 3: Implement the shared system-media URL builder**
+- [x] **Step 4: Map portrait and scene browser fields to CDN variants**
+- [x] **Step 5: Use thumbnails in grids, previews in detail panels, and originals for full-screen/download**
+- [x] **Step 6: Run the three targeted tests and confirm all catalog records resolve to the CDN**
 
 ### Task 3: Idempotent System Media Synchronization
 

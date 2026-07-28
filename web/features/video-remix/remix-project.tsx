@@ -48,8 +48,9 @@ import { Button } from "@/components/ui/button";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import type { ApiJobResult, LibraryAsset, LibraryProduct } from "@/entities/types";
 import type { CreationModelCapability } from "@/features/ai-creation/ai-creation-composer";
-import { fetchPortraits, type Portrait, portraitDisplayUrl } from "@/features/portrait-library/portrait-data";
+import { fetchPortraits, type Portrait } from "@/features/portrait-library/portrait-data";
 import { PortraitPickerDialog } from "@/features/portrait-library/portrait-picker-dialog";
+import { systemPortraitMedia } from "../../../shared/media/system-media";
 import type { RemixPromptTool } from "../../../shared/video-remix/prompt-tools";
 import {
   moveRemixSource,
@@ -73,7 +74,9 @@ interface SelectedPortrait {
   name: string;
   profession: string;
   source_url: string;
+  thumbnail_url: string;
   display_url: string;
+  original_url: string;
   index?: number;
   description?: string;
   gender?: string;
@@ -87,7 +90,9 @@ function toSelectedPortrait(portrait: Portrait): SelectedPortrait {
     name: portrait.name,
     profession: portrait.profession,
     source_url: portrait.source_url,
+    thumbnail_url: portrait.thumbnail_url,
     display_url: portrait.display_url,
+    original_url: portrait.original_url,
     ...(portrait.type === "general" ? { index: portrait.index } : {}),
     description: portrait.description,
     gender: portrait.gender,
@@ -292,17 +297,7 @@ function ConfigSidebar({
       <div className="portrait-cards-row">
         {selectedPortraits.map((portrait) => (
           <div className="remix-portrait-card" key={portrait.key}>
-            {portrait.reference.type === "custom" ? (
-              <AuthenticatedMedia
-                className="config-portrait"
-                url={portrait.display_url}
-                mimeType="image/jpeg"
-                alt={portrait.name}
-                previewable={false}
-              />
-            ) : (
-              <ImagePreview className="config-portrait" src={portrait.display_url} alt={portrait.name} />
-            )}
+            <ImagePreview className="config-portrait" src={portrait.thumbnail_url} alt={portrait.name} />
             <Button
               type="button"
               className="portrait-card-remove"
@@ -1205,19 +1200,21 @@ export function RemixProject() {
       for (const portrait of request.portraitAssets ?? []) {
         const portraitFile = portrait.fileInfo[0];
         if (!portraitFile) continue;
+        const portraitId = portrait.reference?.portraitId ?? (Number(portrait.id) || 0);
+        const generalMedia =
+          portrait.reference?.type === "custom" ? undefined : systemPortraitMedia(portraitId);
         restoredPortraits.push({
           key:
             portrait.reference?.type === "custom"
               ? `custom:${portrait.reference.assetId}`
-              : `general:${portrait.reference?.portraitId ?? (Number(portrait.id) || 0)}`,
+              : `general:${portraitId}`,
           reference: portrait.reference ?? { type: "general", portraitId: Number(portrait.id) || 0 },
           name: portrait.assetName,
           profession: portrait.occupation || "",
           source_url: portraitFile.fileUrl,
-          display_url:
-            portrait.reference?.type === "custom"
-              ? portraitFile.fileUrl
-              : portraitDisplayUrl(portrait.reference?.portraitId ?? (Number(portrait.id) || 0)),
+          thumbnail_url: generalMedia?.thumbnailUrl ?? portraitFile.fileUrl,
+          display_url: generalMedia?.url ?? portraitFile.fileUrl,
+          original_url: generalMedia?.originalUrl ?? portraitFile.fileUrl,
           ...(portrait.reference?.type === "custom" ? {} : { index: Number(portrait.id) || 0 }),
           description: portrait.description ?? undefined,
           gender: portrait.gender ?? undefined,

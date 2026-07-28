@@ -2262,7 +2262,9 @@ const CustomPortraitSchema = z.object({
   name: z.string(),
   description: z.string().optional(),
   gender: z.enum(["男", "女"]).optional(),
+  thumbnailUrl: z.string().url(),
   imageUrl: z.string(),
+  originalUrl: z.string().url(),
   status: CustomPortraitStatusSchema,
   errorCode: z.string().optional(),
   errorMessage: z.string().optional(),
@@ -2273,6 +2275,12 @@ const CustomPortraitSchema = z.object({
 function customPortraitResponse(record: CustomPortraitRecord) {
   const asset = accounts.getOwnedAsset(record.ownerUserId, record.assetId);
   if (!asset || asset.kind !== "portrait") return undefined;
+  const media = publicMediaUrls({
+    baseUrl: env.publicMedia.baseUrl,
+    storageKey: asset.storageKey,
+    mimeType: asset.mimeType,
+    fallbackUrl: `/api/assets/${asset.id}/content`,
+  });
   return {
     type: "custom" as const,
     assetId: record.assetId,
@@ -2280,7 +2288,9 @@ function customPortraitResponse(record: CustomPortraitRecord) {
     name: asset.displayName,
     description: asset.description,
     gender: record.gender,
-    imageUrl: `/api/assets/${asset.id}/content`,
+    thumbnailUrl: media.thumbnailUrl,
+    imageUrl: media.url,
+    originalUrl: media.originalUrl,
     status: record.status,
     errorCode: record.errorCode,
     errorMessage: record.errorMessage,

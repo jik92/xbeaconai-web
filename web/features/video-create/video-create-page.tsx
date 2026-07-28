@@ -734,16 +734,7 @@ export function VideoCreatePage() {
               </div>
               {selectedPortrait ? (
                 <div className="flex items-center gap-2 rounded-lg border border-line p-2 [&_img]:h-12 [&_img]:w-9 [&_img]:rounded-md [&_img]:object-cover">
-                  {selectedPortrait.type === "custom" ? (
-                    <AuthenticatedMedia
-                      url={selectedPortrait.display_url}
-                      mimeType="image/jpeg"
-                      alt={selectedPortrait.name}
-                      previewable={false}
-                    />
-                  ) : (
-                    <ImagePreview src={selectedPortrait.display_url} alt={selectedPortrait.name} />
-                  )}
+                  <ImagePreview src={selectedPortrait.thumbnail_url} alt={selectedPortrait.name} />
                   <span className="min-w-0 flex-1 truncate type-helper text-muted">{selectedPortrait.name}</span>
                   <Button
                     variant="ghost"
