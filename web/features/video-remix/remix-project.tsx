@@ -36,7 +36,7 @@ import {
   type RemixProjectSummary,
   saveRemixProject,
 } from "@/api/api-client";
-import type { Job, SeedanceModelId } from "@/api/generated/types.gen";
+import type { GetCreationCapabilitiesResponse, Job, SeedanceModelId } from "@/api/generated/types.gen";
 import { AttachmentPicker, type AttachmentSelection } from "@/components/domain/attachment-picker";
 import { AuthenticatedMedia } from "@/components/domain/authenticated-media";
 import { DashedPickerTile } from "@/components/domain/dashed-picker-tile";
@@ -47,7 +47,6 @@ import { PromptWorkbench } from "@/components/domain/prompt-workbench";
 import { Button } from "@/components/ui/button";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import type { ApiJobResult, LibraryAsset, LibraryProduct } from "@/entities/types";
-import type { CreationModelCapability } from "@/features/ai-creation/ai-creation-composer";
 import { fetchPortraits, type Portrait } from "@/features/portrait-library/portrait-data";
 import { PortraitPickerDialog } from "@/features/portrait-library/portrait-picker-dialog";
 import { systemPortraitMedia } from "../../../shared/media/system-media";
@@ -835,7 +834,11 @@ export function RemixProject() {
   // 即使模型尚未通过可用性验证，也保留在校对工作台中展示；否则整个编辑器会被错误地替换成空态。
   // 提交按钮仍会根据 enabled 禁用，后端也会做最终校验。
   const videoModels = (creationCapabilities?.models ?? []).filter(
-    (model): model is CreationModelCapability & { id: SeedanceModelId } => model.kind === "video",
+    (
+      model,
+    ): model is GetCreationCapabilitiesResponse["models"][number] & {
+      id: SeedanceModelId;
+    } => model.kind === "video",
   );
   const defaultVideoModel = videoModels.find((model) => model.isDefault) ?? videoModels[0];
   const { data: shotJobs = [], refetch: refetchShotJobs } = useQuery({

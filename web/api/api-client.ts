@@ -17,6 +17,7 @@ import {
   createAiGenerateJob as createAiGenerateJobRequest,
   createDownloadTicket,
   createJob,
+  createMediaUnderstandJob as createMediaUnderstandJobRequest,
   createVideoCreateProject,
   createVideoRemixComposeJob,
   createVideoRemixPromptToolJob,
@@ -29,6 +30,7 @@ import {
   getAdminProviderAudit,
   getAdScriptProject,
   getJob,
+  getMediaUnderstandCapabilities,
   getModels,
   getProviderFeatures,
   getVideoCreateProject,
@@ -74,8 +76,11 @@ import type {
   AdScriptProject,
   CreateAiGenerateJobData,
   CreateDownloadTicketData,
+  CreateMediaUnderstandJobData,
   GenerateVideoCreateShotData,
   GetAdminProviderAuditResponse,
+  GetCreationCapabilitiesResponse,
+  GetMediaUnderstandCapabilitiesResponse,
   GetProviderFeaturesResponse,
   GetVideoCreateShotGenerationDraftResponse,
   GetVideoRemixProjectResponse,
@@ -112,6 +117,7 @@ export type RemixProjectDetail = GetVideoRemixProjectResponse;
 export type VideoCreateMaterialVersion = ListVideoCreateShotMaterialVersionsResponse["versions"][number];
 export type CustomPortrait = ListCustomPortraitsResponse["portraits"][number];
 export type DownloadResource = CreateDownloadTicketData["body"];
+export type MediaUnderstandCapabilities = GetMediaUnderstandCapabilitiesResponse;
 
 const configure = () =>
   client.setConfig({
@@ -690,6 +696,40 @@ export async function submitAiGenerateJob(body: CreateAiGenerateJobData["body"],
     throw new Error(message || (reason instanceof Error ? reason.message : "AI 创作任务创建失败"));
   }
 }
+
+export async function fetchMediaUnderstandCapabilities() {
+  configure();
+  const { data } = await getMediaUnderstandCapabilities({
+    headers: authHeaders(),
+    cache: "no-store",
+    throwOnError: true,
+  });
+  if (!data) throw new Error("素材理解模型加载失败");
+  return data;
+}
+
+export async function submitMediaUnderstandJob(
+  body: Omit<CreateMediaUnderstandJobData["body"], "idempotencyKey">,
+  idempotencyKey = randomUuid(),
+) {
+  configure();
+  try {
+    const { data } = await createMediaUnderstandJobRequest({
+      body: { ...body, idempotencyKey },
+      headers: authHeaders(),
+      throwOnError: true,
+    });
+    if (!data) throw new Error("素材理解任务创建失败");
+    return data;
+  } catch (reason) {
+    const message =
+      reason && typeof reason === "object" && "error" in reason
+        ? (reason as { error?: { message?: string } }).error?.message
+        : undefined;
+    throw new Error(message || (reason instanceof Error ? reason.message : "素材理解任务创建失败"));
+  }
+}
+
 export async function checkQwenVoiceSample(assetId: string) {
   configure();
   try {
@@ -712,7 +752,7 @@ export async function fetchCreationCapabilities() {
   const response = await fetch(apiUrl("/api/creation/capabilities"));
   if (!response.ok) throw new Error("创作模型目录加载失败");
   return response.json() as Promise<{
-    models: import("@/features/ai-creation/ai-creation-composer").CreationModelCapability[];
+    models: GetCreationCapabilitiesResponse["models"];
   }>;
 }
 export async function uploadMediaFile(file: File, folderId?: string, onProgress?: (percent: number) => void) {

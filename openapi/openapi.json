@@ -4458,6 +4458,202 @@
         }
       }
     },
+    "/api/media-understand/capabilities": {
+      "get": {
+        "operationId": "getMediaUnderstandCapabilities",
+        "responses": {
+          "200": {
+            "description": "Ark media understanding model capabilities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "models": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "enum": [
+                              "doubao-seed-2-0-pro-260215",
+                              "doubao-seed-2-1-pro-260628",
+                              "doubao-seed-2-0-lite-260428",
+                              "doubao-seed-2-0-mini-260428"
+                            ]
+                          },
+                          "displayName": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "badges": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "disabledReason": {
+                            "type": "string"
+                          },
+                          "acceptedPrimaryKinds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "image",
+                                "video",
+                                "audio"
+                              ]
+                            }
+                          },
+                          "isDefault": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "displayName",
+                          "description",
+                          "badges",
+                          "enabled",
+                          "acceptedPrimaryKinds",
+                          "isDefault"
+                        ]
+                      }
+                    },
+                    "reasoningEfforts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "medium",
+                          "high"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "models",
+                    "reasoningEfforts"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media-understand/jobs": {
+      "post": {
+        "operationId": "createMediaUnderstandJob",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "modelId": {
+                    "type": "string",
+                    "enum": [
+                      "doubao-seed-2-0-pro-260215",
+                      "doubao-seed-2-1-pro-260628",
+                      "doubao-seed-2-0-lite-260428",
+                      "doubao-seed-2-0-mini-260428"
+                    ]
+                  },
+                  "reasoningEffort": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "medium",
+                      "high"
+                    ]
+                  },
+                  "prompt": {
+                    "type": "string",
+                    "maxLength": 8000,
+                    "default": ""
+                  },
+                  "primaryAssetId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "referenceImageAssetIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "maxItems": 5,
+                    "default": []
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "modelId",
+                  "reasoningEffort",
+                  "primaryAssetId",
+                  "idempotencyKey"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Provider not verified",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid media understanding request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/ai-generate/jobs": {
       "post": {
         "operationId": "createAiGenerateJob",

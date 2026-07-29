@@ -1,5 +1,5 @@
 import type { ModuleId } from "../../web/entities/types";
-import { providerCredentialCatalog, type ProviderId, providerCredentials, providerIds } from "./credential-store";
+import { type ProviderId, providerCredentialCatalog, providerCredentials, providerIds } from "./credential-store";
 
 export interface FeatureAvailability {
   enabled: boolean;
@@ -14,7 +14,7 @@ export const moduleProviderRequirements: Record<ModuleId, ProviderId[]> = {
   "ad-script": ["aihubmix"],
   "ai-generate": ["aihubmix", "ark"],
   "video-cut": ["tos"],
-  "media-understand": ["aihubmix"],
+  "media-understand": ["ark", "tos"],
   "video-mashup": ["tos"],
   "voice-clone": ["qwen-audio", "tos"],
   "video-renewal": ["aihubmix"],

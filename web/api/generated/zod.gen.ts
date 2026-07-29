@@ -1237,6 +1237,59 @@ export const zGetCreationCapabilitiesResponse = z.object({
     }))
 });
 
+/**
+ * Ark media understanding model capabilities
+ */
+export const zGetMediaUnderstandCapabilitiesResponse = z.object({
+    models: z.array(z.object({
+        id: z.enum([
+            'doubao-seed-2-0-pro-260215',
+            'doubao-seed-2-1-pro-260628',
+            'doubao-seed-2-0-lite-260428',
+            'doubao-seed-2-0-mini-260428'
+        ]),
+        displayName: z.string(),
+        description: z.string(),
+        badges: z.array(z.string()),
+        enabled: z.boolean(),
+        disabledReason: z.string().optional(),
+        acceptedPrimaryKinds: z.array(z.enum([
+            'image',
+            'video',
+            'audio'
+        ])),
+        isDefault: z.boolean()
+    })),
+    reasoningEfforts: z.array(z.enum([
+        'off',
+        'medium',
+        'high'
+    ]))
+});
+
+export const zCreateMediaUnderstandJobBody = z.object({
+    modelId: z.enum([
+        'doubao-seed-2-0-pro-260215',
+        'doubao-seed-2-1-pro-260628',
+        'doubao-seed-2-0-lite-260428',
+        'doubao-seed-2-0-mini-260428'
+    ]),
+    reasoningEffort: z.enum([
+        'off',
+        'medium',
+        'high'
+    ]),
+    prompt: z.string().max(8000).optional().default(''),
+    primaryAssetId: z.uuid(),
+    referenceImageAssetIds: z.array(z.uuid()).max(5).optional().default([]),
+    idempotencyKey: z.uuid()
+});
+
+/**
+ * Accepted
+ */
+export const zCreateMediaUnderstandJobResponse = zJob;
+
 export const zCreateAiGenerateJobBody = z.union([
     z.object({
         title: z.string().min(1).max(200),

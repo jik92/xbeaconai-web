@@ -70,7 +70,7 @@ export const APP_CONFIG = {
     aiToolbox: {
       "ai-generate": true,
       "video-cut": true,
-      "media-understand": false,
+      "media-understand": true,
       "video-mashup": true,
       "voice-clone": true,
       "video-renewal": false,

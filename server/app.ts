@@ -7,6 +7,12 @@ import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
 import { aiToolModuleIds, isAiToolModuleId } from "../shared/jobs/ai-tool-modules";
 import {
+  MediaUnderstandRequestSchema,
+  mediaUnderstandModelIds,
+  mediaUnderstandModels,
+  mediaUnderstandReasoningEfforts,
+} from "../shared/media-understand/contract";
+import {
   normalizePortraitReference,
   type PortraitReference,
   serializePortraitReference,
@@ -83,6 +89,7 @@ const shareParser = new ShareContentParser(platformAdapters);
 import { stopAllAdminJobs } from "./jobs/admin-job-control";
 import { BullJobQueue } from "./jobs/bull-job-queue";
 import { InsufficientCreditsError, SqliteJobStore } from "./jobs/sqlite-job-store";
+import { MediaUnderstandValidationError, resolveMediaUnderstandAssets } from "./media-understand/job-service";
 import { isSeedanceModelId, seedanceModelIds, videoModels } from "./models/video-models";
 import { type CustomPortraitRecord, CustomPortraitStore } from "./portraits/custom-portrait-store";
 import { resolvePortraitReference } from "./portraits/portrait-resolver";
@@ -593,6 +600,7 @@ function providerGuard(moduleId: ModuleId): MiddlewareHandler<AppEnv> {
 app.use("/api/video-remix/*", providerGuard("video-remix"));
 app.use("/api/ad-script/*", providerGuard("ad-script"));
 app.use("/api/video-create/*", providerGuard("video-create"));
+app.use("/api/media-understand/*", providerGuard("media-understand"));
 app.use("/api/uploads", providerGuard("video-cut"));
 app.use("/api/uploads/direct*", providerGuard("video-cut"));
 app.use("/api/products", providerGuard("video-cut"));
@@ -1512,6 +1520,199 @@ const creationCapabilitiesRoute = createRoute({
 app.openapi(creationCapabilitiesRoute, (c) => {
   const providers = getCreationProviderStatus();
   return c.json({ models: creationCapabilities(providers.imageEnabled, providers.videoEnabled) }, 200);
+});
+
+const mediaUnderstandCapabilitiesRoute = createRoute({
+  method: "get",
+  path: "/api/media-understand/capabilities",
+  operationId: "getMediaUnderstandCapabilities",
+  responses: {
+    200: {
+      description: "Ark media understanding model capabilities",
+      content: {
+        "application/json": {
+          schema: z.object({
+            models: z.array(
+              z.object({
+                id: z.enum(mediaUnderstandModelIds),
+                displayName: z.string(),
+                description: z.string(),
+                badges: z.array(z.string()),
+                enabled: z.boolean(),
+                disabledReason: z.string().optional(),
+                acceptedPrimaryKinds: z.array(z.enum(["image", "video", "audio"])),
+                isDefault: z.boolean(),
+              }),
+            ),
+            reasoningEfforts: z.array(z.enum(mediaUnderstandReasoningEfforts)),
+          }),
+        },
+      },
+    },
+  },
+});
+app.openapi(mediaUnderstandCapabilitiesRoute, (c) => {
+  const enabled = providerCredentials.isProviderVerified("ark") && providerCredentials.isProviderVerified("tos");
+  return c.json(
+    {
+      models: mediaUnderstandModels.map((model) => ({
+        ...model,
+        enabled,
+        ...(enabled ? {} : { disabledReason: "请先在管理后台检测并通过火山方舟与火山 TOS" }),
+        isDefault: model.id === "doubao-seed-2-0-lite-260428",
+      })),
+      reasoningEfforts: [...mediaUnderstandReasoningEfforts],
+    },
+    200,
+  );
+});
+
+const createMediaUnderstandJobRoute = createRoute({
+  method: "post",
+  path: "/api/media-understand/jobs",
+  operationId: "createMediaUnderstandJob",
+  request: {
+    body: {
+      required: true,
+      content: { "application/json": { schema: MediaUnderstandRequestSchema } },
+    },
+  },
+  responses: {
+    202: { description: "Accepted", content: { "application/json": { schema: JobSchema } } },
+    401: { description: "Unauthorized", content: { "application/json": { schema: ErrorSchema } } },
+    403: { description: "Provider not verified", content: { "application/json": { schema: ErrorSchema } } },
+    422: {
+      description: "Invalid media understanding request",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+  },
+});
+app.openapi(createMediaUnderstandJobRoute, async (c) => {
+  const ownerUserId = c.get("userId");
+  const body = c.req.valid("json");
+  const existing = store.getByIdempotencyKey(ownerUserId, body.idempotencyKey);
+  if (existing) return c.json(existing, 202);
+  let resolvedAssets: ReturnType<typeof resolveMediaUnderstandAssets> | undefined;
+  try {
+    const resolved = resolveMediaUnderstandAssets(
+      ownerUserId,
+      {
+        primaryAssetId: body.primaryAssetId,
+        referenceImageAssetIds: body.referenceImageAssetIds,
+      },
+      (userId, assetId) => accounts.getOwnedAsset(userId, assetId),
+    );
+    resolvedAssets = resolved;
+    const primaryKind = resolved.primary.mimeType.startsWith("video/")
+      ? "video"
+      : resolved.primary.mimeType.startsWith("audio/")
+        ? "audio"
+        : "image";
+    const selectedModel = mediaUnderstandModels.find((model) => model.id === body.modelId);
+    if (!selectedModel?.acceptedPrimaryKinds.includes(primaryKind))
+      return c.json(
+        {
+          error: {
+            code: "MEDIA_UNDERSTAND_MODEL_UNSUPPORTED",
+            message: "所选模型不支持当前主素材类型",
+            retryable: false,
+            requestId: crypto.randomUUID(),
+          },
+        },
+        422,
+      );
+  } catch (error) {
+    if (error instanceof MediaUnderstandValidationError)
+      return c.json(
+        {
+          error: {
+            code: error.code,
+            message: error.message,
+            retryable: false,
+            requestId: crypto.randomUUID(),
+          },
+        },
+        422,
+      );
+    throw error;
+  }
+  if (!resolvedAssets) throw new Error("MEDIA_UNDERSTAND_ASSETS_NOT_RESOLVED");
+  const credits = 5;
+  const user = accounts.getUser(ownerUserId);
+  if (!user || user.credits < credits)
+    return c.json(
+      {
+        error: {
+          code: "INSUFFICIENT_CREDITS",
+          message: `本次预计消耗 ${credits} 创作点，当前余额不足`,
+          retryable: false,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      422,
+    );
+  const now = new Date().toISOString();
+  const job: JobRecord = {
+    id: crypto.randomUUID(),
+    ownerUserId,
+    moduleId: "media-understand",
+    title: `素材理解 · ${new Date().toLocaleString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`,
+    status: "queued",
+    progress: 0,
+    stage: "排队中",
+    overallExecutionMode: "real",
+    values: {
+      mediaUnderstandRequest: JSON.stringify(body),
+      modelId: body.modelId,
+      reasoningEffort: body.reasoningEffort,
+      primaryAssetId: body.primaryAssetId,
+      referenceImageAssetIds: JSON.stringify(body.referenceImageAssetIds),
+      referenceMetadata: JSON.stringify([
+        {
+          id: resolvedAssets.primary.id,
+          name: resolvedAssets.primary.displayName,
+          mimeType: resolvedAssets.primary.mimeType,
+          label: "主素材",
+        },
+        ...resolvedAssets.references.map((reference, index) => ({
+          id: reference.id,
+          name: reference.displayName,
+          mimeType: reference.mimeType,
+          label: `商品参考图 ${index + 1}`,
+        })),
+      ]),
+      prompt: body.prompt,
+      allowMockFallback: "false",
+    },
+    executionPlan: [],
+    provenance: [],
+    idempotencyKey: body.idempotencyKey,
+    cancelRequested: false,
+    providerCancelState: "none",
+    stagingKeys: [],
+    jobSchemaVersion: 2,
+    createdAt: now,
+    updatedAt: now,
+  };
+  try {
+    store.createCharged(job, credits);
+  } catch (error) {
+    if (error instanceof InsufficientCreditsError)
+      return c.json(
+        {
+          error: {
+            code: "INSUFFICIENT_CREDITS",
+            message: "创作点余额发生变化，请刷新后重试",
+            retryable: false,
+            requestId: crypto.randomUUID(),
+          },
+        },
+        422,
+      );
+    throw error;
+  }
+  await queue.enqueue(job.id);
+  return c.json(job, 202);
 });
 
 app.use("/api/ai-generate/jobs", async (c, next) => {
@@ -6853,7 +7054,12 @@ const createJobRoute = createRoute({
 });
 app.openapi(createJobRoute, async (c) => {
   const moduleId = c.req.valid("param").moduleId as ModuleId;
-  if (moduleId === "ad-script" || moduleId === "video-create" || moduleId === "ai-generate")
+  if (
+    moduleId === "ad-script" ||
+    moduleId === "video-create" ||
+    moduleId === "ai-generate" ||
+    moduleId === "media-understand"
+  )
     return c.json(
       {
         error: {
@@ -6863,7 +7069,9 @@ app.openapi(createJobRoute, async (c) => {
               ? "口播脚本必须通过专用创作流程提交"
               : moduleId === "video-create"
                 ? "一键成片必须通过专用项目流程提交"
-                : "AI 创作必须通过专用强类型接口提交",
+                : moduleId === "ai-generate"
+                  ? "AI 创作必须通过专用强类型接口提交"
+                  : "素材理解必须通过专用强类型接口提交",
           retryable: false,
           requestId: crypto.randomUUID(),
         },

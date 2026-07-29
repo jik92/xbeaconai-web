@@ -3,6 +3,7 @@ import { adScriptJob } from "./job-ad-script";
 import { aiGenerateJob } from "./job-ai-generate";
 import { douyinVideoImportJob } from "./job-douyin-video-import";
 import { genericCreationJob } from "./job-generic-creation";
+import { mediaUnderstandJob } from "./job-media-understand";
 import { subtitleEraseJob, videoEnhancementJob } from "./job-mediakit-video";
 import { portraitAssetRegisterJob } from "./job-portrait-asset-register";
 import { qianchuanPcJob } from "./job-qianchuan-pc";
@@ -26,6 +27,7 @@ export const jobHandlers: readonly WorkerJobHandler[] = [
   qianchuanPcJob,
   adScriptJob,
   aiGenerateJob,
+  mediaUnderstandJob,
   videoCreateJob,
   videoRemixPromptRewriteJob,
   videoRemixShotGenerationJob,

@@ -6,7 +6,6 @@ import {
   MessagePartPrimitive,
   MessagePrimitive,
   type ThreadMessageLike,
-  ThreadPrimitive,
   type Unstable_DirectiveFormatter,
   type Unstable_DirectiveSegment,
   unstable_useMentionAdapter,
@@ -15,33 +14,23 @@ import {
   useExternalStoreRuntime,
 } from "@assistant-ui/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  ArrowDown,
-  Image,
-  Library,
-  LoaderCircle,
-  MessageSquare,
-  Plus,
-  RefreshCw,
-  Send,
-  Sparkles,
-  Video,
-} from "lucide-react";
+import { Image, LoaderCircle, MessageSquare, Plus, RefreshCw, Sparkles, Video } from "lucide-react";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { downloadAuthenticated, fetchCreationCapabilities, fetchJobs, submitAiGenerateJob } from "@/api/api-client";
-import type { Job } from "@/api/generated/types.gen";
-import { AttachmentPicker, type AttachmentSelection } from "@/components/domain/attachment-picker";
+import type { GetCreationCapabilitiesResponse, Job } from "@/api/generated/types.gen";
+import type { AttachmentSelection } from "@/components/domain/attachment-picker";
+import { CreationAssistantComposer, CreationAssistantThread } from "@/components/domain/creation-assistant-composer";
 import { MediaResultCard } from "@/components/domain/media-result-card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { randomUuid } from "@/lib/random-id";
-import type { CreationModelCapability } from "../ai-creation/ai-creation-composer";
+import { AiGenerateReferencePreview } from "./ai-generate-reference-preview";
 import {
-  type AiGenerateDraft,
   type AiGenerateConversation,
+  type AiGenerateDraft,
   type AiGenerateKind,
   type AiGenerateReference,
   type AiGenerateResultData,
@@ -50,17 +39,16 @@ import {
   countEffectiveReferences,
   groupAiGenerateConversations,
   jobsToThreadMessages,
-  parseProfessionalPrompt,
   parseJobReferences,
+  parseProfessionalPrompt,
   referenceAccept,
   referencesFromAppendMessage,
-  resolveReferenceMode,
   resolveAssetMentions,
+  resolveReferenceMode,
   seedanceReferenceConstraints,
   supportsMediaReference,
   validateModelReferenceCount,
 } from "./ai-generate-runtime";
-import { AiGenerateReferencePreview } from "./ai-generate-reference-preview";
 
 type RuntimeContextValue = {
   jobs: Job[];
@@ -69,7 +57,7 @@ type RuntimeContextValue = {
   selectConversation: (conversation: Pick<AiGenerateConversation, "id" | "name">) => void;
   createConversation: (name: string) => void;
   draft: AiGenerateDraft;
-  models: CreationModelCapability[];
+  models: GetCreationCapabilitiesResponse["models"];
   setDraft: React.Dispatch<React.SetStateAction<AiGenerateDraft>>;
   submitVariant: (source: Job) => Promise<void>;
   restoreRequest?: Job;
@@ -499,10 +487,8 @@ function AiGenerateComposer() {
   const filteredModels = models.filter((model) => model.kind === draft.kind);
   const model = filteredModels.find((item) => item.id === draft.modelId);
   const professionalPrompt = buildProfessionalPrompt(professionalFields);
-  const acceptedReferenceKinds = model?.acceptedReferenceKinds ?? [];
   const accept = referenceAccept(model);
   const canAttachReferences = Boolean(accept) && Boolean(model?.enabled);
-  const referenceCapabilityKey = acceptedReferenceKinds.join(",");
   useEffect(() => {
     if (!model) return;
     const composer = aui.composer();
@@ -530,7 +516,7 @@ function AiGenerateComposer() {
         });
       toast.warning(`已移除 ${removedCount} 个新模型不支持的参考素材`);
     })();
-  }, [aui, model, referenceCapabilityKey]);
+  }, [aui, model]);
   useEffect(() => {
     if (!restoreRequest) return;
     const composer = aui.composer();
@@ -622,174 +608,170 @@ function AiGenerateComposer() {
       referenceMode: kind === "image" ? "" : "omni",
     }));
   return (
-    <ComposerPrimitive.Root className="rounded-2xl border border-line bg-surface p-3 shadow-sm">
-      <div className="mb-3 flex items-center gap-1">
-        <Button
-          size="sm"
-          variant={composerMode === "concise" ? "default" : "ghost"}
-          onClick={() => setComposerMode("concise")}
-        >
-          简洁版
-        </Button>
-        <Button
-          size="sm"
-          variant={composerMode === "professional" ? "default" : "ghost"}
-          onClick={() => setComposerMode("professional")}
-        >
-          专业版
-        </Button>
-      </div>
-      <div className="mb-2">
-        <AiGenerateReferencePreview
-          references={attachedReferences}
-          removable
-          onRemove={(id) => void removeReference(id)}
-        />
-      </div>
-      {composerMode === "professional" ? (
-        <div className="mb-3 overflow-hidden rounded-xl border border-line">
-          {(
-            [
-              ["script", "脚本", "描述视频主题、核心内容、故事结构或脚本要点"],
-              ["environment", "环境与运镜", "填写场景环境、画面风格、镜头语言与运镜方式"],
-              ["emphasis", "强调点", "填写需要重点突出的产品功能、卖点或记忆点"],
-            ] as const
-          ).map(([key, label, placeholder]) => (
-            <label className="grid grid-cols-[132px_minmax(0,1fr)] border-b border-line last:border-b-0" key={key}>
-              <span className="flex items-center border-r border-line px-3 type-body-strong text-ink">{label}</span>
-              <textarea
-                value={professionalFields[key]}
-                placeholder={placeholder}
-                rows={2}
-                className="min-h-18 resize-y bg-transparent px-3 py-2 type-body text-ink outline-none placeholder:text-muted"
-                onChange={(event) => setProfessionalFields((current) => ({ ...current, [key]: event.target.value }))}
-              />
-            </label>
-          ))}
-        </div>
-      ) : (
-        <ComposerPrimitive.Unstable_TriggerPopoverRoot>
-          <ComposerPrimitive.Input
-            rows={2}
-            placeholder="描述要生成或修改的内容，输入 @引用已添加的素材"
-            className="max-h-40 min-h-16 w-full resize-none bg-transparent px-1 py-2 type-body text-ink outline-none placeholder:text-muted"
-          />
-          <ComposerPrimitive.Unstable_TriggerPopover
-            char="@"
-            adapter={mention.adapter}
-            className="absolute bottom-full left-3 z-30 mb-2 w-72 overflow-hidden rounded-lg border border-line bg-surface p-1 shadow-sm"
-            aria-label="引用素材"
+    <CreationAssistantComposer
+      references={attachedReferences}
+      placeholder="描述要生成或修改的内容，输入 @引用已添加的素材"
+      header={
+        <div className="mb-3 flex items-center gap-1">
+          <Button
+            size="sm"
+            variant={composerMode === "concise" ? "default" : "ghost"}
+            onClick={() => setComposerMode("concise")}
           >
-            <ComposerPrimitive.Unstable_TriggerPopover.Directive {...mention.directive} />
-            <ComposerPrimitive.Unstable_TriggerPopoverItems>
-              {(items) =>
-                items.map((item, index) => (
-                  <ComposerPrimitive.Unstable_TriggerPopoverItem
-                    item={item}
-                    index={index}
-                    key={item.id}
-                    className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left type-body text-ink hover:bg-surface-muted data-highlighted:bg-surface-muted"
-                  >
-                    <span>@{item.label}</span>
-                    <small className="truncate type-helper text-muted">{item.description}</small>
-                  </ComposerPrimitive.Unstable_TriggerPopoverItem>
-                ))
-              }
-            </ComposerPrimitive.Unstable_TriggerPopoverItems>
-          </ComposerPrimitive.Unstable_TriggerPopover>
-        </ComposerPrimitive.Unstable_TriggerPopoverRoot>
-      )}
-      <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
-        <div className="flex rounded-md border border-line p-0.5">
-          <Button size="sm" variant={draft.kind === "image" ? "default" : "ghost"} onClick={() => switchKind("image")}>
-            <Image />
-            生图
+            简洁版
           </Button>
-          <Button size="sm" variant={draft.kind === "video" ? "default" : "ghost"} onClick={() => switchKind("video")}>
-            <Video />
-            生视频
+          <Button
+            size="sm"
+            variant={composerMode === "professional" ? "default" : "ghost"}
+            onClick={() => setComposerMode("professional")}
+          >
+            专业版
           </Button>
         </div>
-        <NativeSelect
-          aria-label="生成模型"
-          value={draft.modelId}
-          onChange={(event) => setDraft((current) => ({ ...current, modelId: event.target.value }))}
-        >
-          {filteredModels.map((item) => (
-            <option key={item.id} value={item.id} disabled={!item.enabled}>
-              {item.displayName}
-              {item.executionMode === "mock" ? " · Mock" : ""}
-            </option>
-          ))}
-        </NativeSelect>
-        <NativeSelect
-          aria-label="画幅"
-          value={draft.ratio}
-          onChange={(event) => setDraft((current) => ({ ...current, ratio: event.target.value }))}
-        >
-          {(model?.supportedRatios ?? []).map((ratio) => (
-            <option key={ratio} value={ratio}>
-              {ratio === "adaptive" ? "自动画幅" : ratio}
-            </option>
-          ))}
-        </NativeSelect>
-        <NativeSelect
-          aria-label="清晰度"
-          value={draft.resolution}
-          onChange={(event) => setDraft((current) => ({ ...current, resolution: event.target.value }))}
-        >
-          {(model?.supportedResolutions ?? []).map((resolution) => (
-            <option key={resolution} value={resolution}>
-              {resolution.toUpperCase()}
-            </option>
-          ))}
-        </NativeSelect>
-        {draft.kind === "video" && (
+      }
+      input={
+        composerMode === "professional" ? (
+          <div className="mb-3 overflow-hidden rounded-xl border border-line">
+            {(
+              [
+                ["script", "脚本", "描述视频主题、核心内容、故事结构或脚本要点"],
+                ["environment", "环境与运镜", "填写场景环境、画面风格、镜头语言与运镜方式"],
+                ["emphasis", "强调点", "填写需要重点突出的产品功能、卖点或记忆点"],
+              ] as const
+            ).map(([key, label, placeholder]) => (
+              <label className="grid grid-cols-[132px_minmax(0,1fr)] border-b border-line last:border-b-0" key={key}>
+                <span className="flex items-center border-r border-line px-3 type-body-strong text-ink">{label}</span>
+                <textarea
+                  value={professionalFields[key]}
+                  placeholder={placeholder}
+                  rows={2}
+                  className="min-h-18 resize-y bg-transparent px-3 py-2 type-body text-ink outline-none placeholder:text-muted"
+                  onChange={(event) => setProfessionalFields((current) => ({ ...current, [key]: event.target.value }))}
+                />
+              </label>
+            ))}
+          </div>
+        ) : (
+          <ComposerPrimitive.Unstable_TriggerPopoverRoot>
+            <ComposerPrimitive.Input
+              rows={2}
+              placeholder="描述要生成或修改的内容，输入 @引用已添加的素材"
+              className="max-h-40 min-h-16 w-full resize-none bg-transparent px-1 py-2 type-body text-ink outline-none placeholder:text-muted"
+            />
+            <ComposerPrimitive.Unstable_TriggerPopover
+              char="@"
+              adapter={mention.adapter}
+              className="absolute bottom-full left-3 z-30 mb-2 w-72 overflow-hidden rounded-lg border border-line bg-surface p-1 shadow-sm"
+              aria-label="引用素材"
+            >
+              <ComposerPrimitive.Unstable_TriggerPopover.Directive {...mention.directive} />
+              <ComposerPrimitive.Unstable_TriggerPopoverItems>
+                {(items) =>
+                  items.map((item, index) => (
+                    <ComposerPrimitive.Unstable_TriggerPopoverItem
+                      item={item}
+                      index={index}
+                      key={item.id}
+                      className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left type-body text-ink hover:bg-surface-muted data-highlighted:bg-surface-muted"
+                    >
+                      <span>@{item.label}</span>
+                      <small className="truncate type-helper text-muted">{item.description}</small>
+                    </ComposerPrimitive.Unstable_TriggerPopoverItem>
+                  ))
+                }
+              </ComposerPrimitive.Unstable_TriggerPopoverItems>
+            </ComposerPrimitive.Unstable_TriggerPopover>
+          </ComposerPrimitive.Unstable_TriggerPopoverRoot>
+        )
+      }
+      controls={
+        <>
+          <div className="flex rounded-md border border-line p-0.5">
+            <Button
+              size="sm"
+              variant={draft.kind === "image" ? "default" : "ghost"}
+              onClick={() => switchKind("image")}
+            >
+              <Image />
+              生图
+            </Button>
+            <Button
+              size="sm"
+              variant={draft.kind === "video" ? "default" : "ghost"}
+              onClick={() => switchKind("video")}
+            >
+              <Video />
+              生视频
+            </Button>
+          </div>
           <NativeSelect
-            aria-label="视频时长"
-            value={draft.duration}
-            onChange={(event) => setDraft((current) => ({ ...current, duration: Number(event.target.value) }))}
+            aria-label="生成模型"
+            value={draft.modelId}
+            onChange={(event) => setDraft((current) => ({ ...current, modelId: event.target.value }))}
           >
-            {(model?.supportedDurations ?? []).map((duration) => (
-              <option key={duration} value={duration}>
-                {duration}s
+            {filteredModels.map((item) => (
+              <option key={item.id} value={item.id} disabled={!item.enabled}>
+                {item.displayName}
+                {item.executionMode === "mock" ? " · Mock" : ""}
               </option>
             ))}
           </NativeSelect>
-        )}
-        {accept && (
-          <AttachmentPicker
-            accept={accept}
-            constraints={seedanceReferenceConstraints(model)}
-            multiple
-            showMediaTypeFilters
-            onSelect={(assets) => void addAssets(assets)}
-            trigger={(open) => (
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={!canAttachReferences}
-                title={model?.disabledReason}
-                onClick={open}
-              >
-                <Library /> 添加参考素材
-              </Button>
-            )}
-          />
-        )}
-        <ComposerPrimitive.Send asChild>
-          <Button
-            className="ml-auto rounded-full"
-            aria-label="发送生成任务"
-            disabled={!model?.enabled || Boolean(referenceError)}
-            title={referenceError}
+          <NativeSelect
+            aria-label="画幅"
+            value={draft.ratio}
+            onChange={(event) => setDraft((current) => ({ ...current, ratio: event.target.value }))}
           >
-            <Send />
-            生成
-          </Button>
-        </ComposerPrimitive.Send>
-      </div>
-    </ComposerPrimitive.Root>
+            {(model?.supportedRatios ?? []).map((ratio) => (
+              <option key={ratio} value={ratio}>
+                {ratio === "adaptive" ? "自动画幅" : ratio}
+              </option>
+            ))}
+          </NativeSelect>
+          <NativeSelect
+            aria-label="清晰度"
+            value={draft.resolution}
+            onChange={(event) => setDraft((current) => ({ ...current, resolution: event.target.value }))}
+          >
+            {(model?.supportedResolutions ?? []).map((resolution) => (
+              <option key={resolution} value={resolution}>
+                {resolution.toUpperCase()}
+              </option>
+            ))}
+          </NativeSelect>
+          {draft.kind === "video" && (
+            <NativeSelect
+              aria-label="视频时长"
+              value={draft.duration}
+              onChange={(event) => setDraft((current) => ({ ...current, duration: Number(event.target.value) }))}
+            >
+              {(model?.supportedDurations ?? []).map((duration) => (
+                <option key={duration} value={duration}>
+                  {duration}s
+                </option>
+              ))}
+            </NativeSelect>
+          )}
+        </>
+      }
+      attachment={
+        accept
+          ? {
+              accept,
+              constraints: seedanceReferenceConstraints(model),
+              multiple: true,
+              showMediaTypeFilters: true,
+              disabled: !canAttachReferences,
+              disabledReason: model?.disabledReason,
+              onSelect: (assets) => void addAssets(assets),
+            }
+          : undefined
+      }
+      sendLabel="生成"
+      sendAriaLabel="发送生成任务"
+      sendDisabled={!model?.enabled || Boolean(referenceError)}
+      sendTitle={referenceError}
+      onRemoveReference={(id) => void removeReference(id)}
+    />
   );
 }
 
@@ -865,37 +847,11 @@ function AiGenerateConversationRail() {
 
 function AiGenerateThread() {
   return (
-    <ThreadPrimitive.Root className="relative flex min-h-0 flex-1 flex-col bg-surface">
-      <ThreadPrimitive.Viewport className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-        <ThreadPrimitive.Empty>
-          <div className="m-auto flex max-w-md flex-col items-center px-6 text-center">
-            <div className="mb-4 flex size-12 items-center justify-center rounded-full bg-surface-muted">
-              <Sparkles className="size-5 text-ink" />
-            </div>
-            <h1 className="type-page-title text-ink">AI 创作</h1>
-          </div>
-        </ThreadPrimitive.Empty>
-        <ThreadPrimitive.Messages
-          components={{
-            UserMessage,
-            AssistantMessage,
-          }}
-        />
-        <ThreadPrimitive.ViewportFooter className="sticky bottom-0 mx-auto w-full max-w-4xl shrink-0 bg-surface/95 px-4 pb-4 pt-2 backdrop-blur">
-          <ThreadPrimitive.ScrollToBottom asChild>
-            <Button
-              variant="outline"
-              size="icon-sm"
-              className="absolute -top-10 left-1/2 -translate-x-1/2 rounded-full"
-              aria-label="滚动到底部"
-            >
-              <ArrowDown />
-            </Button>
-          </ThreadPrimitive.ScrollToBottom>
-          <AiGenerateComposer />
-        </ThreadPrimitive.ViewportFooter>
-      </ThreadPrimitive.Viewport>
-    </ThreadPrimitive.Root>
+    <CreationAssistantThread
+      title="AI 创作"
+      composer={<AiGenerateComposer />}
+      messageComponents={{ UserMessage, AssistantMessage }}
+    />
   );
 }
 

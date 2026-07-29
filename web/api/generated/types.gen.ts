@@ -1259,6 +1259,74 @@ export type GetCreationCapabilitiesResponses = {
 
 export type GetCreationCapabilitiesResponse = GetCreationCapabilitiesResponses[keyof GetCreationCapabilitiesResponses];
 
+export type GetMediaUnderstandCapabilitiesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/media-understand/capabilities';
+};
+
+export type GetMediaUnderstandCapabilitiesResponses = {
+    /**
+     * Ark media understanding model capabilities
+     */
+    200: {
+        models: Array<{
+            id: 'doubao-seed-2-0-pro-260215' | 'doubao-seed-2-1-pro-260628' | 'doubao-seed-2-0-lite-260428' | 'doubao-seed-2-0-mini-260428';
+            displayName: string;
+            description: string;
+            badges: Array<string>;
+            enabled: boolean;
+            disabledReason?: string;
+            acceptedPrimaryKinds: Array<'image' | 'video' | 'audio'>;
+            isDefault: boolean;
+        }>;
+        reasoningEfforts: Array<'off' | 'medium' | 'high'>;
+    };
+};
+
+export type GetMediaUnderstandCapabilitiesResponse = GetMediaUnderstandCapabilitiesResponses[keyof GetMediaUnderstandCapabilitiesResponses];
+
+export type CreateMediaUnderstandJobData = {
+    body: {
+        modelId: 'doubao-seed-2-0-pro-260215' | 'doubao-seed-2-1-pro-260628' | 'doubao-seed-2-0-lite-260428' | 'doubao-seed-2-0-mini-260428';
+        reasoningEffort: 'off' | 'medium' | 'high';
+        prompt?: string;
+        primaryAssetId: string;
+        referenceImageAssetIds?: Array<string>;
+        idempotencyKey: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/media-understand/jobs';
+};
+
+export type CreateMediaUnderstandJobErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ApiErrorResponse;
+    /**
+     * Provider not verified
+     */
+    403: ApiErrorResponse;
+    /**
+     * Invalid media understanding request
+     */
+    422: ApiErrorResponse;
+};
+
+export type CreateMediaUnderstandJobError = CreateMediaUnderstandJobErrors[keyof CreateMediaUnderstandJobErrors];
+
+export type CreateMediaUnderstandJobResponses = {
+    /**
+     * Accepted
+     */
+    202: Job;
+};
+
+export type CreateMediaUnderstandJobResponse = CreateMediaUnderstandJobResponses[keyof CreateMediaUnderstandJobResponses];
+
 export type CreateAiGenerateJobData = {
     body: {
         title: string;

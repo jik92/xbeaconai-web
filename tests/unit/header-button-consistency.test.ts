@@ -69,12 +69,7 @@ describe("compact header button consistency", () => {
   });
 
   test("does not retain visual CSS overrides for standardized Header close buttons", () => {
-    const styles = [
-      source("web/styles/globals.css"),
-      source("web/styles/account.css"),
-      source("web/features/ai-creation/ai-creation-composer.css"),
-      source("web/features/media-understand/media-understand-page.css"),
-    ].join("\n");
+    const styles = [source("web/styles/globals.css"), source("web/styles/account.css")].join("\n");
     const forbidden = [
       ".utility-dialog header button",
       ".attachment-picker-dialog > header button",

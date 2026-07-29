@@ -7,10 +7,15 @@ const root = resolve(import.meta.dir, "../..");
 describe("assistant-ui AI Generate page", () => {
   test("uses official chat primitives without legacy Mock or page CSS", () => {
     const page = readFileSync(resolve(root, "web/features/ai-generate/ai-generate-page.tsx"), "utf8");
+    const sharedComposer = readFileSync(resolve(root, "web/components/domain/creation-assistant-composer.tsx"), "utf8");
     const promptWorkbench = readFileSync(resolve(root, "web/components/domain/prompt-workbench.tsx"), "utf8");
 
     expect(page).toContain('from "@assistant-ui/react"');
-    expect(page).toContain("ThreadPrimitive");
+    expect(page).toContain("CreationAssistantComposer");
+    expect(page).toContain("CreationAssistantThread");
+    expect(page).toContain("<CreationAssistantComposer");
+    expect(page).toContain("<CreationAssistantThread");
+    expect(sharedComposer).toContain("ThreadPrimitive");
     expect(page).toContain("MessagePrimitive");
     expect(page).toContain("ComposerPrimitive");
     expect(page).toContain("ActionBarPrimitive");
@@ -19,14 +24,17 @@ describe("assistant-ui AI Generate page", () => {
     expect(page).not.toContain("AiGenerateMockStore");
     expect(page).not.toContain('import "./ai-generate.css"');
     expect(promptWorkbench).not.toContain("ai-generate.css");
+    expect(sharedComposer).toContain('data-creation-assistant-composer="true"');
+    expect(sharedComposer).toContain('data-creation-assistant-thread="true"');
   });
 
   test("keeps the composer fixed while only the message viewport scrolls", () => {
     const page = readFileSync(resolve(root, "web/features/ai-generate/ai-generate-page.tsx"), "utf8");
+    const sharedComposer = readFileSync(resolve(root, "web/components/domain/creation-assistant-composer.tsx"), "utf8");
 
     expect(page).toContain('className="flex h-[calc(100dvh-56px)] min-h-0 overflow-hidden bg-surface"');
-    expect(page).toContain('className="flex min-h-0 flex-1 flex-col overflow-y-auto"');
-    expect(page).toContain('className="sticky bottom-0 mx-auto w-full max-w-4xl shrink-0');
+    expect(sharedComposer).toContain('className="flex min-h-0 flex-1 flex-col overflow-y-auto"');
+    expect(sharedComposer).toContain('className="sticky bottom-0 mx-auto w-full max-w-4xl shrink-0');
   });
 
   test("reuses the shared media result card for image and video artifacts", () => {
@@ -57,8 +65,9 @@ describe("assistant-ui AI Generate page", () => {
 
   test("uses one model-aware entry for image and video reference media", () => {
     const page = readFileSync(resolve(root, "web/features/ai-generate/ai-generate-page.tsx"), "utf8");
+    const sharedComposer = readFileSync(resolve(root, "web/components/domain/creation-assistant-composer.tsx"), "utf8");
 
-    expect(page).toContain("添加参考素材");
+    expect(sharedComposer).toContain("添加参考素材");
     expect(page).toContain("referenceAccept(model)");
     expect(page).toContain("showMediaTypeFilters");
     expect(page).toContain("supportsMediaReference");
