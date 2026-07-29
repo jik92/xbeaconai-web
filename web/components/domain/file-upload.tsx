@@ -4,12 +4,13 @@ import {
   type DragEvent,
   type KeyboardEvent,
   type ReactNode,
+  useEffect,
   useId,
   useRef,
   useState,
 } from "react";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Label } from "../ui/label";
 import { AuthenticatedMedia } from "./authenticated-media";
 
@@ -53,6 +54,10 @@ function formatBytes(bytes?: number) {
   return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
 }
 
+function localFileKey(file: File) {
+  return `${file.name}-${file.size}-${file.lastModified}`;
+}
+
 export function FileUpload({
   id,
   className,
@@ -78,9 +83,33 @@ export function FileUpload({
   const dragDepth = useRef(0);
   const [dragging, setDragging] = useState(false);
   const [validationError, setValidationError] = useState("");
+  const [localImagePreviews, setLocalImagePreviews] = useState<Record<string, string>>({});
   const hasFiles = files.length > 0 || uploadedFiles.length > 0;
   const visibleError = error || validationError;
   const normalizedProgress = Math.max(0, Math.min(100, Math.round(progress)));
+
+  useEffect(() => {
+    let active = true;
+    const imageFiles = files.filter((file) => file.type.startsWith("image/"));
+    const previewKeys = new Set(imageFiles.map(localFileKey));
+    setLocalImagePreviews((current) =>
+      Object.fromEntries(Object.entries(current).filter(([key]) => previewKeys.has(key))),
+    );
+
+    for (const file of imageFiles) {
+      const key = localFileKey(file);
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (!active || typeof reader.result !== "string") return;
+        setLocalImagePreviews((current) => ({ ...current, [key]: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [files]);
 
   const choose = (nextFiles: File[]) => {
     const accepted = nextFiles.filter((file) => fileMatchesAccept(file, accept));
@@ -231,11 +260,15 @@ export function FileUpload({
               ))}
               {files.map((file) => (
                 <div
-                  key={`${file.name}-${file.size}-${file.lastModified}`}
+                  key={localFileKey(file)}
                   className="overflow-hidden rounded-md border border-line bg-surface-muted"
                 >
                   <div className="flex aspect-video items-center justify-center overflow-hidden [&_audio]:w-[calc(100%-12px)] [&_img]:h-full [&_img]:w-full [&_img]:object-contain [&_video]:h-full [&_video]:w-full [&_video]:object-contain">
-                    <FileText className="size-7 text-muted" aria-hidden="true" />
+                    {localImagePreviews[localFileKey(file)] ? (
+                      <img src={localImagePreviews[localFileKey(file)]} alt={file.name} />
+                    ) : (
+                      <FileText className="size-7 text-muted" aria-hidden="true" />
+                    )}
                   </div>
                   <div className="px-2 py-1.5">
                     <b className="block truncate type-label text-ink" title={file.name}>

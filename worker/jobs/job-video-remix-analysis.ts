@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { env } from "../../server/env";
 import { normalizeReferenceImage, probeMedia } from "../../server/media/ffmpeg";
-import { analyzeVideoWithGemini, GeminiVideoAnalysisError } from "../../server/providers/gemini-video-analysis";
+import { ArkVideoAnalysisError, arkVideoAnalysis } from "../../server/providers/ark-video-analysis";
 import { ossutils } from "../../server/storage/ossutils";
 import type { JobResult, StageProvenance } from "../../server/types";
 import { parseRemixSources, type RemixAnalysisEntry, type RemixSourceRef } from "../../shared/video-remix/workflow";
@@ -109,13 +109,13 @@ export const videoRemixAnalysisJob: WorkerJobHandler = {
             id: `${job.id}:${source.assetId}:video-analysis`,
             capability: "video-understand",
             executionMode: "real",
-            implementation: "gemini-video-analysis",
-            provider: "aihubmix",
-            model: env.videoAnalysisModel,
+            implementation: "ark-video-analysis",
+            provider: "ark",
+            model: env.arkVideoAnalysisModel,
             startedAt: new Date().toISOString(),
           };
           context.change(job.id, {
-            stage: `Gemini 分析视频并生成分镜提示词 ${index + 1}/${sourceRefs.length}`,
+            stage: `Ark 分析视频并生成分镜提示词 ${index + 1}/${sourceRefs.length}`,
             progress: progress(0.4),
             provenance: [...provenance, ...sourceLineage, analysisStage],
           });
@@ -126,10 +126,10 @@ export const videoRemixAnalysisJob: WorkerJobHandler = {
             productImageCount: productImages.length,
             demand: job.values.description,
           });
-          const analysis = await analyzeVideoWithGemini({
+          const analysis = await arkVideoAnalysis.analyzeVideo({
             videoPath,
             prompt,
-            model: env.videoAnalysisModel,
+            model: env.arkVideoAnalysisModel,
             productImages,
           });
           analysisStage.completedAt = new Date().toISOString();
@@ -153,7 +153,7 @@ export const videoRemixAnalysisJob: WorkerJobHandler = {
         } catch (error) {
           if (analysisStage && !sourceLineage.includes(analysisStage)) {
             analysisStage.completedAt = new Date().toISOString();
-            if (error instanceof GeminiVideoAnalysisError) analysisStage.failure = error.failure;
+            if (error instanceof ArkVideoAnalysisError) analysisStage.failure = error.failure;
             sourceLineage.push(analysisStage);
           }
           const errorMessage = error instanceof Error ? error.message : "视频解析失败";

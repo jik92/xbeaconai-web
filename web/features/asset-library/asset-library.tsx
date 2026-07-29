@@ -660,40 +660,46 @@ function ReusableAssetLibrary({ kind }: { kind: "media" | "voice" }) {
         ) : (
           <section className="h-full overflow-y-auto">
             {filtered.map((asset) => (
-              <article className="flex min-h-14 items-center gap-3 border-b border-line/60 px-2 py-2" key={asset.id}>
+              <article
+                className="flex min-h-16 items-center gap-3 border-b border-line/60 px-2 py-2"
+                data-testid="voice-library-row"
+                key={asset.id}
+              >
                 <div className="grid size-8 shrink-0 place-items-center rounded-full bg-surface-muted text-muted">
                   <FileAudio className="size-4" />
                 </div>
                 <Button
                   type="button"
                   variant="ghost"
-                  className="min-w-0 flex-1 flex-col items-start justify-center gap-0 whitespace-normal text-left"
+                  className="h-auto self-stretch min-w-0 flex-1 flex-col items-start justify-center gap-0 whitespace-normal py-1 text-left"
                   onClick={() => setSelected(asset)}
                 >
-                  <b className="block truncate type-label text-ink">{asset.name}</b>
-                  <span className="block truncate type-helper text-muted">
+                  <b className="block w-full truncate type-label text-ink">{asset.name}</b>
+                  <span className="block w-full truncate type-helper text-muted">
                     {asset.description || asset.originalName}
                   </span>
-                  <small className="block type-helper text-muted">
+                  <small className="block w-full truncate type-helper text-muted">
                     {(asset.size / 1024 / 1024).toFixed(1)} MB · {new Date(asset.createdAt).toLocaleDateString("zh-CN")}
                   </small>
                 </Button>
-                {previewingVoiceId === asset.id ? (
-                  <div className="w-56 max-w-[40%]">
-                    <AuthenticatedMedia
-                      url={asset.url}
-                      originalUrl={asset.originalUrl}
-                      mimeType={asset.mimeType}
-                      alt={asset.name}
-                      autoPlay
-                      controls
-                    />
-                  </div>
-                ) : (
-                  <Button size="sm" variant="outline" onClick={() => setPreviewingVoiceId(asset.id)}>
-                    试听
-                  </Button>
-                )}
+                <div className="shrink-0">
+                  {previewingVoiceId === asset.id ? (
+                    <div className="w-56 max-w-[40vw]">
+                      <AuthenticatedMedia
+                        url={asset.url}
+                        originalUrl={asset.originalUrl}
+                        mimeType={asset.mimeType}
+                        alt={asset.name}
+                        autoPlay
+                        controls
+                      />
+                    </div>
+                  ) : (
+                    <Button size="sm" variant="outline" onClick={() => setPreviewingVoiceId(asset.id)}>
+                      试听
+                    </Button>
+                  )}
+                </div>
               </article>
             ))}
             <LibraryState

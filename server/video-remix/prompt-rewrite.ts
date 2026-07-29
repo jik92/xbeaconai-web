@@ -5,9 +5,9 @@ import {
   remixModifyPresets,
   remixPromptToolLabels,
 } from "../../shared/video-remix/prompt-tools";
-import { aihubmix } from "../providers/aihubmix";
+import { generateArkText } from "../providers/ark-text";
 
-export const VIDEO_REMIX_PROMPT_MODEL = "gemini-3.6-flash";
+export const VIDEO_REMIX_PROMPT_MODEL = "doubao-seed-2-0-mini-260428";
 
 const RewriteResultSchema = z.object({
   prompt: z.string().trim().min(20).max(30_000),
@@ -82,9 +82,7 @@ export async function rewriteVideoRemixPrompt(
   input: { tool: RemixPromptTool; config: RemixPromptToolConfig; prompt: string },
   generateText?: GenerateText,
 ): Promise<VideoRemixPromptRewriteResult> {
-  if (!generateText && !aihubmix.configured)
-    throw new VideoRemixPromptModelError("MODEL_NOT_AVAILABLE", "提示词改写模型服务未配置", false);
-  const generate = generateText ?? ((...args) => aihubmix.generateText(...args));
+  const generate = generateText ?? generateArkText;
   let repair = "";
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
@@ -104,7 +102,7 @@ export async function rewriteVideoRemixPrompt(
       const message = error instanceof Error ? error.message : "模型调用失败";
       if (/timeout|timed out|abort/i.test(message))
         throw new VideoRemixPromptModelError("MODEL_TIMEOUT", "提示词改写超过 120 秒，请稍后重试", true);
-      if (/AIHUBMIX_|fetch|network/i.test(message))
+      if (/ARK_|fetch|network/i.test(message))
         throw new VideoRemixPromptModelError("MODEL_PROVIDER_ERROR", "提示词改写服务调用失败，请稍后重试", true);
       if (attempt === 0) {
         repair = "\n上一次输出无法通过 JSON 校验。请重新输出完整 JSON，确保 prompt 包含完整 Markdown。";

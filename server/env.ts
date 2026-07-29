@@ -145,6 +145,7 @@ export const env = {
     Math.max(0, Number(process.env.DOUYIN_LOGIN_GUIDANCE_WAIT_MS ?? 30_000)),
   ),
   videoAnalysisModel: APP_CONFIG.providerDefaults.openai.videoAnalysisModel,
+  arkVideoAnalysisModel: APP_CONFIG.providerDefaults.ark.videoAnalysisModel,
   volcSpeech: APP_CONFIG.providerDefaults.volcSpeech,
   mediaKit: {
     baseUrl: process.env.MEDIAKIT_BASE_URL ?? "https://mediakit.cn-beijing.volces.com",

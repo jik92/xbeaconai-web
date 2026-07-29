@@ -18,6 +18,7 @@ export interface PublicAppConfig {
   readonly projectName: string;
   readonly providerDefaults: {
     readonly openai: { readonly videoAnalysisModel: string };
+    readonly ark: { readonly videoAnalysisModel: string };
     readonly volcSpeech: {
       readonly baseUrl: string;
       readonly cloneResourceId: string;
@@ -41,6 +42,9 @@ export const APP_CONFIG = {
   providerDefaults: {
     openai: {
       videoAnalysisModel: "gemini-3.6-flash",
+    },
+    ark: {
+      videoAnalysisModel: "doubao-seed-2-0-mini-260428",
     },
     volcSpeech: {
       baseUrl: "https://openspeech.bytedance.com",

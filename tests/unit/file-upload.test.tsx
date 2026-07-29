@@ -72,19 +72,30 @@ describe("FileUpload", () => {
     expect(fileMatchesAccept({ name: "notes.txt", type: "text/plain" }, "image/*,.pdf")).toBe(false);
   });
 
-  test("shows pending file metadata without creating or rendering a local media preview", async () => {
+  test("shows a local thumbnail for a pending image without using a Blob URL", async () => {
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
     roots.push(root);
     const originalCreateObjectUrl = URL.createObjectURL;
     const originalRevokeObjectUrl = URL.revokeObjectURL;
+    const originalFileReader = globalThis.FileReader;
     let createCalls = 0;
     URL.createObjectURL = () => {
       createCalls += 1;
       return "blob:forbidden-local-preview";
     };
     URL.revokeObjectURL = () => undefined;
+    class PreviewFileReader {
+      result: string | null = null;
+      onload: ((event: ProgressEvent<FileReader>) => void) | null = null;
+
+      readAsDataURL() {
+        this.result = "data:image/png;base64,cHJldmlldw==";
+        queueMicrotask(() => this.onload?.({} as ProgressEvent<FileReader>));
+      }
+    }
+    globalThis.FileReader = PreviewFileReader as unknown as typeof FileReader;
 
     try {
       await act(async () => {
@@ -94,15 +105,17 @@ describe("FileUpload", () => {
             onFilesChange={() => undefined}
           />,
         );
+        await Promise.resolve();
       });
 
       expect(createCalls).toBe(0);
       expect(container.textContent).toContain("cover.png");
       expect(container.textContent).toContain("等待上传");
-      expect(container.querySelector("img,video,audio")).toBeNull();
+      expect(container.querySelector("img")?.getAttribute("src")).toBe("data:image/png;base64,cHJldmlldw==");
     } finally {
       URL.createObjectURL = originalCreateObjectUrl;
       URL.revokeObjectURL = originalRevokeObjectUrl;
+      globalThis.FileReader = originalFileReader;
     }
   });
 });

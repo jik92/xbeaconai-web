@@ -15,8 +15,8 @@ export const videoRemixPromptRewriteJob: WorkerJobHandler = {
       id: `${job.id}:prompt-rewrite`,
       capability: "text-rewrite",
       executionMode: "real",
-      implementation: "aihubmix-chat-completions",
-      provider: "aihubmix",
+      implementation: "ark-chat-completions",
+      provider: "ark",
       model: VIDEO_REMIX_PROMPT_MODEL,
       startedAt: new Date().toISOString(),
     };

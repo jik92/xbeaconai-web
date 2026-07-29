@@ -45,7 +45,7 @@ describe("video remix prompt rewrite", () => {
     expect(voice).toContain("改为轻松种草语气");
   });
 
-  test("uses the real DeepSeek model and retries one invalid response", async () => {
+  test("uses the configured Ark model and retries one invalid response", async () => {
     const calls: Array<{ model: string; json: boolean }> = [];
     const result = await rewriteVideoRemixPrompt(
       { tool: "check", config: defaultRemixPromptToolConfig, prompt: currentPrompt },
@@ -70,7 +70,7 @@ describe("video remix prompt rewrite", () => {
   test("maps provider failures to a safe retryable error", async () => {
     const pending = rewriteVideoRemixPrompt(
       { tool: "modify", config: defaultRemixPromptToolConfig, prompt: currentPrompt },
-      () => Promise.reject(new Error("AIHUBMIX_502: upstream detail")),
+      () => Promise.reject(new Error("ARK_502: upstream detail")),
     );
 
     await expect(pending).rejects.toBeInstanceOf(VideoRemixPromptModelError);
