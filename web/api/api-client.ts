@@ -846,6 +846,7 @@ interface RemixMaterialFile {
 }
 export interface RemixProjectRequest {
   projectName: string;
+  workflowKind?: "video" | "script";
   mode?: "product" | "talking";
   product: {
     id: number | string | null;
@@ -855,6 +856,7 @@ export interface RemixProjectRequest {
     productFormDesc: string | null;
   };
   demand: string;
+  scriptContent?: string;
   rawMaterialFiles: RemixMaterialFile[];
   voiceAsset?: RemixMaterialFile | null;
   portraitAssets: Array<{

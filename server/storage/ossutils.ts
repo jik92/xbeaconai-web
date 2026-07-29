@@ -21,6 +21,57 @@ export interface TosObjectRef {
   versionId?: string;
 }
 
+export interface LibraryObjectUploadClient {
+  putObjectFromFile(input: {
+    bucket: string;
+    key: string;
+    filePath: string;
+    contentLength: number;
+    acl: (typeof TosClient.ACLType)["ACLPrivate"];
+    contentType: string;
+    serverSideEncryption: string;
+    progress?: (percent: number) => void;
+  }): Promise<unknown>;
+  headObject(input: { bucket: string; key: string }): Promise<{ headers: Record<string, string | undefined> }>;
+  deleteObject(input: { bucket: string; key: string }): Promise<unknown>;
+}
+
+export async function putLibraryObject(
+  client: LibraryObjectUploadClient,
+  input: {
+    bucket: string;
+    filePath: string;
+    key: string;
+    mimeType: string;
+    sizeBytes: number;
+    onProgress?: (percent: number) => void;
+    signal?: AbortSignal;
+  },
+) {
+  if (input.signal?.aborted) throw new Error("TOS_UPLOAD_ABORTED");
+  try {
+    await client.putObjectFromFile({
+      bucket: input.bucket,
+      key: input.key,
+      filePath: input.filePath,
+      contentLength: input.sizeBytes,
+      acl: TosClient.ACLType.ACLPrivate,
+      contentType: input.mimeType,
+      serverSideEncryption: "AES256",
+      progress: (percent) => input.onProgress?.(percent),
+    });
+    if (input.signal?.aborted) throw new Error("TOS_UPLOAD_ABORTED");
+    const head = await client.headObject({ bucket: input.bucket, key: input.key });
+    const uploadedSize = Number(head.headers["content-length"] ?? -1);
+    if (uploadedSize !== input.sizeBytes)
+      throw new Error(`TOS 上传完成后的文件大小校验失败（期望 ${input.sizeBytes}，实际 ${uploadedSize}）`);
+    if (head.headers["x-tos-server-side-encryption"] !== "AES256") throw new Error("TOS 上传对象未启用 AES256 加密");
+  } catch (error) {
+    await client.deleteObject({ bucket: input.bucket, key: input.key }).catch(() => undefined);
+    throw error;
+  }
+}
+
 const MAX_ACTIVE_UPLOAD_BYTES = 500 * 1024 * 1024;
 const MAX_ACTIVE_UPLOADS = 2;
 const CURL_UPLOAD_PART_SIZE = 16 * 1024 * 1024;
@@ -188,38 +239,18 @@ export class OssUtils {
     if (input.signal?.aborted) throw new Error("TOS_UPLOAD_ABORTED");
     const release = await uploadGate.acquire(input.sizeBytes);
     const key = input.key.replace(/^\/+/, "");
-    let uploadId: string | undefined;
-    const cancelSource = TosClient.CancelToken.source();
-    const abort = () => cancelSource.cancel("upload aborted");
-    input.signal?.addEventListener("abort", abort, { once: true });
     try {
-      await this.ready().uploadFile({
+      await this.abortDanglingUploads(key);
+      await putLibraryObject(this.ready(), {
         bucket: env.tos.bucket,
         key,
-        file: input.filePath,
-        partSize: 8 * 1024 * 1024,
-        taskNum: 2,
-        acl: TosClient.ACLType.ACLPrivate,
-        contentType: input.mimeType,
-        serverSideEncryption: "AES256",
-        progress: (percent) => input.onProgress?.(percent),
-        uploadEventChange: (event) => {
-          uploadId = event.uploadId || uploadId;
-        },
-        cancelToken: cancelSource.token,
+        filePath: input.filePath,
+        mimeType: input.mimeType,
+        sizeBytes: input.sizeBytes,
+        onProgress: input.onProgress,
+        signal: input.signal,
       });
-    } catch (error) {
-      if (uploadId)
-        await this.ready()
-          .abortMultipartUpload({ bucket: env.tos.bucket, key, uploadId })
-          .catch(() => undefined);
-      await this.abortDanglingUploads(key).catch(() => undefined);
-      await this.ready()
-        .deleteObject({ bucket: env.tos.bucket, key })
-        .catch(() => undefined);
-      throw error;
     } finally {
-      input.signal?.removeEventListener("abort", abort);
       release();
     }
   }

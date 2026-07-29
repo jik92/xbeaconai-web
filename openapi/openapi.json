@@ -8413,6 +8413,14 @@
                           "minLength": 1,
                           "maxLength": 80
                         },
+                        "workflowKind": {
+                          "type": "string",
+                          "enum": [
+                            "video",
+                            "script"
+                          ],
+                          "default": "video"
+                        },
                         "mode": {
                           "type": "string",
                           "enum": [
@@ -8558,6 +8566,11 @@
                           "maxLength": 2000,
                           "default": ""
                         },
+                        "scriptContent": {
+                          "type": "string",
+                          "maxLength": 12000,
+                          "default": ""
+                        },
                         "rawMaterialFiles": {
                           "type": "array",
                           "items": {
@@ -8648,8 +8661,8 @@
                               "fileType"
                             ]
                           },
-                          "minItems": 1,
-                          "maxItems": 20
+                          "maxItems": 20,
+                          "default": []
                         },
                         "voiceAsset": {
                           "type": "object",
@@ -8869,8 +8882,7 @@
                       },
                       "required": [
                         "projectName",
-                        "product",
-                        "rawMaterialFiles"
+                        "product"
                       ]
                     },
                     "workspace": {
@@ -9622,7 +9634,7 @@
                         "selectedAssetId"
                       ]
                     },
-                    "minItems": 2,
+                    "minItems": 1,
                     "maxItems": 20
                   }
                 },

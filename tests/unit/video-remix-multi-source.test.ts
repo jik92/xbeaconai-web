@@ -68,6 +68,8 @@ describe("video remix multi-source workflow", () => {
     const shotRoute = spec.paths["/api/video-remix/project/shots/generate"]?.post;
     const shotHistoryRoute = spec.paths["/api/video-remix/project/{sourceJobId}/shots"]?.get;
     const page = readFileSync(resolve(import.meta.dir, "../../web/features/video-remix/remix-project.tsx"), "utf8");
+    const api = readFileSync(resolve(import.meta.dir, "../../server/app.ts"), "utf8");
+    const worker = readFileSync(resolve(import.meta.dir, "../../worker/jobs/job-video-remix-compose.ts"), "utf8");
 
     expect(route?.operationId).toBe("createVideoRemixComposeJob");
     expect(route?.responses).toHaveProperty("202");
@@ -81,5 +83,12 @@ describe("video remix multi-source workflow", () => {
     expect(page).toContain("generateRemixShot");
     expect(page).toContain("selectedShotAssets");
     expect(page).toContain("开始合并");
+    expect(page).toContain("if (!job?.id || !composeOrder.length || activeComposeJobId) return");
+    expect(page).toContain("disabled={!composeOrder.length || Boolean(activeComposeJobId)}");
+    expect(page).toContain('? "生成成片"');
+    expect(page).toContain('? "重新生成成片"');
+    expect(api).toContain(".min(1)");
+    expect(worker).toContain("if (!assetIds.length)");
+    expect(worker).not.toContain("assetIds.length < 2");
   });
 });

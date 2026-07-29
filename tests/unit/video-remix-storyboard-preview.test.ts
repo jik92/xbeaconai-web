@@ -36,7 +36,7 @@ describe("video remix storyboard editor", () => {
     expect(storyboard).toContain("submitting={Boolean(activeShotRunning)}");
     expect(storyboard).toContain('submitLabel="生成视频"');
     expect(storyboard).not.toContain("进入合并成片");
-    expect(page).toContain("setPendingShotSubmission({");
+    expect(page).toContain("setPendingShotSubmission(submission)");
     expect(page).toContain("setSubmittedShotJobId(created.id)");
     expect(page).toContain("setStage(4)");
   });
@@ -58,10 +58,18 @@ describe("video remix storyboard editor", () => {
     expect(storyboard).toContain('model.enabled ? "" : "（未验证）"');
   });
 
-  test("binds explicit @Image labels to assets and never injects the source video or a default portrait", () => {
-    expect(page).toContain("const quotedReferences = storyboardReferenceImages.filter");
-    expect(page).toContain("const mentionedLabels = new Set");
-    expect(page).toContain("@".concat("$", "{unresolved} 未绑定到当前参考素材库"));
+  test("defaults new remix shots to Seedance 2.0 Mini and 15 seconds while restoring saved settings", () => {
+    expect(page).toContain('const remixDefaultVideoModelId = "doubao-seedance-2-0-mini-260615"');
+    expect(page).toContain("const remixDefaultDuration = 15");
+    expect(page).toContain("const savedJob = shotJobs.find");
+    expect(page).toContain("savedJob?.videoModel");
+    expect(page).toContain("Number(savedJob?.values.duration)");
+  });
+
+  test("binds every visible image without filtering by @Image labels", () => {
+    expect(page).toContain("const buildShotSubmission = (sourceId: string)");
+    expect(page).not.toContain("const mentionedLabels = new Set");
+    expect(page).not.toContain("ensurePrimaryProductReference");
     expect(page).toContain("references: quotedReferences.flatMap");
     expect(page).toContain("portraitReferences: quotedReferences.flatMap");
     expect(storyboard).toContain("mentions={storyboardReferenceImages.map");
@@ -69,7 +77,9 @@ describe("video remix storyboard editor", () => {
     expect(remixApi).toContain("referenceBindings: JSON.stringify");
     expect(remixApi).toContain('referenceMode: "omni"');
     expect(remixApi).toContain("referenceCount: String(body.references.length + body.portraitReferences.length)");
-    expect(remixApi).toContain("UNBOUND_PROMPT_REFERENCE");
+    expect(remixApi).not.toContain("UNBOUND_PROMPT_REFERENCE");
+    expect(storyboard).toContain("submitDisabled={");
+    expect(storyboard).toContain("storyboardReferenceImages.length === 0");
     expect(remixApi).toContain("const references = referenceAssets.filter");
     expect(remixApi).not.toContain("const references = [sourceAsset, ...referenceAssets]");
     expect(remixApi).not.toContain("...(sourceJob.values.portraitReference");
@@ -77,5 +87,15 @@ describe("video remix storyboard editor", () => {
     expect(seedanceWorker).toContain("remixPortraitReferences(job.values)");
     expect(seedanceWorker).toContain('...(job.moduleId === "video-remix"');
     expect(arkSeedance).toContain("input.generateAudio === undefined ? {} : { generate_audio: input.generateAudio }");
+  });
+
+  test("batch-generates every script shot and auto-composes only after each is ready", () => {
+    expect(storyboard).toContain("一键生成全部并合片");
+    expect(page).toContain("const prepareBatchGeneration");
+    expect(page).toContain("const submitBatchGeneration");
+    expect(page).toContain("Promise.allSettled(submissions.map");
+    expect(page).toContain("全部完成后将自动合并成片");
+    expect(page).toContain("const allSourcesReady");
+    expect(page).toContain("void startCompose()");
   });
 });

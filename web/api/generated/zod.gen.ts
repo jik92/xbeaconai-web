@@ -2135,6 +2135,7 @@ export const zGetVideoRemixProjectResponse = z.object({
     childJobs: z.array(zJob),
     projectRequest: z.object({
         projectName: z.string().min(1).max(80),
+        workflowKind: z.enum(['video', 'script']).optional().default('video'),
         mode: z.enum(['product', 'talking']).optional().default('product'),
         product: z.object({
             id: z.union([
@@ -2175,6 +2176,7 @@ export const zGetVideoRemixProjectResponse = z.object({
             productFormDesc: z.string().optional()
         }),
         demand: z.string().max(2000).optional().default(''),
+        scriptContent: z.string().max(12000).optional().default(''),
         rawMaterialFiles: z.array(z.object({
             id: z.union([
                 z.number(),
@@ -2202,7 +2204,7 @@ export const zGetVideoRemixProjectResponse = z.object({
                 'medium',
                 'high'
             ]).optional()
-        })).min(1).max(20),
+        })).max(20).optional().default([]),
         voiceAsset: z.object({
             id: z.union([
                 z.number(),
@@ -2414,7 +2416,7 @@ export const zCreateVideoRemixComposeJobBody = z.object({
     sources: z.array(z.object({
         sourceAssetId: z.uuid(),
         selectedAssetId: z.uuid()
-    })).min(2).max(20)
+    })).min(1).max(20)
 });
 
 /**

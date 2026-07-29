@@ -391,4 +391,63 @@ describe("video remix project records API", () => {
     expect(created.values.workflowPhase).toBe("analysis");
     expect(created.values.voiceAssetId).toBe("");
   });
+
+  test("creates script analysis without requiring a source video", async () => {
+    const request = projectRequest("脚本二创项目", { productImageAssetId: submissionProductAssetId });
+    const response = await honoApp.request("/api/video-remix/project/generate", {
+      method: "POST",
+      headers: { ...headers(), "Idempotency-Key": crypto.randomUUID() },
+      body: JSON.stringify({
+        ...request,
+        workflowKind: "script",
+        scriptContent: "这是一段完整的商品口播脚本，用于展示版型、材质和穿着场景，并邀请用户查看详情。",
+        rawMaterialFiles: [],
+      }),
+    });
+
+    expect(response.status).toBe(202);
+    const created = (await response.json()) as JobRecord;
+    expect(created.values.workflowKind).toBe("script");
+    expect(created.values.sources).toBe("[]");
+    expect(created.values.scriptContent).toContain("完整的商品口播脚本");
+  });
+
+  test("rejects Seedance 2 shot generation without an image reference", async () => {
+    const sourceJobId = crypto.randomUUID();
+    realStore.create(
+      job({
+        id: sourceJobId,
+        ownerUserId: userId,
+        values: {
+          workflowPhase: "analysis",
+          workflowKind: "video",
+          sources: JSON.stringify([{ assetId: submissionSourceId, name: "remix-source.mp4" }]),
+        },
+      }),
+    );
+
+    const response = await honoApp.request("/api/video-remix/project/shots/generate", {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({
+        sourceJobId,
+        sourceAssetId: submissionSourceId,
+        prompt: "固定机位展示商品，保持商品外观、人物动作和仓库背景自然稳定。",
+        modelId: "doubao-seedance-2-0-mini-260615",
+        ratio: "9:16",
+        resolution: "720p",
+        duration: 15,
+        references: [],
+        portraitReferences: [],
+      }),
+    });
+
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({
+      error: {
+        code: "SEEDANCE_IMAGE_REFERENCE_REQUIRED",
+        retryable: false,
+      },
+    });
+  });
 });

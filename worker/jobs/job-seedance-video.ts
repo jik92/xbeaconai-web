@@ -7,7 +7,7 @@ import { resolvePortraitReference } from "../../server/portraits/portrait-resolv
 import { arkSeedance } from "../../server/providers/ark-seedance";
 import { ossutils } from "../../server/storage/ossutils";
 import type { JobRecord } from "../../server/types";
-import { parsePortraitReference, type PortraitReference } from "../../shared/portraits/portrait-reference";
+import { type PortraitReference, parsePortraitReference } from "../../shared/portraits/portrait-reference";
 import type { JobHandlerContext } from "./types";
 import { assetIdsFromValues } from "./utils";
 import { materializeRemoteAsset } from "./video-remix-assets";
@@ -57,6 +57,15 @@ export function assertSeedanceReferenceVideoDuration(durationSec: number) {
       false,
     );
   return durationSec;
+}
+
+export function assertSeedanceImageReference(references: Array<{ kind: SeedanceReferenceKind; url: string }>) {
+  if (!references.some((reference) => reference.kind === "image"))
+    throw new SeedanceFlowError(
+      "SEEDANCE_IMAGE_REFERENCE_REQUIRED",
+      "Seedance 2 视频生成必须提供至少一张图片参考",
+      false,
+    );
 }
 
 function referenceKind(mimeType: string): SeedanceReferenceKind | undefined {
@@ -252,6 +261,7 @@ export class SeedanceVideoJob {
       let references: Awaited<ReturnType<SeedanceVideoJob["prepareReferences"]>>;
       try {
         references = await this.prepareReferences(job);
+        assertSeedanceImageReference(references);
       } catch (error) {
         await this.cleanupStaging(job.id);
         throw error;

@@ -17,6 +17,22 @@ const input: ArkSeedanceVideoInput = {
 };
 
 describe("Ark Seedance request contract", () => {
+  test("rejects Seedance 2 task creation without an image reference before calling Ark", async () => {
+    let calls = 0;
+    const client = new ArkSeedanceClient("https://ark.example.test/api/v3", "test-key", async () => {
+      calls += 1;
+      return Response.json({ id: "unexpected-task", status: "queued" });
+    });
+
+    await expect(
+      client.createVideo({
+        ...input,
+        references: [{ kind: "video", url: "https://example.test/reference.mp4" }],
+      }),
+    ).rejects.toThrow("SEEDANCE_IMAGE_REFERENCE_REQUIRED");
+    expect(calls).toBe(0);
+  });
+
   test("keeps the virtual portrait asset and native reference role in content", () => {
     expect(buildArkSeedanceVideoRequest(input)).toEqual({
       model: "doubao-seedance-2-0-mini-260615",

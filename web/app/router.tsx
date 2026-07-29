@@ -59,6 +59,11 @@ const moduleRoutes = modules.map((config) =>
     component: () => <ModuleRouteContent config={config} />,
   }),
 );
+const scriptRemixRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/aigc/script-remix",
+  component: () => <RemixProject workflowTitle="脚本二创" workflowKind="script" />,
+});
 const portraitRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/assets/portraits",
@@ -134,6 +139,7 @@ const qianchuanPcRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   indexRoute,
   ...moduleRoutes,
+  scriptRemixRoute,
   materialRoute,
   portraitRoute,
   productRoute,

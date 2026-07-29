@@ -35,7 +35,6 @@ import {
   remixRepairRules,
   remixVoiceModes,
 } from "../shared/video-remix/prompt-tools";
-import { validateRemixShotReferenceBindings } from "../shared/video-remix/shot-reference";
 import { parseRemixAnalysisEntries, parseRemixSources, remixMaxSources } from "../shared/video-remix/workflow";
 import { APP_CONFIG, isModuleOpen } from "../web/app/config";
 import type { ModuleId } from "../web/entities/types";
@@ -3964,47 +3963,58 @@ const remixFileSchema = z.object({
   aiDescription: z.string().nullable().optional(),
   reasoningEffort: z.enum(["low", "medium", "high"]).optional(),
 });
-const remixProjectRequestSchema = z.object({
-  projectName: z.string().trim().min(1).max(80),
-  mode: z.enum(["product", "talking"]).default("product"),
-  product: z.object({
-    id: z.union([z.number(), z.string()]).nullable(),
-    productName: z.string().min(1).max(200),
-    productImages: z.array(remixFileSchema).min(1).max(20),
-    productFormMetaList: z.array(z.unknown()).nullable().optional(),
-    productFormDesc: z.string().nullable().optional(),
-  }),
-  demand: z.string().max(2_000).default(""),
-  rawMaterialFiles: z.array(remixFileSchema).min(1).max(20),
-  voiceAsset: remixFileSchema.nullable().optional(),
-  portraitAssets: z
-    .array(
-      z.object({
-        id: z.union([z.number(), z.string()]).nullable().optional(),
-        reference: z
-          .discriminatedUnion("type", [
-            z.object({ type: z.literal("general"), portraitId: z.number().int().min(1) }),
-            z.object({ type: z.literal("custom"), assetId: z.string().uuid() }),
-          ])
-          .optional(),
-        assetName: z.string().min(1).max(100),
-        fileInfo: z.array(
-          z.object({
-            fileUrl: z.string().min(1),
-            coverUrl: z.string().min(1),
-            fileType: z.literal("IMAGE"),
-            assetId: z.string().nullable().optional(),
-          }),
-        ),
-        description: z.string().max(1_000).default(""),
-        gender: z.string().max(20).default(""),
-        age: z.number().int().min(0).max(150).nullable().optional(),
-        occupation: z.string().max(100).default(""),
-      }),
-    )
-    .max(10)
-    .default([]),
-});
+const remixProjectRequestSchema = z
+  .object({
+    projectName: z.string().trim().min(1).max(80),
+    workflowKind: z.enum(["video", "script"]).default("video"),
+    mode: z.enum(["product", "talking"]).default("product"),
+    product: z.object({
+      id: z.union([z.number(), z.string()]).nullable(),
+      productName: z.string().min(1).max(200),
+      productImages: z.array(remixFileSchema).min(1).max(20),
+      productFormMetaList: z.array(z.unknown()).nullable().optional(),
+      productFormDesc: z.string().nullable().optional(),
+    }),
+    demand: z.string().max(2_000).default(""),
+    scriptContent: z.string().trim().max(12_000).default(""),
+    rawMaterialFiles: z.array(remixFileSchema).max(20).default([]),
+    voiceAsset: remixFileSchema.nullable().optional(),
+    portraitAssets: z
+      .array(
+        z.object({
+          id: z.union([z.number(), z.string()]).nullable().optional(),
+          reference: z
+            .discriminatedUnion("type", [
+              z.object({ type: z.literal("general"), portraitId: z.number().int().min(1) }),
+              z.object({ type: z.literal("custom"), assetId: z.string().uuid() }),
+            ])
+            .optional(),
+          assetName: z.string().min(1).max(100),
+          fileInfo: z.array(
+            z.object({
+              fileUrl: z.string().min(1),
+              coverUrl: z.string().min(1),
+              fileType: z.literal("IMAGE"),
+              assetId: z.string().nullable().optional(),
+            }),
+          ),
+          description: z.string().max(1_000).default(""),
+          gender: z.string().max(20).default(""),
+          age: z.number().int().min(0).max(150).nullable().optional(),
+          occupation: z.string().max(100).default(""),
+        }),
+      )
+      .max(10)
+      .default([]),
+  })
+  .superRefine((value, context) => {
+    if (value.workflowKind === "video" && !value.rawMaterialFiles.length)
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["rawMaterialFiles"], message: "请至少上传一条分镜视频" });
+    if (value.workflowKind === "script" && value.scriptContent.length < 20)
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["scriptContent"], message: "脚本填充至少需要 20 个字符" });
+    if (value.workflowKind === "script" && value.rawMaterialFiles.length)
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["rawMaterialFiles"], message: "脚本二创不接收分镜视频" });
+  });
 
 const RemixPromptToolConfigSchema = z.object({
   scope: z.enum(remixPromptScopes).default(defaultRemixPromptToolConfig.scope),
@@ -4056,7 +4066,7 @@ const RemixComposeRequestSchema = z.object({
         selectedAssetId: z.string().uuid(),
       }),
     )
-    .min(2)
+    .min(1)
     .max(remixMaxSources),
 });
 const RemixPromptVersionSchema = z.object({
@@ -4366,6 +4376,7 @@ app.post("/api/video-remix/project/generate", async (c) => {
   const ownerUserId = c.get("userId");
   const productAssetIds = parsed.data.product.productImages.map((file) => file.metaId).filter(Boolean) as string[];
   const videoAssetIds = parsed.data.rawMaterialFiles.map((file) => file.objectKey);
+  const isScriptRemix = parsed.data.workflowKind === "script";
   const voiceAssetId = parsed.data.voiceAsset?.objectKey;
   const assets = [...productAssetIds, ...videoAssetIds].map((id) => accounts.getOwnedAsset(ownerUserId, id));
   if (!productAssetIds.length || assets.some((asset) => !asset))
@@ -4434,7 +4445,8 @@ app.post("/api/video-remix/project/generate", async (c) => {
     );
   const values = {
     workflowPhase: "analysis",
-    source: `asset:${videoAssets[0]?.id}:${videoAssets[0]?.originalName}`,
+    workflowKind: parsed.data.workflowKind,
+    source: isScriptRemix ? "script" : `asset:${videoAssets[0]?.id}:${videoAssets[0]?.originalName}`,
     sources: JSON.stringify(
       videoAssets.map((asset) => ({ assetId: asset?.id || "", name: asset?.originalName || "source.mp4" })),
     ),
@@ -4443,9 +4455,12 @@ app.post("/api/video-remix/project/generate", async (c) => {
     productImageAssetIds: JSON.stringify(productAssetIds),
     description: parsed.data.demand,
     prompt: parsed.data.demand,
+    scriptContent: parsed.data.scriptContent,
+    productDescription: parsed.data.product.productFormDesc ?? "",
     portrait: parsed.data.portraitAssets[0]?.assetName ?? "",
     ...(portraitReference ? { portraitReference: serializePortraitReference(portraitReference)! } : {}),
     voiceAssetId: voiceAssetId ?? "",
+    voiceName: voiceAsset?.originalName ?? "",
     projectRequest: JSON.stringify(parsed.data),
   };
   const idempotencyKey = c.req.header("Idempotency-Key")?.trim().slice(0, 128);
@@ -4466,22 +4481,36 @@ app.post("/api/video-remix/project/generate", async (c) => {
     overallExecutionMode: "real",
     values,
     executionPlan: [
-      {
-        id: "plan:0:media-probe",
-        capability: "media-probe",
-        executionMode: "local",
-        implementation: "ffprobe-local",
-        startedAt: "",
-      },
-      {
-        id: "plan:1:video-understand",
-        capability: "video-understand",
-        executionMode: "real",
-        implementation: "gemini-video-analysis",
-        provider: "aihubmix",
-        model: env.videoAnalysisModel,
-        startedAt: "",
-      },
+      ...(isScriptRemix
+        ? [
+            {
+              id: "plan:0:script-understand",
+              capability: "text-rewrite" as const,
+              executionMode: "real" as const,
+              implementation: "ark-chat-completions",
+              provider: "ark",
+              model: "doubao-seed-2-0-mini-260428",
+              startedAt: "",
+            },
+          ]
+        : [
+            {
+              id: "plan:0:media-probe",
+              capability: "media-probe" as const,
+              executionMode: "local" as const,
+              implementation: "ffprobe-local",
+              startedAt: "",
+            },
+            {
+              id: "plan:1:video-understand",
+              capability: "video-understand" as const,
+              executionMode: "real" as const,
+              implementation: "ark-video-analysis",
+              provider: "ark",
+              model: env.arkVideoAnalysisModel,
+              startedAt: "",
+            },
+          ]),
     ],
     provenance: [],
     idempotencyKey,
@@ -4616,10 +4645,23 @@ app.openapi(remixShotGenerationRoute, async (c) => {
       { error: { code: "REMIX_SOURCE_NOT_FOUND", message: "当前分镜不属于解析任务", retryable: false, requestId } },
       404,
     );
-  const sourceAsset = accounts.getOwnedAsset(ownerUserId, body.sourceAssetId);
-  if (!sourceAsset?.mimeType.startsWith("video/"))
+  const scriptSource = sourceJob.values.workflowKind === "script";
+  const sourceAsset = scriptSource ? undefined : accounts.getOwnedAsset(ownerUserId, body.sourceAssetId);
+  if (!scriptSource && !sourceAsset?.mimeType.startsWith("video/"))
     return c.json(
       { error: { code: "INVALID_VIDEO_ASSET", message: "原分镜素材不存在或不是视频", retryable: false, requestId } },
+      422,
+    );
+  if (!body.references.length && !body.portraitReferences.length)
+    return c.json(
+      {
+        error: {
+          code: "SEEDANCE_IMAGE_REFERENCE_REQUIRED",
+          message: "Seedance 2 视频生成必须至少添加一张可见的商品图片、人像图片或附件图片",
+          retryable: false,
+          requestId,
+        },
+      },
       422,
     );
   if (!ossutils.configured)
@@ -4668,20 +4710,13 @@ app.openapi(remixShotGenerationRoute, async (c) => {
       { error: { code: "INVALID_REFERENCE_ASSETS", message: "参考人像不能重复", retryable: false, requestId } },
       422,
     );
-  const bindingError = validateRemixShotReferenceBindings(body.prompt, [
-    ...body.references,
-    ...body.portraitReferences,
-  ]);
-  if (bindingError)
+  const referenceLabels = [...body.references, ...body.portraitReferences].map((reference) => reference.label);
+  if (new Set(referenceLabels).size !== referenceLabels.length)
     return c.json(
       {
         error: {
-          code: bindingError.includes("未绑定")
-            ? "UNBOUND_PROMPT_REFERENCE"
-            : bindingError.includes("提示词缺少")
-              ? "MISSING_PROMPT_REFERENCE"
-              : "INVALID_REFERENCE_LABELS",
-          message: bindingError,
+          code: "INVALID_REFERENCE_LABELS",
+          message: "参考素材标签不能重复",
           retryable: false,
           requestId,
         },
@@ -4746,11 +4781,14 @@ app.openapi(remixShotGenerationRoute, async (c) => {
   }
   const timestamp = new Date().toISOString();
   const references = referenceAssets.filter((asset): asset is NonNullable<typeof asset> => asset !== undefined);
+  const sourceName = parseRemixSources(sourceJob.values.sources).find(
+    (source) => source.assetId === body.sourceAssetId,
+  )?.name;
   const job: JobRecord = {
     id: crypto.randomUUID(),
     ownerUserId,
     moduleId: "video-remix",
-    title: `${sourceJob.title} · ${sourceAsset.originalName} · 视频生成`,
+    title: `${sourceJob.title} · ${sourceName || sourceAsset?.originalName || "分镜"} · 视频生成`,
     status: "queued",
     progress: 0,
     stage: "排队中",
@@ -4759,7 +4797,9 @@ app.openapi(remixShotGenerationRoute, async (c) => {
       ...creationValues,
       workflowPhase: "shot-generation",
       sourceJobId: sourceJob.id,
-      sourceAssetId: sourceAsset.id,
+      sourceAssetId: body.sourceAssetId,
+      sourceName: sourceName || sourceAsset?.originalName || "分镜",
+      workflowKind: sourceJob.values.workflowKind || "video",
       references: `assets:${JSON.stringify(
         references.map((asset) => ({
           id: asset.id,

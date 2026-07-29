@@ -2743,6 +2743,7 @@ export type GetVideoRemixProjectResponses = {
         childJobs: Array<Job>;
         projectRequest: {
             projectName: string;
+            workflowKind?: 'video' | 'script';
             mode?: 'product' | 'talking';
             product: {
                 id: number | string | unknown;
@@ -2767,7 +2768,8 @@ export type GetVideoRemixProjectResponses = {
                 productFormDesc?: string;
             };
             demand?: string;
-            rawMaterialFiles: Array<{
+            scriptContent?: string;
+            rawMaterialFiles?: Array<{
                 id?: number | string | unknown;
                 filename: string;
                 objectKey: string;

@@ -8,6 +8,7 @@ import {
   ChevronRight,
   ChevronUp,
   CircleHelp,
+  Clapperboard,
   Coins,
   Eye,
   EyeOff,
@@ -73,6 +74,14 @@ const ASSET_MENU_ITEMS = [
   { id: "voices", path: "/assets/voices", label: "音色库", icon: AudioLines },
 ] as const;
 
+const SCRIPT_REMIX_MENU_ITEM: SidebarMenuItem = {
+  id: "script-remix",
+  path: "/aigc/script-remix",
+  label: "脚本二创",
+  icon: Clapperboard,
+  available: true,
+};
+
 export function assetSidebarCounts(input: {
   materials?: readonly unknown[];
   portraits?: readonly unknown[];
@@ -90,7 +99,8 @@ export function assetSidebarCounts(input: {
 const sidebarMenuItems: Record<SidebarGroup, SidebarMenuItem[]> = {
   创作工作流: modules
     .filter((item) => item.group === "创作工作流")
-    .map((item) => ({ ...item, id: `module:${item.id}`, available: isModuleOpen(item.id) })),
+    .map((item) => ({ ...item, id: `module:${item.id}`, available: isModuleOpen(item.id) }))
+    .flatMap((item) => (item.id === "module:video-remix" ? [item, SCRIPT_REMIX_MENU_ITEM] : [item])),
   "AI 工具箱": modules
     .filter((item) => item.group === "AI 工具箱")
     .map((item) => ({ ...item, id: `module:${item.id}`, available: isModuleOpen(item.id) })),

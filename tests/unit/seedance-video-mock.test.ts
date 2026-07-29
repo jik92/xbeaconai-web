@@ -13,6 +13,7 @@ import { arkSeedance } from "../../server/providers/ark-seedance";
 import type { JobRecord } from "../../server/types";
 import {
   assertSeedanceDuration,
+  assertSeedanceImageReference,
   assertSeedanceReferenceVideoDuration,
   SeedanceFlowError,
   SeedanceVideoJob,
@@ -85,6 +86,16 @@ describe("Seedance FFmpeg mock", () => {
   test("rejects reference videos longer than the Ark Seedance limit before submission", () => {
     expect(assertSeedanceReferenceVideoDuration(15.2)).toBe(15.2);
     expect(() => assertSeedanceReferenceVideoDuration(15.21)).toThrow("参考视频时长不能超过 15.2 秒");
+  });
+
+  test("requires an image among prepared Seedance 2 references", () => {
+    expect(() => assertSeedanceImageReference([])).toThrow("必须提供至少一张图片参考");
+    expect(() => assertSeedanceImageReference([{ kind: "video", url: "https://example.test/reference.mp4" }])).toThrow(
+      SeedanceFlowError,
+    );
+    expect(
+      assertSeedanceImageReference([{ kind: "image", url: "https://example.test/reference.jpg" }]),
+    ).toBeUndefined();
   });
 
   test("rejects an in-flight task created by the removed AIHubMix video provider", async () => {

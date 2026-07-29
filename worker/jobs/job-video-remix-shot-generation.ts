@@ -16,8 +16,12 @@ export const videoRemixShotGenerationJob: WorkerJobHandler = {
     if (!accounts) throw new Error("素材所有权服务不可用");
     if (!ossutils.configured) throw new Error("TOS_NOT_CONFIGURED: 分镜生成结果必须保存到素材库");
     if (!isSeedanceModelId(job.videoModel)) throw new Error("分镜生成模型无效");
-    const sourceAsset = accounts.getOwnedAsset(job.ownerUserId, job.values.sourceAssetId || "");
-    if (!sourceAsset?.mimeType.startsWith("video/")) throw new Error("原分镜素材不存在或不属于当前账号");
+    const scriptSource = job.values.workflowKind === "script";
+    const sourceAsset = scriptSource
+      ? undefined
+      : accounts.getOwnedAsset(job.ownerUserId, job.values.sourceAssetId || "");
+    if (!scriptSource && !sourceAsset?.mimeType.startsWith("video/"))
+      throw new Error("原分镜素材不存在或不属于当前账号");
     const folder = accounts.getAssetFolder(job.ownerUserId, job.values.outputFolderId || "");
     if (!folder) throw new Error("保存文件夹不存在或不属于当前账号");
 
@@ -55,7 +59,8 @@ export const videoRemixShotGenerationJob: WorkerJobHandler = {
       const video = media.streams.find((stream) => stream.codec_type === "video");
       if (!video) throw new Error("生成结果不包含可解码视频");
       const output = Bun.file(outputPath);
-      const safeSourceName = sourceAsset.originalName.replace(/\.[^.]+$/, "").replace(/[^\p{L}\p{N}._-]+/gu, "-");
+      const sourceName = job.values.sourceName || sourceAsset?.originalName || "脚本分镜";
+      const safeSourceName = sourceName.replace(/\.[^.]+$/, "").replace(/[^\p{L}\p{N}._-]+/gu, "-");
       const fileName = `${safeSourceName || "分镜"}-生成-${job.id.slice(0, 8)}.mp4`;
       const assetId = crypto.randomUUID();
       const storageKey = `${folder.storagePrefix}generated/${job.id}/${fileName}`;
@@ -80,7 +85,7 @@ export const videoRemixShotGenerationJob: WorkerJobHandler = {
         durationSec: Number(media.format.duration ?? 0) || undefined,
         kind: "media",
         displayName: fileName.replace(/\.mp4$/, ""),
-        description: `由爆款二创任务 ${job.parentJobId || job.id} 的分镜 ${sourceAsset.id} 生成`,
+        description: `由爆款二创任务 ${job.parentJobId || job.id} 的分镜 ${job.values.sourceAssetId || ""} 生成`,
         folderId: folder.id,
         createdAt: new Date().toISOString(),
       });
@@ -118,7 +123,7 @@ export const videoRemixShotGenerationJob: WorkerJobHandler = {
           job.ownerUserId,
           "task_completed",
           "爆款二创分镜生成完成",
-          `${sourceAsset.originalName} 的生成视频已保存到“${folder.name}”。`,
+          `${sourceName} 的生成视频已保存到“${folder.name}”。`,
           job.id,
         );
     } catch (error) {

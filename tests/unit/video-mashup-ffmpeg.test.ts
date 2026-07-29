@@ -2,7 +2,13 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { concatMashupVideos, generateSampleVideo, normalizeMashupVideo, probeMedia } from "../../server/media/ffmpeg";
+import {
+  concatMashupVideos,
+  concatVideos,
+  generateSampleVideo,
+  normalizeMashupVideo,
+  probeMedia,
+} from "../../server/media/ffmpeg";
 
 const directories: string[] = [];
 afterEach(async () => {
@@ -27,6 +33,25 @@ describe("video mashup ffmpeg pipeline", () => {
       expect(media.streams.some((stream) => stream.codec_type === "video")).toBeTrue();
       expect(media.streams.some((stream) => stream.codec_type === "audio")).toBeTrue();
       expect(Number(media.format.duration)).toBeGreaterThan(7.5);
+    },
+    30_000,
+  );
+
+  run(
+    "creates a playable composed output from one normalized video",
+    async () => {
+      const directory = await mkdtemp(resolve(tmpdir(), "video-single-compose-test-"));
+      directories.push(directory);
+      const source = await generateSampleVideo(resolve(directory, "source.mp4"));
+      const normalized = resolve(directory, "normalized.mp4");
+      await normalizeMashupVideo({ source, output: normalized, width: 640, height: 360, hasAudio: true });
+
+      const output = await concatVideos([normalized], resolve(directory, "output.mp4"));
+      const media = await probeMedia(output);
+
+      expect(media.streams.some((stream) => stream.codec_type === "video")).toBeTrue();
+      expect(media.streams.some((stream) => stream.codec_type === "audio")).toBeTrue();
+      expect(Number(media.format.duration)).toBeGreaterThan(3.5);
     },
     30_000,
   );

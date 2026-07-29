@@ -24,7 +24,7 @@ export const videoRemixComposeJob: WorkerJobHandler = {
     if (!accounts) throw new Error("素材所有权服务不可用");
     if (!ossutils.configured) throw new Error("TOS_NOT_CONFIGURED: 合并成片必须保存到素材库");
     const assetIds = orderedAssetIds(job.values.orderedAssetIds);
-    if (assetIds.length < 2) throw new Error("合并成片至少需要两个视频");
+    if (!assetIds.length) throw new Error("生成成片至少需要一个视频");
     const assets = assetIds.map((assetId) => accounts.getOwnedAsset(job.ownerUserId, assetId));
     if (assets.some((asset) => !asset?.mimeType.startsWith("video/")))
       throw new Error("合并素材不存在、不属于当前账号或不是视频");

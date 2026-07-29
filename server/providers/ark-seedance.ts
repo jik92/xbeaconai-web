@@ -139,6 +139,8 @@ export class ArkSeedanceClient {
   }
 
   async createVideo(input: ArkSeedanceVideoInput) {
+    if (!input.references?.some((reference) => reference.kind === "image"))
+      throw new Error("SEEDANCE_IMAGE_REFERENCE_REQUIRED: Seedance 2 视频生成必须提供至少一张图片参考");
     const task = (await this.request("contents/generations/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

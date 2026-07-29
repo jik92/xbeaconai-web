@@ -286,7 +286,7 @@ export async function splitFixed(input: string, pattern: string) {
 }
 
 export async function concatVideos(inputs: string[], output: string) {
-  if (inputs.length < 2) throw new Error("至少需要两个视频片段才能合并");
+  if (!inputs.length) throw new Error("至少需要一个视频片段才能生成成片");
   await outputDir(output);
   const manifest = `${output}.concat.txt`;
   const escapePath = (path: string) => path.replaceAll("'", "'\\''");

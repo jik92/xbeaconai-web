@@ -72,6 +72,8 @@ export function PromptWorkbench({
   controls,
   children,
   submitting = false,
+  submitDisabled = false,
+  submitDisabledReason,
   submitLabel,
   showSubmit = true,
   mentions = [],
@@ -95,6 +97,8 @@ export function PromptWorkbench({
   controls: ReactNode;
   children?: ReactNode;
   submitting?: boolean;
+  submitDisabled?: boolean;
+  submitDisabledReason?: string;
   submitLabel?: string;
   showSubmit?: boolean;
   /** Enables a lightweight `@` picker in the textarea. The parent remains the source of truth for the prompt. */
@@ -299,7 +303,8 @@ export function PromptWorkbench({
               !submitLabel && "w-8.5 px-0",
             )}
             aria-label="提交"
-            disabled={submitting}
+            disabled={submitting || submitDisabled}
+            title={submitDisabled ? submitDisabledReason : undefined}
             onClick={onSubmit}
           >
             <ArrowUp className="size-4" />
