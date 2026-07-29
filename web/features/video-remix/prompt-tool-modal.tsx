@@ -212,11 +212,25 @@ function ModifyControls({
   const preset = remixModifyPresets.find((item) => item.id === config.preset);
   return (
     <>
-      <label className="space-y-2">
-        <span className="block type-body text-muted">预设场景</span>
+      <section className="space-y-2">
+        <div className="flex h-6 items-center justify-between">
+          <span className="block type-body text-muted">预设场景</span>
+          {preset && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-muted hover:text-ink"
+              onClick={() => setConfig({ ...config, preset: "" })}
+            >
+              取消选择
+            </Button>
+          )}
+        </div>
         <Button
           type="button"
-          className="flex h-10 w-full items-center justify-between rounded-lg border border-line bg-surface px-3 text-left type-body outline-none focus:border-primary"
+          variant="outline"
+          className="flex h-10 w-full items-center justify-between rounded-lg px-3 text-left type-body hover:bg-surface-muted focus:border-primary"
           onClick={() => setPresetOpen((value) => !value)}
         >
           <span className={preset ? "text-ink" : "text-muted"}>{preset?.title ?? "单选，与自定义指令叠加生效"}</span>
@@ -228,7 +242,8 @@ function ModifyControls({
               <Button
                 type="button"
                 key={item.id}
-                className={`block w-full rounded-lg p-3 text-left hover:bg-surface-muted ${config.preset === item.id ? "bg-surface-muted" : ""}`}
+                variant="ghost"
+                className={`block h-auto min-h-[72px] w-full rounded-lg p-3 text-left hover:bg-surface-muted ${config.preset === item.id ? "bg-surface-muted" : ""}`}
                 onClick={() => {
                   setConfig({ ...config, preset: item.id });
                   setPresetOpen(false);
@@ -240,7 +255,7 @@ function ModifyControls({
             ))}
           </div>
         )}
-      </label>
+      </section>
       <label className="space-y-2">
         <span className="block type-body text-muted">自定义</span>
         <textarea
@@ -352,13 +367,12 @@ export function PromptToolModal({
   const [originalPreview, setOriginalPreview] = useState(prompt);
   const [preview, setPreview] = useState(prompt);
   const [draftPreview, setDraftPreview] = useState(prompt);
-  const [pendingVoiceRewrite, setPendingVoiceRewrite] = useState<{
+  const [pendingRewrite, setPendingRewrite] = useState<{
     tool: RemixPromptTool;
     summary: string;
     findings: string[];
   } | null>(null);
-  const [editingVoiceRewrite, setEditingVoiceRewrite] = useState(false);
-  const [lastAppliedVoiceRewrite, setLastAppliedVoiceRewrite] = useState("");
+  const [editingRewrite, setEditingRewrite] = useState(false);
   const [error, setError] = useState("");
   const completedJobs = useRef(new Set<string>());
   const lastOpenedKey = useRef("");
@@ -374,9 +388,8 @@ export function PromptToolModal({
     setOriginalPreview(prompt);
     setPreview(prompt);
     setDraftPreview(prompt);
-    setPendingVoiceRewrite(null);
-    setEditingVoiceRewrite(false);
-    setLastAppliedVoiceRewrite("");
+    setPendingRewrite(null);
+    setEditingRewrite(false);
     setError("");
     setJob((current) => (current && current.status !== "queued" && current.status !== "processing" ? null : current));
   }, [prompt, sourceAssetId, tool]);
@@ -405,20 +418,9 @@ export function PromptToolModal({
             }
             setPreview(rewritten);
             const summary = updated.values.rewriteSummary || updated.result?.summary || "AI 修改完成";
-            let voiceMode: RemixPromptToolConfig["voiceMode"] | undefined;
-            try {
-              voiceMode = (JSON.parse(updated.values.promptToolConfig || "{}") as RemixPromptToolConfig).voiceMode;
-            } catch {
-              voiceMode = undefined;
-            }
-            if (currentTool === "voice" && voiceMode === "correct") {
-              setDraftPreview(rewritten);
-              setPendingVoiceRewrite({ tool: currentTool, summary, findings });
-              setEditingVoiceRewrite(false);
-              setLastAppliedVoiceRewrite("");
-              return;
-            }
-            onApply(currentTool, rewritten, summary, findings);
+            setDraftPreview(rewritten);
+            setPendingRewrite({ tool: currentTool, summary, findings });
+            setEditingRewrite(false);
           }
         })
         .catch((reason) => setError(errorMessage(reason)));
@@ -426,21 +428,21 @@ export function PromptToolModal({
     refresh();
     const timer = window.setInterval(refresh, 2_000);
     return () => window.clearInterval(timer);
-  }, [activeJobId, onApply]);
+  }, [activeJobId]);
 
   const canSubmit = useMemo(() => {
-    if (!tool || !sourceJobId || !sourceAssetId || !prompt.trim() || activeJobId) return false;
+    if (!tool || !sourceJobId || !sourceAssetId || !prompt.trim() || activeJobId || pendingRewrite) return false;
     if (tool === "check") return config.checkTypes.length > 0;
     if (tool === "modify") return Boolean(config.preset || config.customInstruction.trim());
     return config.voiceMode === "correct" || Boolean(config.customInstruction.trim());
-  }, [activeJobId, config, prompt, sourceAssetId, sourceJobId, tool]);
-  const comparisonPreview = editingVoiceRewrite ? draftPreview : preview;
-  const voiceDiff = useMemo(
+  }, [activeJobId, config, pendingRewrite, prompt, sourceAssetId, sourceJobId, tool]);
+  const comparisonPreview = editingRewrite ? draftPreview : preview;
+  const rewriteDiff = useMemo(
     () => buildLineDiff(originalPreview, comparisonPreview),
     [comparisonPreview, originalPreview],
   );
-  const showVoiceDiff = tool === "voice" && comparisonPreview !== originalPreview;
-  const canApplyVoiceRewrite = showVoiceDiff && comparisonPreview !== lastAppliedVoiceRewrite;
+  const showRewriteDiff = Boolean(pendingRewrite);
+  const canApplyRewrite = showRewriteDiff && comparisonPreview !== originalPreview;
   const syncDiffScroll = (source: HTMLElement | null, target: HTMLElement | null) => {
     if (!source || !target) return;
     target.scrollTop = source.scrollTop;
@@ -450,13 +452,10 @@ export function PromptToolModal({
   const submit = async () => {
     if (!tool || !sourceJobId || !sourceAssetId || !canSubmit) return;
     setError("");
-    if (tool === "voice" && config.voiceMode === "correct") {
-      setOriginalPreview(preview);
-      setDraftPreview(preview);
-      setPendingVoiceRewrite(null);
-      setEditingVoiceRewrite(false);
-      setLastAppliedVoiceRewrite("");
-    }
+    setOriginalPreview(preview);
+    setDraftPreview(preview);
+    setPendingRewrite(null);
+    setEditingRewrite(false);
     try {
       setJob(await runRemixPromptTool({ sourceJobId, sourceAssetId, prompt: preview, tool, config }));
     } catch (reason) {
@@ -468,19 +467,21 @@ export function PromptToolModal({
     setConfig(copyDefaultConfig());
     setError("");
   };
-  const saveVoiceRewrite = () => {
-    if (!canApplyVoiceRewrite) return;
-    const rewritten = editingVoiceRewrite ? draftPreview : preview;
+  const saveRewrite = () => {
+    if (!pendingRewrite || !canApplyRewrite) return;
+    const rewritten = editingRewrite ? draftPreview : preview;
     setPreview(rewritten);
     setDraftPreview(rewritten);
-    setEditingVoiceRewrite(false);
-    setLastAppliedVoiceRewrite(rewritten);
-    onApply(
-      pendingVoiceRewrite?.tool ?? "voice",
-      rewritten,
-      pendingVoiceRewrite?.summary ?? "已应用修正口播",
-      pendingVoiceRewrite?.findings ?? [],
-    );
+    setOriginalPreview(rewritten);
+    setEditingRewrite(false);
+    onApply(pendingRewrite.tool, rewritten, pendingRewrite.summary, pendingRewrite.findings);
+    setPendingRewrite(null);
+  };
+  const restartRewrite = () => {
+    setPreview(originalPreview);
+    setDraftPreview(originalPreview);
+    setEditingRewrite(false);
+    setPendingRewrite(null);
   };
   const close = () => {
     lastOpenedKey.current = "";
@@ -531,19 +532,19 @@ export function PromptToolModal({
             </footer>
           </aside>
           <section className="h-full min-h-0 overflow-hidden bg-surface p-4">
-            {showVoiceDiff ? (
+            {showRewriteDiff ? (
               <div className="voice-diff-review">
-                <section className="voice-diff" aria-label="口播修正前后对比">
+                <section className="voice-diff" aria-label="修改前后对比">
                   <DiffColumn
-                    title="原文"
-                    lines={voiceDiff.before}
+                    title="修改前"
+                    lines={rewriteDiff.before}
                     side="before"
                     panelRef={originalDiffPanel}
                     onScroll={() => syncDiffScroll(originalDiffPanel.current, revisedDiffPanel.current)}
                   />
-                  {editingVoiceRewrite ? (
-                    <section className="voice-diff-editor" aria-label="编辑修正后的口播">
-                      <header>修正后（编辑中）</header>
+                  {editingRewrite ? (
+                    <section className="voice-diff-editor" aria-label="编辑修改后内容">
+                      <header>修改后（编辑中）</header>
                       <textarea
                         value={draftPreview}
                         onChange={(event) => setDraftPreview(event.target.value)}
@@ -552,8 +553,8 @@ export function PromptToolModal({
                     </section>
                   ) : (
                     <DiffColumn
-                      title="修正后"
-                      lines={voiceDiff.after}
+                      title="修改后"
+                      lines={rewriteDiff.after}
                       side="after"
                       panelRef={revisedDiffPanel}
                       onScroll={() => syncDiffScroll(revisedDiffPanel.current, originalDiffPanel.current)}
@@ -561,22 +562,25 @@ export function PromptToolModal({
                   )}
                 </section>
                 <div className="voice-diff-actions">
+                  <Button type="button" onClick={restartRewrite}>
+                    重新生成
+                  </Button>
                   <Button
                     type="button"
                     onClick={() => {
-                      if (editingVoiceRewrite) {
+                      if (editingRewrite) {
                         setDraftPreview(preview);
-                        setEditingVoiceRewrite(false);
+                        setEditingRewrite(false);
                       } else {
                         setDraftPreview(preview);
-                        setEditingVoiceRewrite(true);
+                        setEditingRewrite(true);
                       }
                     }}
                   >
-                    {editingVoiceRewrite ? "取消" : "修改"}
+                    {editingRewrite ? "取消编辑" : "继续编辑"}
                   </Button>
-                  <Button type="button" className="primary" disabled={!canApplyVoiceRewrite} onClick={saveVoiceRewrite}>
-                    {canApplyVoiceRewrite ? "应用并保存为新版本" : "已应用，修改后可再次保存"}
+                  <Button type="button" className="primary" disabled={!canApplyRewrite} onClick={saveRewrite}>
+                    {canApplyRewrite ? "应用修改" : "没有可应用的改动"}
                   </Button>
                 </div>
               </div>

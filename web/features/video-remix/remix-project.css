@@ -661,6 +661,68 @@
   @apply font-sans type-body leading-relaxed;
   @apply text-body-strong;
 }
+.prompt-document-comparison {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  overflow: hidden;
+}
+.prompt-diff-column {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.prompt-diff-column + .prompt-diff-column {
+  border-left: 1px solid var(--border);
+}
+.prompt-diff-column > header {
+  flex: none;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  @apply type-label text-body-strong;
+}
+.prompt-diff-column > pre {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  margin: 0;
+  padding: 8px 0;
+  @apply font-sans type-helper leading-relaxed text-body-strong;
+}
+.prompt-diff-column > pre > span {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  min-height: 24px;
+}
+.prompt-diff-column > pre i {
+  padding-right: 9px;
+  text-align: right;
+  user-select: none;
+  @apply not-italic text-body;
+}
+.prompt-diff-column > pre code {
+  min-width: 0;
+  padding: 0 12px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  @apply font-sans;
+}
+.prompt-diff-column-before .is-removed {
+  background: var(--canvas-soft);
+  @apply text-error;
+}
+.prompt-diff-column-before .is-removed i {
+  background: var(--error);
+  @apply text-error;
+}
+.prompt-diff-column-after .is-added {
+  background: var(--surface-strong);
+  @apply text-success;
+}
+.prompt-diff-column-after .is-added i {
+  background: var(--success);
+  @apply text-success;
+}
 
 .voice-diff {
   height: 100%;

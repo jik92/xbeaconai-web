@@ -57,6 +57,7 @@ import {
   type RemixAnalysisEntry,
   remixMaxSources,
 } from "../../../shared/video-remix/workflow";
+import { buildLineDiff } from "./line-diff";
 import { resolveOptionalRemixVoice } from "./optional-voice";
 import { PromptToolModal } from "./prompt-tool-modal";
 import "./remix-project.css";
@@ -109,6 +110,47 @@ interface SourcePromptState {
   prompt: string;
   versions: PromptVersion[];
   activeVersionId: string;
+}
+
+interface PromptComparison {
+  before: string;
+  after: string;
+}
+
+function PromptComparisonDocument({ comparison }: { comparison: PromptComparison }) {
+  const diff = useMemo(() => buildLineDiff(comparison.before, comparison.after), [comparison.after, comparison.before]);
+  return (
+    <section className="prompt-document prompt-document-comparison" aria-label="修改前后对比">
+      <section className="prompt-diff-column prompt-diff-column-before" aria-label="修改前">
+        <header>修改前</header>
+        <pre>
+          {diff.before.map((line) => (
+            <span
+              className={line.kind === "unchanged" ? "" : `is-${line.kind}`}
+              key={`before-${line.lineNumber}-${line.text}`}
+            >
+              <i>{line.lineNumber}</i>
+              <code>{line.text || " "}</code>
+            </span>
+          ))}
+        </pre>
+      </section>
+      <section className="prompt-diff-column prompt-diff-column-after" aria-label="修改后">
+        <header>修改后</header>
+        <pre>
+          {diff.after.map((line) => (
+            <span
+              className={line.kind === "unchanged" ? "" : `is-${line.kind}`}
+              key={`after-${line.lineNumber}-${line.text}`}
+            >
+              <i>{line.lineNumber}</i>
+              <code>{line.text || " "}</code>
+            </span>
+          ))}
+        </pre>
+      </section>
+    </section>
+  );
 }
 
 interface ShotGenerationDraft {
@@ -181,7 +223,17 @@ function PublicPreviewImage({ url, alt }: { url: string; alt: string }) {
   return <ImagePreview src={url} alt={alt} onImageError={() => setFailed(true)} />;
 }
 
-function WorkflowHeader({ stage, onHistory, onReset }: { stage: number; onHistory: () => void; onReset: () => void }) {
+function WorkflowHeader({
+  stage,
+  onHistory,
+  onPrevious,
+  onReset,
+}: {
+  stage: number;
+  onHistory: () => void;
+  onPrevious: () => void;
+  onReset: () => void;
+}) {
   return (
     <header className="remix-header">
       <div className="remix-brand">
@@ -202,6 +254,16 @@ function WorkflowHeader({ stage, onHistory, onReset }: { stage: number; onHistor
         ))}
       </ol>
       <div className="remix-header-actions">
+        <Button
+          className="remix-header-action shrink-0"
+          variant="outline"
+          size="sm"
+          disabled={stage <= 2}
+          onClick={onPrevious}
+        >
+          <ChevronLeft />
+          上一步
+        </Button>
         <Button className="remix-header-action shrink-0" variant="outline" size="sm" onClick={onHistory}>
           <History />
           生成记录
@@ -783,6 +845,7 @@ export function RemixProject() {
   const [parsing, setParsing] = useState(false);
   const [editing, setEditing] = useState(false);
   const [promptStates, setPromptStates] = useState<Record<string, SourcePromptState>>({});
+  const [promptComparisons, setPromptComparisons] = useState<Record<string, PromptComparison>>({});
   const [promptTool, setPromptTool] = useState<RemixPromptTool | null>(null);
   const [sources, setSources] = useState<AttachmentSelection[]>([]);
   const [activeSourceId, setActiveSourceId] = useState("");
@@ -812,6 +875,7 @@ export function RemixProject() {
   const prompt = activePromptState.prompt;
   const promptVersions = activePromptState.versions;
   const activePromptVersionId = activePromptState.activeVersionId;
+  const activePromptComparison = promptComparisons[activeSourceId];
   const analysisEntries = useMemo(
     () => parseRemixAnalysisEntries(job?.values.analysisEntries || job?.result?.data?.values.analysisEntries),
     [job],
@@ -1153,6 +1217,8 @@ export function RemixProject() {
     setProjectName("");
     setDescription("");
     setPromptStates({});
+    setPromptComparisons({});
+    setCompare(false);
     setPromptTool(null);
     setJob(null);
     setComposeJob(null);
@@ -1256,6 +1322,8 @@ export function RemixProject() {
       setParsing(detail.rootJob.status === "queued" || detail.rootJob.status === "processing");
       setStage(rootReady ? detail.workspace.stage : 1);
       setPromptStates(detail.workspace.promptStates);
+      setPromptComparisons({});
+      setCompare(false);
       setSelectedShotAssets(detail.workspace.selectedShotAssets);
       setShotSelectionTouched(Object.fromEntries(restoredSources.map((source) => [source.id, true])));
       setComposeOrder(detail.workspace.composeOrder);
@@ -1279,6 +1347,11 @@ export function RemixProject() {
   const applyPromptTool = useCallback(
     (tool: RemixPromptTool, rewrittenPrompt: string, summary: string, findings: string[]) => {
       const nextVersionId = `${tool}-${Date.now()}`;
+      setPromptComparisons((current) => ({
+        ...current,
+        [activeSourceId]: { before: prompt, after: rewrittenPrompt },
+      }));
+      setCompare(true);
       patchPromptState(activeSourceId, (current) => {
         const versions = current.versions.some((version) => version.prompt === current.prompt)
           ? current.versions
@@ -1298,7 +1371,7 @@ export function RemixProject() {
       });
       setNotice(findings.length ? `${summary}（处理 ${findings.length} 项）` : summary);
     },
-    [activeSourceId, patchPromptState],
+    [activeSourceId, patchPromptState, prompt],
   );
   const result = composeJob?.result as ApiJobResult | undefined;
   const resultVideo = result?.artifacts.find((artifact) => artifact.mimeType.startsWith("video/") && artifact.url);
@@ -1559,7 +1632,12 @@ export function RemixProject() {
 
   return (
     <div className="remix-project">
-      <WorkflowHeader stage={stage} onHistory={() => setHistoryOpen(true)} onReset={() => void startNewProject()} />
+      <WorkflowHeader
+        stage={stage}
+        onHistory={() => setHistoryOpen(true)}
+        onPrevious={() => setStage((current) => Math.max(2, current - 1))}
+        onReset={() => void startNewProject()}
+      />
       <div className="remix-body">
         <ConfigSidebar
           mode={mode}
@@ -1721,24 +1799,28 @@ export function RemixProject() {
                   {orderedPromptVersions.length > 1 && <p>历史版本</p>}
                   {orderedPromptVersions.slice(1).map(promptVersionButton)}
                 </aside>
-                <div className="prompt-document">
-                  {activeAnalysisEntry?.status === "failed" ? (
-                    <div className="source-analysis-error">
-                      <b>该视频解析失败</b>
-                      <span>{activeAnalysisEntry.error || "请稍后重试"}</span>
-                    </div>
-                  ) : editing ? (
-                    <textarea
-                      value={prompt}
-                      onChange={(event) => {
-                        setPrompt(event.target.value);
-                        setActivePromptVersionId("");
-                      }}
-                    />
-                  ) : (
-                    <pre>{prompt}</pre>
-                  )}
-                </div>
+                {compare && activePromptComparison ? (
+                  <PromptComparisonDocument comparison={activePromptComparison} />
+                ) : (
+                  <div className="prompt-document">
+                    {activeAnalysisEntry?.status === "failed" ? (
+                      <div className="source-analysis-error">
+                        <b>该视频解析失败</b>
+                        <span>{activeAnalysisEntry.error || "请稍后重试"}</span>
+                      </div>
+                    ) : editing ? (
+                      <textarea
+                        value={prompt}
+                        onChange={(event) => {
+                          setPrompt(event.target.value);
+                          setActivePromptVersionId("");
+                        }}
+                      />
+                    ) : (
+                      <pre>{prompt}</pre>
+                    )}
+                  </div>
+                )}
               </div>
               <footer className="stage-actions">
                 <div>
