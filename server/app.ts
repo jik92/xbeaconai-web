@@ -80,10 +80,12 @@ import { creationCapabilities, quoteCreation, validateCreationValues } from "./c
 import { type DownloadResource, issueDownloadTicket, verifyDownloadTicket } from "./downloads/download-ticket";
 import { env } from "./env";
 import { buildSecurityHeaders } from "./http/security-headers";
+import { DouyinProductPreviewError, DouyinProductPreviewService } from "./imports/douyin-product";
 import { emitLog } from "./imports/import-logger";
 import { platformAdapters, ShareContentParser } from "./imports/share-content";
 
 const shareParser = new ShareContentParser(platformAdapters);
+const douyinProductPreviewService = new DouyinProductPreviewService(env.dataDir);
 
 import { stopAllAdminJobs } from "./jobs/admin-job-control";
 import { BullJobQueue } from "./jobs/bull-job-queue";
@@ -2590,6 +2592,25 @@ const productResponse = (product: ReturnType<AccountStore["listProducts"]>[numbe
 });
 
 app.get("/api/products", (c) => c.json({ products: accounts.listProducts(c.get("userId")).map(productResponse) }, 200));
+
+app.post("/api/products/link-preview", async (c) => {
+  const requestId = crypto.randomUUID();
+  const body = await c.req.json().catch(() => undefined);
+  const url = typeof body?.url === "string" ? body.url : "";
+  try {
+    const preview = await douyinProductPreviewService.create(c.get("userId"), url);
+    return c.json({ preview: { ...preview, images: preview.images.map((image) => ({ ...image, url: `/api/products/link-previews/${preview.id}/images/${image.id}` })) } }, 200);
+  } catch (error) {
+    const previewError = error instanceof DouyinProductPreviewError ? error : new DouyinProductPreviewError("PRODUCT_LINK_UNAVAILABLE", "商品链接暂时无法抓取", true);
+    return c.json({ error: { code: previewError.code, message: previewError.message, retryable: previewError.retryable, requestId } }, previewError.code === "INVALID_PRODUCT_LINK" ? 400 : 422);
+  }
+});
+
+app.get("/api/products/link-previews/:previewId/images/:imageId", (c) => {
+  const image = douyinProductPreviewService.getImage(c.get("userId"), c.req.param("previewId"), c.req.param("imageId"));
+  if (!image) return c.json({ error: { code: "PRODUCT_PREVIEW_NOT_FOUND", message: "商品预览图片不存在", retryable: false, requestId: crypto.randomUUID() } }, 404);
+  return new Response(Buffer.from(image.bytes), { headers: { "Cache-Control": "no-store", "Content-Disposition": "inline", "Content-Type": image.mimeType } });
+});
 
 app.post("/api/products", async (c) => {
   const requestId = crypto.randomUUID();

@@ -8,9 +8,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   deleteLibraryAsset,
   deleteLibraryProduct,
+  downloadProductPreviewImage,
   fetchAssetFolders,
   fetchLibraryAssets,
   fetchProducts,
+  previewProductLink,
   isPublicMediaUrl,
   saveAssetMetadata,
   uploadLibraryAsset,
@@ -46,8 +48,10 @@ function ProductLibrary() {
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [linkHelpOpen, setLinkHelpOpen] = useState(false);
   const [selected, setSelected] = useState<LibraryProduct | null>(null);
   const [files, setFiles] = useState<File[]>([]);
+  const [productLink, setProductLink] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [sharingScope, setSharingScope] = useState<LibraryProduct["sharingScope"]>("private");
@@ -80,6 +84,7 @@ function ProductLibrary() {
       void queryClient.invalidateQueries({ queryKey: ["asset-library", "product"] });
       setUploadOpen(false);
       setFiles([]);
+      setProductLink("");
       setName("");
       setDescription("");
       setSharingScope("private");
@@ -87,6 +92,34 @@ function ProductLibrary() {
       setSelected(product);
     },
   });
+  const preview = useMutation({
+    mutationFn: async () => {
+      const result = await previewProductLink(productLink);
+      return { ...result, files: await Promise.all(result.images.map(downloadProductPreviewImage)) };
+    },
+    onSuccess: (result) => {
+      setName(result.title);
+      setFiles(result.files);
+    },
+  });
+  const resetProductDraft = () => {
+    upload.reset();
+    preview.reset();
+    setFiles([]);
+    setProductLink("");
+    setName("");
+    setDescription("");
+    setSharingScope("private");
+    setUploadProgress(0);
+  };
+  const openProductUpload = () => {
+    resetProductDraft();
+    setUploadOpen(true);
+  };
+  const closeProductUpload = () => {
+    resetProductDraft();
+    setUploadOpen(false);
+  };
   const remove = useMutation({
     mutationFn: deleteLibraryProduct,
     onSuccess: (_, productId) => {
@@ -134,7 +167,7 @@ function ProductLibrary() {
             setQuery={setQuery}
             title="商品库"
             uploadLabel="创建商品"
-            onUpload={() => setUploadOpen(true)}
+            onUpload={openProductUpload}
             uploadDisabled={uploadDisabled}
             uploadTitle={uploadAvailability?.disabledReason}
           />
@@ -174,14 +207,45 @@ function ProductLibrary() {
             empty={!filtered.length}
             icon={<Package />}
             emptyText="还没有商品"
-            onUpload={() => setUploadOpen(true)}
+            onUpload={openProductUpload}
             uploadDisabled={uploadDisabled}
           />
         </section>
       </AssetPageShell>
 
-      <ToolCreatorModal open={uploadOpen} title="创建商品" onClose={() => setUploadOpen(false)}>
+      <ToolCreatorModal open={uploadOpen} title="创建商品" onClose={closeProductUpload}>
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4 type-body">
+          <Label className="flex-col items-start type-label text-muted">
+            抖音商品链接或分享口令
+            <div className="flex w-full gap-2">
+              <Input
+                value={productLink}
+                maxLength={4096}
+                onChange={(event) => {
+                  setProductLink(event.target.value);
+                  preview.reset();
+                }}
+                placeholder="粘贴抖音链接或完整分享文案"
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!productLink.trim() || preview.isPending || upload.isPending}
+                onClick={() => preview.mutate()}
+              >
+                {preview.isPending ? "抓取中…" : "抓取商品信息"}
+              </Button>
+            </div>
+            <Button
+              className="h-auto px-0 type-helper text-primary"
+              size="sm"
+              variant="ghost"
+              onClick={() => setLinkHelpOpen(true)}
+            >
+              查看链接获取方法
+            </Button>
+            {preview.error && <span className="type-helper text-error">{preview.error.message}</span>}
+          </Label>
           <Label className="flex-col items-start type-label text-muted">
             <span>
               产品名称 <b className="text-error">*</b>
@@ -242,9 +306,32 @@ function ProductLibrary() {
         <ModalFooter
           disabled={uploadDisabled || !files.length || !name.trim() || upload.isPending}
           pending={upload.isPending}
-          onCancel={() => setUploadOpen(false)}
+          onCancel={closeProductUpload}
           onConfirm={() => upload.mutate()}
         />
+      </ToolCreatorModal>
+
+      <ToolCreatorModal open={linkHelpOpen} title="如何获取抖音商品链接" onClose={() => setLinkHelpOpen(false)}>
+        <div className="space-y-3 p-4 type-body text-muted">
+          <ol className="grid gap-2 sm:grid-cols-3">
+            {[
+              ["1", "打开商品详情页", "点击右上角分享按钮"],
+              ["2", "选择复制链接", "在分享面板中点击复制链接"],
+              ["3", "粘贴到这里", "返回本页后点击抓取商品信息"],
+            ].map(([step, title, description]) => (
+              <li className="rounded-md border border-line bg-surface p-3" key={step}>
+                <span className="mb-2 inline-flex size-5 items-center justify-center rounded-full bg-primary type-helper text-on-primary">
+                  {step}
+                </span>
+                <b className="block type-body-strong text-ink">{title}</b>
+                <span className="type-helper">{description}</span>
+              </li>
+            ))}
+          </ol>
+          <p className="rounded-md border border-line bg-surface-muted p-3 type-helper">
+            小贴士：复制完整分享文案也可以，系统会自动识别其中的抖音商品链接。
+          </p>
+        </div>
       </ToolCreatorModal>
 
       <ToolCreatorModal open={Boolean(selected)} title={selected?.name ?? "商品详情"} onClose={() => setSelected(null)}>

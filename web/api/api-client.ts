@@ -807,6 +807,18 @@ export async function fetchProducts() {
   if (!response.ok) throw new Error("商品列表加载失败");
   return ((await response.json()) as { products: LibraryProduct[] }).products;
 }
+export interface ProductLinkPreview { id: string; title: string; images: Array<{ id: string; name: string; mimeType: string; size: number; url: string }> }
+export async function previewProductLink(url: string) {
+  const response = await fetch(apiUrl("/api/products/link-preview"), { method: "POST", headers: { ...authHeaders(), "Content-Type": "application/json" }, body: JSON.stringify({ url }) });
+  const data = (await response.json().catch(() => null)) as { preview?: ProductLinkPreview; error?: { message?: string } } | null;
+  if (!response.ok || !data?.preview) throw new Error(data?.error?.message || "商品链接抓取失败");
+  return data.preview;
+}
+export async function downloadProductPreviewImage(image: ProductLinkPreview["images"][number]) {
+  const response = await fetch(apiUrl(image.url), { headers: authHeaders() }); const type = response.headers.get("content-type")?.split(";", 1)[0] ?? "";
+  if (!response.ok || !["image/jpeg", "image/png", "image/webp"].includes(type)) throw new Error("商品预览图片无法读取");
+  return new File([await response.blob()], image.name, { type });
+}
 export async function uploadProduct(input: {
   files: File[];
   name: string;
