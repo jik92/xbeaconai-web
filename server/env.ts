@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { APP_CONFIG } from "../web/app/config";
@@ -15,6 +16,16 @@ export function resolveWorkerConcurrencies(input: { network?: string; ffmpeg?: s
     network: positiveInteger(input.network, legacy ?? 40),
     ffmpeg: positiveInteger(input.ffmpeg, legacy ?? 2),
   };
+}
+export function resolveRedisQueueName(input: {
+  isProduction: boolean;
+  configuredName?: string;
+  dataDirectory: string;
+}) {
+  const baseName = input.configuredName?.trim() || "yaozuo-jobs";
+  if (input.isProduction) return baseName;
+  const namespace = createHash("sha256").update(resolve(input.dataDirectory)).digest("hex").slice(0, 10);
+  return `${baseName}-dev-${namespace}`;
 }
 export function resolveTosConfig(input: {
   isProduction: boolean;
@@ -130,7 +141,11 @@ export const env = {
   blockAiOutbound: process.env.BLOCK_AI_OUTBOUND === "true",
   byokEncryptionKey: process.env.BYOK_ENCRYPTION_KEY ?? "",
   redisUrl: process.env.REDIS_URL ?? "redis://127.0.0.1:6379",
-  redisQueueName: process.env.REDIS_QUEUE_NAME ?? "yaozuo-jobs",
+  redisQueueName: resolveRedisQueueName({
+    isProduction: process.env.NODE_ENV === "production",
+    configuredName: process.env.REDIS_QUEUE_NAME,
+    dataDirectory: dataDir,
+  }),
   networkWorkerConcurrency: workerConcurrencies.network,
   ffmpegWorkerConcurrency: workerConcurrencies.ffmpeg,
   // Local debugging only: set DOUYIN_BROWSER_HEADLESS=false to observe the

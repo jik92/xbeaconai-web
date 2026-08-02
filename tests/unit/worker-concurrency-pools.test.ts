@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { resolveWorkerConcurrencies } from "../../server/env";
+import { resolveRedisQueueName, resolveWorkerConcurrencies } from "../../server/env";
 import { classifyJobWorkload, type JobWorkloadDescriptor } from "../../shared/jobs/job-workload";
 import { jobQueueName } from "../../shared/jobs/queue-contract";
 
@@ -49,6 +49,31 @@ describe("worker concurrency pools", () => {
   test("derives two stable queue names from the configured base", () => {
     expect(jobQueueName("yaozuo-jobs", "network")).toBe("yaozuo-jobs-network");
     expect(jobQueueName("yaozuo-jobs", "ffmpeg")).toBe("yaozuo-jobs-ffmpeg");
+  });
+
+  test("isolates development queues by data directory without changing production names", () => {
+    const first = resolveRedisQueueName({
+      isProduction: false,
+      configuredName: "yaozuo-jobs",
+      dataDirectory: "/workspace/one/.data",
+    });
+    expect(first).toBe(
+      resolveRedisQueueName({
+        isProduction: false,
+        configuredName: "yaozuo-jobs",
+        dataDirectory: "/workspace/one/.data",
+      }),
+    );
+    expect(first).not.toBe(
+      resolveRedisQueueName({
+        isProduction: false,
+        configuredName: "yaozuo-jobs",
+        dataDirectory: "/workspace/two/.data",
+      }),
+    );
+    expect(
+      resolveRedisQueueName({ isProduction: true, configuredName: "production-jobs", dataDirectory: "/srv/data" }),
+    ).toBe("production-jobs");
   });
 
   test("deploys the requested production concurrency defaults", async () => {
