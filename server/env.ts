@@ -1,6 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { APP_CONFIG } from "../web/app/config";
+import { resolveAllowedOrigins } from "./http/allowed-origins";
 
 const dataDir = resolve(process.env.YAOZUO_DATA_DIR ?? ".data");
 const apiPort = Number(process.env.API_PORT ?? 8787);
@@ -103,10 +104,6 @@ const workerConcurrencies = resolveWorkerConcurrencies({
   ffmpeg: process.env.FFMPEG_WORKER_CONCURRENCY,
   legacy: process.env.WORKER_CONCURRENCY,
 });
-const configuredAllowedOrigins = (process.env.ALLOWED_ORIGINS ?? "")
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
 export const parseAdminPhones = (value: string) =>
   new Set(
     value
@@ -168,15 +165,12 @@ export const env = {
   authRateLimitMax: Number(process.env.AUTH_RATE_LIMIT_MAX ?? 12),
   adminPhones: configuredAdminPhones,
   smsVerificationFixedCode: process.env.SMS_VERIFICATION_FIXED_CODE ?? "",
-  allowedOrigins: new Set([
-    "http://127.0.0.1:5173",
-    "http://localhost:5173",
-    "http://127.0.0.1:4173",
-    "http://localhost:4173",
-    `http://127.0.0.1:${apiPort}`,
-    `http://localhost:${apiPort}`,
-    ...configuredAllowedOrigins,
-  ]),
+  allowedOrigins: resolveAllowedOrigins({
+    isProduction: process.env.NODE_ENV === "production",
+    apiPort,
+    devWebPort: process.env.DEV_WEB_PORT,
+    configured: process.env.ALLOWED_ORIGINS,
+  }),
 };
 
 if (process.env.NODE_ENV === "production" && env.smsVerificationFixedCode)

@@ -22,10 +22,12 @@ run-dev: _check_bun
 	if [ -f .env ]; then env_file=.env; elif [ -f ../xbeaconai-web/.env ]; then env_file=../xbeaconai-web/.env; fi; \
 	echo "Starting Web on $$web_port and API on $$api_port$${env_file:+ using $$env_file}"; \
 	if [ -n "$$env_file" ]; then \
-		PORT="$$web_port" API_PORT="$$api_port" VITE_API_PROXY_TARGET="http://127.0.0.1:$$api_port" \
+		PORT="$$web_port" API_PORT="$$api_port" DEV_WEB_PORT="$$web_port" \
+			VITE_API_PROXY_TARGET="http://127.0.0.1:$$api_port" \
 			$(BUN) "--env-file=$$env_file" run --parallel dev:api dev:worker dev; \
 	else \
-		PORT="$$web_port" API_PORT="$$api_port" VITE_API_PROXY_TARGET="http://127.0.0.1:$$api_port" \
+		PORT="$$web_port" API_PORT="$$api_port" DEV_WEB_PORT="$$web_port" \
+			VITE_API_PROXY_TARGET="http://127.0.0.1:$$api_port" \
 			$(BUN) run --parallel dev:api dev:worker dev; \
 	fi
 
