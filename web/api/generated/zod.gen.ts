@@ -2094,7 +2094,8 @@ export const zUpdateScriptRemixNextProjectBody = z.object({
             camera: z.string().min(1).max(500),
             durationSeconds: z.number().gt(0).lte(60),
             productRequirement: z.string().max(1000),
-            characterRequirement: z.string().max(1000)
+            characterRequirement: z.string().max(1000),
+            prompt: z.string().min(20).max(8000).optional()
         })).min(1).max(9),
         analysisVersion: z.int().gte(0),
         storyboardAssetId: z.union([
@@ -2141,7 +2142,8 @@ export const zCreateScriptRemixNextStoryboardBody = z.object({
         camera: z.string().min(1).max(500),
         durationSeconds: z.number().gt(0).lte(60),
         productRequirement: z.string().max(1000),
-        characterRequirement: z.string().max(1000)
+        characterRequirement: z.string().max(1000),
+        prompt: z.string().min(20).max(8000).optional()
     })).min(1).max(9)
 });
 
@@ -2162,7 +2164,8 @@ export const zCreateScriptRemixNextReferenceImageBody = z.object({
         camera: z.string().min(1).max(500),
         durationSeconds: z.number().gt(0).lte(60),
         productRequirement: z.string().max(1000),
-        characterRequirement: z.string().max(1000)
+        characterRequirement: z.string().max(1000),
+        prompt: z.string().min(20).max(8000).optional()
     })
 });
 
@@ -2183,7 +2186,8 @@ export const zCreateScriptRemixNextShotGenerationBody = z.object({
         camera: z.string().min(1).max(500),
         durationSeconds: z.number().gt(0).lte(60),
         productRequirement: z.string().max(1000),
-        characterRequirement: z.string().max(1000)
+        characterRequirement: z.string().max(1000),
+        prompt: z.string().min(20).max(8000).optional()
     }),
     settings: z.object({
         modelId: zSeedanceModelId,
@@ -2214,7 +2218,8 @@ export const zCreateScriptRemixNextComposeBody = z.object({
             camera: z.string().min(1).max(500),
             durationSeconds: z.number().gt(0).lte(60),
             productRequirement: z.string().max(1000),
-            characterRequirement: z.string().max(1000)
+            characterRequirement: z.string().max(1000),
+            prompt: z.string().min(20).max(8000).optional()
         })).min(1).max(9),
         analysisVersion: z.int().gte(0),
         storyboardAssetId: z.union([

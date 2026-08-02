@@ -19,6 +19,7 @@ import {
 } from "../shared/portraits/portrait-reference";
 import {
   createScriptRemixNextWorkspace,
+  scriptRemixNextCompletePrompt,
   scriptRemixNextReadyToCompose,
 } from "../shared/script-remix-next/workflow";
 import {
@@ -3984,6 +3985,7 @@ const ScriptRemixNextShotSchema = z.object({
   durationSeconds: z.number().positive().max(60),
   productRequirement: z.string().trim().max(1_000),
   characterRequirement: z.string().trim().max(1_000),
+  prompt: z.string().trim().min(20).max(8_000).optional(),
 });
 const ScriptRemixNextVideoSettingsSchema = z.object({
   modelId: VideoModelIdSchema,
@@ -4331,7 +4333,7 @@ app.openapi(createScriptRemixNextShotRoute, async (c) => {
   const creationValues = {
     type: "视频",
     creationKind: "video",
-    prompt: [body.shot.visual, body.shot.action, body.shot.camera, `口播：${body.shot.speech}`].join("\n"),
+    prompt: scriptRemixNextCompletePrompt(body.shot),
     modelId: body.settings.modelId,
     ratio: body.settings.ratio,
     resolution: body.settings.resolution,

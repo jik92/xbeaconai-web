@@ -8399,6 +8399,11 @@
                             "characterRequirement": {
                               "type": "string",
                               "maxLength": 1000
+                            },
+                            "prompt": {
+                              "type": "string",
+                              "minLength": 20,
+                              "maxLength": 8000
                             }
                           },
                           "required": [
@@ -8634,6 +8639,11 @@
                         "characterRequirement": {
                           "type": "string",
                           "maxLength": 1000
+                        },
+                        "prompt": {
+                          "type": "string",
+                          "minLength": 20,
+                          "maxLength": 8000
                         }
                       },
                       "required": [
@@ -8748,6 +8758,11 @@
                       "characterRequirement": {
                         "type": "string",
                         "maxLength": 1000
+                      },
+                      "prompt": {
+                        "type": "string",
+                        "minLength": 20,
+                        "maxLength": 8000
                       }
                     },
                     "required": [
@@ -8859,6 +8874,11 @@
                       "characterRequirement": {
                         "type": "string",
                         "maxLength": 1000
+                      },
+                      "prompt": {
+                        "type": "string",
+                        "minLength": 20,
+                        "maxLength": 8000
                       }
                     },
                     "required": [
@@ -9034,6 +9054,11 @@
                             "characterRequirement": {
                               "type": "string",
                               "maxLength": 1000
+                            },
+                            "prompt": {
+                              "type": "string",
+                              "minLength": 20,
+                              "maxLength": 8000
                             }
                           },
                           "required": [

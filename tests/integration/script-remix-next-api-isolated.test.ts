@@ -251,12 +251,14 @@ describe("script remix next API", () => {
   });
 
   test("creates storyboard, reference image, and video jobs without calling video provider", async () => {
+    const editedPrompt = "这是用户编辑后的完整分镜提示词，包含口播、画面、动作、镜头和一致性要求。";
+    const editedShot = { ...shot, prompt: editedPrompt };
     const storyboard = await honoApp.request(
       "/api/script-remix-next/storyboards",
       auth({
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, shots: [shot] }),
+        body: JSON.stringify({ projectId, shots: [editedShot] }),
       }),
     );
     expect(storyboard.status).toBe(202);
@@ -266,7 +268,7 @@ describe("script remix next API", () => {
       auth({
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, shot }),
+        body: JSON.stringify({ projectId, shot: editedShot }),
       }),
     );
     expect(reference.status).toBe(202);
@@ -277,7 +279,7 @@ describe("script remix next API", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           projectId,
-          shot,
+          shot: editedShot,
           settings: { modelId: "doubao-seedance-2-0-fast-260128", ratio: "9:16", resolution: "720p", duration: 8 },
           referenceAssetId: productImageAssetId,
         }),
@@ -287,6 +289,7 @@ describe("script remix next API", () => {
     const videoJob = await video.json();
     expect(videoJob.values.workflowPhase).toBe("shot-generation");
     expect(videoJob.videoModel).toBe("doubao-seedance-2-0-fast-260128");
+    expect(videoJob.values.prompt).toBe(editedPrompt);
     store.update(videoJob.id, {
       status: "succeeded",
       progress: 100,

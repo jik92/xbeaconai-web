@@ -47,6 +47,7 @@ import {
   createScriptRemixNextWorkspace,
   type ScriptRemixNextShot,
   type ScriptRemixNextWorkspace,
+  scriptRemixNextCompletePrompt,
   scriptRemixNextReadyToCompose,
   scriptRemixNextShotSettings,
 } from "../../../shared/script-remix-next/workflow";
@@ -707,34 +708,10 @@ export function ScriptRemixNextPage() {
                           onChange={(event) => patchShot(shot.id, { durationSeconds: Number(event.target.value) })}
                         />
                         <textarea
-                          value={shot.speech}
-                          aria-label={`分镜 ${shot.ordinal} 口播文案`}
-                          onChange={(event) => patchShot(shot.id, { speech: event.target.value })}
-                        />
-                        <textarea
-                          value={shot.visual}
-                          aria-label={`分镜 ${shot.ordinal} 画面描述`}
-                          onChange={(event) => patchShot(shot.id, { visual: event.target.value })}
-                        />
-                        <textarea
-                          value={shot.action}
-                          aria-label={`分镜 ${shot.ordinal} 动作`}
-                          onChange={(event) => patchShot(shot.id, { action: event.target.value })}
-                        />
-                        <textarea
-                          value={shot.camera}
-                          aria-label={`分镜 ${shot.ordinal} 镜头语言`}
-                          onChange={(event) => patchShot(shot.id, { camera: event.target.value })}
-                        />
-                        <textarea
-                          value={shot.productRequirement}
-                          aria-label={`分镜 ${shot.ordinal} 商品要求`}
-                          onChange={(event) => patchShot(shot.id, { productRequirement: event.target.value })}
-                        />
-                        <textarea
-                          value={shot.characterRequirement}
-                          aria-label={`分镜 ${shot.ordinal} 人物要求`}
-                          onChange={(event) => patchShot(shot.id, { characterRequirement: event.target.value })}
+                          className="col-span-2 min-h-40"
+                          value={scriptRemixNextCompletePrompt(shot)}
+                          aria-label={`分镜 ${shot.ordinal} 完整提示词`}
+                          onChange={(event) => patchShot(shot.id, { prompt: event.target.value })}
                         />
                       </article>
                     ))}

@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import { cropStoryboardGrid, probeMedia } from "../../server/media/ffmpeg";
 import {
   buildScriptRemixNextAnalysisPrompt,
+  buildSingleShotImagePrompt,
   buildStoryboardGridPrompt,
   parseScriptRemixNextAnalysis,
 } from "../../server/script-remix-next/model";
@@ -13,6 +14,7 @@ import {
   normalizeScriptRemixNextShots,
   type ScriptRemixNextShot,
   scriptRemixNextAnalysisModel,
+  scriptRemixNextCompletePrompt,
   scriptRemixNextImageModel,
   scriptRemixNextReadyToCompose,
   scriptRemixNextShotSettings,
@@ -82,6 +84,17 @@ describe("script remix next workflow", () => {
     expect(grid.match(/空白占位格/g)).toHaveLength(7);
   });
 
+  test("uses one editable complete prompt as the authoritative generation input", () => {
+    const current = shot(1);
+    const fallback = scriptRemixNextCompletePrompt(current);
+    expect(fallback).toContain("口播文案：原文1");
+    expect(fallback).toContain("景别、机位和运镜：运镜1");
+    current.prompt = "这是用户调整后的完整提示词，包含口播、画面、动作、运镜以及人物和商品一致性。";
+    expect(scriptRemixNextCompletePrompt(current)).toBe(current.prompt);
+    expect(buildStoryboardGridPrompt({ shots: [current], productName: "测试商品" })).toContain(current.prompt);
+    expect(buildSingleShotImagePrompt({ shot: current, productName: "测试商品" })).toContain(current.prompt);
+  });
+
   test("accepts UTF-8 TXT and Markdown while rejecting invalid documents", () => {
     const content = "这是一份有效的 UTF-8 脚本文档，长度足够用于后续分镜解析。";
     expect(decodeScriptDocument(new TextEncoder().encode(`\uFEFF${content}`), "text/plain", "script.txt")).toBe(
@@ -149,5 +162,8 @@ describe("script remix next entry", () => {
     expect(page).toContain("<ProductPickerModal");
     expect(page).toContain('presentation="wide"');
     expect(legacyPage).toContain("export function ProductPickerModal");
+    expect(page).toContain("完整提示词");
+    expect(page).not.toContain("口播文案`}");
+    expect(page).not.toContain("画面描述`}");
   });
 });

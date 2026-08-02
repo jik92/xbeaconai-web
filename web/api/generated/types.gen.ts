@@ -2748,6 +2748,7 @@ export type UpdateScriptRemixNextProjectData = {
                 durationSeconds: number;
                 productRequirement: string;
                 characterRequirement: string;
+                prompt?: string;
             }>;
             analysisVersion: number;
             storyboardAssetId: string | '';
@@ -2818,6 +2819,7 @@ export type CreateScriptRemixNextStoryboardData = {
             durationSeconds: number;
             productRequirement: string;
             characterRequirement: string;
+            prompt?: string;
         }>;
     };
     path?: never;
@@ -2857,6 +2859,7 @@ export type CreateScriptRemixNextReferenceImageData = {
             durationSeconds: number;
             productRequirement: string;
             characterRequirement: string;
+            prompt?: string;
         };
     };
     path?: never;
@@ -2896,6 +2899,7 @@ export type CreateScriptRemixNextShotGenerationData = {
             durationSeconds: number;
             productRequirement: string;
             characterRequirement: string;
+            prompt?: string;
         };
         settings: {
             modelId: SeedanceModelId;
@@ -2949,6 +2953,7 @@ export type CreateScriptRemixNextComposeData = {
                 durationSeconds: number;
                 productRequirement: string;
                 characterRequirement: string;
+                prompt?: string;
             }>;
             analysisVersion: number;
             storyboardAssetId: string | '';

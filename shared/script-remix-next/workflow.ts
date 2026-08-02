@@ -14,6 +14,24 @@ export interface ScriptRemixNextShot {
   durationSeconds: number;
   productRequirement: string;
   characterRequirement: string;
+  prompt?: string;
+}
+
+export function scriptRemixNextCompletePrompt(
+  shot: Pick<
+    ScriptRemixNextShot,
+    "speech" | "visual" | "action" | "camera" | "productRequirement" | "characterRequirement" | "prompt"
+  >,
+) {
+  if (shot.prompt !== undefined) return shot.prompt;
+  return [
+    `口播文案：${shot.speech}`,
+    `画面描述：${shot.visual}`,
+    `人物动作：${shot.action}`,
+    `景别、机位和运镜：${shot.camera}`,
+    `商品一致性：${shot.productRequirement || "保持所选商品外观一致"}`,
+    `人物一致性：${shot.characterRequirement || "保持人物、服装和造型一致"}`,
+  ].join("\n");
 }
 
 export interface ScriptRemixNextWorkspace {
@@ -63,13 +81,17 @@ export function createScriptRemixNextWorkspace(): ScriptRemixNextWorkspace {
 }
 
 export function normalizeScriptRemixNextShots(input: readonly ScriptRemixNextShot[]) {
-  const normalized = input.map((shot, index) => ({ ...shot, ordinal: index + 1 }));
+  const normalized = input.map((shot, index) => ({
+    ...shot,
+    ordinal: index + 1,
+    prompt: scriptRemixNextCompletePrompt(shot),
+  }));
   if (normalized.length <= scriptRemixNextMaxShots) return normalized;
   const kept = normalized.slice(0, scriptRemixNextMaxShots);
   const overflow = normalized.slice(scriptRemixNextMaxShots - 1);
   const last = overflow[0];
   if (!last) return kept;
-  kept[scriptRemixNextMaxShots - 1] = {
+  const merged = {
     ...last,
     ordinal: scriptRemixNextMaxShots,
     title: last.title || `分镜 ${scriptRemixNextMaxShots}`,
@@ -86,7 +108,9 @@ export function normalizeScriptRemixNextShots(input: readonly ScriptRemixNextSho
       .map((shot) => shot.characterRequirement)
       .filter(Boolean)
       .join("；"),
+    prompt: undefined,
   };
+  kept[scriptRemixNextMaxShots - 1] = { ...merged, prompt: scriptRemixNextCompletePrompt(merged) };
   return kept;
 }
 
