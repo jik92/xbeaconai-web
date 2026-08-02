@@ -163,6 +163,15 @@ describe("script remix next entry", () => {
     expect(page).toContain('presentation="wide"');
     expect(legacyPage).toContain("export function ProductPickerModal");
     expect(page).toContain("完整提示词");
+    expect(page).toContain("分镜标题");
+    expect(page).toContain("建议时长");
+    expect(page).toContain("maxLength={8_000}");
+    expect(page).toContain("/ 8,000");
+    const shotEditor = page.slice(
+      page.indexOf("workspace.shots.map"),
+      page.indexOf('<footer className="flex justify-between pt-3">'),
+    );
+    expect(shotEditor.match(/<textarea/g)).toHaveLength(1);
     expect(page).not.toContain("口播文案`}");
     expect(page).not.toContain("画面描述`}");
   });

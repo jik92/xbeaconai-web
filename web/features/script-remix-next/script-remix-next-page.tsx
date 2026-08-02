@@ -694,25 +694,47 @@ export function ScriptRemixNextPage() {
                         className="grid grid-cols-2 gap-2 rounded-lg border border-line bg-surface p-3"
                       >
                         <b className="col-span-2">分镜 {shot.ordinal}</b>
-                        <input
-                          value={shot.title}
-                          aria-label={`分镜 ${shot.ordinal} 标题`}
-                          onChange={(event) => patchShot(shot.id, { title: event.target.value })}
-                        />
-                        <input
-                          type="number"
-                          min={1}
-                          max={60}
-                          value={shot.durationSeconds}
-                          aria-label={`分镜 ${shot.ordinal} 建议时长`}
-                          onChange={(event) => patchShot(shot.id, { durationSeconds: Number(event.target.value) })}
-                        />
-                        <textarea
-                          className="col-span-2 min-h-40"
-                          value={scriptRemixNextCompletePrompt(shot)}
-                          aria-label={`分镜 ${shot.ordinal} 完整提示词`}
-                          onChange={(event) => patchShot(shot.id, { prompt: event.target.value })}
-                        />
+                        <label className="flex min-w-0 flex-col gap-1 type-label text-muted">
+                          分镜标题
+                          <input
+                            className="h-9 rounded-md border border-line bg-surface px-3 type-body text-ink"
+                            value={shot.title}
+                            aria-label={`分镜 ${shot.ordinal} 标题`}
+                            onChange={(event) => patchShot(shot.id, { title: event.target.value })}
+                          />
+                        </label>
+                        <label className="flex min-w-0 flex-col gap-1 type-label text-muted">
+                          建议时长
+                          <span className="relative block">
+                            <input
+                              className="h-9 w-full rounded-md border border-line bg-surface px-3 pr-9 type-body text-ink"
+                              type="number"
+                              min={1}
+                              max={60}
+                              value={shot.durationSeconds}
+                              aria-label={`分镜 ${shot.ordinal} 建议时长`}
+                              onChange={(event) => patchShot(shot.id, { durationSeconds: Number(event.target.value) })}
+                            />
+                            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center type-helper text-muted">
+                              秒
+                            </span>
+                          </span>
+                        </label>
+                        <label className="col-span-2 flex min-w-0 flex-col gap-1 type-label text-muted">
+                          <span className="flex items-center justify-between gap-2">
+                            <span>完整提示词</span>
+                            <span className="type-helper">
+                              {scriptRemixNextCompletePrompt(shot).length.toLocaleString()} / 8,000
+                            </span>
+                          </span>
+                          <textarea
+                            className="min-h-40 rounded-md border border-line bg-surface px-3 py-2 type-body text-ink"
+                            value={scriptRemixNextCompletePrompt(shot)}
+                            maxLength={8_000}
+                            aria-label={`分镜 ${shot.ordinal} 完整提示词`}
+                            onChange={(event) => patchShot(shot.id, { prompt: event.target.value })}
+                          />
+                        </label>
                       </article>
                     ))}
                   </div>
