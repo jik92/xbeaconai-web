@@ -75,14 +75,14 @@ export function createScriptRemixNextJob(dependencies: ScriptRemixNextDependenci
             model: scriptRemixNextImageModel,
             size: "1024x1536",
             count: 1,
-            quality: "low",
+            quality: "high",
           })
         : aihubmix.generateImages({
             prompt: input.prompt,
             model: scriptRemixNextImageModel,
             size: "1024x1536",
             count: 1,
-            quality: "low",
+            quality: "high",
           }));
   const fetchResult = dependencies.fetchResult ?? defaultFetchResult;
 

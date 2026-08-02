@@ -212,8 +212,13 @@ describe("script remix next Worker", () => {
         uploaded.push(key);
       },
       generateImages: async ({ prompt, images }) => {
-        expect(prompt).toContain("严格 3×3");
-        expect(prompt.match(/空白占位格/g)).toHaveLength(7);
+        expect(prompt).toContain("严格 3 列×3 行");
+        expect(prompt.match(/空白占位/g)).toHaveLength(7);
+        expect(prompt).toContain("本次恰好只有 2 个有效格");
+        expect(prompt).toContain("绝对禁止擅自补画");
+        expect(prompt).toContain("自然皮肤纹理");
+        expect(prompt).toContain("接触阴影");
+        expect(prompt).toContain("【负面约束】");
         expect(images).toHaveLength(1);
         return [{ b64Json: Buffer.from(pngBytes).toString("base64") }];
       },

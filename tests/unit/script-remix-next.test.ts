@@ -80,8 +80,15 @@ describe("script remix next workflow", () => {
     expect(analysis).toContain("最多输出 9 条");
     expect(analysis).toContain("不得改写、删减、重复或调序");
     const grid = buildStoryboardGridPrompt({ shots: [shot(1), shot(2)], productName: "测试商品" });
-    expect(grid).toContain("严格 3×3");
-    expect(grid.match(/空白占位格/g)).toHaveLength(7);
+    expect(grid).toContain("严格 3 列×3 行");
+    expect(grid.match(/空白占位/g)).toHaveLength(7);
+    expect(grid).toContain("参考图优先级");
+    expect(grid).toContain("本次恰好只有 2 个有效格");
+    expect(grid).toContain("绝对禁止擅自补画");
+    expect(grid).toContain("自然皮肤纹理");
+    expect(grid).toContain("接触阴影");
+    expect(grid).toContain("负面约束");
+    expect(grid).toContain("禁止标题、编号、字幕");
   });
 
   test("uses one editable complete prompt as the authoritative generation input", () => {
@@ -174,5 +181,11 @@ describe("script remix next entry", () => {
     expect(shotEditor.match(/<textarea/g)).toHaveLength(1);
     expect(page).not.toContain("口播文案`}");
     expect(page).not.toContain("画面描述`}");
+  });
+
+  test("requests high-quality images for storyboard and single-shot generation", async () => {
+    const worker = await Bun.file(resolve(import.meta.dir, "../../worker/jobs/job-script-remix-next.ts")).text();
+    expect(worker.match(/quality: "high"/g)).toHaveLength(2);
+    expect(worker).not.toContain('quality: "low"');
   });
 });
