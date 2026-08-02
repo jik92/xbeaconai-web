@@ -11,6 +11,7 @@ import { VideoCreateStore } from "../server/video-create/video-create-store";
 import { classifyJobWorkload, type JobWorkload } from "../shared/jobs/job-workload";
 import { type ExecuteJobPayload, executeJobName, executeJobOptions, jobQueueName } from "../shared/jobs/queue-contract";
 import { JobProcessor } from "./job-processor";
+import { SeedanceFlowError } from "./jobs/job-seedance-video";
 import { safelySyncProviderGenerationAudits } from "./jobs/provider-audit";
 import { createWorkerRedisConnection } from "./redis";
 
@@ -104,9 +105,9 @@ const handleFailure = (job: { data: ExecuteJobPayload } | undefined, error: Erro
     status: "failed",
     stage: "Worker 执行失败",
     error: {
-      code: "WORKER_EXECUTION_FAILED",
+      code: error instanceof SeedanceFlowError ? error.code : "WORKER_EXECUTION_FAILED",
       message: error.message,
-      retryable: true,
+      retryable: error instanceof SeedanceFlowError ? error.retryable : true,
       requestId: crypto.randomUUID(),
     },
   });

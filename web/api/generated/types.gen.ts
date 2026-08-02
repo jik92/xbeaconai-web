@@ -2678,6 +2678,13 @@ export type CreateScriptRemixNextProjectData = {
         productDescription?: string;
         productImageAssetIds: Array<string>;
         portraitAssetId?: string;
+        portraitReference?: {
+            type: 'general';
+            portraitId: number;
+        } | {
+            type: 'custom';
+            assetId: string;
+        };
         portraitName?: string;
         voiceAssetId?: string;
         voiceName?: string;

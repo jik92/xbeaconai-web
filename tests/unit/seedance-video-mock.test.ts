@@ -15,6 +15,8 @@ import {
   assertSeedanceDuration,
   assertSeedanceImageReference,
   assertSeedanceReferenceVideoDuration,
+  buildVirtualPortraitFallbackPrompt,
+  isArkRealPersonPrivacyError,
   SeedanceFlowError,
   SeedanceVideoJob,
   seedanceVideoSettings,
@@ -22,6 +24,29 @@ import {
 
 const directories: string[] = [];
 const originalMockGenerateVideoApi = process.env.MOCK_GENERATE_VIDEO_API;
+
+describe("Seedance virtual portrait privacy fallback", () => {
+  test("matches only the explicit Ark real-person privacy rejection", () => {
+    expect(
+      isArkRealPersonPrivacyError(
+        new Error(
+          'ARK_400: {"error":{"code":"InputImageSensitiveContentDetected.PrivacyInformation","message":"input may contain real person"}}',
+        ),
+      ),
+    ).toBe(true);
+    expect(isArkRealPersonPrivacyError(new Error("ARK_400: invalid ratio"))).toBe(false);
+    expect(isArkRealPersonPrivacyError(new Error("ARK_429: may contain real person"))).toBe(false);
+  });
+
+  test("locks every source-image detail except facial identity", () => {
+    const selected = buildVirtualPortraitFallbackPrompt(true);
+    expect(selected).toContain("Preserve the product exactly");
+    expect(selected).toContain("Preserve the person's body, clothing, pose, hands, action");
+    expect(selected).toContain("smooth, featureless, matte neutral tracking placeholder");
+    expect(selected).toContain("separate registered virtual portrait");
+    expect(buildVirtualPortraitFallbackPrompt(false)).toContain("default virtual portrait");
+  });
+});
 
 afterEach(async () => {
   if (originalMockGenerateVideoApi === undefined) delete process.env.MOCK_GENERATE_VIDEO_API;

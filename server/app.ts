@@ -4014,6 +4014,7 @@ const ScriptRemixNextCreateSchema = z
     productDescription: z.string().trim().max(2_000).default(""),
     productImageAssetIds: z.array(z.string().uuid()).min(1).max(20),
     portraitAssetId: z.string().uuid().optional(),
+    portraitReference: PortraitReferenceSchema.optional(),
     portraitName: z.string().trim().max(100).default(""),
     voiceAssetId: z.string().uuid().optional(),
     voiceName: z.string().trim().max(100).default(""),
@@ -4122,6 +4123,14 @@ app.openapi(createScriptRemixNextProjectRoute, async (c) => {
       { error: { code: "INVALID_OPTIONAL_ASSETS", message: "人像或音色素材无效", retryable: false, requestId } },
       422,
     );
+  if (
+    body.portraitReference &&
+    !resolvePortraitReference({ ownerUserId, reference: body.portraitReference, accounts, customPortraits })
+  )
+    return c.json(
+      { error: { code: "PORTRAIT_NOT_AVAILABLE", message: "所选虚拟人像不存在或尚未就绪", retryable: false, requestId } },
+      422,
+    );
   const idempotencyKey = c.req.header("Idempotency-Key")?.trim().slice(0, 128);
   if (idempotencyKey) {
     const existing = store.getByIdempotencyKey(ownerUserId, idempotencyKey);
@@ -4141,6 +4150,7 @@ app.openapi(createScriptRemixNextProjectRoute, async (c) => {
       productImageAssetIds: JSON.stringify(body.productImageAssetIds),
       referenceAssetIds: JSON.stringify(referenceAssetIds),
       portraitAssetId: body.portraitAssetId || "",
+      portraitReference: serializePortraitReference(body.portraitReference) || "",
       portraitName: body.portraitName,
       voiceAssetId: body.voiceAssetId || "",
       voiceName: body.voiceName,
@@ -4319,7 +4329,7 @@ app.openapi(createScriptRemixNextShotRoute, async (c) => {
       422,
     );
   const ownedReferences = references.filter((asset): asset is MediaAsset => asset !== undefined);
-  const configuredAssets = [root.values.portraitAssetId, root.values.voiceAssetId]
+  const configuredAssets = [root.values.voiceAssetId]
     .filter((id): id is string => Boolean(id))
     .map((id) => accounts.getOwnedAsset(ownerUserId, id))
     .filter((asset): asset is MediaAsset => Boolean(asset));
@@ -4373,6 +4383,7 @@ app.openapi(createScriptRemixNextShotRoute, async (c) => {
         })),
       ),
       portraitReferences: "[]",
+      privacyFallbackPortraitReference: root.values.portraitReference || "",
       outputFolderId: accounts.getDefaultAssetFolderId(ownerUserId),
     },
   });

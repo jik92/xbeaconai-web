@@ -187,6 +187,7 @@ export function ScriptRemixNextPage() {
         productDescription: selectedProduct.description || "",
         productImageAssetIds: selectedProduct.images.map((image) => image.id),
         ...(selectedPortrait?.type === "custom" ? { portraitAssetId: selectedPortrait.assetId } : {}),
+        ...(selectedPortrait ? { portraitReference: selectedPortrait.reference } : {}),
         portraitName: selectedPortrait?.name || "",
         voiceAssetId: selectedVoice?.id,
         voiceName: selectedVoice?.name || "",
@@ -632,14 +633,14 @@ export function ScriptRemixNextPage() {
                   onClick={() => setProductPickerOpen(true)}
                 />
                 <label className="flex flex-col gap-1 type-label">
-                  人像（选填）
+                  虚拟人像（选填）
                   <select
                     value={selectedPortrait?.key || ""}
                     onChange={(event) =>
                       setSelectedPortrait(portraitsQuery.data?.find((item) => item.key === event.target.value) || null)
                     }
                   >
-                    <option value="">不使用人像</option>
+                    <option value="">自动虚拟人像</option>
                     {portraitsQuery.data
                       ?.filter((portrait) => portrait.status === "active")
                       .map((portrait) => (

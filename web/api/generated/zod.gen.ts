@@ -2061,6 +2061,16 @@ export const zCreateScriptRemixNextProjectBody = z.object({
     productDescription: z.string().max(2000).optional().default(''),
     productImageAssetIds: z.array(z.uuid()).min(1).max(20),
     portraitAssetId: z.uuid().optional(),
+    portraitReference: z.union([
+        z.object({
+            type: z.enum(['general']),
+            portraitId: z.int().gte(1)
+        }),
+        z.object({
+            type: z.enum(['custom']),
+            assetId: z.uuid()
+        })
+    ]).optional(),
     portraitName: z.string().max(100).optional().default(''),
     voiceAssetId: z.uuid().optional(),
     voiceName: z.string().max(100).optional().default('')

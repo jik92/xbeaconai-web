@@ -1,9 +1,12 @@
+import { Buffer } from "node:buffer";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, resolve } from "node:path";
 import { probeMedia } from "../../server/media/ffmpeg";
 import type { SeedanceModelId, SeedanceReferenceKind } from "../../server/models/video-models";
+import { getPortraitArkAssetUri, getPortraitById } from "../../server/portraits/catalog";
 import { resolvePortraitReference } from "../../server/portraits/portrait-resolver";
+import { aihubmix } from "../../server/providers/aihubmix";
 import { arkSeedance } from "../../server/providers/ark-seedance";
 import { ossutils } from "../../server/storage/ossutils";
 import type { JobRecord } from "../../server/types";
@@ -68,6 +71,18 @@ export function assertSeedanceImageReference(references: Array<{ kind: SeedanceR
     );
 }
 
+export function isArkRealPersonPrivacyError(error: unknown) {
+  return (
+    error instanceof Error &&
+    error.message.includes("InputImageSensitiveContentDetected.PrivacyInformation") &&
+    error.message.includes("may contain real person")
+  );
+}
+
+export function buildVirtualPortraitFallbackPrompt(hasSelectedPortrait: boolean) {
+  return `Edit this image as a production-safe Seedance motion and composition reference. Preserve the product exactly, including shape, color, material, logo and packaging. Preserve the person's body, clothing, pose, hands, action, hair silhouette, camera angle, framing, background, lighting and aspect ratio. Remove every visible facial identity cue and replace only the face area with a smooth, featureless, matte neutral tracking placeholder: no eyes, eyebrows, nose, mouth, ears, skin texture or recognizable facial geometry. It must look obviously synthetic and cannot resemble any real or public person.${hasSelectedPortrait ? " A separate registered virtual portrait will define the final identity; do not render that identity in this image." : " A registered default virtual portrait will define the final identity separately."} Do not add text, watermarks, UI, extra people or extra objects.`;
+}
+
 function referenceKind(mimeType: string): SeedanceReferenceKind | undefined {
   if (mimeType.startsWith("image/")) return "image";
   if (mimeType.startsWith("video/")) return "video";
@@ -119,6 +134,87 @@ async function sha256File(path: string) {
 
 export class SeedanceVideoJob {
   constructor(private readonly context: JobHandlerContext) {}
+
+  private async createPrivacySafeReferences(
+    job: JobRecord,
+    references: Array<{ kind: SeedanceReferenceKind; url: string }>,
+  ) {
+    const { accounts, customPortraits, store } = this.context;
+    if (!accounts) throw new SeedanceFlowError("ACCOUNT_STORE_UNAVAILABLE", "素材所有权服务不可用", false);
+    const source = assetIdsFromValues(job.values)
+      .map((id) => accounts.getOwnedAsset(job.ownerUserId, id))
+      .find((asset) => asset?.mimeType.startsWith("image/"));
+    if (!source) throw new SeedanceFlowError("PRIVACY_FALLBACK_SOURCE_MISSING", "未找到可换脸的分镜参考图", false);
+    const tempDir = await mkdtemp(resolve(tmpdir(), "yaozuo-seedance-privacy-fallback-"));
+    try {
+      const sourcePath = resolve(tempDir, `source${extname(source.originalName) || ".png"}`);
+      await ossutils.downloadLibraryFile(source.storageKey, sourcePath);
+      const imageInputs = [
+        {
+          bytes: new Uint8Array(await Bun.file(sourcePath).arrayBuffer()),
+          mimeType: source.mimeType,
+          name: source.originalName,
+        },
+      ];
+      const selectedReference = parsePortraitReference(job.values.privacyFallbackPortraitReference);
+      let portraitArkAssetUri: string | undefined;
+      if (selectedReference?.type === "custom") {
+        if (!customPortraits) throw new SeedanceFlowError("PORTRAIT_STORE_UNAVAILABLE", "虚拟人像服务不可用", false);
+        const portrait = resolvePortraitReference({
+          ownerUserId: job.ownerUserId,
+          reference: selectedReference,
+          accounts,
+          customPortraits,
+        });
+        if (!portrait) throw new SeedanceFlowError("PORTRAIT_NOT_AVAILABLE", "所选虚拟人像不可用", false);
+        portraitArkAssetUri = portrait.arkAssetUri;
+      } else {
+        const portraitId = selectedReference?.type === "general" ? selectedReference.portraitId : 1;
+        const portrait = getPortraitById(portraitId);
+        if (!portrait) throw new SeedanceFlowError("PORTRAIT_NOT_AVAILABLE", "系统虚拟人像不可用", false);
+        portraitArkAssetUri = getPortraitArkAssetUri(portrait);
+      }
+      const [result] = await aihubmix.editImages({
+        prompt: buildVirtualPortraitFallbackPrompt(Boolean(selectedReference)),
+        images: imageInputs,
+        model: "gpt-image-2",
+        size: "1024x1536",
+        count: 1,
+        quality: "high",
+      });
+      if (!result) throw new SeedanceFlowError("PRIVACY_FALLBACK_IMAGE_EMPTY", "虚拟人像替换未返回图片", true);
+      const bytes = result.b64Json
+        ? new Uint8Array(Buffer.from(result.b64Json, "base64"))
+        : result.url
+          ? await fetch(result.url, { signal: AbortSignal.timeout(120_000) }).then(async (response) => {
+              if (!response.ok) throw new Error(`PRIVACY_FALLBACK_IMAGE_DOWNLOAD_${response.status}`);
+              return new Uint8Array(await response.arrayBuffer());
+            })
+          : undefined;
+      if (!bytes) throw new SeedanceFlowError("PRIVACY_FALLBACK_IMAGE_EMPTY", "虚拟人像替换未返回图片", true);
+      const outputPath = resolve(tempDir, "privacy-safe-reference.png");
+      await Bun.write(outputPath, bytes);
+      const uploaded = await ossutils.putStagedFile({
+        filePath: outputPath,
+        sizeBytes: bytes.byteLength,
+        sha256: await sha256File(outputPath),
+        mimeType: "image/png",
+        jobId: job.id,
+        extension: ".png",
+      });
+      const latest = store.get(job.id);
+      if (latest) this.context.change(job.id, { stagingKeys: [...latest.stagingKeys, uploaded.key] });
+      const next = [...references];
+      const sourceIndex = next.findIndex((reference) => reference.kind === "image");
+      if (sourceIndex < 0) throw new SeedanceFlowError("PRIVACY_FALLBACK_SOURCE_MISSING", "未找到图片参考", false);
+      next[sourceIndex] = { kind: "image", url: ossutils.createSignedReadUrl(uploaded.key) };
+      if (portraitArkAssetUri && next.length < 12)
+        next.splice(sourceIndex + 1, 0, { kind: "image", url: portraitArkAssetUri });
+      return next;
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  }
 
   private async prepareReferences(job: JobRecord) {
     const { accounts, store } = this.context;
@@ -269,7 +365,7 @@ export class SeedanceVideoJob {
       this.context.change(job.id, { providerStatus: "submitting" });
       try {
         const settings = seedanceVideoSettings(job.values);
-        const created = await arkSeedance.createVideo({
+        const request = (requestReferences: typeof references) => ({
           model,
           prompt:
             job.values.prompt ||
@@ -282,8 +378,50 @@ export class SeedanceVideoJob {
           ...(job.moduleId === "video-remix"
             ? {}
             : { generateAudio: job.values.generateAudio !== "false", watermark: false }),
-          references,
+          references: requestReferences,
         });
+        let created: Awaited<ReturnType<typeof arkSeedance.createVideo>>;
+        try {
+          created = await arkSeedance.createVideo(request(references));
+        } catch (error) {
+          if (job.moduleId !== "script-remix-next" || !isArkRealPersonPrivacyError(error)) throw error;
+          this.context.change(job.id, {
+            stage: "正在替换为虚拟人像",
+            values: {
+              ...(this.context.store.get(job.id)?.values ?? job.values),
+              privacyFallbackAttempted: "true",
+              privacyFallbackReason: "ark-real-person-privacy",
+            },
+          });
+          let fallbackReferences: typeof references;
+          try {
+            fallbackReferences = await this.createPrivacySafeReferences(job, references);
+          } catch (fallbackError) {
+            throw new SeedanceFlowError(
+              "PRIVACY_FALLBACK_IMAGE_FAILED",
+              `Ark 拒绝了可能包含真人的参考图，虚拟人像替换失败：${fallbackError instanceof Error ? fallbackError.message : String(fallbackError)}`,
+              true,
+            );
+          }
+          try {
+            created = await arkSeedance.createVideo(request(fallbackReferences));
+          } catch (retryError) {
+            if (isArkRealPersonPrivacyError(retryError))
+              throw new SeedanceFlowError(
+                "PRIVACY_FALLBACK_REJECTED",
+                "替换为虚拟人像后仍被 Ark 真人隐私审核拒绝，请更换虚拟人像后重试",
+                false,
+              );
+            throw retryError;
+          }
+          this.context.change(job.id, {
+            stage: "虚拟人像替换成功，已重新提交",
+            values: {
+              ...(this.context.store.get(job.id)?.values ?? job.values),
+              privacyFallbackApplied: "true",
+            },
+          });
+        }
         taskId = created.id;
         const submittedAt = new Date();
         this.context.change(job.id, {
@@ -293,7 +431,9 @@ export class SeedanceVideoJob {
           providerDeadlineAt: new Date(submittedAt.getTime() + 20 * 60_000).toISOString(),
         });
       } catch (error) {
-        const definitelyRejected = error instanceof Error && /ARK_4(00|01|03|04|13|22):/.test(error.message);
+        const definitelyRejected =
+          error instanceof SeedanceFlowError ||
+          (error instanceof Error && /ARK_4(00|01|03|04|13|22):/.test(error.message));
         if (!definitelyRejected) {
           this.context.change(job.id, { providerStatus: "submission_unknown" });
           throw new SeedanceFlowError(

@@ -188,4 +188,15 @@ describe("script remix next entry", () => {
     expect(worker.match(/quality: "high"/g)).toHaveLength(2);
     expect(worker).not.toContain('quality: "low"');
   });
+
+  test("passes a selected system portrait into the privacy fallback without uploading it as the original reference", async () => {
+    const page = await Bun.file(
+      resolve(import.meta.dir, "../../web/features/script-remix-next/script-remix-next-page.tsx"),
+    ).text();
+    const api = await Bun.file(resolve(import.meta.dir, "../../server/app.ts")).text();
+    expect(page).toContain("portraitReference: selectedPortrait.reference");
+    expect(page).toContain("自动虚拟人像");
+    expect(api).toContain('privacyFallbackPortraitReference: root.values.portraitReference || ""');
+    expect(api).toContain("const configuredAssets = [root.values.voiceAssetId]");
+  });
 });
