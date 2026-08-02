@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "bash scripts/run-dev-service.sh web vite --host 127.0.0.1",
+    "dev": "bash scripts/run-dev-service.sh web vite --host 127.0.0.1 --port ${PORT:-5173} --strictPort",
     "dev:all": "bun run --parallel dev:api dev",
     "dev:api": "bash scripts/run-dev-service.sh api bun --hot server/index.ts",
     "dev:worker": "bash scripts/run-dev-service.sh worker bun --watch worker/index.ts",
