@@ -55,7 +55,7 @@ import {
 
 const SIDEBAR_MENU_STORAGE_KEY = "yaozuo:sidebar-menu:v2";
 const SIDEBAR_GROUP_STORAGE_KEY = "yaozuo:sidebar-groups:v1";
-const SIDEBAR_GROUPS = ["创作工作流", "AI 工具箱", "实用工具", "投放", "资产"] as const;
+const SIDEBAR_GROUPS = ["创作工作流", "AI创作", "AI 工具箱", "实用工具", "投放", "资产"] as const;
 type SidebarGroup = (typeof SIDEBAR_GROUPS)[number];
 
 interface SidebarMenuItem {
@@ -101,8 +101,16 @@ const sidebarMenuItems: Record<SidebarGroup, SidebarMenuItem[]> = {
     .filter((item) => item.group === "创作工作流")
     .map((item) => ({ ...item, id: `module:${item.id}`, available: isModuleOpen(item.id) }))
     .flatMap((item) => (item.id === "module:video-remix" ? [item, SCRIPT_REMIX_MENU_ITEM] : [item])),
+  AI创作: modules
+    .filter((item) => item.id === "ai-generate" || item.id === "media-understand")
+    .map((item) => ({
+      ...item,
+      id: `module:${item.id}`,
+      label: item.id === "ai-generate" ? "素材生成" : item.label,
+      available: isModuleOpen(item.id),
+    })),
   "AI 工具箱": modules
-    .filter((item) => item.group === "AI 工具箱")
+    .filter((item) => item.group === "AI 工具箱" && item.id !== "ai-generate" && item.id !== "media-understand")
     .map((item) => ({ ...item, id: `module:${item.id}`, available: isModuleOpen(item.id) })),
   实用工具: modules
     .filter((item) => item.group === "实用工具")
@@ -196,7 +204,7 @@ export function AppShell() {
   const [panel, setPanel] = useState<WorkspacePanel>(),
     [unread, setUnread] = useState(0),
     [sidebarCollapsed, setSidebarCollapsed] = useState(
-      () => window.localStorage.getItem("sidebar-collapsed") === "true",
+      () => window.localStorage.getItem("sidebar-collapsed") !== "false",
     ),
     [expandedSidebarGroups, setExpandedSidebarGroups] = useState(loadExpandedSidebarGroups),
     [menuEditing, setMenuEditing] = useState(false),
