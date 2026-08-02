@@ -130,64 +130,6 @@
 .panel-primary {
   margin-top: 20px;
 }
-.panel-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  @apply text-primary;
-  @apply type-helper;
-  margin-bottom: 10px;
-}
-.panel-toolbar button {
-  border: 0;
-  background: transparent;
-  @apply text-primary;
-  @apply type-badge;
-}
-.panel-toolbar button:disabled {
-  @apply text-muted;
-}
-.notification-list > button {
-  width: 100%;
-  display: flex;
-  gap: 10px;
-  text-align: left;
-  padding: 13px 7px;
-  border: 0;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-}
-.notification-list > button.read {
-  opacity: 0.62;
-}
-.notification-list > button > i {
-  width: 30px;
-  height: 30px;
-  display: grid;
-  place-items: center;
-  border-radius: 8px;
-  background: var(--surface-strong);
-  @apply text-primary;
-}
-.notification-list > button i svg {
-  width: 15px;
-}
-.notification-list > button > span {
-  flex: 1;
-}
-.notification-list b {
-  @apply type-helper;
-}
-.notification-list p {
-  margin: 4px 0;
-  @apply text-primary;
-  @apply type-helper;
-  @apply leading-normal;
-}
-.notification-list small {
-  @apply text-primary;
-  @apply type-helper;
-}
 .mock-warning,
 .security-note {
   padding: 11px;

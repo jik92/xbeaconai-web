@@ -173,10 +173,11 @@ function NotificationsPanel({ onUnread }: { onUnread: (count: number) => void })
   }, []);
   if (!items) return <Loading />;
   return (
-    <div className="notification-list">
-      <div className="panel-toolbar">
+    <div>
+      <div className="mb-2 flex items-center justify-between text-muted type-helper">
         <span>{unread} 条未读</span>
         <Button
+          variant="ghost"
           disabled={!unread}
           onClick={() => void markAllNotificationsRead({ throwOnError: true }).then(() => load())}
         >
@@ -184,22 +185,31 @@ function NotificationsPanel({ onUnread }: { onUnread: (count: number) => void })
         </Button>
       </div>
       {!items.length && <p className="panel-muted">暂时没有通知</p>}
-      {items.map((item) => (
-        <Button
-          key={item.id}
-          className={item.readAt ? "read" : ""}
-          onClick={() =>
-            void markNotificationRead({ path: { notificationId: item.id }, throwOnError: true }).then(() => load())
-          }
-        >
-          <i>{item.readAt ? <Check /> : <Bell />}</i>
-          <span>
-            <b>{item.title}</b>
-            <p>{item.body}</p>
-            <small className="type-helper">{new Date(item.createdAt).toLocaleString()}</small>
-          </span>
-        </Button>
-      ))}
+      <div className="divide-y divide-line">
+        {items.map((item) => (
+          <Button
+            key={item.id}
+            variant="ghost"
+            className="h-auto w-full items-start justify-start rounded-none px-2 py-3 text-left whitespace-normal"
+            onClick={() =>
+              void markNotificationRead({ path: { notificationId: item.id }, throwOnError: true }).then(() => load())
+            }
+          >
+            <span
+              className={`mt-0.5 grid size-8 shrink-0 place-items-center rounded-md bg-surface-muted ${
+                item.readAt ? "text-muted" : "text-ink"
+              }`}
+            >
+              {item.readAt ? <Check /> : <Bell />}
+            </span>
+            <span className={`min-w-0 flex-1 ${item.readAt ? "text-muted" : "text-ink"}`}>
+              <b className="block type-card-title">{item.title}</b>
+              <span className="mt-1 block type-helper">{item.body}</span>
+              <span className="mt-1 block text-muted type-helper">{new Date(item.createdAt).toLocaleString()}</span>
+            </span>
+          </Button>
+        ))}
+      </div>
     </div>
   );
 }
