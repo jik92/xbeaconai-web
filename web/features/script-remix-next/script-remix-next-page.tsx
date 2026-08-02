@@ -23,7 +23,6 @@ import {
   downloadAuthenticated,
   fetchJobs,
   fetchLibraryAssets,
-  fetchProducts,
   generateScriptRemixNextReferenceImage,
   generateScriptRemixNextShot,
   generateScriptRemixNextStoryboard,
@@ -34,13 +33,16 @@ import {
 import type { Job } from "@/api/generated/types.gen";
 import { AttachmentPicker } from "@/components/domain/attachment-picker";
 import { AuthenticatedMedia } from "@/components/domain/authenticated-media";
+import { DashedPickerTile } from "@/components/domain/dashed-picker-tile";
 import { FileUpload } from "@/components/domain/file-upload";
 import { MediaResultCard } from "@/components/domain/media-result-card";
 import { ProductImage } from "@/components/domain/product-image";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
+import { Switch } from "@/components/ui/switch";
 import type { LibraryAsset, LibraryProduct } from "@/entities/types";
 import { fetchPortraits, type Portrait } from "@/features/portrait-library/portrait-data";
+import { ProductPickerModal } from "@/features/video-remix/remix-project";
 import {
   createScriptRemixNextWorkspace,
   type ScriptRemixNextShot,
@@ -69,7 +71,10 @@ export function ScriptRemixNextPage() {
   const [projectId, setProjectId] = useState("");
   const [projectName, setProjectName] = useState("");
   const [documentFile, setDocumentFile] = useState<File | null>(null);
+  const [scriptInputMode, setScriptInputMode] = useState<"text" | "upload">("text");
+  const [scriptContent, setScriptContent] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<LibraryProduct | null>(null);
+  const [productPickerOpen, setProductPickerOpen] = useState(false);
   const [selectedPortrait, setSelectedPortrait] = useState<Portrait | null>(null);
   const [selectedVoice, setSelectedVoice] = useState<LibraryAsset | null>(null);
   const [workspace, setWorkspace] = useState<ScriptRemixNextWorkspace>(createScriptRemixNextWorkspace);
@@ -87,7 +92,6 @@ export function ScriptRemixNextPage() {
     refetchInterval: (query) =>
       query.state.data?.some((job) => job.status === "queued" || job.status === "processing") ? 2_500 : false,
   });
-  const productsQuery = useQuery({ queryKey: ["product-library"], queryFn: fetchProducts, staleTime: 30_000 });
   const portraitsQuery = useQuery({ queryKey: ["portrait-library"], queryFn: fetchPortraits, staleTime: Infinity });
   const voicesQuery = useQuery({
     queryKey: ["asset-library", "voice"],
@@ -168,11 +172,16 @@ export function ScriptRemixNextPage() {
 
   const createProject = useMutation({
     mutationFn: async () => {
-      if (!documentFile || !selectedProduct) throw new Error("请选择脚本文档和商品");
-      const document = await uploadLibraryAsset(documentFile, "media", documentFile.name.replace(/\.[^.]+$/, ""));
+      if (!selectedProduct) throw new Error("请选择商品");
+      if (scriptInputMode === "text" && scriptContent.trim().length < 20) throw new Error("请至少输入 20 个字符的脚本");
+      if (scriptInputMode === "upload" && !documentFile) throw new Error("请选择脚本文档");
+      const document =
+        scriptInputMode === "upload" && documentFile
+          ? await uploadLibraryAsset(documentFile, "media", documentFile.name.replace(/\.[^.]+$/, ""))
+          : undefined;
       return createScriptRemixNext({
         projectName: projectName.trim() || `${selectedProduct.name}脚本二创`,
-        documentAssetId: document.id,
+        ...(document ? { documentAssetId: document.id } : { scriptContent: scriptContent.trim() }),
         productName: selectedProduct.name,
         productDescription: selectedProduct.description || "",
         productImageAssetIds: selectedProduct.images.map((image) => image.id),
@@ -437,6 +446,8 @@ export function ScriptRemixNextPage() {
     setProjectId("");
     setProjectName("");
     setDocumentFile(null);
+    setScriptInputMode("text");
+    setScriptContent("");
     setSelectedProduct(null);
     setSelectedPortrait(null);
     setSelectedVoice(null);
@@ -568,39 +579,57 @@ export function ScriptRemixNextPage() {
                     onChange={(event) => setProjectName(event.target.value)}
                   />
                 </label>
-                <FileUpload
-                  label="脚本文档"
-                  accept=".txt,.md,text/plain,text/markdown"
-                  files={documentFile ? [documentFile] : []}
-                  description="TXT 或 Markdown，不超过 2MB"
-                  onFilesChange={(files) => setDocumentFile(files[0] || null)}
-                  onClear={() => setDocumentFile(null)}
-                />
-                <label className="flex flex-col gap-1 type-label">
-                  商品
-                  <select
-                    value={selectedProduct?.id || ""}
-                    onChange={(event) =>
-                      setSelectedProduct(productsQuery.data?.find((item) => item.id === event.target.value) || null)
-                    }
-                  >
-                    <option value="">请选择商品</option>
-                    {productsQuery.data?.map((product) => (
-                      <option key={product.id} value={product.id}>
-                        {product.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {selectedProduct?.images[0] && (
-                  <ProductImage
-                    className="h-28 w-full"
-                    url={selectedProduct.images[0].url}
-                    originalUrl={selectedProduct.images[0].originalUrl}
-                    mimeType={selectedProduct.images[0].mimeType}
-                    alt={selectedProduct.name}
+                <div className="flex items-center justify-between gap-2 type-label">
+                  <span>{scriptInputMode === "upload" ? "上传脚本文档" : "直接添加脚本"}</span>
+                  <span className="flex items-center gap-2 type-helper text-muted">
+                    上传文档
+                    <Switch
+                      checked={scriptInputMode === "upload"}
+                      onCheckedChange={(checked) => setScriptInputMode(checked ? "upload" : "text")}
+                      aria-label="切换脚本输入方式"
+                    />
+                  </span>
+                </div>
+                {scriptInputMode === "upload" ? (
+                  <FileUpload
+                    label="脚本文档"
+                    accept=".txt,.md,text/plain,text/markdown"
+                    files={documentFile ? [documentFile] : []}
+                    description="TXT 或 Markdown，不超过 2MB"
+                    onFilesChange={(files) => setDocumentFile(files[0] || null)}
+                    onClear={() => setDocumentFile(null)}
+                  />
+                ) : (
+                  <textarea
+                    className="min-h-40 w-full resize-y rounded-md border border-line bg-surface px-3 py-2 type-body"
+                    value={scriptContent}
+                    maxLength={12_000}
+                    placeholder="粘贴或输入完整脚本"
+                    aria-label="直接添加脚本"
+                    onChange={(event) => setScriptContent(event.target.value)}
                   />
                 )}
+                <div className="config-field-title">
+                  <b>商品 *</b>
+                </div>
+                <DashedPickerTile
+                  presentation="wide"
+                  title={selectedProduct?.name || "未选择商品"}
+                  description={selectedProduct ? `${selectedProduct.images.length} 张商品图` : undefined}
+                  icon={<Plus />}
+                  preview={
+                    selectedProduct ? (
+                      <ProductImage
+                        url={selectedProduct.images[0]?.thumbnailUrl || ""}
+                        originalUrl={selectedProduct.images[0]?.originalUrl}
+                        mimeType={selectedProduct.images[0]?.mimeType || "image/png"}
+                        alt={selectedProduct.name}
+                      />
+                    ) : undefined
+                  }
+                  aria-label={selectedProduct ? "更换商品" : "选择商品"}
+                  onClick={() => setProductPickerOpen(true)}
+                />
                 <label className="flex flex-col gap-1 type-label">
                   人像（选填）
                   <select
@@ -637,7 +666,11 @@ export function ScriptRemixNextPage() {
                 </label>
                 {!projectId && (
                   <Button
-                    disabled={createProject.isPending || !documentFile || !selectedProduct}
+                    disabled={
+                      createProject.isPending ||
+                      !selectedProduct ||
+                      (scriptInputMode === "upload" ? !documentFile : scriptContent.trim().length < 20)
+                    }
                     onClick={() => createProject.mutate()}
                   >
                     {createProject.isPending ? <LoaderCircle className="animate-spin" /> : <Sparkles />}脚本解析
@@ -1007,6 +1040,16 @@ export function ScriptRemixNextPage() {
           </section>
         )}
       </div>
+      {productPickerOpen && (
+        <ProductPickerModal
+          current={selectedProduct}
+          onClose={() => setProductPickerOpen(false)}
+          onSelect={(product) => {
+            setSelectedProduct(product);
+            setProductPickerOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }

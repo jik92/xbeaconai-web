@@ -190,6 +190,48 @@ describe("script remix next API", () => {
     expect(enqueued.filter((id) => id === projectId)).toHaveLength(1);
   });
 
+  test("creates a project from directly entered script without a document asset", async () => {
+    const response = await honoApp.request(
+      "/api/script-remix-next/projects",
+      auth({
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Idempotency-Key": "next-direct-script" },
+        body: JSON.stringify({
+          projectName: "直接添加脚本项目",
+          scriptContent: "这是一份直接添加到页面中的完整脚本内容，字符数量足够用于模型解析。",
+          productName: "测试商品",
+          productImageAssetIds: [productImageAssetId],
+        }),
+      }),
+    );
+    expect(response.status).toBe(202);
+    const created = await response.json();
+    expect(created.values.documentAssetId).toBe("");
+    expect(created.values.scriptText).toContain("直接添加到页面");
+  });
+
+  test("rejects missing or conflicting script input modes", async () => {
+    const base = { projectName: "无效项目", productName: "测试商品", productImageAssetIds: [productImageAssetId] };
+    const missing = await honoApp.request(
+      "/api/script-remix-next/projects",
+      auth({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(base) }),
+    );
+    const conflicting = await honoApp.request(
+      "/api/script-remix-next/projects",
+      auth({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...base,
+          documentAssetId,
+          scriptContent: "这是一份与上传文档冲突的直接输入脚本文本内容。",
+        }),
+      }),
+    );
+    expect(missing.status).toBe(400);
+    expect(conflicting.status).toBe(400);
+  });
+
   test("saves valid workspace and rejects foreign shot references", async () => {
     const workspace = { ...createScriptRemixNextWorkspace(), shots: [shot], composeOrder: [shot.id] };
     const saved = await honoApp.request(

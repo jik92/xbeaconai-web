@@ -4003,17 +4003,22 @@ const ScriptRemixNextWorkspaceSchema = z.object({
   globalVideoSettings: ScriptRemixNextVideoSettingsSchema,
   shotVideoSettings: z.record(z.string().uuid(), ScriptRemixNextVideoSettingsSchema.partial()),
 });
-const ScriptRemixNextCreateSchema = z.object({
-  projectName: z.string().trim().min(1).max(80),
-  documentAssetId: z.string().uuid(),
-  productName: z.string().trim().min(1).max(200),
-  productDescription: z.string().trim().max(2_000).default(""),
-  productImageAssetIds: z.array(z.string().uuid()).min(1).max(20),
-  portraitAssetId: z.string().uuid().optional(),
-  portraitName: z.string().trim().max(100).default(""),
-  voiceAssetId: z.string().uuid().optional(),
-  voiceName: z.string().trim().max(100).default(""),
-});
+const ScriptRemixNextCreateSchema = z
+  .object({
+    projectName: z.string().trim().min(1).max(80),
+    documentAssetId: z.string().uuid().optional(),
+    scriptContent: z.string().trim().min(20).max(12_000).optional(),
+    productName: z.string().trim().min(1).max(200),
+    productDescription: z.string().trim().max(2_000).default(""),
+    productImageAssetIds: z.array(z.string().uuid()).min(1).max(20),
+    portraitAssetId: z.string().uuid().optional(),
+    portraitName: z.string().trim().max(100).default(""),
+    voiceAssetId: z.string().uuid().optional(),
+    voiceName: z.string().trim().max(100).default(""),
+  })
+  .refine((value) => Boolean(value.documentAssetId) !== Boolean(value.scriptContent), {
+    message: "脚本文本和脚本文档必须且只能选择一种",
+  });
 const ScriptRemixNextStoryboardSchema = z.object({
   projectId: z.string().uuid(),
   shots: z.array(ScriptRemixNextShotSchema).min(1).max(9),
@@ -4089,11 +4094,14 @@ app.openapi(createScriptRemixNextProjectRoute, async (c) => {
   const ownerUserId = c.get("userId");
   const body = c.req.valid("json");
   const requestId = crypto.randomUUID();
-  const document = accounts.getOwnedAsset(ownerUserId, body.documentAssetId);
+  const document = body.documentAssetId ? accounts.getOwnedAsset(ownerUserId, body.documentAssetId) : undefined;
   if (
-    !document ||
-    document.byteSize > 2 * 1024 * 1024 ||
-    !(document.mimeType === "text/plain" || document.mimeType === "text/markdown" || /\.(txt|md)$/i.test(document.originalName))
+    body.documentAssetId &&
+    (!document ||
+      document.byteSize > 2 * 1024 * 1024 ||
+      !(document.mimeType === "text/plain" ||
+        document.mimeType === "text/markdown" ||
+        /\.(txt|md)$/i.test(document.originalName)))
   )
     return c.json(
       { error: { code: "INVALID_SCRIPT_DOCUMENT", message: "请选择不超过 2MB 的 TXT 或 Markdown 文档", retryable: false, requestId } },
@@ -4124,7 +4132,8 @@ app.openapi(createScriptRemixNextProjectRoute, async (c) => {
     phase: "analysis",
     idempotencyKey,
     values: {
-      documentAssetId: body.documentAssetId,
+      documentAssetId: body.documentAssetId || "",
+      scriptText: body.scriptContent || "",
       productName: body.productName,
       productDescription: body.productDescription,
       productImageAssetIds: JSON.stringify(body.productImageAssetIds),

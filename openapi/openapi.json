@@ -8200,6 +8200,11 @@
                     "type": "string",
                     "format": "uuid"
                   },
+                  "scriptContent": {
+                    "type": "string",
+                    "minLength": 20,
+                    "maxLength": 12000
+                  },
                   "productName": {
                     "type": "string",
                     "minLength": 1,
@@ -8240,7 +8245,6 @@
                 },
                 "required": [
                   "projectName",
-                  "documentAssetId",
                   "productName",
                   "productImageAssetIds"
                 ]

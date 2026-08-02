@@ -108,15 +108,21 @@ export function createScriptRemixNextJob(dependencies: ScriptRemixNextDependenci
       };
       try {
         if (phase === "analysis") {
-          const document = accounts.getOwnedAsset(job.ownerUserId, job.values.documentAssetId || "");
-          if (!document) throw new Error("SCRIPT_DOCUMENT_NOT_FOUND");
-          const path = resolve(tempDir, `script${extname(document.originalName) || ".txt"}`);
-          await download(document, path);
-          const script = decodeScriptDocument(
-            new Uint8Array(await Bun.file(path).arrayBuffer()),
-            document.mimeType,
-            document.originalName,
-          );
+          const directScript = job.values.scriptText?.trim();
+          const document = job.values.documentAssetId
+            ? accounts.getOwnedAsset(job.ownerUserId, job.values.documentAssetId)
+            : undefined;
+          if (!directScript && !document) throw new Error("SCRIPT_INPUT_NOT_FOUND");
+          let script = directScript || "";
+          if (document) {
+            const path = resolve(tempDir, `script${extname(document.originalName) || ".txt"}`);
+            await download(document, path);
+            script = decodeScriptDocument(
+              new Uint8Array(await Bun.file(path).arrayBuffer()),
+              document.mimeType,
+              document.originalName,
+            );
+          }
           const stage: StageProvenance = {
             id: `${job.id}:analysis`,
             capability: "text-understand",

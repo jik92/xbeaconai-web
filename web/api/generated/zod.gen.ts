@@ -2055,7 +2055,8 @@ export const zListJobsResponse = z.object({
 
 export const zCreateScriptRemixNextProjectBody = z.object({
     projectName: z.string().min(1).max(80),
-    documentAssetId: z.uuid(),
+    documentAssetId: z.uuid().optional(),
+    scriptContent: z.string().min(20).max(12000).optional(),
     productName: z.string().min(1).max(200),
     productDescription: z.string().max(2000).optional().default(''),
     productImageAssetIds: z.array(z.uuid()).min(1).max(20),

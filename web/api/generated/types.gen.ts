@@ -2672,7 +2672,8 @@ export type ListJobsResponse = ListJobsResponses[keyof ListJobsResponses];
 export type CreateScriptRemixNextProjectData = {
     body: {
         projectName: string;
-        documentAssetId: string;
+        documentAssetId?: string;
+        scriptContent?: string;
         productName: string;
         productDescription?: string;
         productImageAssetIds: Array<string>;

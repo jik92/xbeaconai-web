@@ -588,7 +588,7 @@ function AssetPickerModal({
   );
 }
 
-function ProductPickerModal({
+export function ProductPickerModal({
   current,
   onClose,
   onSelect,

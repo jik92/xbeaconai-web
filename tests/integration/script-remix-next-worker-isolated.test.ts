@@ -160,6 +160,31 @@ describe("script remix next Worker", () => {
     expect(completed?.provenance[0]).toMatchObject({ provider: "aihubmix", model: "gpt-5.6-sol" });
   });
 
+  test("parses directly entered script without downloading a document", async () => {
+    const scriptText = "这是一份直接添加的完整脚本内容，不需要上传文档也可以进入相同的解析流程。";
+    const record = job({
+      phase: "analysis",
+      values: { scriptText, productName: "测试商品", referenceAssetIds: JSON.stringify([productImageId]) },
+    });
+    store.create(record);
+    let downloadCalled = false;
+    let receivedScript = "";
+    const handler = createScriptRemixNextJob({
+      download: async () => {
+        downloadCalled = true;
+      },
+      upload: async () => {},
+      analyze: async (input) => {
+        receivedScript = input.script;
+        return { shots, model: "gpt-5.6-sol", usage: {} };
+      },
+    });
+    await handler.execute(record, { store, accounts, change: (id, patch) => store.update(id, patch) });
+    expect(downloadCalled).toBe(false);
+    expect(receivedScript).toBe(scriptText);
+    expect(store.get(record.id)?.status).toBe("succeeded");
+  });
+
   test("generates, uploads, and splits a storyboard without an external image call", async () => {
     const root = job({
       phase: "analysis",

@@ -135,13 +135,19 @@ describe("script remix next workflow", () => {
 
 describe("script remix next entry", () => {
   test("registers an adjacent independent menu and route", async () => {
-    const [shell, router] = await Promise.all([
+    const [shell, router, page, legacyPage] = await Promise.all([
       Bun.file(resolve(import.meta.dir, "../../web/components/domain/app-shell.tsx")).text(),
       Bun.file(resolve(import.meta.dir, "../../web/app/router.tsx")).text(),
+      Bun.file(resolve(import.meta.dir, "../../web/features/script-remix-next/script-remix-next-page.tsx")).text(),
+      Bun.file(resolve(import.meta.dir, "../../web/features/video-remix/remix-project.tsx")).text(),
     ]);
     expect(shell).toContain('label: "脚本二创【新】"');
     expect(shell).toContain('path: "/aigc/script-remix-next"');
     expect(router).toContain("<ScriptRemixNextPage />");
     expect(router).toContain('moduleId="script-remix-next"');
+    expect(page).toContain("<Switch");
+    expect(page).toContain("<ProductPickerModal");
+    expect(page).toContain('presentation="wide"');
+    expect(legacyPage).toContain("export function ProductPickerModal");
   });
 });
