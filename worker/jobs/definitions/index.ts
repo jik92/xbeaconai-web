@@ -3,6 +3,7 @@ import { adScriptDefinition } from "./ad-script";
 import { aiGenerateDefinition } from "./ai-generate";
 import { kickartDefinition } from "./kickart";
 import { mediaUnderstandDefinition } from "./media-understand";
+import { scriptRemixNextDefinition } from "./script-remix-next";
 import { subtitleEraseDefinition } from "./subtitle-erase";
 import type { JobDefinition } from "./types";
 import { videoCreateDefinition } from "./video-create";
@@ -17,6 +18,7 @@ import { voiceCloneDefinition } from "./voice-clone";
 
 const definitions = [
   videoRemixDefinition,
+  scriptRemixNextDefinition,
   videoCreateDefinition,
   adScriptDefinition,
   aiGenerateDefinition,

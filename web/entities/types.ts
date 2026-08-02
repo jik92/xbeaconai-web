@@ -10,6 +10,7 @@ export type TaskStatus =
   | "cancelled";
 export type ModuleId =
   | "video-remix"
+  | "script-remix-next"
   | "video-create"
   | "ad-script"
   | "ai-generate"

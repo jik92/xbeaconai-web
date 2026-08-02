@@ -10,13 +10,15 @@ import type { WorkerJobHandler } from "./types";
 
 export const videoRemixShotGenerationJob: WorkerJobHandler = {
   name: "video-remix-shot-generation",
-  supports: (job) => job.moduleId === "video-remix" && job.values.workflowPhase === "shot-generation",
+  supports: (job) =>
+    (job.moduleId === "video-remix" || job.moduleId === "script-remix-next") &&
+    job.values.workflowPhase === "shot-generation",
   async execute(job, context) {
     const { accounts } = context;
     if (!accounts) throw new Error("素材所有权服务不可用");
     if (!ossutils.configured) throw new Error("TOS_NOT_CONFIGURED: 分镜生成结果必须保存到素材库");
     if (!isSeedanceModelId(job.videoModel)) throw new Error("分镜生成模型无效");
-    const scriptSource = job.values.workflowKind === "script";
+    const scriptSource = job.values.workflowKind === "script" || job.moduleId === "script-remix-next";
     const sourceAsset = scriptSource
       ? undefined
       : accounts.getOwnedAsset(job.ownerUserId, job.values.sourceAssetId || "");

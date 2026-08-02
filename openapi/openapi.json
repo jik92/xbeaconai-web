@@ -327,6 +327,7 @@
         "type": "string",
         "enum": [
           "video-remix",
+          "script-remix-next",
           "video-create",
           "ad-script",
           "ai-generate",
@@ -818,6 +819,7 @@
         "type": "string",
         "enum": [
           "video-remix",
+          "script-remix-next",
           "video-create",
           "ad-script",
           "ai-generate",
@@ -3635,6 +3637,34 @@
                       "type": "object",
                       "properties": {
                         "video-remix": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "requiredProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "unavailableProviders": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/ProviderId"
+                              }
+                            },
+                            "disabledReason": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "requiredProviders",
+                            "unavailableProviders"
+                          ]
+                        },
+                        "script-remix-next": {
                           "type": "object",
                           "properties": {
                             "enabled": {
@@ -8144,6 +8174,1029 @@
                   "required": [
                     "jobs"
                   ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/script-remix-next/projects": {
+      "post": {
+        "operationId": "createScriptRemixNextProject",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "projectName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "documentAssetId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "productName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "productDescription": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "default": ""
+                  },
+                  "productImageAssetIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "minItems": 1,
+                    "maxItems": 20
+                  },
+                  "portraitAssetId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "portraitName": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "default": ""
+                  },
+                  "voiceAssetId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "voiceName": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "default": ""
+                  }
+                },
+                "required": [
+                  "projectName",
+                  "documentAssetId",
+                  "productName",
+                  "productImageAssetIds"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Script analysis accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid project assets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/script-remix-next/projects/{projectId}/analysis": {
+      "post": {
+        "operationId": "regenerateScriptRemixNextAnalysis",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Analysis regeneration accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/script-remix-next/projects/{projectId}": {
+      "patch": {
+        "operationId": "updateScriptRemixNextProject",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "workspace": {
+                    "type": "object",
+                    "properties": {
+                      "stage": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 3
+                      },
+                      "shots": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "ordinal": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9
+                            },
+                            "title": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 80
+                            },
+                            "speech": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 4000
+                            },
+                            "visual": {
+                              "type": "string",
+                              "minLength": 5,
+                              "maxLength": 2000
+                            },
+                            "action": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 1000
+                            },
+                            "camera": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 500
+                            },
+                            "durationSeconds": {
+                              "type": "number",
+                              "exclusiveMinimum": 0,
+                              "maximum": 60
+                            },
+                            "productRequirement": {
+                              "type": "string",
+                              "maxLength": 1000
+                            },
+                            "characterRequirement": {
+                              "type": "string",
+                              "maxLength": 1000
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "ordinal",
+                            "title",
+                            "speech",
+                            "visual",
+                            "action",
+                            "camera",
+                            "durationSeconds",
+                            "productRequirement",
+                            "characterRequirement"
+                          ]
+                        },
+                        "minItems": 1,
+                        "maxItems": 9
+                      },
+                      "analysisVersion": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "storyboardAssetId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              ""
+                            ]
+                          }
+                        ]
+                      },
+                      "storyboardVersion": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "referenceAssetIds": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "selectedVideoAssetIds": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "composeOrder": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "maxItems": 9
+                      },
+                      "globalVideoSettings": {
+                        "type": "object",
+                        "properties": {
+                          "modelId": {
+                            "$ref": "#/components/schemas/SeedanceModelId"
+                          },
+                          "ratio": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 20
+                          },
+                          "resolution": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 20
+                          },
+                          "duration": {
+                            "type": "integer",
+                            "minimum": 4,
+                            "maximum": 15
+                          }
+                        },
+                        "required": [
+                          "modelId",
+                          "ratio",
+                          "resolution",
+                          "duration"
+                        ]
+                      },
+                      "shotVideoSettings": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "object",
+                          "properties": {
+                            "modelId": {
+                              "$ref": "#/components/schemas/SeedanceModelId"
+                            },
+                            "ratio": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 20
+                            },
+                            "resolution": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 20
+                            },
+                            "duration": {
+                              "type": "integer",
+                              "minimum": 4,
+                              "maximum": 15
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "required": [
+                      "stage",
+                      "shots",
+                      "analysisVersion",
+                      "storyboardAssetId",
+                      "storyboardVersion",
+                      "referenceAssetIds",
+                      "selectedVideoAssetIds",
+                      "composeOrder",
+                      "globalVideoSettings",
+                      "shotVideoSettings"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Project updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/script-remix-next/storyboards": {
+      "post": {
+        "operationId": "createScriptRemixNextStoryboard",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "projectId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "shots": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "ordinal": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9
+                        },
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "speech": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4000
+                        },
+                        "visual": {
+                          "type": "string",
+                          "minLength": 5,
+                          "maxLength": 2000
+                        },
+                        "action": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 1000
+                        },
+                        "camera": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "durationSeconds": {
+                          "type": "number",
+                          "exclusiveMinimum": 0,
+                          "maximum": 60
+                        },
+                        "productRequirement": {
+                          "type": "string",
+                          "maxLength": 1000
+                        },
+                        "characterRequirement": {
+                          "type": "string",
+                          "maxLength": 1000
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "ordinal",
+                        "title",
+                        "speech",
+                        "visual",
+                        "action",
+                        "camera",
+                        "durationSeconds",
+                        "productRequirement",
+                        "characterRequirement"
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 9
+                  }
+                },
+                "required": [
+                  "projectId",
+                  "shots"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Generation accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/script-remix-next/reference-images": {
+      "post": {
+        "operationId": "createScriptRemixNextReferenceImage",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "projectId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "shot": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "ordinal": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9
+                      },
+                      "title": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      },
+                      "speech": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4000
+                      },
+                      "visual": {
+                        "type": "string",
+                        "minLength": 5,
+                        "maxLength": 2000
+                      },
+                      "action": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1000
+                      },
+                      "camera": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 500
+                      },
+                      "durationSeconds": {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "maximum": 60
+                      },
+                      "productRequirement": {
+                        "type": "string",
+                        "maxLength": 1000
+                      },
+                      "characterRequirement": {
+                        "type": "string",
+                        "maxLength": 1000
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "ordinal",
+                      "title",
+                      "speech",
+                      "visual",
+                      "action",
+                      "camera",
+                      "durationSeconds",
+                      "productRequirement",
+                      "characterRequirement"
+                    ]
+                  }
+                },
+                "required": [
+                  "projectId",
+                  "shot"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Generation accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/script-remix-next/shots": {
+      "post": {
+        "operationId": "createScriptRemixNextShotGeneration",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "projectId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "shot": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "ordinal": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9
+                      },
+                      "title": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      },
+                      "speech": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4000
+                      },
+                      "visual": {
+                        "type": "string",
+                        "minLength": 5,
+                        "maxLength": 2000
+                      },
+                      "action": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1000
+                      },
+                      "camera": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 500
+                      },
+                      "durationSeconds": {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "maximum": 60
+                      },
+                      "productRequirement": {
+                        "type": "string",
+                        "maxLength": 1000
+                      },
+                      "characterRequirement": {
+                        "type": "string",
+                        "maxLength": 1000
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "ordinal",
+                      "title",
+                      "speech",
+                      "visual",
+                      "action",
+                      "camera",
+                      "durationSeconds",
+                      "productRequirement",
+                      "characterRequirement"
+                    ]
+                  },
+                  "settings": {
+                    "type": "object",
+                    "properties": {
+                      "modelId": {
+                        "$ref": "#/components/schemas/SeedanceModelId"
+                      },
+                      "ratio": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 20
+                      },
+                      "resolution": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 20
+                      },
+                      "duration": {
+                        "type": "integer",
+                        "minimum": 4,
+                        "maximum": 15
+                      }
+                    },
+                    "required": [
+                      "modelId",
+                      "ratio",
+                      "resolution",
+                      "duration"
+                    ]
+                  },
+                  "referenceAssetId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "extraReferenceAssetIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "maxItems": 8,
+                    "default": []
+                  }
+                },
+                "required": [
+                  "projectId",
+                  "shot",
+                  "settings",
+                  "referenceAssetId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Video generation accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid references",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/script-remix-next/compose": {
+      "post": {
+        "operationId": "createScriptRemixNextCompose",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "projectId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "workspace": {
+                    "type": "object",
+                    "properties": {
+                      "stage": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 3
+                      },
+                      "shots": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "ordinal": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9
+                            },
+                            "title": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 80
+                            },
+                            "speech": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 4000
+                            },
+                            "visual": {
+                              "type": "string",
+                              "minLength": 5,
+                              "maxLength": 2000
+                            },
+                            "action": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 1000
+                            },
+                            "camera": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 500
+                            },
+                            "durationSeconds": {
+                              "type": "number",
+                              "exclusiveMinimum": 0,
+                              "maximum": 60
+                            },
+                            "productRequirement": {
+                              "type": "string",
+                              "maxLength": 1000
+                            },
+                            "characterRequirement": {
+                              "type": "string",
+                              "maxLength": 1000
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "ordinal",
+                            "title",
+                            "speech",
+                            "visual",
+                            "action",
+                            "camera",
+                            "durationSeconds",
+                            "productRequirement",
+                            "characterRequirement"
+                          ]
+                        },
+                        "minItems": 1,
+                        "maxItems": 9
+                      },
+                      "analysisVersion": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "storyboardAssetId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              ""
+                            ]
+                          }
+                        ]
+                      },
+                      "storyboardVersion": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "referenceAssetIds": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "selectedVideoAssetIds": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "composeOrder": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "maxItems": 9
+                      },
+                      "globalVideoSettings": {
+                        "type": "object",
+                        "properties": {
+                          "modelId": {
+                            "$ref": "#/components/schemas/SeedanceModelId"
+                          },
+                          "ratio": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 20
+                          },
+                          "resolution": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 20
+                          },
+                          "duration": {
+                            "type": "integer",
+                            "minimum": 4,
+                            "maximum": 15
+                          }
+                        },
+                        "required": [
+                          "modelId",
+                          "ratio",
+                          "resolution",
+                          "duration"
+                        ]
+                      },
+                      "shotVideoSettings": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "object",
+                          "properties": {
+                            "modelId": {
+                              "$ref": "#/components/schemas/SeedanceModelId"
+                            },
+                            "ratio": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 20
+                            },
+                            "resolution": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 20
+                            },
+                            "duration": {
+                              "type": "integer",
+                              "minimum": 4,
+                              "maximum": 15
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "required": [
+                      "stage",
+                      "shots",
+                      "analysisVersion",
+                      "storyboardAssetId",
+                      "storyboardVersion",
+                      "referenceAssetIds",
+                      "selectedVideoAssetIds",
+                      "composeOrder",
+                      "globalVideoSettings",
+                      "shotVideoSettings"
+                    ]
+                  }
+                },
+                "required": [
+                  "projectId",
+                  "workspace"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Composition accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Project not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
             }

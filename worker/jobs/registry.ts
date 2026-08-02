@@ -8,6 +8,7 @@ import { subtitleEraseJob, videoEnhancementJob } from "./job-mediakit-video";
 import { portraitAssetRegisterJob } from "./job-portrait-asset-register";
 import { qianchuanPcJob } from "./job-qianchuan-pc";
 import { qwenVoiceCloneJob } from "./job-qwen-voice-clone";
+import { scriptRemixNextJob } from "./job-script-remix-next";
 import { videoClipMergeJob } from "./job-video-clip-merge";
 import { videoCreateJob } from "./job-video-create";
 import { videoCutJob } from "./job-video-cut";
@@ -29,6 +30,7 @@ export const jobHandlers: readonly WorkerJobHandler[] = [
   aiGenerateJob,
   mediaUnderstandJob,
   videoCreateJob,
+  scriptRemixNextJob,
   videoRemixPromptRewriteJob,
   videoRemixShotGenerationJob,
   videoRemixComposeJob,

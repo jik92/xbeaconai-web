@@ -26,6 +26,17 @@ export const sdkRegistry: SdkRegistryEntry[] = [
     testAdapter: "test-text",
   },
   {
+    id: "aihubmix-text-script-remix-next",
+    implementationPath: "server/providers/aihubmix.ts",
+    kind: "model",
+    capability: "text-generate",
+    provider: "aihubmix",
+    model: "gpt-5.6-sol",
+    enabled: true,
+    required: true,
+    testAdapter: "test-text",
+  },
+  {
     id: "aihubmix-image",
     implementationPath: "server/providers/aihubmix.ts",
     kind: "model",

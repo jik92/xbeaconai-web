@@ -18,6 +18,11 @@ import {
   createDownloadTicket,
   createJob,
   createMediaUnderstandJob as createMediaUnderstandJobRequest,
+  createScriptRemixNextCompose,
+  createScriptRemixNextProject,
+  createScriptRemixNextReferenceImage,
+  createScriptRemixNextShotGeneration,
+  createScriptRemixNextStoryboard,
   createVideoCreateProject,
   createVideoRemixComposeJob,
   createVideoRemixPromptToolJob,
@@ -58,6 +63,7 @@ import {
   releaseAdminUsers,
   replaceVideoCreateShot,
   retryJob,
+  regenerateScriptRemixNextAnalysis,
   runAdminCredentialDoctor as runAdminCredentialDoctorRequest,
   runVideoCreateAction,
   saveAdScriptVersion,
@@ -70,6 +76,7 @@ import {
   updateVideoCreateProject,
   updateVideoCreateShotSettings,
   updateVideoRemixProject,
+  updateScriptRemixNextProject,
 } from "./generated/sdk.gen";
 import type {
   AdScriptInput,
@@ -77,6 +84,12 @@ import type {
   CreateAiGenerateJobData,
   CreateDownloadTicketData,
   CreateMediaUnderstandJobData,
+  CreateScriptRemixNextProjectData,
+  CreateScriptRemixNextShotGenerationData,
+  CreateScriptRemixNextStoryboardData,
+  CreateScriptRemixNextReferenceImageData,
+  CreateScriptRemixNextComposeData,
+  UpdateScriptRemixNextProjectData,
   GenerateVideoCreateShotData,
   GetAdminProviderAuditResponse,
   GetCreationCapabilitiesResponse,
@@ -118,6 +131,8 @@ export type VideoCreateMaterialVersion = ListVideoCreateShotMaterialVersionsResp
 export type CustomPortrait = ListCustomPortraitsResponse["portraits"][number];
 export type DownloadResource = CreateDownloadTicketData["body"];
 export type MediaUnderstandCapabilities = GetMediaUnderstandCapabilitiesResponse;
+export type ScriptRemixNextCreateInput = NonNullable<CreateScriptRemixNextProjectData["body"]>;
+export type ScriptRemixNextWorkspaceInput = NonNullable<UpdateScriptRemixNextProjectData["body"]>["workspace"];
 
 const configure = () =>
   client.setConfig({
@@ -140,6 +155,99 @@ export async function fetchAllJobs() {
   configure();
   const { data } = await listJobs({ headers: authHeaders(), throwOnError: true });
   return data?.jobs ?? [];
+}
+
+export async function createScriptRemixNext(input: ScriptRemixNextCreateInput, idempotencyKey = randomUuid()) {
+  configure();
+  const { data } = await createScriptRemixNextProject({
+    body: input,
+    headers: { ...authHeaders(), "Idempotency-Key": idempotencyKey },
+    throwOnError: true,
+  });
+  if (!data) throw new Error("脚本解析任务创建失败");
+  return data;
+}
+
+export async function regenerateScriptRemixNext(projectId: string, idempotencyKey = randomUuid()) {
+  configure();
+  const { data } = await regenerateScriptRemixNextAnalysis({
+    path: { projectId },
+    headers: { ...authHeaders(), "Idempotency-Key": idempotencyKey },
+    throwOnError: true,
+  });
+  if (!data) throw new Error("脚本重新解析任务创建失败");
+  return data;
+}
+
+export async function saveScriptRemixNext(
+  projectId: string,
+  input: NonNullable<UpdateScriptRemixNextProjectData["body"]>,
+) {
+  configure();
+  const { data } = await updateScriptRemixNextProject({
+    path: { projectId },
+    body: input,
+    headers: authHeaders(),
+    throwOnError: true,
+  });
+  if (!data) throw new Error("新版脚本二创项目保存失败");
+  return data;
+}
+
+export async function generateScriptRemixNextStoryboard(
+  input: NonNullable<CreateScriptRemixNextStoryboardData["body"]>,
+  idempotencyKey = randomUuid(),
+) {
+  configure();
+  const { data } = await createScriptRemixNextStoryboard({
+    body: input,
+    headers: { ...authHeaders(), "Idempotency-Key": idempotencyKey },
+    throwOnError: true,
+  });
+  if (!data) throw new Error("九宫格任务创建失败");
+  return data;
+}
+
+export async function generateScriptRemixNextReferenceImage(
+  input: NonNullable<CreateScriptRemixNextReferenceImageData["body"]>,
+  idempotencyKey = randomUuid(),
+) {
+  configure();
+  const { data } = await createScriptRemixNextReferenceImage({
+    body: input,
+    headers: { ...authHeaders(), "Idempotency-Key": idempotencyKey },
+    throwOnError: true,
+  });
+  if (!data) throw new Error("单格参考图任务创建失败");
+  return data;
+}
+
+export async function generateScriptRemixNextShot(
+  input: NonNullable<CreateScriptRemixNextShotGenerationData["body"]>,
+  idempotencyKey = randomUuid(),
+) {
+  configure();
+  const { data } = await createScriptRemixNextShotGeneration({
+    body: input,
+    headers: { ...authHeaders(), "Idempotency-Key": idempotencyKey },
+    throwOnError: true,
+  });
+  if (!data) throw new Error("分镜视频任务创建失败");
+  return data;
+}
+
+export async function composeScriptRemixNext(
+  input: NonNullable<CreateScriptRemixNextComposeData["body"]>,
+  idempotencyKey = randomUuid(),
+) {
+  configure();
+  const { data } = await createScriptRemixNextCompose({
+    body: input,
+    headers: { ...authHeaders(), "Idempotency-Key": idempotencyKey },
+    throwOnError: true,
+  });
+  if (!data) throw new Error("合片任务创建失败");
+  return data;
 }
 
 export async function fetchAdminCredentials() {

@@ -1,6 +1,6 @@
 import type { ModuleId } from "@/entities/types";
 
-export type CreationWorkflowId = "video-remix" | "video-create" | "ad-script";
+export type CreationWorkflowId = "video-remix" | "script-remix-next" | "video-create" | "ad-script";
 export type UtilityId = "video-extract" | "video-editor";
 export type AiToolboxId = Exclude<ModuleId, CreationWorkflowId | UtilityId>;
 export type AssetFeatureId = "materials" | "portraits" | "products" | "scenes" | "voices";
@@ -68,6 +68,7 @@ export const APP_CONFIG = {
   menuFeatures: {
     creationWorkflow: {
       "video-remix": true,
+      "script-remix-next": true,
       "video-create": true,
       "ad-script": true,
     },
@@ -102,6 +103,7 @@ export const APP_CONFIG = {
 
 const MODULE_GROUP = {
   "video-remix": "creationWorkflow",
+  "script-remix-next": "creationWorkflow",
   "video-create": "creationWorkflow",
   "ad-script": "creationWorkflow",
   "ai-generate": "aiToolbox",

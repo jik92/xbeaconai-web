@@ -16,6 +16,8 @@ export const directUploadExtensions: Readonly<Record<string, string>> = {
   "audio/ogg": ".ogg",
   "audio/mp4": ".m4a",
   "audio/webm": ".webm",
+  "text/plain": ".txt",
+  "text/markdown": ".md",
 };
 
 const issuer = "yaozuo-direct-upload";

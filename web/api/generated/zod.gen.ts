@@ -76,6 +76,7 @@ export const zAiRechargeRecord = z.object({
 
 export const zJobModuleId = z.enum([
     'video-remix',
+    'script-remix-next',
     'video-create',
     'ad-script',
     'ai-generate',
@@ -289,6 +290,7 @@ export const zProviderCredentialName = z.enum([
 
 export const zModuleId = z.enum([
     'video-remix',
+    'script-remix-next',
     'video-create',
     'ad-script',
     'ai-generate',
@@ -1057,6 +1059,12 @@ export const zGetCapabilitiesResponse = z.object({
 export const zGetProviderFeaturesResponse = z.object({
     modules: z.object({
         'video-remix': z.object({
+            enabled: z.boolean(),
+            requiredProviders: z.array(zProviderId),
+            unavailableProviders: z.array(zProviderId),
+            disabledReason: z.string().optional()
+        }).optional(),
+        'script-remix-next': z.object({
             enabled: z.boolean(),
             requiredProviders: z.array(zProviderId),
             unavailableProviders: z.array(zProviderId),
@@ -2044,6 +2052,197 @@ export const zListJobsQuery = z.object({
 export const zListJobsResponse = z.object({
     jobs: z.array(zJob)
 });
+
+export const zCreateScriptRemixNextProjectBody = z.object({
+    projectName: z.string().min(1).max(80),
+    documentAssetId: z.uuid(),
+    productName: z.string().min(1).max(200),
+    productDescription: z.string().max(2000).optional().default(''),
+    productImageAssetIds: z.array(z.uuid()).min(1).max(20),
+    portraitAssetId: z.uuid().optional(),
+    portraitName: z.string().max(100).optional().default(''),
+    voiceAssetId: z.uuid().optional(),
+    voiceName: z.string().max(100).optional().default('')
+});
+
+/**
+ * Script analysis accepted
+ */
+export const zCreateScriptRemixNextProjectResponse = zJob;
+
+export const zRegenerateScriptRemixNextAnalysisPath = z.object({
+    projectId: z.uuid()
+});
+
+/**
+ * Analysis regeneration accepted
+ */
+export const zRegenerateScriptRemixNextAnalysisResponse = zJob;
+
+export const zUpdateScriptRemixNextProjectBody = z.object({
+    title: z.string().min(1).max(80).optional(),
+    workspace: z.object({
+        stage: z.int().gte(0).lte(3),
+        shots: z.array(z.object({
+            id: z.uuid(),
+            ordinal: z.int().gte(1).lte(9),
+            title: z.string().min(1).max(80),
+            speech: z.string().min(1).max(4000),
+            visual: z.string().min(5).max(2000),
+            action: z.string().min(1).max(1000),
+            camera: z.string().min(1).max(500),
+            durationSeconds: z.number().gt(0).lte(60),
+            productRequirement: z.string().max(1000),
+            characterRequirement: z.string().max(1000)
+        })).min(1).max(9),
+        analysisVersion: z.int().gte(0),
+        storyboardAssetId: z.union([
+            z.uuid(),
+            z.enum([''])
+        ]),
+        storyboardVersion: z.int().gte(0),
+        referenceAssetIds: z.record(z.string(), z.uuid()),
+        selectedVideoAssetIds: z.record(z.string(), z.uuid()),
+        composeOrder: z.array(z.uuid()).max(9),
+        globalVideoSettings: z.object({
+            modelId: zSeedanceModelId,
+            ratio: z.string().min(1).max(20),
+            resolution: z.string().min(1).max(20),
+            duration: z.int().gte(4).lte(15)
+        }),
+        shotVideoSettings: z.record(z.string(), z.object({
+            modelId: zSeedanceModelId.optional(),
+            ratio: z.string().min(1).max(20).optional(),
+            resolution: z.string().min(1).max(20).optional(),
+            duration: z.int().gte(4).lte(15).optional()
+        }))
+    }).optional()
+});
+
+export const zUpdateScriptRemixNextProjectPath = z.object({
+    projectId: z.uuid()
+});
+
+/**
+ * Project updated
+ */
+export const zUpdateScriptRemixNextProjectResponse = zJob;
+
+export const zCreateScriptRemixNextStoryboardBody = z.object({
+    projectId: z.uuid(),
+    shots: z.array(z.object({
+        id: z.uuid(),
+        ordinal: z.int().gte(1).lte(9),
+        title: z.string().min(1).max(80),
+        speech: z.string().min(1).max(4000),
+        visual: z.string().min(5).max(2000),
+        action: z.string().min(1).max(1000),
+        camera: z.string().min(1).max(500),
+        durationSeconds: z.number().gt(0).lte(60),
+        productRequirement: z.string().max(1000),
+        characterRequirement: z.string().max(1000)
+    })).min(1).max(9)
+});
+
+/**
+ * Generation accepted
+ */
+export const zCreateScriptRemixNextStoryboardResponse = zJob;
+
+export const zCreateScriptRemixNextReferenceImageBody = z.object({
+    projectId: z.uuid(),
+    shot: z.object({
+        id: z.uuid(),
+        ordinal: z.int().gte(1).lte(9),
+        title: z.string().min(1).max(80),
+        speech: z.string().min(1).max(4000),
+        visual: z.string().min(5).max(2000),
+        action: z.string().min(1).max(1000),
+        camera: z.string().min(1).max(500),
+        durationSeconds: z.number().gt(0).lte(60),
+        productRequirement: z.string().max(1000),
+        characterRequirement: z.string().max(1000)
+    })
+});
+
+/**
+ * Generation accepted
+ */
+export const zCreateScriptRemixNextReferenceImageResponse = zJob;
+
+export const zCreateScriptRemixNextShotGenerationBody = z.object({
+    projectId: z.uuid(),
+    shot: z.object({
+        id: z.uuid(),
+        ordinal: z.int().gte(1).lte(9),
+        title: z.string().min(1).max(80),
+        speech: z.string().min(1).max(4000),
+        visual: z.string().min(5).max(2000),
+        action: z.string().min(1).max(1000),
+        camera: z.string().min(1).max(500),
+        durationSeconds: z.number().gt(0).lte(60),
+        productRequirement: z.string().max(1000),
+        characterRequirement: z.string().max(1000)
+    }),
+    settings: z.object({
+        modelId: zSeedanceModelId,
+        ratio: z.string().min(1).max(20),
+        resolution: z.string().min(1).max(20),
+        duration: z.int().gte(4).lte(15)
+    }),
+    referenceAssetId: z.uuid(),
+    extraReferenceAssetIds: z.array(z.uuid()).max(8).optional().default([])
+});
+
+/**
+ * Video generation accepted
+ */
+export const zCreateScriptRemixNextShotGenerationResponse = zJob;
+
+export const zCreateScriptRemixNextComposeBody = z.object({
+    projectId: z.uuid(),
+    workspace: z.object({
+        stage: z.int().gte(0).lte(3),
+        shots: z.array(z.object({
+            id: z.uuid(),
+            ordinal: z.int().gte(1).lte(9),
+            title: z.string().min(1).max(80),
+            speech: z.string().min(1).max(4000),
+            visual: z.string().min(5).max(2000),
+            action: z.string().min(1).max(1000),
+            camera: z.string().min(1).max(500),
+            durationSeconds: z.number().gt(0).lte(60),
+            productRequirement: z.string().max(1000),
+            characterRequirement: z.string().max(1000)
+        })).min(1).max(9),
+        analysisVersion: z.int().gte(0),
+        storyboardAssetId: z.union([
+            z.uuid(),
+            z.enum([''])
+        ]),
+        storyboardVersion: z.int().gte(0),
+        referenceAssetIds: z.record(z.string(), z.uuid()),
+        selectedVideoAssetIds: z.record(z.string(), z.uuid()),
+        composeOrder: z.array(z.uuid()).max(9),
+        globalVideoSettings: z.object({
+            modelId: zSeedanceModelId,
+            ratio: z.string().min(1).max(20),
+            resolution: z.string().min(1).max(20),
+            duration: z.int().gte(4).lte(15)
+        }),
+        shotVideoSettings: z.record(z.string(), z.object({
+            modelId: zSeedanceModelId.optional(),
+            ratio: z.string().min(1).max(20).optional(),
+            resolution: z.string().min(1).max(20).optional(),
+            duration: z.int().gte(4).lte(15).optional()
+        }))
+    })
+});
+
+/**
+ * Composition accepted
+ */
+export const zCreateScriptRemixNextComposeResponse = zJob;
 
 export const zListVideoRemixProjectsQuery = z.object({
     query: z.string().max(100).optional(),

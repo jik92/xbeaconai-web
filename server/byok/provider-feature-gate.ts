@@ -10,6 +10,7 @@ export interface FeatureAvailability {
 
 export const moduleProviderRequirements: Record<ModuleId, ProviderId[]> = {
   "video-remix": ["aihubmix", "ark", "tos"],
+  "script-remix-next": ["aihubmix", "tos"],
   "video-create": ["aihubmix", "ark", "tos"],
   "ad-script": ["aihubmix"],
   "ai-generate": ["aihubmix", "ark"],

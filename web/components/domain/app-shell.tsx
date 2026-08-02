@@ -12,6 +12,7 @@ import {
   Coins,
   Eye,
   EyeOff,
+  FilePlus2,
   Files,
   GripVertical,
   Images,
@@ -82,6 +83,14 @@ const SCRIPT_REMIX_MENU_ITEM: SidebarMenuItem = {
   available: true,
 };
 
+const SCRIPT_REMIX_NEXT_MENU_ITEM: SidebarMenuItem = {
+  id: "script-remix-next",
+  path: "/aigc/script-remix-next",
+  label: "脚本二创【新】",
+  icon: FilePlus2,
+  available: isModuleOpen("script-remix-next"),
+};
+
 export function assetSidebarCounts(input: {
   materials?: readonly unknown[];
   portraits?: readonly unknown[];
@@ -100,7 +109,9 @@ const sidebarMenuItems: Record<SidebarGroup, SidebarMenuItem[]> = {
   创作工作流: modules
     .filter((item) => item.group === "创作工作流")
     .map((item) => ({ ...item, id: `module:${item.id}`, available: isModuleOpen(item.id) }))
-    .flatMap((item) => (item.id === "module:video-remix" ? [item, SCRIPT_REMIX_MENU_ITEM] : [item])),
+    .flatMap((item) =>
+      item.id === "module:video-remix" ? [item, SCRIPT_REMIX_MENU_ITEM, SCRIPT_REMIX_NEXT_MENU_ITEM] : [item],
+    ),
   AI创作: modules
     .filter((item) => item.id === "ai-generate" || item.id === "media-understand")
     .map((item) => ({

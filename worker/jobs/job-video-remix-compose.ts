@@ -18,7 +18,8 @@ function orderedAssetIds(raw: string | undefined) {
 
 export const videoRemixComposeJob: WorkerJobHandler = {
   name: "video-remix-compose",
-  supports: (job) => job.moduleId === "video-remix" && job.values.workflowPhase === "compose",
+  supports: (job) =>
+    (job.moduleId === "video-remix" || job.moduleId === "script-remix-next") && job.values.workflowPhase === "compose",
   async execute(job, context) {
     const { accounts } = context;
     if (!accounts) throw new Error("素材所有权服务不可用");

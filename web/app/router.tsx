@@ -13,6 +13,7 @@ import { ProviderFeatureGate } from "@/features/provider/provider-feature-gate";
 import { QianchuanMerchantBindingPage } from "@/features/qianchuan/qianchuan-merchant-binding-page";
 import { QianchuanPcDeliveryPage } from "@/features/qianchuan/qianchuan-pc-delivery-page";
 import { SceneLibrary } from "@/features/scene-library/scene-library";
+import { ScriptRemixNextPage } from "@/features/script-remix-next/script-remix-next-page";
 import { VideoCreatePage } from "@/features/video-create/video-create-page";
 import { VideoEditorPage } from "@/features/video-editor/video-editor-page";
 import { VideoExtractPage } from "@/features/video-extract/video-extract-page";
@@ -63,6 +64,15 @@ const scriptRemixRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/aigc/script-remix",
   component: () => <RemixProject workflowTitle="脚本二创" workflowKind="script" />,
+});
+const scriptRemixNextRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/aigc/script-remix-next",
+  component: () => (
+    <ProviderFeatureGate moduleId="script-remix-next">
+      <ScriptRemixNextPage />
+    </ProviderFeatureGate>
+  ),
 });
 const portraitRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -140,6 +150,7 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   ...moduleRoutes,
   scriptRemixRoute,
+  scriptRemixNextRoute,
   materialRoute,
   portraitRoute,
   productRoute,

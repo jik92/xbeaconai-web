@@ -84,7 +84,7 @@ export type AiConsumptionRecord = {
     createdAt: string;
 };
 
-export type JobModuleId = 'video-remix' | 'video-create' | 'ad-script' | 'ai-generate' | 'video-cut' | 'media-understand' | 'video-mashup' | 'voice-clone' | 'video-renewal' | 'subtitle-erase' | 'video-enhancement' | 'video-extract' | 'video-editor' | 'kickart' | 'douyin-video-import' | 'share-content-import' | 'portrait-asset-register' | 'qianchuan-material-upload' | 'qianchuan-pc-submit' | 'qianchuan-pc-sync';
+export type JobModuleId = 'video-remix' | 'script-remix-next' | 'video-create' | 'ad-script' | 'ai-generate' | 'video-cut' | 'media-understand' | 'video-mashup' | 'voice-clone' | 'video-renewal' | 'subtitle-erase' | 'video-enhancement' | 'video-extract' | 'video-editor' | 'kickart' | 'douyin-video-import' | 'share-content-import' | 'portrait-asset-register' | 'qianchuan-material-upload' | 'qianchuan-pc-submit' | 'qianchuan-pc-sync';
 
 export type ProviderId = 'aihubmix' | 'ark' | 'volc-speech' | 'tos' | 'mediakit' | 'qwen-audio' | 'qianchuan';
 
@@ -191,7 +191,7 @@ export type AiToolModuleId = 'ai-generate' | 'video-cut' | 'media-understand' | 
 
 export type ProviderCredentialName = 'OPENAI_KEY' | 'OPENAI_BASE_URL' | 'ARK_API_KEY' | 'VOLC_SPEECH_API_KEY_ID' | 'VOLC_SPEECH_API_KEY' | 'TOS_ACCESS_KEY_ID' | 'TOS_SECRET_ACCESS_KEY' | 'MEDIAKIT_API_KEY' | 'QWEN_AUDIO_API_KEY' | 'QWEN_AUDIO_WORKSPACE_ID' | 'QIANCHUAN_APP_ID' | 'QIANCHUAN_APP_SECRET';
 
-export type ModuleId = 'video-remix' | 'video-create' | 'ad-script' | 'ai-generate' | 'video-cut' | 'media-understand' | 'video-mashup' | 'voice-clone' | 'video-renewal' | 'subtitle-erase' | 'video-enhancement' | 'video-extract' | 'video-editor' | 'kickart';
+export type ModuleId = 'video-remix' | 'script-remix-next' | 'video-create' | 'ad-script' | 'ai-generate' | 'video-cut' | 'media-understand' | 'video-mashup' | 'voice-clone' | 'video-renewal' | 'subtitle-erase' | 'video-enhancement' | 'video-extract' | 'video-editor' | 'kickart';
 
 export type AdScriptProject = {
     project: {
@@ -1058,6 +1058,12 @@ export type GetProviderFeaturesResponses = {
     200: {
         modules: {
             'video-remix'?: {
+                enabled: boolean;
+                requiredProviders: Array<ProviderId>;
+                unavailableProviders: Array<ProviderId>;
+                disabledReason?: string;
+            };
+            'script-remix-next'?: {
                 enabled: boolean;
                 requiredProviders: Array<ProviderId>;
                 unavailableProviders: Array<ProviderId>;
@@ -2662,6 +2668,339 @@ export type ListJobsResponses = {
 };
 
 export type ListJobsResponse = ListJobsResponses[keyof ListJobsResponses];
+
+export type CreateScriptRemixNextProjectData = {
+    body: {
+        projectName: string;
+        documentAssetId: string;
+        productName: string;
+        productDescription?: string;
+        productImageAssetIds: Array<string>;
+        portraitAssetId?: string;
+        portraitName?: string;
+        voiceAssetId?: string;
+        voiceName?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/script-remix-next/projects';
+};
+
+export type CreateScriptRemixNextProjectErrors = {
+    /**
+     * Invalid project assets
+     */
+    422: ApiErrorResponse;
+};
+
+export type CreateScriptRemixNextProjectError = CreateScriptRemixNextProjectErrors[keyof CreateScriptRemixNextProjectErrors];
+
+export type CreateScriptRemixNextProjectResponses = {
+    /**
+     * Script analysis accepted
+     */
+    202: Job;
+};
+
+export type CreateScriptRemixNextProjectResponse = CreateScriptRemixNextProjectResponses[keyof CreateScriptRemixNextProjectResponses];
+
+export type RegenerateScriptRemixNextAnalysisData = {
+    body?: never;
+    path: {
+        projectId: string;
+    };
+    query?: never;
+    url: '/api/script-remix-next/projects/{projectId}/analysis';
+};
+
+export type RegenerateScriptRemixNextAnalysisErrors = {
+    /**
+     * Project not found
+     */
+    404: ApiErrorResponse;
+};
+
+export type RegenerateScriptRemixNextAnalysisError = RegenerateScriptRemixNextAnalysisErrors[keyof RegenerateScriptRemixNextAnalysisErrors];
+
+export type RegenerateScriptRemixNextAnalysisResponses = {
+    /**
+     * Analysis regeneration accepted
+     */
+    202: Job;
+};
+
+export type RegenerateScriptRemixNextAnalysisResponse = RegenerateScriptRemixNextAnalysisResponses[keyof RegenerateScriptRemixNextAnalysisResponses];
+
+export type UpdateScriptRemixNextProjectData = {
+    body: {
+        title?: string;
+        workspace?: {
+            stage: number;
+            shots: Array<{
+                id: string;
+                ordinal: number;
+                title: string;
+                speech: string;
+                visual: string;
+                action: string;
+                camera: string;
+                durationSeconds: number;
+                productRequirement: string;
+                characterRequirement: string;
+            }>;
+            analysisVersion: number;
+            storyboardAssetId: string | '';
+            storyboardVersion: number;
+            referenceAssetIds: {
+                [key: string]: string;
+            };
+            selectedVideoAssetIds: {
+                [key: string]: string;
+            };
+            composeOrder: Array<string>;
+            globalVideoSettings: {
+                modelId: SeedanceModelId;
+                ratio: string;
+                resolution: string;
+                duration: number;
+            };
+            shotVideoSettings: {
+                [key: string]: {
+                    modelId?: SeedanceModelId;
+                    ratio?: string;
+                    resolution?: string;
+                    duration?: number;
+                };
+            };
+        };
+    };
+    path: {
+        projectId: string;
+    };
+    query?: never;
+    url: '/api/script-remix-next/projects/{projectId}';
+};
+
+export type UpdateScriptRemixNextProjectErrors = {
+    /**
+     * Project not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Invalid workspace
+     */
+    422: ApiErrorResponse;
+};
+
+export type UpdateScriptRemixNextProjectError = UpdateScriptRemixNextProjectErrors[keyof UpdateScriptRemixNextProjectErrors];
+
+export type UpdateScriptRemixNextProjectResponses = {
+    /**
+     * Project updated
+     */
+    200: Job;
+};
+
+export type UpdateScriptRemixNextProjectResponse = UpdateScriptRemixNextProjectResponses[keyof UpdateScriptRemixNextProjectResponses];
+
+export type CreateScriptRemixNextStoryboardData = {
+    body: {
+        projectId: string;
+        shots: Array<{
+            id: string;
+            ordinal: number;
+            title: string;
+            speech: string;
+            visual: string;
+            action: string;
+            camera: string;
+            durationSeconds: number;
+            productRequirement: string;
+            characterRequirement: string;
+        }>;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/script-remix-next/storyboards';
+};
+
+export type CreateScriptRemixNextStoryboardErrors = {
+    /**
+     * Project not found
+     */
+    404: ApiErrorResponse;
+};
+
+export type CreateScriptRemixNextStoryboardError = CreateScriptRemixNextStoryboardErrors[keyof CreateScriptRemixNextStoryboardErrors];
+
+export type CreateScriptRemixNextStoryboardResponses = {
+    /**
+     * Generation accepted
+     */
+    202: Job;
+};
+
+export type CreateScriptRemixNextStoryboardResponse = CreateScriptRemixNextStoryboardResponses[keyof CreateScriptRemixNextStoryboardResponses];
+
+export type CreateScriptRemixNextReferenceImageData = {
+    body: {
+        projectId: string;
+        shot: {
+            id: string;
+            ordinal: number;
+            title: string;
+            speech: string;
+            visual: string;
+            action: string;
+            camera: string;
+            durationSeconds: number;
+            productRequirement: string;
+            characterRequirement: string;
+        };
+    };
+    path?: never;
+    query?: never;
+    url: '/api/script-remix-next/reference-images';
+};
+
+export type CreateScriptRemixNextReferenceImageErrors = {
+    /**
+     * Project not found
+     */
+    404: ApiErrorResponse;
+};
+
+export type CreateScriptRemixNextReferenceImageError = CreateScriptRemixNextReferenceImageErrors[keyof CreateScriptRemixNextReferenceImageErrors];
+
+export type CreateScriptRemixNextReferenceImageResponses = {
+    /**
+     * Generation accepted
+     */
+    202: Job;
+};
+
+export type CreateScriptRemixNextReferenceImageResponse = CreateScriptRemixNextReferenceImageResponses[keyof CreateScriptRemixNextReferenceImageResponses];
+
+export type CreateScriptRemixNextShotGenerationData = {
+    body: {
+        projectId: string;
+        shot: {
+            id: string;
+            ordinal: number;
+            title: string;
+            speech: string;
+            visual: string;
+            action: string;
+            camera: string;
+            durationSeconds: number;
+            productRequirement: string;
+            characterRequirement: string;
+        };
+        settings: {
+            modelId: SeedanceModelId;
+            ratio: string;
+            resolution: string;
+            duration: number;
+        };
+        referenceAssetId: string;
+        extraReferenceAssetIds?: Array<string>;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/script-remix-next/shots';
+};
+
+export type CreateScriptRemixNextShotGenerationErrors = {
+    /**
+     * Project not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Invalid references
+     */
+    422: ApiErrorResponse;
+};
+
+export type CreateScriptRemixNextShotGenerationError = CreateScriptRemixNextShotGenerationErrors[keyof CreateScriptRemixNextShotGenerationErrors];
+
+export type CreateScriptRemixNextShotGenerationResponses = {
+    /**
+     * Video generation accepted
+     */
+    202: Job;
+};
+
+export type CreateScriptRemixNextShotGenerationResponse = CreateScriptRemixNextShotGenerationResponses[keyof CreateScriptRemixNextShotGenerationResponses];
+
+export type CreateScriptRemixNextComposeData = {
+    body: {
+        projectId: string;
+        workspace: {
+            stage: number;
+            shots: Array<{
+                id: string;
+                ordinal: number;
+                title: string;
+                speech: string;
+                visual: string;
+                action: string;
+                camera: string;
+                durationSeconds: number;
+                productRequirement: string;
+                characterRequirement: string;
+            }>;
+            analysisVersion: number;
+            storyboardAssetId: string | '';
+            storyboardVersion: number;
+            referenceAssetIds: {
+                [key: string]: string;
+            };
+            selectedVideoAssetIds: {
+                [key: string]: string;
+            };
+            composeOrder: Array<string>;
+            globalVideoSettings: {
+                modelId: SeedanceModelId;
+                ratio: string;
+                resolution: string;
+                duration: number;
+            };
+            shotVideoSettings: {
+                [key: string]: {
+                    modelId?: SeedanceModelId;
+                    ratio?: string;
+                    resolution?: string;
+                    duration?: number;
+                };
+            };
+        };
+    };
+    path?: never;
+    query?: never;
+    url: '/api/script-remix-next/compose';
+};
+
+export type CreateScriptRemixNextComposeErrors = {
+    /**
+     * Project not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Project not ready
+     */
+    422: ApiErrorResponse;
+};
+
+export type CreateScriptRemixNextComposeError = CreateScriptRemixNextComposeErrors[keyof CreateScriptRemixNextComposeErrors];
+
+export type CreateScriptRemixNextComposeResponses = {
+    /**
+     * Composition accepted
+     */
+    202: Job;
+};
+
+export type CreateScriptRemixNextComposeResponse = CreateScriptRemixNextComposeResponses[keyof CreateScriptRemixNextComposeResponses];
 
 export type ListVideoRemixProjectsData = {
     body?: never;

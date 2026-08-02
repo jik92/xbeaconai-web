@@ -266,6 +266,31 @@ export async function normalizeReferenceImage(input: string, output: string) {
   return output;
 }
 
+export async function cropStoryboardGrid(input: string, outputs: readonly string[]) {
+  if (outputs.length > 9) throw new Error("STORYBOARD_GRID_TOO_MANY_OUTPUTS");
+  const media = await probeMedia(input);
+  const video = media.streams.find((stream) => stream.codec_type === "video");
+  const width = video?.width ?? 0;
+  const height = video?.height ?? 0;
+  if (width < 3 || height < 3) throw new Error("STORYBOARD_GRID_INVALID_IMAGE");
+  const cellWidth = Math.floor(width / 3);
+  const cellHeight = Math.floor(height / 3);
+  for (const [index, output] of outputs.entries()) {
+    await outputDir(output);
+    await run("ffmpeg", [
+      "-y",
+      "-i",
+      input,
+      "-vf",
+      `crop=${cellWidth}:${cellHeight}:${(index % 3) * cellWidth}:${Math.floor(index / 3) * cellHeight}`,
+      "-frames:v",
+      "1",
+      output,
+    ]);
+  }
+  return { width: cellWidth, height: cellHeight };
+}
+
 export async function splitFixed(input: string, pattern: string) {
   await outputDir(pattern);
   await run("ffmpeg", [

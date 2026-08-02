@@ -50,6 +50,12 @@ describe("worker job registry", () => {
     expect(findJobHandler(job("video-remix", { workflowPhase: "shot-generation" })).name).toBe(
       "video-remix-shot-generation",
     );
+    expect(findJobHandler(job("script-remix-next", { workflowPhase: "analysis" })).name).toBe("script-remix-next");
+    expect(findJobHandler(job("script-remix-next", { workflowPhase: "storyboard" })).name).toBe("script-remix-next");
+    expect(findJobHandler(job("script-remix-next", { workflowPhase: "shot-generation" })).name).toBe(
+      "video-remix-shot-generation",
+    );
+    expect(findJobHandler(job("script-remix-next", { workflowPhase: "compose" })).name).toBe("video-remix-compose");
     expect(findJobHandler(job("video-cut", { mergeMode: "video-cut-clips" })).name).toBe("video-clip-merge");
     expect(findJobHandler(job("video-cut")).name).toBe("video-cut");
     expect(findJobHandler(job("video-mashup")).name).toBe("video-mashup");
@@ -78,6 +84,7 @@ describe("worker job registry", () => {
     expect(Object.keys(jobDefinitions).sort()).toEqual(
       [
         "video-remix",
+        "script-remix-next",
         "video-create",
         "ad-script",
         "ai-generate",
